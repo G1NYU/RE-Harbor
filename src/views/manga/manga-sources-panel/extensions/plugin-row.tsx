@@ -1,4 +1,4 @@
-import { ArrowUpCircle, CheckCircle2, Download, Globe2, Loader2, Trash2 } from "lucide-react";
+import { Activity, ArrowUpCircle, CheckCircle2, Download, Globe2, Loader2, Trash2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 import {
@@ -59,6 +59,7 @@ export function PluginRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const [connectionReport, setConnectionReport] = useState<string | null>(null);
   const canUnlockBatcave =
     !!installed &&
     /batcave/i.test(manifest.id + " " + manifest.name) &&
@@ -74,6 +75,37 @@ export function PluginRow({
       if (!ready) setError("BatCave did not issue a session cookie. Reopen its WebView.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not establish BatCave session");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const testBatcaveConnection = async () => {
+    setBusy(true);
+    setError(null);
+    setConnectionReport(null);
+    try {
+      const report = await invoke<{
+        webviewCookiePresent: boolean;
+        cachedCookiePresent: boolean;
+        userAgentMatches: boolean;
+        catalogueStatus: number | null;
+        redirectedToGuard: boolean;
+        networkError: string | null;
+      }>("batcave_connection_diagnostic");
+      const yesNo = (value: boolean) => (value ? "yes" : "no");
+      setConnectionReport(
+        [
+          `WebView trust: ${yesNo(report.webviewCookiePresent)}`,
+          `Native trust: ${yesNo(report.cachedCookiePresent)}`,
+          `UA matched: ${yesNo(report.userAgentMatches)}`,
+          `Catalogue POST: ${report.catalogueStatus ?? "no response"}`,
+          `DLE redirect: ${yesNo(report.redirectedToGuard)}`,
+          ...(report.networkError ? [report.networkError] : []),
+        ].join(" · "),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "BatCave connection test failed");
     } finally {
       setBusy(false);
     }
@@ -124,10 +156,27 @@ export function PluginRow({
           )}
           {error && <span className="text-danger"> · {error}</span>}
         </span>
+        {connectionReport && (
+          <span className="max-w-[640px] break-words text-[11px] text-ink-muted">
+            {connectionReport}
+          </span>
+        )}
       </div>
 
       {installed ? (
         <div className="flex shrink-0 items-center gap-3">
+          {canUnlockBatcave && (
+            <button
+              type="button"
+              onClick={() => void testBatcaveConnection()}
+              disabled={busy}
+              title="Diagnose BatCave without exposing cookies"
+              aria-label="Diagnose BatCave connection"
+              className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-ink-muted ring-1 ring-edge-soft transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+            >
+              <Activity size={17} />
+            </button>
+          )}
           {canUnlockBatcave && (
             <button
               type="button"

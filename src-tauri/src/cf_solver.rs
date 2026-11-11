@@ -356,6 +356,103 @@ pub async fn cf_prepare_batcave(app: AppHandle) -> Result<bool, String> {
     Ok(has_trust())
 }
 
+
+
+/// Explicit, read-only BatCave connection probe. Intentionally exposes no
+/// raw cookies, headers, page contents, account information, or API keys.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatcaveConnectionDiagnostic {
+    pub webview_cookie_present: bool,
+    pub cached_cookie_present: bool,
+    pub user_agent_matches: bool,
+    pub catalogue_status: Option<u16>,
+    pub redirected_to_guard: bool,
+    pub network_error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn batcave_connection_diagnostic(app: AppHandle) -> BatcaveConnectionDiagnostic {
+    const URL: &str = "https://batcave.biz/comix/";
+    const HOST: &str = "batcave.biz";
+
+    let webview_cookie_present = app
+        .get_webview_window(SOLVER_LABEL)
+        .and_then(|win| {
+            let url = Url::parse(URL).ok()?;
+            win.cookies_for_url(url).ok()
+        })
+        .map(|cookies| {
+            cookies
+                .iter()
+                .any(|cookie| cookie.name() == "__guard_trust" && !cookie.value().is_empty())
+        })
+        .unwrap_or(false);
+
+    let cached = cf_cached(HOST);
+    let cached_cookie_present = cached
+        .as_ref()
+        .is_some_and(|(cookie, _)| has_dle_guard_cookie(cookie));
+    let user_agent_matches = cached
+        .as_ref()
+        .is_some_and(|(_, ua)| ua == crate::http_fetch::BROWSER_UA);
+
+    let mut diagnostic = BatcaveConnectionDiagnostic {
+        webview_cookie_present,
+        cached_cookie_present,
+        user_agent_matches,
+        catalogue_status: None,
+        redirected_to_guard: false,
+        network_error: None,
+    };
+
+    // This tests the same catalogue POST that the native BatCave plugin uses,
+    // without triggering another challenge WebView or following its /_c redirect.
+    let client = match crate::http_fetch::http_client_builder().build() {
+        Ok(client) => client,
+        Err(_) => {
+            diagnostic.network_error = Some("Could not initialize HTTP client".into());
+            return diagnostic;
+        }
+    };
+    let mut request = client
+        .post(URL)
+        .timeout(Duration::from_secs(12))
+        .header(reqwest::header::USER_AGENT, crate::http_fetch::BROWSER_UA)
+        .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml,*/*")
+        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .body("dlenewssortby=rating&dledirection=desc&set_new_sort=dle_sort_cat_1&set_direction_sort=dle_direction_cat_1");
+    if let Some((cookie, _)) = cached {
+        request = request.header(reqwest::header::COOKIE, cookie);
+    }
+
+    match request.send().await {
+        Ok(response) => {
+            diagnostic.catalogue_status = Some(response.status().as_u16());
+            diagnostic.redirected_to_guard = response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| reqwest::Url::parse(URL).ok()?.join(value).ok())
+                .is_some_and(|redirect| {
+                    matches!(redirect.host_str(), Some("batcave.biz" | "www.batcave.biz"))
+                        && redirect.path().split('/').nth(1) == Some("_c")
+                });
+        }
+        Err(error) => {
+            diagnostic.network_error = Some(if error.is_timeout() {
+                "Connection timed out".into()
+            } else if error.is_connect() {
+                "Could not connect to BatCave".into()
+            } else {
+                "HTTP request failed".into()
+            });
+        }
+    }
+
+    diagnostic
+}
+
 #[cfg(test)]
 mod batcave_session_tests {
     use super::{has_dle_guard_cookie, is_batcave_host, is_replay_cookie};

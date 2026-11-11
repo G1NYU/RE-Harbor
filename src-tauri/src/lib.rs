@@ -1534,6 +1534,7 @@ pub fn run() {
             subtitle_credentials::subtitle_credentials_clear,
             cf_solver::cf_report,
             cf_solver::cf_prepare_batcave,
+            cf_solver::batcave_connection_diagnostic,
             capstan::capstan_ping,
             capstan::capstan_install,
             capstan::capstan_uninstall,
