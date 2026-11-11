@@ -131,14 +131,14 @@ export async function probeIndex(indexUrl) {
 
 function printHuman(results) {
   for (const result of results) {
-    console.log(`\\n${result.indexUrl}`);
+    console.log(`\n${result.indexUrl}`);
     console.log(result.status === 'ok' ? `  Index OK; ${result.modules.length} modules` : `  Index error: ${result.error}`);
     for (const module of result.modules) {
       console.log(`  - ${module.name} (${module.id}, ${module.version}): ${module.status}${module.bytes ? ` [${module.bytes} bytes]` : ''}`);
       if (module.error) console.log(`    ${module.error}`);
     }
   }
-  console.log('\\nNo module code was executed. "javascript-candidate" does not imply Harbor playback compatibility.');
+  console.log('\nNo module code was executed. "javascript-candidate" does not imply Harbor playback compatibility.');
 }
 
 export async function main(args = process.argv.slice(2)) {
