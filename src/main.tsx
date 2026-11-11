@@ -253,6 +253,10 @@ async function mount() {
       ? import("@/lib/music/player").then(({ initializeMusic }) => initializeMusic())
       : Promise.resolve(),
   ]);
+  // Process pending Refract watches only in the primary application window.
+  if (!isAuxWindow && !isRemote) {
+    void import("@/lib/refract/sync").then(({ startRefractSync }) => startRefractSync());
+  }
   if (!isHdrOverlay && !isModal && !isCaptions && !isDjDeck) void initSubtitleCache();
   if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck)
     startTaskbarProgress();
