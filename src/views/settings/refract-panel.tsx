@@ -1,12 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useT } from "@/lib/i18n";
 import {
-  getRefractKey, refractEnabled, saveRefractKey,
-  setRefractEnabled, verifyRefractKey,
+  getRefractKey,
+  refractEnabled,
+  saveRefractKey,
+  setRefractEnabled,
+  verifyRefractKey,
 } from "@/lib/refract/client";
 import {
-  refractStatus, resetRefractSync, retryRefractSync,
-  startRefractSync, subscribeRefractStatus,
+  refractStatus,
+  resetRefractSync,
+  retryRefractSync,
+  startRefractSync,
+  subscribeRefractStatus,
 } from "@/lib/refract/sync";
 import { Section, ToggleRow } from "./shared";
 import { ROW_ACTION_PRIMARY, ROW_DESC } from "./kit";
@@ -41,8 +47,12 @@ export function RefractPanel() {
       setMessage(`Connected to Refract (${identity}). Future completed watches will sync.`);
       startRefractSync();
     } catch {
-      setMessage("Could not verify the key via Refract /v1/me. Check permissions and connectivity.");
-    } finally { setBusy(false); }
+      setMessage(
+        "Could not verify the key via Refract /v1/me. Check permissions and connectivity.",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const disconnect = () => {
@@ -55,29 +65,41 @@ export function RefractPanel() {
   };
 
   return (
-    <Section title={t("Refract watched-history sync")}
-      subtitle={t("Mark completed movies and episodes watched in Refract when you watch them in Harbor.")}>
+    <Section
+      title={t("Refract watched-history sync")}
+      subtitle={t(
+        "Mark completed movies and episodes watched in Refract when you watch them in Harbor.",
+      )}
+    >
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            Create a personal API key in Refract with profile-read and mark-watched
-            permissions. Never commit your key to GitHub.
+            Create a personal API key in Refract with profile-read and mark-watched permissions.
+            Never commit your key to GitHub.
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
             {t("Refract personal API key")}
           </label>
           <div className="flex items-center gap-2">
-            <input id="refract-api-key" type={showKey ? "text" : "password"}
-              value={input} onChange={e => setInput(e.target.value)}
-              placeholder="rfk_..." autoComplete="off" spellCheck={false}
-              className="h-11 min-w-0 flex-1 rounded-[10px] border border-edge bg-elevated px-3 font-mono text-[14px] text-ink" />
-            <button type="button" onClick={() => setShowKey(v => !v)}
-              className="h-11 rounded-[10px] border border-edge px-3 text-ink-muted">
+            <input
+              id="refract-api-key"
+              type={showKey ? "text" : "password"}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="rfk_..."
+              autoComplete="off"
+              spellCheck={false}
+              className="h-11 min-w-0 flex-1 rounded-[10px] border border-edge bg-elevated px-3 font-mono text-[14px] text-ink"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((v) => !v)}
+              className="h-11 rounded-[10px] border border-edge px-3 text-ink-muted"
+            >
               {showKey ? t("Hide") : t("Show")}
             </button>
           </div>
-          <button type="submit" disabled={busy || !input.trim()}
-            className={ROW_ACTION_PRIMARY}>
+          <button type="submit" disabled={busy || !input.trim()} className={ROW_ACTION_PRIMARY}>
             {busy ? t("Verifying...") : t("Connect Refract")}
           </button>
         </form>
@@ -88,9 +110,11 @@ export function RefractPanel() {
           </p>
           <ToggleRow
             label={t("Automatically sync completed movies and episodes")}
-            sub={t("Partial playback is not marked watched. This prototype only syncs the primary Harbor profile.")}
+            sub={t(
+              "Partial playback is not marked watched. This prototype only syncs the primary Harbor profile.",
+            )}
             value={enabled}
-            onChange={value => {
+            onChange={(value) => {
               setRefractEnabled(value);
               setEnabled(value);
               if (value) retryRefractSync();
@@ -104,23 +128,35 @@ export function RefractPanel() {
             <details className="text-[13px] text-ink-muted">
               <summary>Unmatched items</summary>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                {status.failures.map((reason, i) => <li key={i}>{reason}</li>)}
+                {status.failures.map((reason, i) => (
+                  <li key={i}>{reason}</li>
+                ))}
               </ul>
             </details>
           )}
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={retryRefractSync}
-              className="rounded-[10px] border border-edge px-4 py-2 text-ink">
+            <button
+              type="button"
+              onClick={retryRefractSync}
+              className="rounded-[10px] border border-edge px-4 py-2 text-ink"
+            >
               {t("Retry pending watches")}
             </button>
-            <button type="button" onClick={disconnect}
-              className="rounded-[10px] border border-danger px-4 py-2 text-danger">
+            <button
+              type="button"
+              onClick={disconnect}
+              className="rounded-[10px] border border-danger px-4 py-2 text-danger"
+            >
               {t("Disconnect Refract")}
             </button>
           </div>
         </div>
       )}
-      {message && <p role="status" className={ROW_DESC}>{message}</p>}
+      {message && (
+        <p role="status" className={ROW_DESC}>
+          {message}
+        </p>
+      )}
     </Section>
   );
 }
