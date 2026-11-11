@@ -100,6 +100,12 @@ export function PluginRow({
         catalogueStatus: number | null;
         redirectedToGuard: boolean;
         networkError: string | null;
+        browserState: string;
+        browserPageKind: string;
+        browserCatalogueItems: number;
+        browserFetchState: string;
+        browserFetchStatus: number | null;
+        browserFetchKind: string;
       }>("batcave_connection_diagnostic");
       const yesNo = (value: boolean) => (value ? "yes" : "no");
       setConnectionReport(
@@ -109,6 +115,10 @@ export function PluginRow({
           `UA matched: ${yesNo(report.userAgentMatches)}`,
           `Catalogue POST: ${report.catalogueStatus ?? "no response"}`,
           `DLE redirect: ${yesNo(report.redirectedToGuard)}`,
+          `WebView: ${report.browserState} / ${report.browserPageKind}`,
+          `WebView titles: ${report.browserCatalogueItems}`,
+          `Browser GET: ${report.browserFetchStatus ?? report.browserFetchState}`,
+          `Browser GET content: ${report.browserFetchKind}`,
           ...(report.networkError ? [report.networkError] : []),
         ].join(" · "),
       );

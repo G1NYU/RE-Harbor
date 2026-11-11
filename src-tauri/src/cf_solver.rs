@@ -358,6 +358,145 @@ pub async fn cf_prepare_batcave(app: AppHandle) -> Result<bool, String> {
 
 
 
+
+const BATCAVE_BROWSER_PROBE_SCRIPT: &str = r#"
+(() => {
+  try {
+    const originAllowed =
+      location.protocol === 'https:' &&
+      (location.hostname === 'batcave.biz' || location.hostname === 'www.batcave.biz');
+    if (!originAllowed) {
+      return { state: 'wrong-origin', pageKind: 'unknown', catalogueItems: 0,
+        fetchState: 'not-run', fetchStatus: null, fetchKind: 'unknown' };
+    }
+    const classify = (content, count) => {
+      const html = String(content || '').slice(0, 500000).toLowerCase();
+      if (/just a moment|cf-challenge|challenge-platform|cf-turnstile/.test(html)) return 'cloudflare';
+      if (/the signal.s up. the door isn.t/.test(html) ||
+          (/sign in|log in/.test(html) && /password|magic link|discord/.test(html))) return 'login';
+      if (count > 0 || /class=["'][^"']*\breaded\b/.test(html)) return 'catalogue';
+      if (/\/_c(?:\/|$)/.test(location.pathname)) return 'dle';
+      return 'unknown';
+    };
+    const pageHtml = document.documentElement?.outerHTML || '';
+    const catalogueItems = document.querySelectorAll(
+      '#dle-content .readed, #content-load .latest'
+    ).length;
+    if (!window.__harborBatcaveOriginProbe) {
+      window.__harborBatcaveOriginProbe = {
+        fetchState: 'pending', fetchStatus: null, fetchKind: 'unknown'
+      };
+      // Fixed, same-origin, credentialed GET. Never send content/cookies to Harbor.
+      fetch('/comix/', {
+        method: 'GET', credentials: 'same-origin', cache: 'no-store',
+        redirect: 'follow', headers: { Accept: 'text/html,application/xhtml+xml,*/*' }
+      })
+        .then(async response => {
+          const html = (await response.text()).slice(0, 500000);
+          window.__harborBatcaveOriginProbe = {
+            fetchState: 'done', fetchStatus: response.status,
+            fetchKind: classify(html, 0)
+          };
+        })
+        .catch(() => {
+          window.__harborBatcaveOriginProbe = {
+            fetchState: 'failed', fetchStatus: null, fetchKind: 'unknown'
+          };
+        });
+    }
+    return {
+      state: 'ready',
+      pageKind: classify(pageHtml, catalogueItems),
+      catalogueItems: Math.min(catalogueItems, 10000),
+      ...window.__harborBatcaveOriginProbe
+    };
+  } catch (_) {
+    return { state: 'script-error', pageKind: 'unknown', catalogueItems: 0,
+      fetchState: 'failed', fetchStatus: null, fetchKind: 'unknown' };
+  }
+})()
+"#;
+
+/// A fixed, read-only diagnostic: only enums, counts and status codes leave the
+/// WebView. The origin is checked again in native code before invoking JS.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BatcaveBrowserProbe {
+    state: String,
+    page_kind: String,
+    catalogue_items: usize,
+    fetch_state: String,
+    fetch_status: Option<u16>,
+    fetch_kind: String,
+}
+
+fn parse_browser_probe(raw: &str) -> Option<BatcaveBrowserProbe> {
+    let value: serde_json::Value = serde_json::from_str(raw).ok()?;
+    // Tauri serializes the return value to JSON; on some runtimes it is a
+    // JSON-encoded string, and on others it is the object directly.
+    if let Some(encoded) = value.as_str() {
+        serde_json::from_str(encoded).ok()
+    } else {
+        serde_json::from_value(value).ok()
+    }
+}
+
+async fn inspect_batcave_browser(app: &AppHandle) -> BatcaveBrowserProbe {
+    let mut fallback = BatcaveBrowserProbe {
+        state: "no-webview".into(),
+        ..Default::default()
+    };
+    let Some(win) = app.get_webview_window(SOLVER_LABEL) else {
+        return fallback;
+    };
+    let Ok(url) = win.url() else {
+        fallback.state = "no-url".into();
+        return fallback;
+    };
+    if url.scheme() != "https"
+        || !url.host_str().is_some_and(is_batcave_host)
+    {
+        fallback.state = "wrong-origin".into();
+        return fallback;
+    }
+
+    for _ in 0..10 {
+        let (tx, rx) = oneshot::channel::<String>();
+        let pending = Mutex::new(Some(tx));
+        if win
+            .eval_with_callback(BATCAVE_BROWSER_PROBE_SCRIPT, move |response| {
+                if let Ok(mut guard) = pending.lock() {
+                    if let Some(sender) = guard.take() {
+                        let _ = sender.send(response);
+                    }
+                }
+            })
+            .is_err()
+        {
+            fallback.state = "eval-failed".into();
+            return fallback;
+        }
+        let raw = match tokio::time::timeout(Duration::from_secs(4), rx).await {
+            Ok(Ok(raw)) => raw,
+            _ => {
+                fallback.state = "callback-timeout".into();
+                return fallback;
+            }
+        };
+        if let Some(probe) = parse_browser_probe(&raw) {
+            if probe.fetch_state != "pending" {
+                return probe;
+            }
+            fallback = probe;
+        } else {
+            fallback.state = "invalid-result".into();
+            return fallback;
+        }
+        tokio::time::sleep(Duration::from_millis(450)).await;
+    }
+    fallback
+}
+
 /// Explicit, read-only BatCave connection probe. Intentionally exposes no
 /// raw cookies, headers, page contents, account information, or API keys.
 #[derive(serde::Serialize)]
@@ -369,12 +508,19 @@ pub struct BatcaveConnectionDiagnostic {
     pub catalogue_status: Option<u16>,
     pub redirected_to_guard: bool,
     pub network_error: Option<String>,
+    pub browser_state: String,
+    pub browser_page_kind: String,
+    pub browser_catalogue_items: usize,
+    pub browser_fetch_state: String,
+    pub browser_fetch_status: Option<u16>,
+    pub browser_fetch_kind: String,
 }
 
 #[tauri::command]
 pub async fn batcave_connection_diagnostic(app: AppHandle) -> BatcaveConnectionDiagnostic {
     const URL: &str = "https://batcave.biz/comix/";
     const HOST: &str = "batcave.biz";
+    let browser = inspect_batcave_browser(&app).await;
 
     let webview_cookie_present = app
         .get_webview_window(SOLVER_LABEL)
@@ -404,6 +550,12 @@ pub async fn batcave_connection_diagnostic(app: AppHandle) -> BatcaveConnectionD
         catalogue_status: None,
         redirected_to_guard: false,
         network_error: None,
+        browser_state: browser.state,
+        browser_page_kind: browser.page_kind,
+        browser_catalogue_items: browser.catalogue_items,
+        browser_fetch_state: browser.fetch_state,
+        browser_fetch_status: browser.fetch_status,
+        browser_fetch_kind: browser.fetch_kind,
     };
 
     // This tests the same catalogue POST that the native BatCave plugin uses,
@@ -455,7 +607,19 @@ pub async fn batcave_connection_diagnostic(app: AppHandle) -> BatcaveConnectionD
 
 #[cfg(test)]
 mod batcave_session_tests {
-    use super::{has_dle_guard_cookie, is_batcave_host, is_replay_cookie};
+    use super::{has_dle_guard_cookie, is_batcave_host, is_replay_cookie, parse_browser_probe};
+
+    #[test]
+    fn browser_probe_decodes_direct_and_serialized_values() {
+        let payload = r#"{"state":"ready","pageKind":"cloudflare","catalogueItems":0,"fetchState":"done","fetchStatus":403,"fetchKind":"cloudflare"}"#;
+        let direct = parse_browser_probe(payload).expect("direct object");
+        assert_eq!(direct.fetch_status, Some(403));
+        assert_eq!(direct.fetch_kind, "cloudflare");
+        let serialized = serde_json::to_string(payload).unwrap();
+        let nested = parse_browser_probe(&serialized).expect("serialized object");
+        assert_eq!(nested.page_kind, "cloudflare");
+        assert_eq!(nested.catalogue_items, 0);
+    }
 
     #[test]
     fn only_batcave_hosts_can_use_dle_guard() {
