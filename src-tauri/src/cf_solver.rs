@@ -103,6 +103,10 @@ impl Drop for SolverDismiss {
     }
 }
 
+fn is_replay_cookie(name: &str) -> bool {
+    name == "cf_clearance" || name == "__cf_bm" || name.starts_with("cf_chl") || name == "__guard_trust"
+}
+
 fn harvest(app: &AppHandle, url: &str) -> bool {
     let Some(win) = app.get_webview_window(SOLVER_LABEL) else {
         return false;
@@ -127,7 +131,7 @@ fn harvest(app: &AppHandle, url: &str) -> bool {
     let mut parts: Vec<String> = Vec::new();
     for c in cookies {
         let name = c.name();
-        if name == "cf_clearance" || name == "__cf_bm" || name.starts_with("cf_chl") {
+        if is_replay_cookie(name) {
             parts.push(format!("{}={}", name, c.value()));
         }
     }
@@ -154,6 +158,8 @@ const INIT_SCRIPT: &str = r#"
   var done = false;
   function challenged() {
     var t = (document.title || '').toLowerCase();
+    // DLE Guard's /_c interstitial navigates away once the trust cookie is set.
+    if (/^\/_(?:c|v)(?:\/|$)/.test(location.pathname || '')) return true;
     if (t.indexOf('just a moment') >= 0 || t.indexOf('attention required') >= 0) return true;
     if (document.getElementById('challenge-running') || document.getElementById('cf-please-wait')) return true;
     if (document.querySelector('#challenge-form, #cf-challenge-running, .cf-turnstile')) return true;
@@ -279,6 +285,41 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
             PENDING.lock().unwrap().take();
             eprintln!("[cf] TIMEOUT {}", url);
             Err("cloudflare challenge timed out".into())
+        }
+    }
+}
+
+
+/// Explicit, user-triggered WebView warm-up for BatCave's DLE Guard.
+/// Only the native process handles the cookie; it is never returned to JavaScript.
+#[tauri::command]
+pub async fn cf_prepare_batcave(app: AppHandle) -> Result<bool, String> {
+    const HOST: &str = "batcave.biz";
+    let has_trust = || {
+        cf_cached(HOST).is_some_and(|(cookie, _)| {
+            cookie.split(';').any(|p| p.trim().starts_with("__guard_trust="))
+        })
+    };
+    if has_trust() {
+        return Ok(true);
+    }
+    // Explicit user action can retry after an earlier automatic solve failed.
+    cf_clear_failure(HOST);
+    cf_fetch(app, "https://batcave.biz/".to_string()).await?;
+    Ok(has_trust())
+}
+
+#[cfg(test)]
+mod batcave_session_tests {
+    use super::is_replay_cookie;
+
+    #[test]
+    fn keep_expected_guard_and_cloudflare_cookies_only() {
+        for name in ["__guard_trust", "cf_clearance", "__cf_bm", "cf_chl_2"] {
+            assert!(is_replay_cookie(name), "{name}");
+        }
+        for name in ["session", "auth", "remember_me", "__other_guard"] {
+            assert!(!is_replay_cookie(name), "{name}");
         }
     }
 }

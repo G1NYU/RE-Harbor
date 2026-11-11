@@ -1,4 +1,5 @@
-import { ArrowUpCircle, Download, Loader2, Trash2 } from "lucide-react";
+import { ArrowUpCircle, CheckCircle2, Download, Globe2, Loader2, Trash2 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 import {
   installPlugin,
@@ -59,6 +60,24 @@ export function PluginRow({
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const canUnlockBatcave =
+    !!installed && /batcave/i.test(manifest.id + " " + manifest.name) &&
+    typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+  const unlockBatcave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const ready = await invoke<boolean>("cf_prepare_batcave");
+      setSessionReady(ready);
+      if (!ready) setError("BatCave did not issue a session cookie. Reopen its WebView.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not establish BatCave session");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const install = async () => {
     setBusy(true);
@@ -106,6 +125,18 @@ export function PluginRow({
 
       {installed ? (
         <div className="flex shrink-0 items-center gap-3">
+          {canUnlockBatcave && (
+            <button
+              type="button"
+              onClick={() => void unlockBatcave()}
+              disabled={busy}
+              title={sessionReady ? "BatCave session ready" : "Open BatCave in WebView to unlock chapters"}
+              aria-label={sessionReady ? "BatCave session ready" : "Unlock BatCave in WebView"}
+              className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-accent ring-1 ring-edge-soft transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+            >
+              {busy ? <Loader2 size={16} className="animate-spin" /> : sessionReady ? <CheckCircle2 size={17} /> : <Globe2 size={17} />}
+            </button>
+          )}
           {outdated && (
             <button
               type="button"
