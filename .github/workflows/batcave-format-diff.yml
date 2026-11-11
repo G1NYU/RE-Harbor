@@ -1,0 +1,25 @@
+name: BatCave Formatting Diff
+
+on:
+  push:
+    branches:
+      - feature/batcave-webview-session
+
+permissions:
+  contents: read
+
+jobs:
+  show:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Show required formatter diff
+        run: |
+          vp fmt src/views/manga/manga-sources-panel/extensions/plugin-row.tsx
+          git diff -- src/views/manga/manga-sources-panel/extensions/plugin-row.tsx
