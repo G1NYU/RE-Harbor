@@ -63,6 +63,8 @@ jobs:
 
   windows-preview:
     name: Windows BatCave preview installer
+    # Build MSI only when explicitly dispatched; pushes still run the targeted checks.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
