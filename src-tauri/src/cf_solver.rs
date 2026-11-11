@@ -58,6 +58,14 @@ fn host_of(url: &str) -> Option<String> {
     Url::parse(url).ok()?.host_str().map(|s| s.to_string())
 }
 
+fn is_batcave_host(host: &str) -> bool {
+    matches!(host, "batcave.biz" | "www.batcave.biz")
+}
+
+fn has_dle_guard_cookie(cookie: &str) -> bool {
+    cookie.split(';').any(|part| part.trim().starts_with("__guard_trust="))
+}
+
 fn cf_in_cooldown(host: &str) -> bool {
     let mut map = cf_failures().lock().unwrap();
     let fresh = map.get(host).map(|at| at.elapsed() < CF_RETRY_COOLDOWN);
@@ -155,6 +163,9 @@ const INIT_SCRIPT: &str = r#"
 (function () {
   if (window.__harborCfBooted) return;
   window.__harborCfBooted = true;
+  // Report the user agent immediately. A DLE interstitial may never reach
+  // the normal report() path until its HttpOnly cookie has been issued.
+  try { window.__TAURI_INTERNALS__.invoke('cf_report', { body: '', ua: navigator.userAgent || '' }); } catch (e) {}
   var done = false;
   function challenged() {
     var t = (document.title || '').toLowerCase();
@@ -193,8 +204,10 @@ pub fn cf_report(body: String, ua: String) {
     if !ua.is_empty() {
         *last_ua().lock().unwrap() = ua;
     }
-    if let Some(tx) = PENDING.lock().unwrap().take() {
-        let _ = tx.send(body);
+    if !body.is_empty() {
+        if let Some(tx) = PENDING.lock().unwrap().take() {
+            let _ = tx.send(body);
+        }
     }
 }
 
@@ -270,6 +283,36 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
         }
     }
 
+    // BatCave's DLE Guard can display a normal-looking page before its trust
+    // cookie exists. Wait for that cookie rather than any incidental page body.
+    if host.as_deref().is_some_and(is_batcave_host) {
+        let ready = tokio::time::timeout(Duration::from_secs(90), async {
+            loop {
+                let check_app = app.clone();
+                let check_url = url.clone();
+                let harvested = tokio::task::spawn_blocking(move || harvest(&check_app, &check_url))
+                    .await
+                    .unwrap_or(false);
+                if harvested
+                    && host.as_deref().and_then(cf_cached)
+                        .is_some_and(|(cookie, _)| has_dle_guard_cookie(&cookie))
+                {
+                    return true;
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        })
+        .await;
+        PENDING.lock().unwrap().take();
+        if matches!(ready, Ok(true)) {
+            if let Some(h) = host.as_deref() {
+                cf_clear_failure(h);
+            }
+            return Ok(String::new());
+        }
+        return Err("BatCave WebView did not issue a DLE Guard trust cookie".into());
+    }
+
     match tokio::time::timeout(Duration::from_secs(90), rx).await {
         Ok(Ok(body)) => {
             eprintln!("[cf] got {} bytes", body.len());
@@ -295,23 +338,29 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn cf_prepare_batcave(app: AppHandle) -> Result<bool, String> {
     const HOST: &str = "batcave.biz";
-    let has_trust = || {
-        cf_cached(HOST).is_some_and(|(cookie, _)| {
-            cookie.split(';').any(|p| p.trim().starts_with("__guard_trust="))
-        })
-    };
+    let has_trust = || cf_cached(HOST).is_some_and(|(cookie, _)| has_dle_guard_cookie(&cookie));
     if has_trust() {
         return Ok(true);
     }
     // Explicit user action can retry after an earlier automatic solve failed.
     cf_clear_failure(HOST);
-    cf_fetch(app, "https://batcave.biz/".to_string()).await?;
+    cf_fetch(app, "https://batcave.biz/comix/".to_string()).await?;
     Ok(has_trust())
 }
 
 #[cfg(test)]
 mod batcave_session_tests {
-    use super::is_replay_cookie;
+    use super::{has_dle_guard_cookie, is_batcave_host, is_replay_cookie};
+
+    #[test]
+    fn only_batcave_hosts_can_use_dle_guard() {
+        assert!(is_batcave_host("batcave.biz"));
+        assert!(is_batcave_host("www.batcave.biz"));
+        assert!(!is_batcave_host("fakebatcave.biz"));
+        assert!(!is_batcave_host("batcave.biz.evil.test"));
+        assert!(has_dle_guard_cookie("cf_clearance=abc; __guard_trust=ok"));
+        assert!(!has_dle_guard_cookie("__guard_trust_fake=bad"));
+    }
 
     #[test]
     fn keep_expected_guard_and_cloudflare_cookies_only() {
