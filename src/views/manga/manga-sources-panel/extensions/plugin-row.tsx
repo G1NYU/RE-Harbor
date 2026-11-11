@@ -1,4 +1,12 @@
-import { Activity, ArrowUpCircle, CheckCircle2, Download, Globe2, Loader2, Trash2 } from "lucide-react";
+import {
+  Activity,
+  ArrowUpCircle,
+  CheckCircle2,
+  Download,
+  Globe2,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 import {
