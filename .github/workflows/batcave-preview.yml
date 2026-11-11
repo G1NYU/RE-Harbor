@@ -11,6 +11,8 @@ permissions:
 
 env:
   HARBOR_CAPSTAN_OPTIONAL: "1"
+  # Same checksum-pinned DLL as scripts/fetch-libmpv.mjs; former tag now 404s.
+  HARBOR_LIBMPV_URL: "https://github.com/Harborofficial/Harbor/releases/download/libmpv-windows-x64/libmpv-2.dll"
 
 jobs:
   targeted:
