@@ -1,0 +1,26 @@
+name: BatCave temporary formatting diagnostics
+
+on:
+  push:
+    branches:
+      - feature/batcave-webview-session
+
+permissions:
+  contents: read
+
+jobs:
+  format-diff:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Show expected format diff
+        run: |
+          vp fmt src/views/manga/manga-sources-panel/extensions/plugin-row.tsx
+          git diff -- src/views/manga/manga-sources-panel/extensions/plugin-row.tsx
