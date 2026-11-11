@@ -260,6 +260,13 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
     let _guard = request_lock().lock().await;
     let host = host_of(&url);
     if let Some(h) = host.as_deref() {
+        // Multiple concurrent source requests may have queued a solve. Avoid
+        // reopening the WebView after the first request established trust.
+        if is_batcave_host(h)
+            && cf_cached(h).is_some_and(|(cookie, _)| has_dle_guard_cookie(&cookie))
+        {
+            return Ok(String::new());
+        }
         if cf_in_cooldown(h) {
             eprintln!("[cf] skipping {}, a recent solve failed", h);
             return Err(format!("cloudflare challenge for {} recently failed", h));
