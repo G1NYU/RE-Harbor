@@ -1,4 +1,13 @@
-import { ArrowUpCircle, Download, Loader2, Trash2 } from "lucide-react";
+import {
+  Activity,
+  ArrowUpCircle,
+  CheckCircle2,
+  Download,
+  Globe2,
+  Loader2,
+  Trash2,
+} from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 import {
   installPlugin,
@@ -12,7 +21,11 @@ import { useT } from "@/lib/i18n";
 
 function PluginIcon({ src, name }: { src?: string; name: string }) {
   const [failed, setFailed] = useState(false);
-  const initials = name.replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase() || "?";
+  const initials =
+    name
+      .replace(/[^a-z0-9]/gi, "")
+      .slice(0, 2)
+      .toUpperCase() || "?";
   return (
     <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-canvas ring-1 ring-edge-soft">
       {src && !failed ? (
@@ -26,13 +39,7 @@ function PluginIcon({ src, name }: { src?: string; name: string }) {
 
 function EnableSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      onClick={onToggle}
-      className="shrink-0"
-    >
+    <button type="button" role="switch" aria-checked={on} onClick={onToggle} className="shrink-0">
       <span
         aria-hidden
         className={`relative block h-6 w-10 rounded-full transition-colors ${on ? "bg-ink" : "bg-edge"}`}
@@ -59,6 +66,58 @@ export function PluginRow({
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [connectionReport, setConnectionReport] = useState<string | null>(null);
+  const canUnlockBatcave =
+    !!installed &&
+    /batcave/i.test(manifest.id + " " + manifest.name) &&
+    typeof window !== "undefined" &&
+    "__TAURI_INTERNALS__" in window;
+
+  const unlockBatcave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const ready = await invoke<boolean>("cf_prepare_batcave");
+      setSessionReady(ready);
+      if (!ready) setError("BatCave did not issue a session cookie. Reopen its WebView.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not establish BatCave session");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const testBatcaveConnection = async () => {
+    setBusy(true);
+    setError(null);
+    setConnectionReport(null);
+    try {
+      const report = await invoke<{
+        webviewCookiePresent: boolean;
+        cachedCookiePresent: boolean;
+        userAgentMatches: boolean;
+        catalogueStatus: number | null;
+        redirectedToGuard: boolean;
+        networkError: string | null;
+      }>("batcave_connection_diagnostic");
+      const yesNo = (value: boolean) => (value ? "yes" : "no");
+      setConnectionReport(
+        [
+          `WebView trust: ${yesNo(report.webviewCookiePresent)}`,
+          `Native trust: ${yesNo(report.cachedCookiePresent)}`,
+          `UA matched: ${yesNo(report.userAgentMatches)}`,
+          `Catalogue POST: ${report.catalogueStatus ?? "no response"}`,
+          `DLE redirect: ${yesNo(report.redirectedToGuard)}`,
+          ...(report.networkError ? [report.networkError] : []),
+        ].join(" · "),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "BatCave connection test failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const install = async () => {
     setBusy(true);
@@ -98,14 +157,56 @@ export function PluginRow({
         <span className="truncate text-[12.5px] text-ink-muted">
           {languageName(manifest.lang)}
           {outdated && (
-            <span className="text-accent"> · {t("update to v{version}", { version: manifest.version })}</span>
+            <span className="text-accent">
+              {" "}
+              · {t("update to v{version}", { version: manifest.version })}
+            </span>
           )}
           {error && <span className="text-danger"> · {error}</span>}
         </span>
+        {connectionReport && (
+          <span className="max-w-[640px] break-words text-[11px] text-ink-muted">
+            {connectionReport}
+          </span>
+        )}
       </div>
 
       {installed ? (
         <div className="flex shrink-0 items-center gap-3">
+          {canUnlockBatcave && (
+            <button
+              type="button"
+              onClick={() => void testBatcaveConnection()}
+              disabled={busy}
+              title="Diagnose BatCave without exposing cookies"
+              aria-label="Diagnose BatCave connection"
+              className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-ink-muted ring-1 ring-edge-soft transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+            >
+              <Activity size={17} />
+            </button>
+          )}
+          {canUnlockBatcave && (
+            <button
+              type="button"
+              onClick={() => void unlockBatcave()}
+              disabled={busy}
+              title={
+                sessionReady
+                  ? "BatCave session ready"
+                  : "Open BatCave in WebView to unlock chapters"
+              }
+              aria-label={sessionReady ? "BatCave session ready" : "Unlock BatCave in WebView"}
+              className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-accent ring-1 ring-edge-soft transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+            >
+              {busy ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : sessionReady ? (
+                <CheckCircle2 size={17} />
+              ) : (
+                <Globe2 size={17} />
+              )}
+            </button>
+          )}
           {outdated && (
             <button
               type="button"

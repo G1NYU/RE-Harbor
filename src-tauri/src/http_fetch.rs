@@ -9,7 +9,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
 
-const BROWSER_UA: &str =
+pub(crate) const BROWSER_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
 const MAX_CONCURRENT_FETCHES: usize = 48;
@@ -398,6 +398,11 @@ fn collect_headers(headers: &reqwest::header::HeaderMap) -> HashMap<String, Stri
     out
 }
 
+fn is_batcave_guard_url(url: &reqwest::Url) -> bool {
+    matches!(url.host_str(), Some("batcave.biz" | "www.batcave.biz"))
+        && url.path().split('/').nth(1) == Some("_c")
+}
+
 fn is_followable_redirect(status: reqwest::StatusCode) -> bool {
     use reqwest::StatusCode;
     matches!(
@@ -644,6 +649,11 @@ async fn harbor_fetch_inner(
         let next_url = current_url
             .join(&location)
             .map_err(|e| format!("redirect url: {}", e))?;
+        // BatCave's DLE Guard responds with a redirect to /_c. Do not follow
+        // the interstitial as though it were a valid manga catalogue response.
+        if is_batcave_guard_url(&next_url) {
+            break resp;
+        }
         if next_url.scheme() != "http" && next_url.scheme() != "https" {
             return Err(format!("redirect bad scheme: {}", next_url.scheme()));
         }
@@ -720,7 +730,14 @@ async fn harbor_fetch_inner(
         res.text().await.unwrap_or_default()
     };
 
-    if is_cloudflare_challenge(status, cf_mitigated.as_deref(), &body) {
+    let dle_guard = reqwest::Url::parse(&final_url)
+        .ok()
+        .is_some_and(|url| is_batcave_guard_url(&url))
+        || response_headers
+            .get("location")
+            .and_then(|location| reqwest::Url::parse(&final_url).ok()?.join(location).ok())
+            .is_some_and(|url| is_batcave_guard_url(&url));
+    if dle_guard || is_cloudflare_challenge(status, cf_mitigated.as_deref(), &body) {
         if let Some(h) = original_host.as_deref() {
             crate::cf_solver::cf_invalidate(h);
         }
@@ -736,7 +753,21 @@ async fn harbor_fetch_inner(
             && args.max_response_bytes.is_none()
         {
             eprintln!("[cf] challenge detected ({}) for {}", status, args.url);
-            if let Ok(solved) = crate::cf_solver::cf_fetch(app, args.url.clone()).await {
+            // A plugin browse call has a much shorter timeout than a user-facing
+            // challenge WebView. Let BatCave verification continue independently
+            // of this specific HTTP request, then let the caller retry normally.
+            // The response below stays a real 403/302, never a fake 200.
+            if original_host.as_deref().is_some_and(|host| {
+                matches!(host, "batcave.biz" | "www.batcave.biz")
+            }) {
+                let solve_app = app.clone();
+                let solve_url = args.url.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = crate::cf_solver::cf_fetch(solve_app, solve_url).await {
+                        eprintln!("[dle] BatCave WebView verification: {error}");
+                    }
+                });
+            } else if let Ok(solved) = crate::cf_solver::cf_fetch(app.clone(), args.url.clone()).await {
                 return Ok(HarborFetchResponse {
                     status: 200,
                     ok: true,
@@ -882,6 +913,23 @@ mod tests {
         is_https_downgrade, is_public_network_ip, same_origin, solver_host_allowed, strip_headers,
         validate_target,
     };
+
+    #[test]
+    fn only_real_batcave_guard_redirects_trigger_webview() {
+        for path in ["/_c", "/_c/", "/_c/proof"] {
+            let url = reqwest::Url::parse(&format!("https://batcave.biz{}", path)).unwrap();
+            assert!(super::is_batcave_guard_url(&url));
+        }
+        for raw in [
+            "https://batcave.biz/comix/",
+            "https://batcave.biz/_ca",
+            "https://evil-batcave.biz/_c/",
+            "https://batcave.biz.evil.test/_c/",
+        ] {
+            let url = reqwest::Url::parse(raw).unwrap();
+            assert!(!super::is_batcave_guard_url(&url));
+        }
+    }
 
     #[test]
     fn background_metadata_does_not_open_cloudflare_windows() {

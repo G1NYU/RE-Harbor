@@ -1,0 +1,119 @@
+name: BatCave WebView Preview
+
+on:
+  push:
+    branches:
+      - feature/batcave-webview-session
+  workflow_dispatch:
+
+concurrency:
+  group: batcave-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  HARBOR_CAPSTAN_OPTIONAL: "1"
+  # Same checksum-pinned DLL as scripts/fetch-libmpv.mjs; former tag now 404s.
+  HARBOR_LIBMPV_URL: "https://github.com/Harborofficial/Harbor/releases/download/libmpv-windows-x64/libmpv-2.dll"
+
+jobs:
+  targeted:
+    name: BatCave targeted checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Frontend typecheck
+        run: pnpm run typecheck
+      - name: Windows WebView button source verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'cf_prepare_batcave' src/views/manga/manga-sources-panel/extensions/plugin-row.tsx
+          grep -q 'cf_solver::cf_prepare_batcave' src-tauri/src/lib.rs
+          grep -q 'name == "__guard_trust"' src-tauri/src/cf_solver.rs
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev libayatana-appindicator3-dev libgtk-3-dev \
+            libmpv-dev librsvg2-dev libssl-dev libudev-dev \
+            libwebkit2gtk-4.1-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+      - name: Native compile
+        env:
+          TAURI_CONFIG: '{"bundle":{"externalBin":[],"resources":[]}}'
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: BatCave native cookie tests only
+        env:
+          TAURI_CONFIG: '{"bundle":{"externalBin":[],"resources":[]}}'
+        run: cargo test --manifest-path src-tauri/Cargo.toml batcave_session_tests --lib
+
+  windows-preview:
+    name: Windows BatCave preview installer
+    # Build MSI only when explicitly dispatched; pushes still run the targeted checks.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.401"
+      - name: Stage Pokémon resources
+        shell: bash
+        run: node tools/pokemon-engine/build.mjs --fetch-source "$RUNNER_TEMP/harbor-pokemon-source" --output src-tauri/resources/pokemon-engine --artifacts "$RUNNER_TEMP/harbor-pokemon-build"
+      - name: Install packages
+        run: pnpm install --frozen-lockfile
+      - name: Prepare binaries and fonts
+        run: pnpm run setup
+      - name: Configure isolated test install
+        shell: pwsh
+        run: |
+          @'
+          {
+            "productName": "Harbor BatCave Preview",
+            "identifier": "app.harbor.batcave-preview",
+            "plugins": {
+              "updater": {
+                "endpoints": []
+              }
+            }
+          }
+          '@ | Set-Content -Path src-tauri/tauri.batcave-preview.conf.json -Encoding utf8
+      - name: Build Windows installer
+        run: pnpm tauri build --bundles msi --config src-tauri/tauri.batcave-preview.conf.json
+      - name: Upload separate Windows test installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-batcave-preview-windows
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 7

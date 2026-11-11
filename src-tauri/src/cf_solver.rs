@@ -58,6 +58,14 @@ fn host_of(url: &str) -> Option<String> {
     Url::parse(url).ok()?.host_str().map(|s| s.to_string())
 }
 
+fn is_batcave_host(host: &str) -> bool {
+    matches!(host, "batcave.biz" | "www.batcave.biz")
+}
+
+fn has_dle_guard_cookie(cookie: &str) -> bool {
+    cookie.split(';').any(|part| part.trim().starts_with("__guard_trust="))
+}
+
 fn cf_in_cooldown(host: &str) -> bool {
     let mut map = cf_failures().lock().unwrap();
     let fresh = map.get(host).map(|at| at.elapsed() < CF_RETRY_COOLDOWN);
@@ -103,6 +111,10 @@ impl Drop for SolverDismiss {
     }
 }
 
+fn is_replay_cookie(name: &str) -> bool {
+    name == "cf_clearance" || name == "__cf_bm" || name.starts_with("cf_chl") || name == "__guard_trust"
+}
+
 fn harvest(app: &AppHandle, url: &str) -> bool {
     let Some(win) = app.get_webview_window(SOLVER_LABEL) else {
         return false;
@@ -113,10 +125,10 @@ fn harvest(app: &AppHandle, url: &str) -> bool {
     let Some(host) = parsed.host_str().map(|s| s.to_string()) else {
         return false;
     };
-    let ua = last_ua().lock().unwrap().clone();
-    if ua.is_empty() {
-        return false;
-    }
+    // The challenge page is a remote origin and cannot be relied on to
+    // invoke native commands. The solver WebView explicitly uses this UA,
+    // ensuring the replayed request and its trust cookie share an identity.
+    let ua = crate::http_fetch::BROWSER_UA.to_string();
     let cookies = match win.cookies_for_url(parsed) {
         Ok(c) => c,
         Err(e) => {
@@ -127,7 +139,7 @@ fn harvest(app: &AppHandle, url: &str) -> bool {
     let mut parts: Vec<String> = Vec::new();
     for c in cookies {
         let name = c.name();
-        if name == "cf_clearance" || name == "__cf_bm" || name.starts_with("cf_chl") {
+        if is_replay_cookie(name) {
             parts.push(format!("{}={}", name, c.value()));
         }
     }
@@ -151,9 +163,14 @@ const INIT_SCRIPT: &str = r#"
 (function () {
   if (window.__harborCfBooted) return;
   window.__harborCfBooted = true;
+  // Report the user agent immediately. A DLE interstitial may never reach
+  // the normal report() path until its HttpOnly cookie has been issued.
+  try { window.__TAURI_INTERNALS__.invoke('cf_report', { body: '', ua: navigator.userAgent || '' }); } catch (e) {}
   var done = false;
   function challenged() {
     var t = (document.title || '').toLowerCase();
+    // DLE Guard's /_c interstitial navigates away once the trust cookie is set.
+    if (/^\/_(?:c|v)(?:\/|$)/.test(location.pathname || '')) return true;
     if (t.indexOf('just a moment') >= 0 || t.indexOf('attention required') >= 0) return true;
     if (document.getElementById('challenge-running') || document.getElementById('cf-please-wait')) return true;
     if (document.querySelector('#challenge-form, #cf-challenge-running, .cf-turnstile')) return true;
@@ -187,8 +204,10 @@ pub fn cf_report(body: String, ua: String) {
     if !ua.is_empty() {
         *last_ua().lock().unwrap() = ua;
     }
-    if let Some(tx) = PENDING.lock().unwrap().take() {
-        let _ = tx.send(body);
+    if !body.is_empty() {
+        if let Some(tx) = PENDING.lock().unwrap().take() {
+            let _ = tx.send(body);
+        }
     }
 }
 
@@ -211,6 +230,7 @@ fn open_solver(app: &AppHandle, url: &str) -> Result<(), String> {
         let builder =
             WebviewWindowBuilder::new(&app_main, SOLVER_LABEL, WebviewUrl::External(parsed))
                 .title("Harbor · checking source")
+                .user_agent(crate::http_fetch::BROWSER_UA)
                 .inner_size(480.0, 640.0)
                 .center()
                 .resizable(true)
@@ -240,6 +260,13 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
     let _guard = request_lock().lock().await;
     let host = host_of(&url);
     if let Some(h) = host.as_deref() {
+        // Multiple concurrent source requests may have queued a solve. Avoid
+        // reopening the WebView after the first request established trust.
+        if is_batcave_host(h)
+            && cf_cached(h).is_some_and(|(cookie, _)| has_dle_guard_cookie(&cookie))
+        {
+            return Ok(String::new());
+        }
         if cf_in_cooldown(h) {
             eprintln!("[cf] skipping {}, a recent solve failed", h);
             return Err(format!("cloudflare challenge for {} recently failed", h));
@@ -264,6 +291,36 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
         }
     }
 
+    // BatCave's DLE Guard can display a normal-looking page before its trust
+    // cookie exists. Wait for that cookie rather than any incidental page body.
+    if host.as_deref().is_some_and(is_batcave_host) {
+        let ready = tokio::time::timeout(Duration::from_secs(90), async {
+            loop {
+                let check_app = app.clone();
+                let check_url = url.clone();
+                let harvested = tokio::task::spawn_blocking(move || harvest(&check_app, &check_url))
+                    .await
+                    .unwrap_or(false);
+                if harvested
+                    && host.as_deref().and_then(cf_cached)
+                        .is_some_and(|(cookie, _)| has_dle_guard_cookie(&cookie))
+                {
+                    return true;
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        })
+        .await;
+        PENDING.lock().unwrap().take();
+        if matches!(ready, Ok(true)) {
+            if let Some(h) = host.as_deref() {
+                cf_clear_failure(h);
+            }
+            return Ok(String::new());
+        }
+        return Err("BatCave WebView did not issue a DLE Guard trust cookie".into());
+    }
+
     match tokio::time::timeout(Duration::from_secs(90), rx).await {
         Ok(Ok(body)) => {
             eprintln!("[cf] got {} bytes", body.len());
@@ -279,6 +336,144 @@ pub async fn cf_fetch(app: AppHandle, url: String) -> Result<String, String> {
             PENDING.lock().unwrap().take();
             eprintln!("[cf] TIMEOUT {}", url);
             Err("cloudflare challenge timed out".into())
+        }
+    }
+}
+
+
+/// Explicit, user-triggered WebView warm-up for BatCave's DLE Guard.
+/// Only the native process handles the cookie; it is never returned to JavaScript.
+#[tauri::command]
+pub async fn cf_prepare_batcave(app: AppHandle) -> Result<bool, String> {
+    const HOST: &str = "batcave.biz";
+    let has_trust = || cf_cached(HOST).is_some_and(|(cookie, _)| has_dle_guard_cookie(&cookie));
+    if has_trust() {
+        return Ok(true);
+    }
+    // Explicit user action can retry after an earlier automatic solve failed.
+    cf_clear_failure(HOST);
+    cf_fetch(app, "https://batcave.biz/comix/".to_string()).await?;
+    Ok(has_trust())
+}
+
+
+
+/// Explicit, read-only BatCave connection probe. Intentionally exposes no
+/// raw cookies, headers, page contents, account information, or API keys.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatcaveConnectionDiagnostic {
+    pub webview_cookie_present: bool,
+    pub cached_cookie_present: bool,
+    pub user_agent_matches: bool,
+    pub catalogue_status: Option<u16>,
+    pub redirected_to_guard: bool,
+    pub network_error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn batcave_connection_diagnostic(app: AppHandle) -> BatcaveConnectionDiagnostic {
+    const URL: &str = "https://batcave.biz/comix/";
+    const HOST: &str = "batcave.biz";
+
+    let webview_cookie_present = app
+        .get_webview_window(SOLVER_LABEL)
+        .and_then(|win| {
+            let url = Url::parse(URL).ok()?;
+            win.cookies_for_url(url).ok()
+        })
+        .map(|cookies| {
+            cookies
+                .iter()
+                .any(|cookie| cookie.name() == "__guard_trust" && !cookie.value().is_empty())
+        })
+        .unwrap_or(false);
+
+    let cached = cf_cached(HOST);
+    let cached_cookie_present = cached
+        .as_ref()
+        .is_some_and(|(cookie, _)| has_dle_guard_cookie(cookie));
+    let user_agent_matches = cached
+        .as_ref()
+        .is_some_and(|(_, ua)| ua == crate::http_fetch::BROWSER_UA);
+
+    let mut diagnostic = BatcaveConnectionDiagnostic {
+        webview_cookie_present,
+        cached_cookie_present,
+        user_agent_matches,
+        catalogue_status: None,
+        redirected_to_guard: false,
+        network_error: None,
+    };
+
+    // This tests the same catalogue POST that the native BatCave plugin uses,
+    // without triggering another challenge WebView or following its /_c redirect.
+    let client = match crate::http_fetch::http_client_builder().build() {
+        Ok(client) => client,
+        Err(_) => {
+            diagnostic.network_error = Some("Could not initialize HTTP client".into());
+            return diagnostic;
+        }
+    };
+    let mut request = client
+        .post(URL)
+        .timeout(Duration::from_secs(12))
+        .header(reqwest::header::USER_AGENT, crate::http_fetch::BROWSER_UA)
+        .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml,*/*")
+        .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .body("dlenewssortby=rating&dledirection=desc&set_new_sort=dle_sort_cat_1&set_direction_sort=dle_direction_cat_1");
+    if let Some((cookie, _)) = cached {
+        request = request.header(reqwest::header::COOKIE, cookie);
+    }
+
+    match request.send().await {
+        Ok(response) => {
+            diagnostic.catalogue_status = Some(response.status().as_u16());
+            diagnostic.redirected_to_guard = response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| reqwest::Url::parse(URL).ok()?.join(value).ok())
+                .is_some_and(|redirect| {
+                    matches!(redirect.host_str(), Some("batcave.biz" | "www.batcave.biz"))
+                        && redirect.path().split('/').nth(1) == Some("_c")
+                });
+        }
+        Err(error) => {
+            diagnostic.network_error = Some(if error.is_timeout() {
+                "Connection timed out".into()
+            } else if error.is_connect() {
+                "Could not connect to BatCave".into()
+            } else {
+                "HTTP request failed".into()
+            });
+        }
+    }
+
+    diagnostic
+}
+
+#[cfg(test)]
+mod batcave_session_tests {
+    use super::{has_dle_guard_cookie, is_batcave_host, is_replay_cookie};
+
+    #[test]
+    fn only_batcave_hosts_can_use_dle_guard() {
+        assert!(is_batcave_host("batcave.biz"));
+        assert!(is_batcave_host("www.batcave.biz"));
+        assert!(!is_batcave_host("fakebatcave.biz"));
+        assert!(!is_batcave_host("batcave.biz.evil.test"));
+        assert!(has_dle_guard_cookie("cf_clearance=abc; __guard_trust=ok"));
+        assert!(!has_dle_guard_cookie("__guard_trust_fake=bad"));
+    }
+
+    #[test]
+    fn keep_expected_guard_and_cloudflare_cookies_only() {
+        for name in ["__guard_trust", "cf_clearance", "__cf_bm", "cf_chl_2"] {
+            assert!(is_replay_cookie(name), "{name}");
+        }
+        for name in ["session", "auth", "remember_me", "__other_guard"] {
+            assert!(!is_replay_cookie(name), "{name}");
         }
     }
 }

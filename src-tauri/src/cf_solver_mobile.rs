@@ -22,3 +22,9 @@ pub async fn cf_fetch(_app: AppHandle, url: String) -> Result<String, String> {
         url
     ))
 }
+
+
+#[tauri::command]
+pub async fn cf_prepare_batcave(_app: AppHandle) -> Result<bool, String> {
+    Err("BatCave WebView warm-up is supported on Harbor desktop only".into())
+}
