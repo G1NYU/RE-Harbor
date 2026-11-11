@@ -65,6 +65,7 @@ export function PluginRow({
 }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
+  const [diagnosticBusy, setDiagnosticBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [connectionReport, setConnectionReport] = useState<string | null>(null);
@@ -89,7 +90,7 @@ export function PluginRow({
   };
 
   const testBatcaveConnection = async () => {
-    setBusy(true);
+    setDiagnosticBusy(true);
     setError(null);
     setConnectionReport(null);
     try {
@@ -100,6 +101,12 @@ export function PluginRow({
         catalogueStatus: number | null;
         redirectedToGuard: boolean;
         networkError: string | null;
+        browserState: string;
+        browserPageKind: string;
+        browserCatalogueItems: number;
+        browserFetchState: string;
+        browserFetchStatus: number | null;
+        browserFetchKind: string;
       }>("batcave_connection_diagnostic");
       const yesNo = (value: boolean) => (value ? "yes" : "no");
       setConnectionReport(
@@ -109,13 +116,17 @@ export function PluginRow({
           `UA matched: ${yesNo(report.userAgentMatches)}`,
           `Catalogue POST: ${report.catalogueStatus ?? "no response"}`,
           `DLE redirect: ${yesNo(report.redirectedToGuard)}`,
+          `WebView: ${report.browserState} / ${report.browserPageKind}`,
+          `WebView titles: ${report.browserCatalogueItems}`,
+          `Browser GET: ${report.browserFetchStatus ?? report.browserFetchState}`,
+          `Browser GET content: ${report.browserFetchKind}`,
           ...(report.networkError ? [report.networkError] : []),
         ].join(" · "),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "BatCave connection test failed");
     } finally {
-      setBusy(false);
+      setDiagnosticBusy(false);
     }
   };
 
@@ -177,8 +188,8 @@ export function PluginRow({
             <button
               type="button"
               onClick={() => void testBatcaveConnection()}
-              disabled={busy}
-              title="Diagnose BatCave without exposing cookies"
+              disabled={diagnosticBusy}
+              title="Diagnose BatCave while its WebView is open, without exposing cookies"
               aria-label="Diagnose BatCave connection"
               className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-ink-muted ring-1 ring-edge-soft transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
             >
