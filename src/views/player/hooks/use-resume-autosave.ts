@@ -74,6 +74,7 @@ type ResumeSession = {
   ready: boolean;
   position: number;
   lastSaved: number;
+  refractCompleted?: boolean;
 };
 
 export function useResumeAutosave(params: ResumeAutosaveParams) {
@@ -221,7 +222,8 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
       setMovieWatchedLocal(id, true);
       clearLocalCw(id, current.ownerId);
     }
-    if (finished) {
+    if (finished && !current.refractCompleted) {
+      current.refractCompleted = true;
       recordWatchEvent({
         id,
         type: s.meta.type === "movie" ? "movie" : "series",
@@ -230,6 +232,15 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
         season: cs,
         episode: ep,
         at: Date.now(),
+      }, {
+        externalId: rv && rid ? rid : undefined,
+        episodes: s.meta.type === "movie" ? undefined : (covered.length ? covered : [ep])
+          .filter((value): value is number => typeof value === "number" && Number.isInteger(value))
+          .map(value => ({
+            season: rv && s.episode?.imdbSeason != null ? s.episode.imdbSeason : cs ?? -1,
+            episode: rv && s.episode?.imdbEpisode != null && typeof ep === "number"
+              ? s.episode.imdbEpisode + value - ep : value,
+          })),
       });
     }
     const animeLocal = ANIME_CLOUD_ID.test(id);

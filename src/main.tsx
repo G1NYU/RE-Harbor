@@ -238,6 +238,18 @@ async function mount() {
       ? initializeMusic()
       : Promise.resolve(),
   ]);
+  // Retry pending Refract history only from the regular app window.
+  if (
+    !isHdrOverlay &&
+    !isModal &&
+    !isCaptions &&
+    !isPip &&
+    !isVideoPip &&
+    !isDjDeck &&
+    !isRemote
+  ) {
+    void import("@/lib/refract/sync").then(({ startRefractSync }) => startRefractSync());
+  }
   if (!isHdrOverlay && !isModal && !isCaptions && !isDjDeck) void initSubtitleCache();
   if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck)
     startTaskbarProgress();
