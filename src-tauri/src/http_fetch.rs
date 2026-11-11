@@ -9,7 +9,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
 
-const BROWSER_UA: &str =
+pub(crate) const BROWSER_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
 const MAX_CONCURRENT_FETCHES: usize = 48;

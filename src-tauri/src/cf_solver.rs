@@ -125,10 +125,10 @@ fn harvest(app: &AppHandle, url: &str) -> bool {
     let Some(host) = parsed.host_str().map(|s| s.to_string()) else {
         return false;
     };
-    let ua = last_ua().lock().unwrap().clone();
-    if ua.is_empty() {
-        return false;
-    }
+    // The challenge page is a remote origin and cannot be relied on to
+    // invoke native commands. The solver WebView explicitly uses this UA,
+    // ensuring the replayed request and its trust cookie share an identity.
+    let ua = crate::http_fetch::BROWSER_UA.to_string();
     let cookies = match win.cookies_for_url(parsed) {
         Ok(c) => c,
         Err(e) => {
@@ -230,6 +230,7 @@ fn open_solver(app: &AppHandle, url: &str) -> Result<(), String> {
         let builder =
             WebviewWindowBuilder::new(&app_main, SOLVER_LABEL, WebviewUrl::External(parsed))
                 .title("Harbor · checking source")
+                .user_agent(crate::http_fetch::BROWSER_UA)
                 .inner_size(480.0, 640.0)
                 .center()
                 .resizable(true)
