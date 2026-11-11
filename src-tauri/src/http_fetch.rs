@@ -398,6 +398,11 @@ fn collect_headers(headers: &reqwest::header::HeaderMap) -> HashMap<String, Stri
     out
 }
 
+fn is_batcave_guard_url(url: &reqwest::Url) -> bool {
+    matches!(url.host_str(), Some("batcave.biz" | "www.batcave.biz"))
+        && url.path().split('/').nth(1) == Some("_c")
+}
+
 fn is_followable_redirect(status: reqwest::StatusCode) -> bool {
     use reqwest::StatusCode;
     matches!(
@@ -464,7 +469,7 @@ pub(crate) async fn public_http_client(url: &reqwest::Url) -> Result<reqwest::Cl
         .map_err(|error| format!("public client: {error}"))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HarborFetchArgs {
     pub url: String,
@@ -500,13 +505,15 @@ pub async fn harbor_fetch(
 ) -> Result<HarborFetchResponse, String> {
     let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS));
     let _permit = acquire_fetch_permit().await?;
-    run_with_deadline(timeout, harbor_fetch_inner(app, args)).await
+    run_with_deadline(timeout, harbor_fetch_inner(app, args, false)).await
 }
 
 async fn harbor_fetch_inner(
     app: tauri::AppHandle,
     args: HarborFetchArgs,
+    already_retried: bool,
 ) -> Result<HarborFetchResponse, String> {
+    let original_args = args.clone();
     let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS));
     let public_network_only = args.public_network_only.unwrap_or(false);
     let allow_local_network = args.allow_local_network.unwrap_or(false);
@@ -644,6 +651,11 @@ async fn harbor_fetch_inner(
         let next_url = current_url
             .join(&location)
             .map_err(|e| format!("redirect url: {}", e))?;
+        // BatCave's DLE Guard responds with a redirect to /_c. Do not follow
+        // the interstitial as though it were a valid manga catalogue response.
+        if is_batcave_guard_url(&next_url) {
+            break resp;
+        }
         if next_url.scheme() != "http" && next_url.scheme() != "https" {
             return Err(format!("redirect bad scheme: {}", next_url.scheme()));
         }
@@ -720,7 +732,14 @@ async fn harbor_fetch_inner(
         res.text().await.unwrap_or_default()
     };
 
-    if is_cloudflare_challenge(status, cf_mitigated.as_deref(), &body) {
+    let dle_guard = reqwest::Url::parse(&final_url)
+        .ok()
+        .is_some_and(|url| is_batcave_guard_url(&url))
+        || response_headers
+            .get("location")
+            .and_then(|location| reqwest::Url::parse(&final_url).ok()?.join(location).ok())
+            .is_some_and(|url| is_batcave_guard_url(&url));
+    if dle_guard || is_cloudflare_challenge(status, cf_mitigated.as_deref(), &body) {
         if let Some(h) = original_host.as_deref() {
             crate::cf_solver::cf_invalidate(h);
         }
@@ -732,11 +751,19 @@ async fn harbor_fetch_inner(
         // participate in the caller's response-size contract. Binary/capped callers
         // must receive the original bounded response instead of bypassing those rules.
         if solver_ok
+            && !already_retried
             && args.response_type.as_deref() != Some("base64")
             && args.max_response_bytes.is_none()
         {
             eprintln!("[cf] challenge detected ({}) for {}", status, args.url);
-            if let Ok(solved) = crate::cf_solver::cf_fetch(app, args.url.clone()).await {
+            if let Ok(solved) = crate::cf_solver::cf_fetch(app.clone(), args.url.clone()).await {
+                if original_host.as_deref().is_some_and(|host| {
+                    matches!(host, "batcave.biz" | "www.batcave.biz")
+                }) {
+                    // Replay the ORIGINAL request with the newly cached DLE cookie.
+                    // The initial API POST body must not turn into an HTML GET.
+                    return Box::pin(harbor_fetch_inner(app, original_args, true)).await;
+                }
                 return Ok(HarborFetchResponse {
                     status: 200,
                     ok: true,
@@ -882,6 +909,23 @@ mod tests {
         is_https_downgrade, is_public_network_ip, same_origin, solver_host_allowed, strip_headers,
         validate_target,
     };
+
+    #[test]
+    fn only_real_batcave_guard_redirects_trigger_webview() {
+        for path in ["/_c", "/_c/", "/_c/proof"] {
+            let url = reqwest::Url::parse(&format!("https://batcave.biz{}", path)).unwrap();
+            assert!(super::is_batcave_guard_url(&url));
+        }
+        for raw in [
+            "https://batcave.biz/comix/",
+            "https://batcave.biz/_ca",
+            "https://evil-batcave.biz/_c/",
+            "https://batcave.biz.evil.test/_c/",
+        ] {
+            let url = reqwest::Url::parse(raw).unwrap();
+            assert!(!super::is_batcave_guard_url(&url));
+        }
+    }
 
     #[test]
     fn background_metadata_does_not_open_cloudflare_windows() {
