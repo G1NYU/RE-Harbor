@@ -45,6 +45,8 @@ export async function markMovieWatched(
     name: meta.name,
     poster: meta.poster,
     at: Date.now(),
+  }, {
+    externalId: imdb ?? (tmdbId != null ? `tmdb:movie:${tmdbId}` : undefined),
   });
   const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : (tmdbId ?? undefined);
   const authKey = readActiveStremioAuthKey();
@@ -176,7 +178,17 @@ export async function markMetaWatched(
   const resolvedImdb = resolveSeriesImdb(meta, imdbId);
   const eps = await releasedEpisodes(meta, resolvedImdb);
   if (activeProfileId() !== ownerProfile) return;
-  if (eps.length > 0) setManualWatchedMany(meta.id, eps, true);
+  if (eps.length > 0) {
+    setManualWatchedMany(meta.id, eps, true);
+    void import("@/lib/refract/sync").then(({ enqueueRefractWatch }) => {
+      enqueueRefractWatch({
+        id: meta.id, type: "series", name: meta.name, poster: meta.poster, at: Date.now(),
+      }, {
+        externalId: resolvedImdb ?? (tmdbId != null ? `tmdb:tv:${tmdbId}` : undefined),
+        episodes: eps,
+      });
+    }).catch(() => {});
+  }
   if (!isNuvioProviderActive()) void syncSeriesWatchedToStremio(meta, resolvedImdb);
   const isAnime = /^(kitsu|mal|anilist|anidb):/.test(meta.id);
   const imdb = resolvedImdb ?? (meta.id.startsWith("tt") ? meta.id : undefined);
