@@ -84,3 +84,10 @@ test("poster and rail code uses measured sizes and batches visibility checks", (
   assert.match(row, /scheduleVisibilityRecheck\(root, el, \(\) => setVisible\(true\)\)/);
   assert.match(row, /now - lastRevealAt >= 16/);
 });
+
+test("diagnostic HUD avoids expensive redraws and DOM recounts for every frame event", () => {
+  const profiler = readFileSync(new URL("../src/lib/memory-profiler.ts", import.meta.url), "utf8");
+  const hud = readFileSync(new URL("../src/components/memory-hud.tsx", import.meta.url), "utf8");
+  assert.match(profiler, /now - lastDomSampleAt < 500/);
+  assert.match(hud, /now - lastPaintAt < 250/);
+});
