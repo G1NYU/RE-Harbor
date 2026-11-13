@@ -36,3 +36,18 @@ Install the isolated MSI and use comparable account, theme, addons, and library 
 - Content visibility for entire below-fold rails only with reliable intrinsic sizes to avoid scrollbar jumps.
 
 The optimized build must pass TypeScript and focused regression tests before an MSI is uploaded. It is a performance experiment until the Windows smoke test confirms that lazy card reveal and audio restore are sound.
+
+## Profiler-guided pass (November 13)
+
+The first 44-second performance report showed a 4.8 FPS 1% low, a 1.7-second worst frame, 7,420 DOM nodes and 1.15 GB WebView RSS at a ~270 Hz display refresh rate. Its old Long Animation Frame labels were incorrect: the field called "style" was actually **pre-layout rendering callbacks**, while the field called "paint" included **style/layout plus painting**. Older public reports should not be interpreted as isolated style versus paint timings.
+
+This follow-up build:
+- Uses ResizeObserver measurements directly in poster components rather than reading bounding rectangles again for every resize callback.
+- Batches the redundant 400 ms lazy-cell fallback intersection checks per row. One timer and one row rect replace separate timers and row reads for each cell.
+- Limits the card expansion follow-scroll geometry reads to approximately 60 times per second even on 240–270 Hz screens.
+- Corrects profiler LoAF buckets to **before-render / callbacks / layout+paint / forced layout**, matching documented browser timing boundaries. These are not isolated JS versus paint timings.
+- Caches profiler DOM element counts for 500 ms and limits profiler HUD repaints to 4 Hz. Collection still records all events.
+
+Keep the original report to compare against, but capture a new report from this code when validating the effect. For a fair test, reproduce the same user action at the same viewport resolution and application content. A 44-second single capture does not prove the root cause of the worst 1.7-second hitch.
+
+Only post anonymized profiler exports to public channels. Never commit raw addon URLs, authentication tokens, or credential-bearing paths to a public repository.
