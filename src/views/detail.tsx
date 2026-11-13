@@ -51,6 +51,7 @@ import { omdbPrefetch, omdbScores, type OmdbScores } from "@/lib/providers/omdb"
 import { harborImdbTitle } from "@/lib/providers/harbor-imdb";
 import { awardSummary, pickHeroAwards, useAwards } from "@/lib/providers/wikidata";
 import { mergeBundledAwards } from "@/lib/awards-history";
+import { useBundledAwardsVersion } from "@/lib/use-bundled-awards";
 import {
   tmdbDetails,
   tmdbImdbId,
@@ -1188,9 +1189,10 @@ export function DetailView({
     [shownSimilar, graphReasons],
   );
   const liveAwards = useAwards(detail?.imdbId ?? undefined, meta.type === "series");
+  const awardsVersion = useBundledAwardsVersion();
   const awards = useMemo(
     () => mergeBundledAwards(liveAwards, meta.name, releaseYearNum ?? undefined),
-    [liveAwards, meta.name, releaseYearNum],
+    [awardsVersion, liveAwards, meta.name, releaseYearNum],
   );
   const heroAwardSummary = pickHeroAwards(awardSummary(awards));
   const awardsInDescription = (settings.theme.preset as string) === "elegantfin";
