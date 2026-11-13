@@ -1,83 +1,73 @@
-# Refract native watch-history integration (review preview)
+# Refract native watch-history sync
 
-This branch isolates the Refract watched-history prototype from experimental BatCave
-work. It was branched from `beta-branch` ; it does not contain the BatCave
-cookie/WebView changes or build workflows.
+This review branch is based on `beta-branch`.
+It contains no BatCave or installer changes.
 
-## Status — 2026-11-13
+## Implemented
 
--  **Implemented, but not live-tested:** Settings → Trackers → Refract personal API-key
-  connection, an opt-in completed-watch toggle, a persistent retry queue, a status
-  counter, and replay-protected Harbor → Refract writes for movies and episodes.
--  Harbor marks watched on playback completion using its existing ~85% rule; Refract
-  jobs are created from the existing watch-events path, including supported manual
-  marks.
--  External IDs must match IMDb, TMDB, or TheTVDB. No title guessing. Episodes are
-  matched to Refract's TMDB numbering through its documented `/v1/search/{id_type}/{id}`
-  endpoint.
--  **Improved in this branch:** A watched episode is sent with its actual timestamp
-  (`watched_at`), preserving dates when an offline retry happens later.
--  **Not implemented:** automatic Refract → Harbor inbound library/watched-state sync,
-  show/episode rewatch logging, OAuth account linking, or a Refract-branded Stremio
-  addon.
-- No media is streamed by Refract; this is a tracker integration.
+- Opt-in Refract integration in Settings → Trackers.
+- Personal API key stored using Harbor's credential store.
+- `GET /v1/me` to verify the connected account.
+- Harbor → Refract completed movie and episode watches.
+- Refract search by IMDb, TMDB or TVDB identifiers.
+- Persistent retry queue and status diagnostics.
+- Primary Harbor profile guard.
+- Playback completion uses Harbor's existing 85% rule.
+- Offline episode retries preserve the actual `watched_at` time.
+- Movies use stable `Idempotency-Key` headers.
+- Episodes use idempotent `PUT` watched-state requests.
 
-## Official API contract (verified in public docs, not against a member account)
+## Not implemented yet
 
-- Base: `https://getrefract.app/v1`
-- Key verification: `GET /me` → `profile:read`
-- ID resolution: `GET /search/{id_type}/{id}` → `library:read`
--  Episode first watch: `PUT /history/episodes/{show_id}/{season}/{number}` →
-  `history:write` . The body may contain `watched_at` ; repeating a PUT does not add
-  another watch.
--  Movie play: `POST /history/movies` → `history:write` , with a stable
-  `Idempotency-Key` per viewing. Refract holds keys for 24 hours and deduplicates
-  same-viewing reports within 30 minutes.
-- Rate limit: 120 requests per minute per credential; obey `Retry-After` on 429.
-- Source pages:
-  - https://getrefract.app/developers/authentication
-  - https://getrefract.app/developers/search
-  - https://getrefract.app/developers/writing
-  - https://getrefract.app/developers/rate-limits
-  - https://getrefract.app/developers/sync
+- Refract → Harbor reverse synchronization.
+- Episode-rewatch logging and show rewatch sessions.
+- OAuth app registration and device-code sign-in.
+- Import of Refract library, watchlists or ratings.
 
-## Connection instructions for a test build
+## Test permissions
 
-1.  In Refract → Integrations → Access and connected apps,
-   **revoke any previously exposed key** and generate a new one with exactly
-   `profile:read` , `library:read` , `history:write` .
-2.  In a deliberately built desktop Harbor preview, visit Settings → Trackers → Refract;
-   paste the fresh key. Never send the key in a chat, issue, screenshot or commit.
-3. Confirm the displayed Refract account name, and the enabled tracking toggle.
-4.  Test one known movie and one known show episode in TMDB numbering. Mark each watched
-   in Harbor; confirm Refract's diary dates and that no duplicates appear.
-5.  Test a disconnection/offline retry, a watch while paused before the 85% threshold,
-   an anime with alternate absolute numbering, an unknown external ID, and an account
-   change.
-6. Check the counter and unmatched diagnostics, without exposing tokens in logs.
-7. Only after passing tests, plan the production integration and onboarding.
+In Refract, open Integrations → Access and connected apps.
+Create a fresh personal key with these scopes:
 
-## Next phase: real two-way sync
+- `profile:read`
+- `library:read`
+- `history:write`
 
-Refract officially supplies `GET /v1/changes/head` , `GET /v1/library` ,
-`GET /v1/history/episodes` , `GET /v1/history/movies` , and `GET /v1/changes?cursor=…` .
+Revoke any API key previously exposed in messages or logs.
+Never put a personal key into a repository or GitHub issue.
 
-For a proper Refract → Harbor importer:
-1. Take `/changes/head` **before** the first paginated snapshot.
-2.  Build an external-ID-indexed cache of library and watched state, applying subsequent
-   `/changes` pages idempotently, storing `next_cursor` only after each page applies
-   successfully.
-3.  Match show/movie IDs by type and use correct TMDB season/episode numbering. Avoid
-   overriding Harbor's partial resume position.
-4.  Avoid conflict loops by recording the origin of each watch event, and do not
-   translate Refract deletes to local destructive operations without explicit user
-   consent.
-5. On 410/`SYNC_RESET_REQUIRED`, rebuild the local Refract snapshot.
-6.  Offer **manual preview first** , then opt-in scheduled inbound synchronization; do
-   not silently mark an entire Harbor library watched on connection.
-7.  Eventually replace personal keys with a Refract OAuth 2.1 public-client device/PKCE
-   flow (requires app registration, consent scopes and safe refresh-token rotation).
+## Validation before merge
 
-**Safety constraints:** This prototype is off production, must not trigger recurring MSI
-builds, must not merge before targeted TypeScript/Rust checks and real member API
-testing. Keep other Harbor trackers working and do not mix BatCave changes into this PR.
+1. Run format, lint and TypeScript checks.
+2. Use a fresh key to confirm `GET /v1/me`.
+3. Play a movie and an episode to completion.
+4. Verify watch dates and duplicate protection in Refract.
+5. Test offline retries and insufficient permissions.
+6. Test anime numbering and unknown external identifiers.
+7. Confirm changing Harbor profiles does not cross-sync.
+8. Review write behavior after manual marks and rewatches.
+
+Do not merge or build a distributed installer before these pass.
+
+## Plan for two-way synchronization
+
+1. Call `GET /v1/changes/head` before the initial snapshot.
+2. Page through library and watched-history endpoints.
+3. Match titles by external IDs and media type.
+4. Apply changes from `GET /v1/changes` idempotently.
+5. Store the cursor only after changes are saved.
+6. On `SYNC_RESET_REQUIRED`, recreate the snapshot.
+7. Preview incoming changes before writing to Harbor.
+8. Prevent echo loops and avoid destructive sync by default.
+9. Add OAuth 2.1 public-client authentication later.
+
+Refract's change feed allows a one-minute background cadence.
+The official API limit is 120 requests per minute per member.
+
+## API documentation
+
+- https://getrefract.app/developers/authentication
+- https://getrefract.app/developers/search
+- https://getrefract.app/developers/writing
+- https://getrefract.app/developers/sync
+- https://getrefract.app/developers/rate-limits
