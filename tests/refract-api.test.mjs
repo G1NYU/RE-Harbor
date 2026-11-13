@@ -34,9 +34,7 @@ function harness(responder = () => new Response("{}", { status: 200 })) {
 }
 
 test("Refract key verification uses the official API and bearer authentication", async () => {
-  const h = harness(() =>
-    new Response(JSON.stringify({ username: "tester" }), { status: 200 }),
-  );
+  const h = harness(() => new Response(JSON.stringify({ username: "tester" }), { status: 200 }));
   assert.equal(await h.client.verifyRefractKey("rfk_private"), "tester");
   assert.equal(h.calls[0].url, "https://getrefract.app/v1/me");
   assert.equal(h.calls[0].init.headers.Authorization, "Bearer rfk_private");
@@ -76,19 +74,13 @@ test("episode watched PUT preserves the original time across offline retries", a
 });
 
 test("TheTVDB episode resolution requests explicit TheTVDB numbering", async () => {
-  const h = harness(() =>
-    new Response(JSON.stringify({ data: [{ episode: { season: 2, number: 6 } }] }), {
-      status: 200,
-    }),
+  const h = harness(
+    () =>
+      new Response(JSON.stringify({ data: [{ episode: { season: 2, number: 6 } }] }), {
+        status: 200,
+      }),
   );
-  const result = await h.client.lookupRefract(
-    "rfk_private",
-    "tvdb",
-    "371980",
-    "episode",
-    1,
-    6,
-  );
+  const result = await h.client.lookupRefract("rfk_private", "tvdb", "371980", "episode", 1, 6);
   assert.equal(result.length, 1);
   const url = new URL(h.calls[0].url);
   assert.equal(url.pathname, "/v1/search/tvdb/371980");
@@ -99,12 +91,12 @@ test("TheTVDB episode resolution requests explicit TheTVDB numbering", async () 
 });
 
 test("Refract 429 uses server-supplied Retry-After delay", async () => {
-  const h = harness(() =>
-    new Response("{}", { status: 429, headers: { "Retry-After": "13" } }),
-  );
+  const h = harness(() => new Response("{}", { status: 429, headers: { "Retry-After": "13" } }));
   await assert.rejects(
     () => h.client.verifyRefractKey("rfk_private"),
-    (error) => error instanceof h.client.RefractApiError &&
-      error.status === 429 && error.retryAfterMs === 13000,
+    (error) =>
+      error instanceof h.client.RefractApiError &&
+      error.status === 429 &&
+      error.retryAfterMs === 13000,
   );
 });

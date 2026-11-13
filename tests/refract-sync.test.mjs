@@ -43,8 +43,7 @@ function harness() {
   const module = { exports: {} };
   new Function("require", "module", "exports", output)(
     (id) => {
-      if (id === "@/lib/active-profile-id")
-        return { activeProfileIsPrimary: () => primary };
+      if (id === "@/lib/active-profile-id") return { activeProfileIsPrimary: () => primary };
       if (id === "./client") return client;
       throw new Error(`Unexpected import: ${id}`);
     },
@@ -55,10 +54,18 @@ function harness() {
     sync: module.exports,
     db,
     calls,
-    setPrimary: (v) => { primary = v; },
-    setEnabled: (v) => { enabled = v; },
-    setKey: (v) => { key = v; },
-    setOffline: (v) => { offline = v; },
+    setPrimary: (v) => {
+      primary = v;
+    },
+    setEnabled: (v) => {
+      enabled = v;
+    },
+    setKey: (v) => {
+      key = v;
+    },
+    setOffline: (v) => {
+      offline = v;
+    },
     cleanup: () => {
       globalThis.localStorage = oldStorage;
       globalThis.window = oldWindow;

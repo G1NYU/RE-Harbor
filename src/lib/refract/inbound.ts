@@ -76,10 +76,19 @@ function harborIds(work: RefractWork, kind: "show" | "movie"): string[] {
   const ids: string[] = [];
   if (!work.is_anime && typeof work.ids?.imdb === "string" && /^tt\d+$/i.test(work.ids.imdb))
     ids.push(work.ids.imdb);
-  if (typeof work.ids?.tmdb === "number" && Number.isSafeInteger(work.ids.tmdb) && work.ids.tmdb > 0)
+  if (
+    typeof work.ids?.tmdb === "number" &&
+    Number.isSafeInteger(work.ids.tmdb) &&
+    work.ids.tmdb > 0
+  )
     ids.push(`tmdb:${kind === "show" ? "tv" : "movie"}:${work.ids.tmdb}`);
   // Anime movies have no episode-number ambiguity; an IMDb movie ID is also safe.
-  if (kind === "movie" && work.is_anime && typeof work.ids?.imdb === "string" && /^tt\d+$/i.test(work.ids.imdb))
+  if (
+    kind === "movie" &&
+    work.is_anime &&
+    typeof work.ids?.imdb === "string" &&
+    /^tt\d+$/i.test(work.ids.imdb)
+  )
     ids.push(work.ids.imdb);
   return [...new Set(ids)];
 }
@@ -91,8 +100,14 @@ function applyEpisodes(entries: RefractEpisodeWatch[], valid: () => boolean): nu
     if (!valid()) return accepted;
     const season = entry.episode?.season;
     const number = entry.episode?.number;
-    if (typeof season !== "number" || !Number.isInteger(season) || season < 0 ||
-        typeof number !== "number" || !Number.isInteger(number) || number < 1)
+    if (
+      typeof season !== "number" ||
+      !Number.isInteger(season) ||
+      season < 0 ||
+      typeof number !== "number" ||
+      !Number.isInteger(number) ||
+      number < 1
+    )
       continue;
     const ids = harborIds(entry.show, "show");
     if (!ids.length) continue;
@@ -134,8 +149,7 @@ function applyChanges(changes: RefractChange[], valid: () => boolean): number {
   const episodes: RefractEpisodeWatch[] = [];
   const movies: RefractMoviePlay[] = [];
   for (const change of changes) {
-    if (change.action !== "upsert" || !change.item || typeof change.item !== "object")
-      continue;
+    if (change.action !== "upsert" || !change.item || typeof change.item !== "object") continue;
     const item = change.item as Record<string, unknown>;
     if (change.type === "episode_watch" && item.show && item.episode) {
       episodes.push(item as unknown as RefractEpisodeWatch);
@@ -153,10 +167,7 @@ export async function pollRefractInbound(): Promise<void> {
   if (!key) return;
   const epoch = generation;
   const valid = () =>
-    generation === epoch &&
-    getRefractKey() === key &&
-    refractEnabled() &&
-    activeProfileIsPrimary();
+    generation === epoch && getRefractKey() === key && refractEnabled() && activeProfileIsPrimary();
   const previous = read();
   if (previous && previous.nextAt > Date.now()) return;
   running = true;
@@ -190,12 +201,16 @@ export async function pollRefractInbound(): Promise<void> {
           state.cursor,
         );
         if (!valid()) return;
-        if (!Array.isArray(page.data) || typeof page.has_more !== "boolean" ||
-            (page.has_more && !page.next_cursor))
+        if (
+          !Array.isArray(page.data) ||
+          typeof page.has_more !== "boolean" ||
+          (page.has_more && !page.next_cursor)
+        )
           throw new Error("Refract returned an incomplete history page");
-        const count = phase === "episodes"
-          ? applyEpisodes(page.data as RefractEpisodeWatch[], valid)
-          : applyMovies(page.data as RefractMoviePlay[], valid);
+        const count =
+          phase === "episodes"
+            ? applyEpisodes(page.data as RefractEpisodeWatch[], valid)
+            : applyMovies(page.data as RefractMoviePlay[], valid);
         if (!valid()) return;
         state.imported += count;
         state.cursor = page.has_more ? page.next_cursor : null;
@@ -208,8 +223,7 @@ export async function pollRefractInbound(): Promise<void> {
       if (state.phase === "changes" || state.phase === "live") {
         const page = await listRefractChanges(key, state.cursor || state.head);
         if (!valid()) return;
-        if (!Array.isArray(page.data) || !page.next_cursor ||
-            typeof page.has_more !== "boolean")
+        if (!Array.isArray(page.data) || !page.next_cursor || typeof page.has_more !== "boolean")
           throw new Error("Refract returned an incomplete change page");
         state.imported += applyChanges(page.data, valid);
         if (!valid()) return;
@@ -232,14 +246,19 @@ export async function pollRefractInbound(): Promise<void> {
     }
     if (!state) return;
     const status = error instanceof RefractApiError ? error.status : 0;
-    state.error = status === 403
-      ? "Refract import needs the history:read permission. Create a key with that scope."
-      : status === 401
-        ? "Refract rejected the API key; reconnect in settings."
-        : error instanceof Error ? error.message : "Refract history import failed";
-    state.nextAt = Date.now() + (status === 401 || status === 403
-      ? 60 * 60_000
-      : Math.max(error instanceof RefractApiError ? error.retryAfterMs : 0, 60_000));
+    state.error =
+      status === 403
+        ? "Refract import needs the history:read permission. Create a key with that scope."
+        : status === 401
+          ? "Refract rejected the API key; reconnect in settings."
+          : error instanceof Error
+            ? error.message
+            : "Refract history import failed";
+    state.nextAt =
+      Date.now() +
+      (status === 401 || status === 403
+        ? 60 * 60_000
+        : Math.max(error instanceof RefractApiError ? error.retryAfterMs : 0, 60_000));
     write(state);
   } finally {
     running = false;

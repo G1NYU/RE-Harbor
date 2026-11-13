@@ -83,15 +83,13 @@ export function RefractPanel() {
   return (
     <Section
       title={t("Refract watched-history sync")}
-      subtitle={t(
-        "Sync completed movies and episodes between Harbor and Refract.",
-      )}
+      subtitle={t("Sync completed movies and episodes between Harbor and Refract.")}
     >
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            Create a Refract API key with profile:read, library:read, history:read and history:write.
-            Never share or commit the key.
+            Create a Refract API key with profile:read, library:read, history:read and
+            history:write. Never share or commit the key.
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
             {t("Refract personal API key")}
@@ -144,7 +142,8 @@ export function RefractPanel() {
             {status.message ? ` · ${status.message}` : ""}
           </p>
           <p className={ROW_DESC}>
-            Refract → Harbor: {incoming.imported} imported · {incoming.active ? "up to date" : incoming.phase}
+            Refract → Harbor: {incoming.imported} imported ·{" "}
+            {incoming.active ? "up to date" : incoming.phase}
             {incoming.error ? ` · ${incoming.error}` : ""}
           </p>
           {status.failures.length > 0 && (

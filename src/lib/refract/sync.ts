@@ -111,8 +111,7 @@ function parseId(raw: string, kind: Job["type"]) {
   let m = /^imdb:(tt\d+)$/i.exec(raw);
   if (m) return { type: "imdb" as const, id: m[1] };
   m = /^tmdb:(movie|tv):(\d+)$/i.exec(raw);
-  if (m && m[1] === (kind === "movie" ? "movie" : "tv"))
-    return { type: "tmdb" as const, id: m[2] };
+  if (m && m[1] === (kind === "movie" ? "movie" : "tv")) return { type: "tmdb" as const, id: m[2] };
   m = /^tvdb:(\d+)$/i.exec(raw);
   if (m && kind === "episode") return { type: "tvdb" as const, id: m[1] };
   return null;

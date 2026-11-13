@@ -39,7 +39,8 @@ function harness() {
       manualWatchedState: (id, season, number) => watchedEpisodes.get(`${id}|${season}|${number}`),
       applyRemoteWatched: (id, add) => {
         calls.push(["apply-episodes", id, add]);
-        for (const episode of add) watchedEpisodes.set(`${id}|${episode.season}|${episode.episode}`, true);
+        for (const episode of add)
+          watchedEpisodes.set(`${id}|${episode.season}|${episode.episode}`, true);
       },
     },
     "@/lib/movie-watched": {
@@ -61,19 +62,23 @@ function harness() {
       listRefractHistory: async (_key, phase) => {
         calls.push(["history", phase]);
         if (failCode) throw new RefractApiError(failCode);
-        return (phase === "episodes" ? episodePages : moviePages).shift() ?? {
-          data: [],
-          next_cursor: null,
-          has_more: false,
-        };
+        return (
+          (phase === "episodes" ? episodePages : moviePages).shift() ?? {
+            data: [],
+            next_cursor: null,
+            has_more: false,
+          }
+        );
       },
       listRefractChanges: async (_key, cursor) => {
         calls.push(["changes", cursor]);
-        return changePages.shift() ?? {
-          data: [],
-          next_cursor: "live-cursor",
-          has_more: false,
-        };
+        return (
+          changePages.shift() ?? {
+            data: [],
+            next_cursor: "live-cursor",
+            has_more: false,
+          }
+        );
       },
     },
   };
@@ -96,11 +101,21 @@ function harness() {
     watchedEpisodes,
     calls,
     storage,
-    setAccount: (id) => { account = id; },
-    setPrimary: (v) => { primary = v; },
-    setKey: (v) => { key = v; },
-    setEnabled: (v) => { enabled = v; },
-    setFailure: (v) => { failCode = v; },
+    setAccount: (id) => {
+      account = id;
+    },
+    setPrimary: (v) => {
+      primary = v;
+    },
+    setKey: (v) => {
+      key = v;
+    },
+    setEnabled: (v) => {
+      enabled = v;
+    },
+    setFailure: (v) => {
+      failCode = v;
+    },
     addEpisodePages: (...pages) => episodePages.push(...pages),
     addMoviePages: (...pages) => moviePages.push(...pages),
     addChangePages: (...pages) => changePages.push(...pages),
@@ -140,9 +155,10 @@ test("first inbound sync takes head before snapshot and imports watched episodes
     h.addMoviePages(page([movie()]));
     h.addChangePages(page([], "cursor-1"));
     await h.sync.pollRefractInbound();
-    assert.deepEqual(h.calls.filter((x) => ["head", "history", "changes"].includes(x[0])).map((x) => x[0]), [
-      "head", "history", "history", "changes",
-    ]);
+    assert.deepEqual(
+      h.calls.filter((x) => ["head", "history", "changes"].includes(x[0])).map((x) => x[0]),
+      ["head", "history", "history", "changes"],
+    );
     assert.equal(h.watchedEpisodes.get("tt11280740|2|4"), true);
     assert.equal(h.watchedEpisodes.get("tmdb:tv:95396|2|4"), true);
     assert.equal(h.watchedMovies.has("tmdb:movie:321"), true);
@@ -160,12 +176,27 @@ test("subsequent poll reuses its change cursor without repeating the full snapsh
   try {
     await h.sync.pollRefractInbound();
     h.calls.length = 0;
-    h.addChangePages(page([{
-      type: "episode_watch", action: "upsert", item: episode(),
-    }], "cursor-2"));
+    h.addChangePages(
+      page(
+        [
+          {
+            type: "episode_watch",
+            action: "upsert",
+            item: episode(),
+          },
+        ],
+        "cursor-2",
+      ),
+    );
     await h.sync.pollRefractInbound();
-    assert.deepEqual(h.calls.filter((c) => c[0] === "changes"), [["changes", "live-cursor"]]);
-    assert.equal(h.calls.some((c) => c[0] === "head" || c[0] === "history"), false);
+    assert.deepEqual(
+      h.calls.filter((c) => c[0] === "changes"),
+      [["changes", "live-cursor"]],
+    );
+    assert.equal(
+      h.calls.some((c) => c[0] === "head" || c[0] === "history"),
+      false,
+    );
     assert.equal(h.watchedEpisodes.get("tt11280740|2|4"), true);
   } finally {
     h.cleanup();
@@ -181,7 +212,10 @@ test("an account change discards the previous account cursor", async () => {
     await h.sync.pollRefractInbound();
     assert.equal(h.calls[0][0], "head");
     assert.equal(h.sync.refractInboundStatus().active, true);
-    assert.equal(JSON.parse(h.storage.get("harbor.refract.inbound.v1")).account, "refract-account-2");
+    assert.equal(
+      JSON.parse(h.storage.get("harbor.refract.inbound.v1")).account,
+      "refract-account-2",
+    );
   } finally {
     h.cleanup();
   }
@@ -217,10 +251,21 @@ test("remote deletes don't erase potentially independently watched Harbor items"
   try {
     h.watchedEpisodes.set("tt11280740|2|4", true);
     h.watchedMovies.add("tmdb:movie:321");
-    h.addChangePages(page([
-      { type: "episode_watch", action: "delete", show: episode().show.ids, episode: episode().episode, item: null },
-      { type: "movie_play", action: "delete", movie: movie().movie.ids, item: null },
-    ], "cursor-3"));
+    h.addChangePages(
+      page(
+        [
+          {
+            type: "episode_watch",
+            action: "delete",
+            show: episode().show.ids,
+            episode: episode().episode,
+            item: null,
+          },
+          { type: "movie_play", action: "delete", movie: movie().movie.ids, item: null },
+        ],
+        "cursor-3",
+      ),
+    );
     await h.sync.pollRefractInbound();
     assert.equal(h.watchedEpisodes.get("tt11280740|2|4"), true);
     assert.equal(h.watchedMovies.has("tmdb:movie:321"), true);
