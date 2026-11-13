@@ -86,9 +86,7 @@ function rssLine(input: DumpInput): string {
   const { harborRss, webviewRss, total } = input.nativeMem;
   if (total <= 0) return "  native rss:    unavailable on this platform build";
   const webview =
-    webviewRss > 0
-      ? `webview ${webviewRss.toFixed(0)}`
-      : "webview not attributed on this platform";
+    webviewRss > 0 ? `webview ${webviewRss.toFixed(0)}` : "webview not attributed on this platform";
   return `  native rss:    ${total.toFixed(0)} MB (app ${harborRss.toFixed(0)}, ${webview}) tier ${input.ramTier}`;
 }
 
@@ -163,9 +161,7 @@ function framesSection(input: DumpInput): string[] {
   lines.push(
     "  high average fps still hides a tail. A long p99 with a low max and no long tasks means fill-rate",
   );
-  lines.push(
-    "  or compositor cost, which scales with the backing pixels above, not JS.",
-  );
+  lines.push("  or compositor cost, which scales with the backing pixels above, not JS.");
   return lines;
 }
 
@@ -184,7 +180,9 @@ function slowFramesSection(input: DumpInput): string[] {
     .sort((a, b) => b.ms - a.ms)
     .slice(0, 12);
   lines.push("SLOW FRAMES (long-animation-frame, with the scripts that ran)");
-  lines.push("  before-render = pre-render work; callbacks = rendering callbacks (e.g. rAF / ResizeObserver); layout+paint = work after style/layout begins.");
+  lines.push(
+    "  before-render = pre-render work; callbacks = rendering callbacks (e.g. rAF / ResizeObserver); layout+paint = work after style/layout begins.",
+  );
   for (const { e, ms } of rows) {
     const d = e.detail ?? {};
     lines.push(
@@ -368,8 +366,12 @@ export function buildDumpText(input: DumpInput): string {
   lines.push("");
 
   lines.push("LONG ANIMATION FRAMES (>80ms, browser timing boundaries)");
-  lines.push("  before-render: tasks before rendering; callbacks: rAF and observer callbacks; layout+paint: time after style/layout starts.");
-  lines.push("  These are NOT isolated script/style/paint buckets; forced-layout is the JS-attributed synchronous portion.");
+  lines.push(
+    "  before-render: tasks before rendering; callbacks: rAF and observer callbacks; layout+paint: time after style/layout starts.",
+  );
+  lines.push(
+    "  These are NOT isolated script/style/paint buckets; forced-layout is the JS-attributed synchronous portion.",
+  );
   lines.push("  time         total  before  callbacks  layout+paint  forced   top scripts");
   const loafs = input.events.filter((s) => s.kind === "loaf");
   for (const l of loafs) {

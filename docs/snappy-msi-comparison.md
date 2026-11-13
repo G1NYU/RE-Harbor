@@ -42,6 +42,7 @@ The optimized build must pass TypeScript and focused regression tests before an 
 The first 44-second performance report showed a 4.8 FPS 1% low, a 1.7-second worst frame, 7,420 DOM nodes and 1.15 GB WebView RSS at a ~270 Hz display refresh rate. Its old Long Animation Frame labels were incorrect: the field called "style" was actually **pre-layout rendering callbacks**, while the field called "paint" included **style/layout plus painting**. Older public reports should not be interpreted as isolated style versus paint timings.
 
 This follow-up build:
+
 - Uses ResizeObserver measurements directly in poster components rather than reading bounding rectangles again for every resize callback.
 - Batches the redundant 400 ms lazy-cell fallback intersection checks per row. One timer and one row rect replace separate timers and row reads for each cell.
 - Limits the card expansion follow-scroll geometry reads to approximately 60 times per second even on 240–270 Hz screens.

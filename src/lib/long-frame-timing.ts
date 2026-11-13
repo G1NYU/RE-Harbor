@@ -45,7 +45,9 @@ export function longFrameBreakdown(entry: LongFrameLike): LongFrameBreakdown {
       : null;
   const forcedLayout = (entry.scripts ?? []).reduce((total, script) => {
     const forced = script.forcedStyleAndLayoutDuration;
-    return total + (typeof forced === "number" && Number.isFinite(forced) ? Math.max(0, forced) : 0);
+    return (
+      total + (typeof forced === "number" && Number.isFinite(forced) ? Math.max(0, forced) : 0)
+    );
   }, 0);
 
   return {
