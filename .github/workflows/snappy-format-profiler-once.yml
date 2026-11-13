@@ -1,0 +1,38 @@
+name: One-Time Profiler and Rails Formatter
+
+on:
+  push:
+    branches:
+      - feature/snappy-startup-msi
+    paths:
+      - .github/workflows/snappy-format-profiler-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-profiler:
+    if: github.repository == 'G1NYU/RE-Harbor'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+      - run: vp install --frozen-lockfile
+      - name: Format profiler and rail fixes
+        run: |
+          vp fmt src/components/poster.tsx src/components/row.tsx src/lib/memory-profiler.ts src/lib/memory-dump-text.ts src/lib/long-frame-timing.ts src/components/memory-hud.tsx tests/long-frame-timing.test.mjs docs/snappy-msi-comparison.md .github/workflows/snappy-msi.yml
+          git diff --check
+      - name: Commit canonical format
+        shell: bash
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/components/poster.tsx src/components/row.tsx src/lib/memory-profiler.ts src/lib/memory-dump-text.ts src/lib/long-frame-timing.ts src/components/memory-hud.tsx tests/long-frame-timing.test.mjs docs/snappy-msi-comparison.md .github/workflows/snappy-msi.yml
+            git commit -m "style(perf): format profiler-guided optimization pass"
+            git push origin HEAD:feature/snappy-startup-msi
+          fi
