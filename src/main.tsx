@@ -258,7 +258,7 @@ async function mount() {
     if ("requestIdleCallback" in window) {
       window.requestIdleCallback(warmAwards, { timeout: 5000 });
     } else {
-      window.setTimeout(warmAwards, 2500);
+      setTimeout(warmAwards, 2500);
     }
   }
   createRoot(document.getElementById("root")!).render(
