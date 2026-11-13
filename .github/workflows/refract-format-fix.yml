@@ -1,0 +1,46 @@
+name: Refract One-Time Formatter
+
+on:
+  push:
+    branches:
+      - feature/refract-native-sync-2026
+    paths:
+      - .github/workflows/refract-format-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-refract:
+    if: github.repository == 'G1NYU/RE-Harbor'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+      - run: pnpm install --frozen-lockfile
+      - name: Format only Refract files
+        run: |
+          pnpm exec vp fmt \
+            src/lib/refract/client.ts \
+            src/lib/refract/sync.ts \
+            src/lib/refract/inbound.ts \
+            src/views/settings/refract-panel.tsx \
+            tests/refract-api.test.mjs \
+            tests/refract-sync.test.mjs \
+            tests/refract-inbound.test.mjs
+          git diff --check
+          git diff --stat
+      - name: Commit mechanical formatting
+        shell: bash
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/lib/refract/client.ts src/lib/refract/sync.ts src/lib/refract/inbound.ts src/views/settings/refract-panel.tsx tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-inbound.test.mjs
+            git commit -m "style(refract): apply repository formatter"
+            git push origin HEAD:feature/refract-native-sync-2026
+          fi
