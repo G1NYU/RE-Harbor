@@ -44,9 +44,7 @@ export function RefractPanel() {
       setConnected(true);
       setEnabled(true);
       setInput("");
-      setMessage(
-        `Connected to Refract (${identity}). Future completed watches will sync.`,
-      );
+      setMessage(`Connected to Refract (${identity}). Future completed watches will sync.`);
       startRefractSync();
     } catch {
       setMessage(
@@ -76,8 +74,8 @@ export function RefractPanel() {
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            Create a Refract API key with profile:read, library:read and history:write.
-            Never share or commit the key.
+            Create a Refract API key with profile:read, library:read and history:write. Never share
+            or commit the key.
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
             {t("Refract personal API key")}
@@ -101,11 +99,7 @@ export function RefractPanel() {
               {showKey ? t("Hide") : t("Show")}
             </button>
           </div>
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            className={ROW_ACTION_PRIMARY}
-          >
+          <button type="submit" disabled={busy || !input.trim()} className={ROW_ACTION_PRIMARY}>
             {busy ? t("Verifying...") : t("Connect Refract")}
           </button>
         </form>
