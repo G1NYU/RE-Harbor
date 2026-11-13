@@ -44,7 +44,9 @@ export function RefractPanel() {
       setConnected(true);
       setEnabled(true);
       setInput("");
-      setMessage(`Connected to Refract (${identity}). Future completed watches will sync.`);
+      setMessage(
+        `Connected to Refract (${identity}). Future completed watches will sync.`,
+      );
       startRefractSync();
     } catch {
       setMessage(
