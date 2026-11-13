@@ -14,6 +14,11 @@ import {
   startRefractSync,
   subscribeRefractStatus,
 } from "@/lib/refract/sync";
+import {
+  pollRefractInbound,
+  refractInboundStatus,
+  resetRefractInboundSync,
+} from "@/lib/refract/inbound";
 import { Section, ToggleRow } from "./shared";
 import { ROW_ACTION_PRIMARY, ROW_DESC } from "./kit";
 
@@ -26,8 +31,16 @@ export function RefractPanel() {
   const [message, setMessage] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [status, setStatus] = useState(refractStatus);
+  const [incoming, setIncoming] = useState(refractInboundStatus);
 
-  useEffect(() => subscribeRefractStatus(() => setStatus(refractStatus())), []);
+  useEffect(
+    () =>
+      subscribeRefractStatus(() => {
+        setStatus(refractStatus());
+        setIncoming(refractInboundStatus());
+      }),
+    [],
+  );
 
   const connect = async (event: FormEvent) => {
     event.preventDefault();
@@ -39,13 +52,15 @@ export function RefractPanel() {
       const identity = await verifyRefractKey(key);
       // Never replay watches from another Refract account after replacing a key.
       resetRefractSync();
+      resetRefractInboundSync();
       saveRefractKey(key);
       setRefractEnabled(true);
       setConnected(true);
       setEnabled(true);
       setInput("");
-      setMessage(`Connected to Refract (${identity}). Future completed watches will sync.`);
+      setMessage(`Connected to Refract (${identity}). Watched history sync is enabled.`);
       startRefractSync();
+      void pollRefractInbound();
     } catch {
       setMessage(
         "Could not verify the key via Refract /v1/me. Check permissions and connectivity.",
@@ -59,6 +74,7 @@ export function RefractPanel() {
     setRefractEnabled(false);
     saveRefractKey(null);
     resetRefractSync();
+    resetRefractInboundSync();
     setConnected(false);
     setEnabled(false);
     setMessage("Disconnected from Refract.");
@@ -68,14 +84,14 @@ export function RefractPanel() {
     <Section
       title={t("Refract watched-history sync")}
       subtitle={t(
-        "Mark completed movies and episodes watched in Refract when you watch them in Harbor.",
+        "Sync completed movies and episodes between Harbor and Refract.",
       )}
     >
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            Create a Refract API key with profile:read, library:read and history:write. Never share
-            or commit the key.
+            Create a Refract API key with profile:read, library:read, history:read and history:write.
+            Never share or commit the key.
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
             {t("Refract personal API key")}
@@ -109,20 +125,27 @@ export function RefractPanel() {
             {t("Refract key saved in Harbor's credential store")}
           </p>
           <ToggleRow
-            label={t("Automatically sync completed movies and episodes")}
+            label={t("Sync watched movies and episodes in both directions")}
             sub={t(
-              "Partial playback is not marked watched. This prototype only syncs the primary Harbor profile.",
+              "Refract imports add verified watches without removing local history. Only the primary Harbor profile is synced.",
             )}
             value={enabled}
             onChange={(value) => {
               setRefractEnabled(value);
               setEnabled(value);
-              if (value) retryRefractSync();
+              if (value) {
+                retryRefractSync();
+                void pollRefractInbound();
+              }
             }}
           />
           <p className={ROW_DESC}>
             {status.synced} sent · {status.pending} pending · {status.failed} unmatched
             {status.message ? ` · ${status.message}` : ""}
+          </p>
+          <p className={ROW_DESC}>
+            Refract → Harbor: {incoming.imported} imported · {incoming.active ? "up to date" : incoming.phase}
+            {incoming.error ? ` · ${incoming.error}` : ""}
           </p>
           {status.failures.length > 0 && (
             <details className="text-[13px] text-ink-muted">
@@ -137,7 +160,10 @@ export function RefractPanel() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={retryRefractSync}
+              onClick={() => {
+                retryRefractSync();
+                void pollRefractInbound();
+              }}
               className="rounded-[10px] border border-edge px-4 py-2 text-ink"
             >
               {t("Retry pending watches")}
