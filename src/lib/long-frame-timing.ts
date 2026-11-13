@@ -50,7 +50,7 @@ export function longFrameBreakdown(entry: LongFrameLike): LongFrameBreakdown {
 
   return {
     beforeRenderMs: render === null ? duration : render - start,
-    renderCallbacksMs: layout === null || render === null ? 0 : layout - render,
+    renderCallbacksMs: render === null ? 0 : (layout ?? end) - render,
     styleLayoutAndPaintMs: layout === null ? 0 : end - layout,
     forcedLayoutMs: Math.min(duration, forcedLayout),
   };
