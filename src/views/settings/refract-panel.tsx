@@ -74,8 +74,9 @@ export function RefractPanel() {
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            In Refract → Integrations → Access and connected apps, create a key with profile:read, library:read, and history:write.
-            Never commit your key to GitHub.
+            In Refract → Integrations → Access and connected apps, create a key with
+            profile:read, library:read, and history:write. Never commit your key to
+            GitHub.
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
             {t("Refract personal API key")}
@@ -99,7 +100,11 @@ export function RefractPanel() {
               {showKey ? t("Hide") : t("Show")}
             </button>
           </div>
-          <button type="submit" disabled={busy || !input.trim()} className={ROW_ACTION_PRIMARY}>
+          <button
+            type="submit"
+            disabled={busy || !input.trim()}
+            className={ROW_ACTION_PRIMARY}
+          >
             {busy ? t("Verifying...") : t("Connect Refract")}
           </button>
         </form>
