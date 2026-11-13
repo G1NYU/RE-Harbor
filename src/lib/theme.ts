@@ -126,7 +126,8 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   "void-native": {
     id: "void-native",
     name: "VOID Native",
-    blurb: "Experimental first-class VOID layout: native icons, night-purple colors, and selective glass chrome. No theme injection.",
+    blurb:
+      "Experimental first-class VOID layout: native icons, night-purple colors, and selective glass chrome. No theme injection.",
     previewImage: harborPreview,
     swatch: ["#0d0b15", "#1d192b", "#a19acb"],
     tokens: {
