@@ -84,6 +84,13 @@ function LazyChild({
   const [visible, setVisible] = useState(eager);
   const ref = useRef<HTMLDivElement>(null);
 
+  // A row can become visible after the first render. Promote its leading
+  // cards immediately when it enters the viewport instead of waiting for each
+  // child's independent intersection callback.
+  useEffect(() => {
+    if (eager) setVisible(true);
+  }, [eager]);
+
   useEffect(() => {
     if (!root) return;
     const el = ref.current;
@@ -859,7 +866,7 @@ export function Row({
                   : Math.max(baseWidth, Math.min(desiredExpandedWidth, viewportLimit));
               return (
                 <LazyChild
-                  eager={alwaysActive || i < EAGER_COUNT}
+                  eager={alwaysActive || (near && i < EAGER_COUNT)}
                   shape={effShape}
                   span={span}
                   expansion={
