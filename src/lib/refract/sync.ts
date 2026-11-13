@@ -262,9 +262,16 @@ export function retryRefractSync(): void {
   void flushRefractSync();
 }
 export function startRefractSync(): void {
-  if (started) return;
+  if (started) {
+    void import("./inbound").then(({ pollRefractInbound }) => pollRefractInbound());
+    return;
+  }
   started = true;
-  window.addEventListener("online", () => void flushRefractSync());
-  window.setInterval(() => void flushRefractSync(), 60_000);
-  void flushRefractSync();
+  const poll = () => {
+    void flushRefractSync();
+    void import("./inbound").then(({ pollRefractInbound }) => pollRefractInbound());
+  };
+  window.addEventListener("online", poll);
+  window.setInterval(poll, 60_000);
+  poll();
 }
