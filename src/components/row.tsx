@@ -31,6 +31,55 @@ const EAGER_COUNT = 6;
 const NEAR_MARGIN = "300px";
 const FAR_RELEASE_MS = 15000;
 
+// A new row can contain dozens of lazy cells. Previously *each* cell scheduled
+// its own 400ms geometry check, interleaving layout reads and React updates.
+// Batch the fallback recheck by row so one callback reads the row rect once and
+// allows React to batch all newly visible cells into one update.
+type VisibilityRecheck = { el: HTMLDivElement; onVisible: () => void };
+type RecheckBatch = { pending: Set<VisibilityRecheck>; timer: number };
+const recheckBatches = new WeakMap<HTMLElement, RecheckBatch>();
+
+function scheduleVisibilityRecheck(
+  root: HTMLElement,
+  el: HTMLDivElement,
+  onVisible: () => void,
+): () => void {
+  let batch = recheckBatches.get(root);
+  if (!batch) {
+    batch = { pending: new Set<VisibilityRecheck>(), timer: 0 };
+    const pendingBatch = batch;
+    pendingBatch.timer = window.setTimeout(() => {
+      recheckBatches.delete(root);
+      const rr = root.getBoundingClientRect();
+      if (rr.width === 0 || rr.height === 0) return;
+      const visible: VisibilityRecheck[] = [];
+      for (const entry of pendingBatch.pending) {
+        const rect = entry.el.getBoundingClientRect();
+        if (
+          rect.right > rr.left - 300 &&
+          rect.left < rr.right + 300 &&
+          rect.bottom > rr.top - 300 &&
+          rect.top < rr.bottom + 300
+        ) {
+          visible.push(entry);
+        }
+      }
+      for (const entry of visible) entry.onVisible();
+      pendingBatch.pending.clear();
+    }, 400);
+    recheckBatches.set(root, pendingBatch);
+  }
+  const item = { el, onVisible };
+  batch.pending.add(item);
+  return () => {
+    batch.pending.delete(item);
+    if (batch.pending.size === 0) {
+      window.clearTimeout(batch.timer);
+      recheckBatches.delete(root);
+    }
+  };
+}
+
 export type RowShape = "portrait" | "landscape" | "service" | "rank" | "tile" | "square" | "cta";
 
 export const TV_CARD_MIN = 318;
@@ -108,21 +157,10 @@ function LazyChild({
       },
       root,
     );
-    const recheck = window.setTimeout(() => {
-      const rect = el.getBoundingClientRect();
-      const rr = root.getBoundingClientRect();
-      if (rr.width === 0 || rr.height === 0) return;
-      const near = 300;
-      const within =
-        rect.right > rr.left - near &&
-        rect.left < rr.right + near &&
-        rect.bottom > rr.top - near &&
-        rect.top < rr.bottom + near;
-      if (within) setVisible(true);
-    }, 400);
+    const stopRecheck = scheduleVisibilityRecheck(root, el, () => setVisible(true));
     return () => {
       stopIo();
-      window.clearTimeout(recheck);
+      stopRecheck();
       if (hideTimer != null) window.clearTimeout(hideTimer);
     };
   }, [root, eager]);
@@ -388,10 +426,17 @@ export function Row({
     track.style.scrollBehavior = "auto";
     if (expandedCard) {
       const startedAt = performance.now();
-      const keepExpandedCardVisible = () => {
+      let lastRevealAt = -Infinity;
+      const keepExpandedCardVisible = (now: number) => {
         expansionFrameRef.current = null;
-        if (!drag.current.active) revealExpanded(track, expandedCard.index);
-        if (performance.now() - startedAt < 520) {
+        // On 240/270Hz panels this used to force two geometry reads on every
+        // display frame throughout the 480ms expansion animation. 16ms is a
+        // sufficient tracking interval without thrashing high-refresh layouts.
+        if (now - lastRevealAt >= 16) {
+          lastRevealAt = now;
+          if (!drag.current.active) revealExpanded(track, expandedCard.index);
+        }
+        if (now - startedAt < 520) {
           expansionFrameRef.current = requestAnimationFrame(keepExpandedCardVisible);
         }
       };
