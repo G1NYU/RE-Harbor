@@ -89,8 +89,10 @@ function applyEpisodes(entries: RefractEpisodeWatch[], valid: () => boolean): nu
   let accepted = 0;
   for (const entry of entries) {
     if (!valid()) return accepted;
-    const { season, number } = entry.episode || {};
-    if (!Number.isInteger(season) || season < 0 || !Number.isInteger(number) || number < 1)
+    const season = entry.episode?.season;
+    const number = entry.episode?.number;
+    if (typeof season !== "number" || !Number.isInteger(season) || season < 0 ||
+        typeof number !== "number" || !Number.isInteger(number) || number < 1)
       continue;
     const ids = harborIds(entry.show, "show");
     if (!ids.length) continue;
@@ -136,9 +138,9 @@ function applyChanges(changes: RefractChange[], valid: () => boolean): number {
       continue;
     const item = change.item as Record<string, unknown>;
     if (change.type === "episode_watch" && item.show && item.episode) {
-      episodes.push(item as RefractEpisodeWatch);
+      episodes.push(item as unknown as RefractEpisodeWatch);
     } else if (change.type === "movie_play" && item.movie) {
-      movies.push(item as RefractMoviePlay);
+      movies.push(item as unknown as RefractMoviePlay);
     }
   }
   return applyEpisodes(episodes, valid) + applyMovies(movies, valid);
