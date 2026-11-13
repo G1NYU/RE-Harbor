@@ -1,7 +1,7 @@
 # Refract native watch-history sync
 
 This review branch is based on `beta-branch`.
-It contains no BatCave or installer changes.
+It contains no BatCave changes. A separate isolated Windows MSI validation workflow is included.
 
 ## Implemented
 
@@ -17,12 +17,18 @@ It contains no BatCave or installer changes.
 - Movies use stable `Idempotency-Key` headers.
 - Episodes use idempotent `PUT` watched-state requests.
 
+## Release authentication: personal API keys
+
+Harbor users will connect their own Refract accounts with a personal API key, consistent with other Harbor tracker connections. OAuth and device-code login are optional future enhancements, **not release blockers**. Never embed one user's API key in an installer, repo, logs, or public configuration. Keep Disconnect and key replacement available in settings.
+
+The existing Harbor native secret-store path persists credentials to `secrets.json` in the app data directory; it is **not OS-keychain encrypted**. Do not describe this as Windows Credential Manager storage or encryption at rest. Review credential file permissions, migration, and backup handling before public release.
+
 ## Not implemented yet
 
 - Refract → Harbor reverse synchronization.
 - Episode-rewatch logging and show rewatch sessions.
-- OAuth app registration and device-code sign-in.
 - Import of Refract library, watchlists or ratings.
+- Optional OAuth app registration and device-code sign-in (post-release enhancement).
 
 ## Test permissions
 
@@ -47,7 +53,7 @@ Never put a personal key into a repository or GitHub issue.
 7. Confirm changing Harbor profiles does not cross-sync.
 8. Review write behavior after manual marks and rewatches.
 
-Do not merge or build a distributed installer before these pass.
+The isolated MSI workflow can produce installable test builds now; do not call the integration production-ready or publish a stable release before live validation and the agreed bidirectional watched-state scope pass.
 
 ## Plan for two-way synchronization
 
@@ -59,7 +65,7 @@ Do not merge or build a distributed installer before these pass.
 6. On `SYNC_RESET_REQUIRED`, recreate the snapshot.
 7. Preview incoming changes before writing to Harbor.
 8. Prevent echo loops and avoid destructive sync by default.
-9. Add OAuth 2.1 public-client authentication later.
+9. Keep personal API keys as the production login method; consider OAuth 2.1 public-client authentication later.
 
 Refract's change feed allows a one-minute background cadence.
 The official API limit is 120 requests per minute per member.
