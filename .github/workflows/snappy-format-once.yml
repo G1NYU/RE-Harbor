@@ -24,7 +24,7 @@ jobs:
       - run: vp install --frozen-lockfile
       - name: Format changed startup and UI code
         run: |
-          vp fmt src/main.tsx src/views/detail.tsx src/views/person.tsx src/views/home.tsx tests/snappy-startup.test.mjs
+          vp fmt src/main.tsx src/views/detail.tsx src/views/person.tsx src/views/home.tsx src/components/row.tsx tests/snappy-startup.test.mjs
           git diff --check
           git diff --stat
       - name: Commit mechanical formatting
@@ -33,7 +33,7 @@ jobs:
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/main.tsx src/views/detail.tsx src/views/person.tsx src/views/home.tsx tests/snappy-startup.test.mjs
+            git add src/main.tsx src/views/detail.tsx src/views/person.tsx src/views/home.tsx src/components/row.tsx tests/snappy-startup.test.mjs
             git commit -m "style(perf): format startup responsiveness pass"
             git push origin HEAD:feature/snappy-startup-msi
           fi
