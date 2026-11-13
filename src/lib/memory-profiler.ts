@@ -177,12 +177,23 @@ function snapshotHeapMB(): number {
   return bytesToMB(mem.usedJSHeapSize);
 }
 
+let lastDomSampleAt = -Infinity;
+let domSample = { nodes: 0, imgs: 0, vids: 0 };
+
 function snapshotDom(): { nodes: number; imgs: number; vids: number } {
   if (typeof document === "undefined") return { nodes: 0, imgs: 0, vids: 0 };
-  const nodes = document.getElementsByTagName("*").length;
-  const imgs = document.images.length;
-  const vids = document.getElementsByTagName("video").length;
-  return { nodes, imgs, vids };
+  // A slow frame can produce three profiler events (frame/longtask/LoAF).
+  // Recounting thousands of DOM nodes for every event artificially adds
+  // work to exactly the frames being investigated. Refresh at most twice/s.
+  const now = nowMs();
+  if (now - lastDomSampleAt < 500) return domSample;
+  lastDomSampleAt = now;
+  domSample = {
+    nodes: document.getElementsByTagName("*").length,
+    imgs: document.images.length,
+    vids: document.getElementsByTagName("video").length,
+  };
+  return domSample;
 }
 
 function pushSample(kind: SampleKind, label: string, detail?: Record<string, unknown>) {
@@ -756,6 +767,7 @@ const api: ProfilerApi = {
   getPeakMB: () => peakHeapMB,
   getNetworkMB: () => bytesToMB(networkBytes),
   reset: () => {
+    lastDomSampleAt = -Infinity;
     samples.length = 0;
     fullHistory.length = 0;
     navStack.length = 0;
