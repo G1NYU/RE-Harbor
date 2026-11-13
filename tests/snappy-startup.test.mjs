@@ -32,3 +32,9 @@ test("parked Home skips background library reconciliation until reactivated", ()
   assert.match(home, /if \(!active\) return;\s*let cancelled = false;\s*const load = \(\) =>/);
   assert.match(home, /\[authKey, active, hideSharedCw\]/);
 });
+
+test("offscreen catalog rails defer leading card components until near the viewport", () => {
+  const row = read("../src/components/row.tsx");
+  assert.match(row, /eager=\{alwaysActive \|\| \(near && i < EAGER_COUNT\)\}/);
+  assert.match(row, /if \(eager\) setVisible\(true\);/);
+});
