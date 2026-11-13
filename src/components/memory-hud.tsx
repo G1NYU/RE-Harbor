@@ -35,7 +35,16 @@ export function MemoryHud() {
   useEffect(() => {
     if (!open) return;
     startProfiler();
-    const unsub = subscribeProfiler(() => force((x) => x + 1));
+    // The collector records every event, but the 400px HUD does not need to
+    // repaint for every frame/LoAF/longtask sample. At 240/270Hz this was
+    // adding frequent panel layout and blur work to the very workload measured.
+    let lastPaintAt = -Infinity;
+    const unsub = subscribeProfiler(() => {
+      const now = performance.now();
+      if (now - lastPaintAt < 250) return;
+      lastPaintAt = now;
+      force((x) => x + 1);
+    });
     return () => {
       unsub();
       stopProfiler();
