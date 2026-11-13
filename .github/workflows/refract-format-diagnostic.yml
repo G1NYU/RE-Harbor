@@ -1,0 +1,23 @@
+name: Refract Format Diagnostic (temporary)
+on:
+  pull_request:
+    branches:
+      - beta-branch
+permissions:
+  contents: read
+jobs:
+  inspect:
+    if: github.head_ref == 'feature/refract-native-sync-2026'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Show formatter-only change
+        run: |
+          vp fmt src/views/settings/refract-panel.tsx
+          git diff -- src/views/settings/refract-panel.tsx
