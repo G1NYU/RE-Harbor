@@ -1939,8 +1939,10 @@ export const DEFAULT_CUSTOM_COLORS: CustomColors = {
   danger: "#d35a3a",
 };
 
+// Experimental VOID fork: fresh profiles start in the native VOID appearance.
+// Existing users keep their saved theme until they select VOID Native.
 export const DEFAULT_THEME: ThemeSettings = {
-  preset: "cool-grey",
+  preset: "void-native",
   backgroundImage: null,
   backgroundDim: 0.65,
   fontPair: "sentient-switzer",
