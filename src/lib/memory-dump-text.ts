@@ -184,10 +184,11 @@ function slowFramesSection(input: DumpInput): string[] {
     .sort((a, b) => b.ms - a.ms)
     .slice(0, 12);
   lines.push("SLOW FRAMES (long-animation-frame, with the scripts that ran)");
+  lines.push("  before-render = pre-render work; callbacks = rendering callbacks (e.g. rAF / ResizeObserver); layout+paint = work after style/layout begins.");
   for (const { e, ms } of rows) {
     const d = e.detail ?? {};
     lines.push(
-      `  ${formatTime(e.ts)}  ${String(Math.round(ms)).padStart(4)}ms  script ${String(d.scriptMs ?? "?")} style ${String(d.styleMs ?? "?")} paint ${String(d.paintMs ?? "?")} blocking ${String(d.blockingMs ?? "?")}`,
+      `  ${formatTime(e.ts)}  ${String(Math.round(ms)).padStart(4)}ms  before-render ${String(d.beforeRenderMs ?? "?")} callbacks ${String(d.renderCallbacksMs ?? "?")} layout+paint ${String(d.styleLayoutAndPaintMs ?? "?")} forced-layout ${String(d.forcedLayoutMs ?? "?")} blocking ${String(d.blockingMs ?? "?")}`,
     );
     const scripts = Array.isArray(d.scripts) ? (d.scripts as string[]) : [];
     if (scripts.length === 0) lines.push("        (no script attribution reported)");
@@ -366,14 +367,16 @@ export function buildDumpText(input: DumpInput): string {
   }
   lines.push("");
 
-  lines.push("LONG ANIMATION FRAMES (>80ms, split into script / style+layout / paint)");
-  lines.push("  time         total   script  style   paint   top scripts");
+  lines.push("LONG ANIMATION FRAMES (>80ms, browser timing boundaries)");
+  lines.push("  before-render: tasks before rendering; callbacks: rAF and observer callbacks; layout+paint: time after style/layout starts.");
+  lines.push("  These are NOT isolated script/style/paint buckets; forced-layout is the JS-attributed synchronous portion.");
+  lines.push("  time         total  before  callbacks  layout+paint  forced   top scripts");
   const loafs = input.events.filter((s) => s.kind === "loaf");
   for (const l of loafs) {
     const d = l.detail ?? {};
     const scripts = Array.isArray(d.scripts) ? (d.scripts as string[]).join(" | ") : "";
     lines.push(
-      `  ${formatTime(l.ts)}  ${String(d.durationMs ?? 0).padStart(5, " ")}ms ${String(d.scriptMs ?? 0).padStart(5, " ")}ms ${String(d.styleMs ?? 0).padStart(5, " ")}ms ${String(d.paintMs ?? 0).padStart(5, " ")}ms  ${scripts}`,
+      `  ${formatTime(l.ts)}  ${String(d.durationMs ?? 0).padStart(5, " ")}ms ${String(d.beforeRenderMs ?? 0).padStart(5, " ")}ms ${String(d.renderCallbacksMs ?? 0).padStart(5, " ")}ms ${String(d.styleLayoutAndPaintMs ?? 0).padStart(5, " ")}ms ${String(d.forcedLayoutMs ?? 0).padStart(5, " ")}ms  ${scripts}`,
     );
   }
   if (loafs.length === 0) {
