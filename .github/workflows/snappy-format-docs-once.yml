@@ -1,0 +1,38 @@
+name: One-Time Snappy Docs Formatter
+
+on:
+  push:
+    branches:
+      - feature/snappy-startup-msi
+    paths:
+      - .github/workflows/snappy-format-docs-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-docs:
+    if: github.repository == 'G1NYU/RE-Harbor'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+      - run: vp install --frozen-lockfile
+      - name: Format comparison notes
+        run: |
+          vp fmt docs/snappy-msi-comparison.md
+          git diff --check
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/snappy-msi-comparison.md
+            git commit -m "style(perf): format MSI comparison notes"
+            git push origin HEAD:feature/snappy-startup-msi
+          fi
