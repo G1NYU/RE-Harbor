@@ -74,9 +74,8 @@ export function RefractPanel() {
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            In Refract → Integrations → Access and connected apps, create a key with
-            profile:read, library:read, and history:write. Never commit your key to
-            GitHub.
+            Create a Refract API key with profile:read, library:read and history:write.
+            Never share or commit the key.
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
             {t("Refract personal API key")}
