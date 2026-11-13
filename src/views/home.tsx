@@ -544,6 +544,9 @@ export function Home({
       setItems([]);
       return;
     }
+    // A parked Home view must not rescan the Stremio library in the background.
+    // When Home becomes active, this effect immediately refreshes it.
+    if (!active) return;
     let cancelled = false;
     const load = () => {
       libraryIfChanged(authKey)
