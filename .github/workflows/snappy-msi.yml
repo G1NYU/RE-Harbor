@@ -33,7 +33,7 @@ jobs:
       - name: TypeScript
         run: pnpm run typecheck
       - name: Refract and snappiness regression tests
-        run: node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-inbound.test.mjs tests/snappy-startup.test.mjs
+        run: node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-inbound.test.mjs tests/snappy-startup.test.mjs tests/long-frame-timing.test.mjs
 
   windows-msi:
     name: Harbor Snappy isolated Windows MSI
