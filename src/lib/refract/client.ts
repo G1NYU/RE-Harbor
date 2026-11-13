@@ -67,9 +67,62 @@ async function request<T>(
   const raw = await response.text();
   return (raw ? JSON.parse(raw) : undefined) as T;
 }
+export type RefractProfile = { id: string; username?: string; display_name?: string };
+export type RefractIds = {
+  refract?: string | null;
+  imdb?: string | null;
+  tmdb?: number | null;
+  tvdb?: number | null;
+};
+export type RefractWork = {
+  ids?: RefractIds;
+  type?: "show" | "movie";
+  is_anime?: boolean;
+};
+export type RefractEpisodeRef = { season: number; number: number };
+export type RefractEpisodeWatch = { show: RefractWork; episode: RefractEpisodeRef };
+export type RefractMoviePlay = { id: string; movie: RefractWork };
+export type RefractChange = {
+  type: string;
+  action: string;
+  show?: RefractIds | null;
+  movie?: RefractIds | null;
+  episode?: RefractEpisodeRef;
+  item?: unknown;
+};
+export type RefractPage<T> = {
+  data: T[];
+  next_cursor: string | null;
+  has_more: boolean;
+};
+
+export async function getRefractProfile(key: string): Promise<RefractProfile> {
+  return request<RefractProfile>(key, "/me");
+}
 export async function verifyRefractKey(key: string): Promise<string> {
-  const profile = await request<{ username?: string; display_name?: string }>(key, "/me");
+  const profile = await getRefractProfile(key);
   return profile?.username || profile?.display_name || "Connected";
+}
+export async function getRefractSyncHead(key: string): Promise<string> {
+  const result = await request<{ cursor: string }>(key, "/changes/head");
+  if (!result?.cursor) throw new Error("Refract did not provide a sync cursor");
+  return result.cursor;
+}
+export async function listRefractHistory<T extends RefractEpisodeWatch | RefractMoviePlay>(
+  key: string,
+  kind: "episodes" | "movies",
+  cursor: string | null,
+): Promise<RefractPage<T>> {
+  const query = new URLSearchParams({ limit: "200" });
+  if (cursor) query.set("cursor", cursor);
+  return request<RefractPage<T>>(key, `/history/${kind}?${query}`);
+}
+export async function listRefractChanges(
+  key: string,
+  cursor: string,
+): Promise<RefractPage<RefractChange>> {
+  const query = new URLSearchParams({ cursor, limit: "100" });
+  return request<RefractPage<RefractChange>>(key, `/changes?${query}`);
 }
 export async function lookupRefract(
   key: string,
