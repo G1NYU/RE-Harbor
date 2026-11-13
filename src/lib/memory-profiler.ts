@@ -6,6 +6,7 @@ import {
   type RenderReportRow,
 } from "./memory-dump-text";
 import { getNativeMem, getRamTier } from "./native-memory";
+import { longFrameBreakdown } from "./long-frame-timing";
 import {
   probeRows,
   renderCauseRows,
@@ -535,6 +536,7 @@ type LoafScript = {
   invoker?: string;
   invokerType?: string;
   duration?: number;
+  forcedStyleAndLayoutDuration?: number;
 };
 
 type LoafEntry = PerformanceEntry & {
@@ -559,30 +561,24 @@ function instrumentLongAnimationFrames() {
       for (const raw of list.getEntries()) {
         const entry = raw as LoafEntry;
         if (entry.duration < 80) continue;
-        const scriptMs = entry.renderStart ? Math.max(0, entry.renderStart - entry.startTime) : 0;
-        const styleMs =
-          entry.styleAndLayoutStart && entry.renderStart
-            ? Math.max(0, entry.styleAndLayoutStart - entry.renderStart)
-            : 0;
-        const paintMs = entry.styleAndLayoutStart
-          ? Math.max(0, entry.startTime + entry.duration - entry.styleAndLayoutStart)
-          : 0;
+        const timing = longFrameBreakdown(entry);
         const scripts = (entry.scripts ?? [])
           .slice()
           .sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0))
           .slice(0, 3)
           .map(
             (s) =>
-              `${s.sourceFunctionName || s.invoker || s.invokerType || "?"} @${shortenUrl(s.sourceURL ?? "")} ${Math.round(s.duration ?? 0)}ms`,
+              `${s.sourceFunctionName || s.invoker || s.invokerType || "?"} @${shortenUrl(s.sourceURL ?? "")} ${Math.round(s.duration ?? 0)}ms${(s.forcedStyleAndLayoutDuration ?? 0) > 0 ? ` (forced layout ${Math.round(s.forcedStyleAndLayoutDuration ?? 0)}ms)` : ""}`,
           );
         pushSample(
           "loaf",
-          `${entry.duration.toFixed(0)}ms frame — script ${scriptMs.toFixed(0)} style ${styleMs.toFixed(0)} paint ${paintMs.toFixed(0)}`,
+          `${entry.duration.toFixed(0)}ms frame — before-render ${timing.beforeRenderMs.toFixed(0)} callbacks ${timing.renderCallbacksMs.toFixed(0)} layout+paint ${timing.styleLayoutAndPaintMs.toFixed(0)}`,
           {
             durationMs: Math.round(entry.duration),
-            scriptMs: Math.round(scriptMs),
-            styleMs: Math.round(styleMs),
-            paintMs: Math.round(paintMs),
+            beforeRenderMs: Math.round(timing.beforeRenderMs),
+            renderCallbacksMs: Math.round(timing.renderCallbacksMs),
+            styleLayoutAndPaintMs: Math.round(timing.styleLayoutAndPaintMs),
+            forcedLayoutMs: Math.round(timing.forcedLayoutMs),
             blockingMs: Math.round(entry.blockingDuration ?? 0),
             scripts,
           },
