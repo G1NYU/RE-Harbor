@@ -106,20 +106,23 @@ function append(s: Store, job: Job): void {
   else s.message = "Refract queue full; unable to save another watch";
 }
 /** Never send title-only matches; Refract resolves externally verified IDs. */
-function parseId(raw: string) {
+function parseId(raw: string, kind: Job["type"]) {
   if (/^tt\d+$/i.test(raw)) return { type: "imdb" as const, id: raw };
   let m = /^imdb:(tt\d+)$/i.exec(raw);
   if (m) return { type: "imdb" as const, id: m[1] };
-  m = /^tmdb:(?:movie|tv):(\d+)$/i.exec(raw);
-  if (m) return { type: "tmdb" as const, id: m[1] };
+  m = /^tmdb:(movie|tv):(\d+)$/i.exec(raw);
+  if (m && m[1] === (kind === "movie" ? "movie" : "tv"))
+    return { type: "tmdb" as const, id: m[2] };
   m = /^tvdb:(\d+)$/i.exec(raw);
-  if (m) return { type: "tvdb" as const, id: m[1] };
+  if (m && kind === "episode") return { type: "tvdb" as const, id: m[1] };
   return null;
 }
 export function enqueueRefractWatch(event: WatchEvent, hint: RefractHint = {}): void {
   // A single personal key must never accidentally receive another Harbor profile's watches.
   if (!refractEnabled() || !activeProfileIsPrimary()) return;
-  const sourceId = parseId(hint.externalId || "") ? hint.externalId! : event.id;
+  const sourceId = parseId(hint.externalId || "", event.type === "movie" ? "movie" : "episode")
+    ? hint.externalId!
+    : event.id;
   const at = event.at || Date.now();
   const s = read();
   const make = (type: Job["type"], season?: number, episode?: number): Job => ({
@@ -155,7 +158,7 @@ export function enqueueRefractWatch(event: WatchEvent, hint: RefractHint = {}): 
 }
 class Unmatched extends Error {}
 async function push(key: string, job: Job): Promise<void> {
-  const parsed = parseId(job.sourceId);
+  const parsed = parseId(job.sourceId, job.type);
   if (!parsed) throw new Unmatched("No verified IMDb/TMDB/TVDB identity");
   const found = await lookupRefract(
     key,
