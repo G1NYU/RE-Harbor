@@ -17,14 +17,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: 24
-      - uses: pnpm/action-setup@v5
-      - run: pnpm install --frozen-lockfile
+          cache: true
+      - run: vp install --frozen-lockfile
       - name: Format only Refract files
         run: |
-          pnpm exec vp fmt \
+          vp fmt \
             src/lib/refract/client.ts \
             src/lib/refract/sync.ts \
             src/lib/refract/inbound.ts \
