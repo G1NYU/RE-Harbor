@@ -397,7 +397,8 @@ function NavItem({
   const t = useT();
   const { settings } = useSettings();
   const navGlyphId = String(view ?? id ?? "");
-  const nativeVoidGlyph = settings.theme.preset === "void-native" && hasVoidNavIcon(navGlyphId);
+  const nativeVoidGlyph =
+    settings.theme.preset === "void-native" && hasVoidNavIcon(navGlyphId);
   const text = t(label);
   const [hovered, setHovered] = useState(false);
   const { open: openContextMenu } = useContextMenu();
@@ -440,7 +441,11 @@ function NavItem({
           data-harbor-sidebar-icon
           className={`relative ${big ? "scale-110" : ""} ${gated ? "opacity-70" : ""}`}
         >
-          {nativeVoidGlyph ? <VoidNavIcon id={navGlyphId} /> : render(Boolean(active || hovered), hovered)}
+          {nativeVoidGlyph ? (
+            <VoidNavIcon id={navGlyphId} />
+          ) : (
+            render(Boolean(active || hovered), hovered)
+          )}
           {gated && (
             <span className="absolute -bottom-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle ring-1 ring-edge">
               <Lock size={9} strokeWidth={2.4} />
