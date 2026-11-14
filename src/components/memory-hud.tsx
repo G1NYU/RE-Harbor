@@ -35,7 +35,16 @@ export function MemoryHud() {
   useEffect(() => {
     if (!open) return;
     startProfiler();
-    const unsub = subscribeProfiler(() => force((x) => x + 1));
+    // The collector records every event, but the 400px HUD does not need to
+    // repaint for every frame/LoAF/longtask sample. At 240/270Hz this was
+    // adding frequent panel layout and blur work to the very workload measured.
+    let lastPaintAt = -Infinity;
+    const unsub = subscribeProfiler(() => {
+      const now = performance.now();
+      if (now - lastPaintAt < 250) return;
+      lastPaintAt = now;
+      force((x) => x + 1);
+    });
     return () => {
       unsub();
       stopProfiler();
@@ -75,11 +84,10 @@ export function MemoryHud() {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-bold text-ink">PROFILER</span>
-          <span style={{ color: heapColor }}>
-            {heap.toFixed(1)}MB
-          </span>
+          <span style={{ color: heapColor }}>{heap.toFixed(1)}MB</span>
           <span className="text-ink-subtle">
-            (Δ{delta >= 0 ? "+" : ""}{delta.toFixed(1)} · peak {peak.toFixed(1)})
+            (Δ{delta >= 0 ? "+" : ""}
+            {delta.toFixed(1)} · peak {peak.toFixed(1)})
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -96,7 +104,9 @@ export function MemoryHud() {
             onClick={() => {
               const r = api.dumpReport();
               if (r) {
-                setToast(`Downloaded ${r.filename} (${r.events} events, ${(r.bytes / 1024).toFixed(1)} KB)`);
+                setToast(
+                  `Downloaded ${r.filename} (${r.events} events, ${(r.bytes / 1024).toFixed(1)} KB)`,
+                );
                 setTimeout(() => setToast(null), 4000);
               }
             }}
@@ -234,9 +244,7 @@ function EventList({ samples }: { samples: Sample[] }) {
         .filter((s) => s.kind !== "tick")
         .map((s, i) => (
           <div key={i} className="flex items-baseline justify-between gap-2 text-[10px]">
-            <span className="shrink-0 text-ink-subtle">
-              [{s.kind}]
-            </span>
+            <span className="shrink-0 text-ink-subtle">[{s.kind}]</span>
             <span className="flex-1 truncate text-ink-muted">{s.label}</span>
             <span className="shrink-0 text-ink">{s.heapMB.toFixed(0)}MB</span>
           </div>

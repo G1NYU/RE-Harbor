@@ -6,6 +6,7 @@ import {
   type RenderReportRow,
 } from "./memory-dump-text";
 import { getNativeMem, getRamTier } from "./native-memory";
+import { longFrameBreakdown } from "./long-frame-timing";
 import {
   probeRows,
   renderCauseRows,
@@ -153,7 +154,8 @@ const FRAME_STALL_MS = 100;
 // seconds, so a scrolling episode that ended before the dump was invisible — which is exactly how
 // "it gets laggier while I scroll" kept reading as a clean 10%.
 const SECOND_HISTORY_MAX = 3600;
-let secondHistory: Array<{ at: number; frames: number; p50: number; p95: number; max: number }> = [];
+let secondHistory: Array<{ at: number; frames: number; p50: number; p95: number; max: number }> =
+  [];
 let secondDts: number[] = [];
 let secondStartAt = 0;
 let frameRaf: number | null = null;
@@ -176,12 +178,23 @@ function snapshotHeapMB(): number {
   return bytesToMB(mem.usedJSHeapSize);
 }
 
+let lastDomSampleAt = -Infinity;
+let domSample = { nodes: 0, imgs: 0, vids: 0 };
+
 function snapshotDom(): { nodes: number; imgs: number; vids: number } {
   if (typeof document === "undefined") return { nodes: 0, imgs: 0, vids: 0 };
-  const nodes = document.getElementsByTagName("*").length;
-  const imgs = document.images.length;
-  const vids = document.getElementsByTagName("video").length;
-  return { nodes, imgs, vids };
+  // A slow frame can produce three profiler events (frame/longtask/LoAF).
+  // Recounting thousands of DOM nodes for every event artificially adds
+  // work to exactly the frames being investigated. Refresh at most twice/s.
+  const now = nowMs();
+  if (now - lastDomSampleAt < 500) return domSample;
+  lastDomSampleAt = now;
+  domSample = {
+    nodes: document.getElementsByTagName("*").length,
+    imgs: document.images.length,
+    vids: document.getElementsByTagName("video").length,
+  };
+  return domSample;
 }
 
 function pushSample(kind: SampleKind, label: string, detail?: Record<string, unknown>) {
@@ -441,14 +454,18 @@ function periodicReport() {
   if (heapJumps.length > 0) {
     console.warn("Heap jumps (>5MB) in last window:");
     for (const { s, jump } of heapJumps) {
-      console.warn(`  +${jump.toFixed(1)}MB @ ${new Date(s.ts).toLocaleTimeString()} after ${s.kind}: ${s.label}`);
+      console.warn(
+        `  +${jump.toFixed(1)}MB @ ${new Date(s.ts).toLocaleTimeString()} after ${s.kind}: ${s.label}`,
+      );
     }
   }
   if (navStack.length > 0) {
     const lastNav = navStack[navStack.length - 1];
     const since = (Date.now() - lastNav.at) / 1000;
     const heapDeltaSinceNav = heap - lastNav.heap;
-    console.info(`Last nav: ${lastNav.label} (${since.toFixed(0)}s ago, Δ${heapDeltaSinceNav >= 0 ? "+" : ""}${heapDeltaSinceNav.toFixed(1)}MB since)`);
+    console.info(
+      `Last nav: ${lastNav.label} (${since.toFixed(0)}s ago, Δ${heapDeltaSinceNav >= 0 ? "+" : ""}${heapDeltaSinceNav.toFixed(1)}MB since)`,
+    );
   }
   console.groupEnd();
 }
@@ -504,7 +521,8 @@ function instrumentClicks() {
     (e) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      const label = target.getAttribute("aria-label") ||
+      const label =
+        target.getAttribute("aria-label") ||
         target.textContent?.trim().slice(0, 40) ||
         target.tagName.toLowerCase();
       pushSample("click", label);
@@ -535,6 +553,7 @@ type LoafScript = {
   invoker?: string;
   invokerType?: string;
   duration?: number;
+  forcedStyleAndLayoutDuration?: number;
 };
 
 type LoafEntry = PerformanceEntry & {
@@ -559,30 +578,24 @@ function instrumentLongAnimationFrames() {
       for (const raw of list.getEntries()) {
         const entry = raw as LoafEntry;
         if (entry.duration < 80) continue;
-        const scriptMs = entry.renderStart ? Math.max(0, entry.renderStart - entry.startTime) : 0;
-        const styleMs =
-          entry.styleAndLayoutStart && entry.renderStart
-            ? Math.max(0, entry.styleAndLayoutStart - entry.renderStart)
-            : 0;
-        const paintMs = entry.styleAndLayoutStart
-          ? Math.max(0, entry.startTime + entry.duration - entry.styleAndLayoutStart)
-          : 0;
+        const timing = longFrameBreakdown(entry);
         const scripts = (entry.scripts ?? [])
           .slice()
           .sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0))
           .slice(0, 3)
           .map(
             (s) =>
-              `${s.sourceFunctionName || s.invoker || s.invokerType || "?"} @${shortenUrl(s.sourceURL ?? "")} ${Math.round(s.duration ?? 0)}ms`,
+              `${s.sourceFunctionName || s.invoker || s.invokerType || "?"} @${shortenUrl(s.sourceURL ?? "")} ${Math.round(s.duration ?? 0)}ms${(s.forcedStyleAndLayoutDuration ?? 0) > 0 ? ` (forced layout ${Math.round(s.forcedStyleAndLayoutDuration ?? 0)}ms)` : ""}`,
           );
         pushSample(
           "loaf",
-          `${entry.duration.toFixed(0)}ms frame — script ${scriptMs.toFixed(0)} style ${styleMs.toFixed(0)} paint ${paintMs.toFixed(0)}`,
+          `${entry.duration.toFixed(0)}ms frame — before-render ${timing.beforeRenderMs.toFixed(0)} callbacks ${timing.renderCallbacksMs.toFixed(0)} layout+paint ${timing.styleLayoutAndPaintMs.toFixed(0)}`,
           {
             durationMs: Math.round(entry.duration),
-            scriptMs: Math.round(scriptMs),
-            styleMs: Math.round(styleMs),
-            paintMs: Math.round(paintMs),
+            beforeRenderMs: Math.round(timing.beforeRenderMs),
+            renderCallbacksMs: Math.round(timing.renderCallbacksMs),
+            styleLayoutAndPaintMs: Math.round(timing.styleLayoutAndPaintMs),
+            forcedLayoutMs: Math.round(timing.forcedLayoutMs),
             blockingMs: Math.round(entry.blockingDuration ?? 0),
             scripts,
           },
@@ -593,7 +606,10 @@ function instrumentLongAnimationFrames() {
   } catch {}
 }
 
-const renderTimings = new Map<string, { count: number; totalMs: number; maxMs: number; lastMs: number }>();
+const renderTimings = new Map<
+  string,
+  { count: number; totalMs: number; maxMs: number; lastMs: number }
+>();
 
 export function recordRender(componentId: string, actualDurationMs: number): void {
   const entry = renderTimings.get(componentId) ?? { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 };
@@ -760,6 +776,7 @@ const api: ProfilerApi = {
   getPeakMB: () => peakHeapMB,
   getNetworkMB: () => bytesToMB(networkBytes),
   reset: () => {
+    lastDomSampleAt = -Infinity;
     samples.length = 0;
     fullHistory.length = 0;
     navStack.length = 0;

@@ -16,7 +16,6 @@ import { HdrOverlayApp } from "@/views/hdr-overlay-app";
 import { hdrOverlayEmitAction } from "@/lib/hdr-overlay";
 import { PipApp } from "@/views/pip";
 import { VideoPipApp } from "@/views/video-pip";
-import "@/lib/awards-history-eager";
 import "@/index.css";
 import "flag-icons/css/flag-icons.min.css";
 import { startTaskbarProgress } from "@/lib/download/taskbar-progress";
@@ -230,13 +229,15 @@ async function mount() {
   ) {
     returnPreferencesReady = completeBetaReturnPreferences(__APP_VERSION__);
   }
+  // Native music database bootstrap can take much longer than the first UI frame.
+  // It runs independently; the music store publishes when its state is ready.
+  if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck) {
+    void initializeMusic();
+  }
   await Promise.all([
     loadSecrets(),
     hydrateCustomThemes().catch(() => {}),
     ensureUiLocale(getUiLanguage()),
-    !isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck
-      ? initializeMusic()
-      : Promise.resolve(),
   ]);
   // Retry pending Refract history only from the regular app window.
   if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck && !isRemote) {
@@ -245,6 +246,21 @@ async function mount() {
   if (!isHdrOverlay && !isModal && !isCaptions && !isDjDeck) void initSubtitleCache();
   if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck)
     startTaskbarProgress();
+  // Desktop awards data is 4.2 MB. Defer parsing it until the app has mounted
+  // and the browser has an idle slice, rather than making the Home entry pay for it.
+  // Existing award corners subscribe to the bundled version and update on arrival.
+  if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck && !isRemote) {
+    const warmAwards = () => {
+      void import("@/lib/awards-history")
+        .then(({ ensureBundledAwards }) => ensureBundledAwards())
+        .catch(() => {});
+    };
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(warmAwards, { timeout: 5000 });
+    } else {
+      setTimeout(warmAwards, 2500);
+    }
+  }
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       {isHdrOverlay ? (

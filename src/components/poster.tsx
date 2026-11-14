@@ -297,8 +297,9 @@ function PosterBody({
     if (qMult === 0) return;
     const el = rootRef.current;
     if (!el) return;
-    return observeResize(el, () => {
-      const box = el.getBoundingClientRect();
+    // ResizeObserver already measured this element. Reading getBoundingClientRect()
+    // again inside every poster's callback can force a layout flush across a rail.
+    return observeResize(el, (box) => {
       if (box.width <= 0) return;
       const need = Math.max(box.width, box.height * RATIO_AR[ratio]);
       // Capped at 2. An Android TV WebView reports devicePixelRatio 4 because it is
