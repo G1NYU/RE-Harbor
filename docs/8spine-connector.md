@@ -64,3 +64,13 @@ The fixture-only runtime uses a fresh subprocess per request, JSON input/output,
 The five runtime tests passed locally under Node 22.16.0 on Linux. Windows and actual Harbor playback remain untested. Node vm is not a security boundary for untrusted JavaScript, the heap cap is not a process-wide memory limit, and Node's permission model is not network isolation. This is development scaffolding, not the production module loader.
 
 Next: design a constrained embedded JS engine in Harbor's existing native worker architecture, with a separately audited, consent-gated network interface and process-level isolation. Keep it disabled for downloaded code until those boundaries are enforced and verified. Packed modules need documented format support; do not unpack them by guessing.
+
+## Native embedded-engine fixture
+
+The standalone crate at `tools/8spine-native-poc` evaluates only compiled-in fixtures with rquickjs 0.14.0 (QuickJS), using the minimal std feature rather than dynamic/native module loading. It accepts one bounded JSON request on stdin and writes one JSON reply. The engine has a 16 MiB heap budget, 256 KiB stack limit, 350 ms interrupt deadline, and a 256 KiB serialized-result cap. The fixture's output URL is deliberately non-routable.
+
+Run `cargo test --manifest-path tools/8spine-native-poc/Cargo.toml`. The dedicated fork workflow builds and tests on Windows and Linux, independently of Harbor's full Tauri build. Initial verification is pending; the local coding environment does not provide Cargo.
+
+This is a native development prototype, not a production sandbox or a registered Harbor connector. It has no HTTP bridge, OS-level confinement, downloaded code execution, or real playback. For production: audit and lock dependencies; place the engine inside an externally supervised, OS-constrained worker; introduce an explicit consent-gated broker; validate result identities and authorized stream URLs; then register the adapter through Harbor's MusicConnector interface. The opaque package format is still unsupported.
+
+Engine API: https://docs.rs/rquickjs/0.14.0/rquickjs/

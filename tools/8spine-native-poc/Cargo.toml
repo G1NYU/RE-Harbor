@@ -1,0 +1,11 @@
+[package]
+name = "harbor-8spine-native-poc"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+rquickjs = { version = "=0.14.0", default-features = false, features = ["std"] }
+serde_json = "1"
