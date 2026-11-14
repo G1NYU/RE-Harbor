@@ -52,3 +52,15 @@ Reference links:
 - https://8spine.club/documentation#api-reference
 - https://github.com/Harborofficial/Harbor/tree/beta-branch/src-tauri/src/music
 - https://github.com/Harborofficial/Harbor/blob/beta-branch/src-tauri/src/music/worker.rs
+
+## Development runtime proof of concept
+
+Run with Node.js 22.13+:
+
+    node --test tests/8spine-runtime.test.mjs
+
+The fixture-only runtime uses a fresh subprocess per request, JSON input/output, an allowlisted locally authored JavaScript fixture, a VM execution deadline, a parent-process wall deadline, bounded output, a V8 old-generation heap limit, a reduced child environment and Node's permission model. The fixture context has no fetch, process, require, timers, console bridge or dynamic code generation. No module file, credential, or arbitrary source code is accepted; the resolved fixture URL is deliberately non-routable. No real media is retrieved.
+
+The five runtime tests passed locally under Node 22.16.0 on Linux. Windows and actual Harbor playback remain untested. Node vm is not a security boundary for untrusted JavaScript, the heap cap is not a process-wide memory limit, and Node's permission model is not network isolation. This is development scaffolding, not the production module loader.
+
+Next: design a constrained embedded JS engine in Harbor's existing native worker architecture, with a separately audited, consent-gated network interface and process-level isolation. Keep it disabled for downloaded code until those boundaries are enforced and verified. Packed modules need documented format support; do not unpack them by guessing.
