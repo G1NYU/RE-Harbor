@@ -1,0 +1,37 @@
+name: Refract CI validation
+on:
+  push:
+    branches: [fix/refract-ci-validation]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          version: 1.5.1
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Format and lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git diff --name-only 2fbc673dd15994e60c8109f5a7e3446efa2dd449 HEAD | grep -E '\.(tsx?|mjs|md)$')
+          vp fmt --check "${files[@]}"
+          mapfile -t code < <(printf '%s\n' "${files[@]}" | grep -E '\.(tsx?|mjs)$')
+          vp check --no-fmt "${code[@]}"
+      - name: Typecheck
+        run: vp run typecheck
+      - name: Focused changed behavior tests
+        run: node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/resume-autosave-session.test.ts tests/activity-watch-events.test.ts tests/i18n-coverage.test.ts tests/watchlist-identity.test.mjs
+      - name: Full test suite
+        run: vp run test
