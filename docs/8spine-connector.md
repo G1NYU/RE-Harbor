@@ -17,12 +17,20 @@ Harbor has a Rust MusicConnector trait with search, resolve, and optional catalo
 
 These statuses may change. The supplied Mornye Roaming project provides an interesting parallel example of an extensible desktop client, but its own extension format does not establish interoperability with 8SPINE modules.
 
+## Repository update — 14 November 2026
+
+The user supplied https://8spine-modules.pages.dev/ as the current module library; its /index.json and /documentation/ were accessible during inspection. The flattened index includes category:modules and other publisher-specific categories alongside an external_sources list. The probe now defaults to this index, reads all published music categories without following external indexes or downloading executable packages, and skips artwork/access-only records. The repository's listing is not proof that a module is playable or authorized. Individual package retrieval was not verified.
+
+A reference contract adapter (tools/8spine-fixture-contract.mjs) exercises the documented search and resolution methods using only locally authored fixture objects and a non-routable example.invalid URL. It is intentionally not a loader, sandbox, production adapter, or playback test. Packed modules remain unsupported.
+
 ## How to run this stage
 
 From the root of the fork:
 
     node tools/8spine-probe.mjs
     node tools/8spine-probe.mjs --json
+    node tools/8spine-probe.mjs --inspect-packages # optional format-only inspection
+    node --test tests/8spine-fixture-contract.test.mjs
     node tools/8spine-probe.mjs --index=https://example.org/index.json
     node --test tests/8spine-probe.test.mjs
 

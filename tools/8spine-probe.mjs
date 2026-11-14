@@ -2,15 +2,12 @@
 /**
  * 8SPINE repository compatibility probe for Harbor.
  * Intentionally never executes downloaded module code.
- * Usage: node tools/8spine-probe.mjs [--json] [--index=https://.../index.json]
+ * Usage: node tools/8spine-probe.mjs [--json] [--index=https://.../index.json] [--inspect-packages]
  */
 import { pathToFileURL } from 'node:url';
 
 export const DEFAULT_INDEXES = [
-  'https://8spine-modules.vercel.app/index.json',
-  'https://jimmy-iota.vercel.app/index.json',
-  'https://kinetic.xander12.workers.dev/index.json',
-  'https://raw.githubusercontent.com/a1xh1m5/reverb-spine/refs/heads/main/index.json',
+  'https://8spine-modules.pages.dev/index.json',
 ];
 
 const MAX_INDEX_BYTES = 256 * 1024;
@@ -33,30 +30,42 @@ export function checkedUrl(value, base) {
   return url.href;
 }
 
-/** 8SPINE indexes group source modules under the literal `category:modules` key. */
+/** Flatten published music module categories. Never follow external indexes automatically. */
 export function parseIndex(data, indexUrl) {
   const root = typeof data === 'string' ? JSON.parse(data) : data;
-  if (!root || typeof root !== 'object' || Array.isArray(root) ||
-      !Array.isArray(root['category:modules'])) {
-    throw new Error('No category:modules array in repository index');
+  if (!root || typeof root !== 'object' || Array.isArray(root)) {
+    throw new Error('Invalid repository index');
   }
+  const categories = Object.entries(root).filter(([key, value]) =>
+    key.startsWith('category:') && Array.isArray(value));
+  if (!categories.length) throw new Error('No category:modules or other category arrays in repository index');
   const seen = new Set();
-  return root['category:modules'].map(entry => {
-    if (!entry || typeof entry !== 'object' || entry.type !== 'MODULE' ||
-        typeof entry.id !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(entry.id) ||
-        seen.has(entry.id) || typeof entry.name !== 'string') return null;
-    seen.add(entry.id);
-    const target = typeof entry.download === 'string' ? entry.download : entry.file;
-    if (typeof target !== 'string' || !target.trim()) return null;
-    let download;
-    try { download = checkedUrl(target, indexUrl); } catch { return null; }
-    return {
-      id: entry.id,
-      name: entry.name,
-      version: typeof entry.version === 'string' ? entry.version : 'unknown',
-      download,
-    };
-  }).filter(Boolean);
+  const rows = [];
+  for (const [category, entries] of categories) {
+    if (category === 'category:artworks' || category === 'category:testing') continue;
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object' || entry.type !== 'MODULE' ||
+          typeof entry.id !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/.test(entry.id) ||
+          typeof entry.name !== 'string' || !entry.name.trim()) continue;
+      const target = typeof entry.download === 'string' ? entry.download : entry.file;
+      if (typeof target !== 'string' || !target.trim()) continue;
+      let download;
+      try { download = checkedUrl(target, indexUrl); } catch { continue; }
+      if (seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      rows.push({
+        id: entry.id,
+        name: entry.name,
+        version: typeof entry.version === 'string' ? entry.version : 'unknown',
+        download,
+        category: category.slice('category:'.length),
+        author: typeof entry.author === 'string' ? entry.author : null,
+        tags: Array.isArray(entry.tags) ? entry.tags.filter(t => typeof t === 'string').slice(0, 20) : [],
+      });
+      if (rows.length >= 1000) return rows;
+    }
+  }
+  return rows;
 }
 
 export function classifyModule(buffer) {
@@ -109,12 +118,16 @@ async function fetchLimited(input, maxBytes) {
   throw new Error('Too many redirects');
 }
 
-export async function probeIndex(indexUrl) {
+export async function probeIndex(indexUrl, { inspectPackages = false } = {}) {
   const record = { indexUrl, status: 'error', modules: [] };
   try {
     const { bytes, url } = await fetchLimited(indexUrl, MAX_INDEX_BYTES);
     const modules = parseIndex(bytes.toString('utf8'), url);
     record.status = 'ok';
+    if (!inspectPackages) {
+      record.modules = modules.map(module => ({ ...module, status: 'catalogued-not-inspected' }));
+      return record;
+    }
     record.modules = await Promise.all(modules.map(async module => {
       try {
         const { bytes: payload } = await fetchLimited(module.download, MAX_MODULE_BYTES);
@@ -145,7 +158,8 @@ export async function main(args = process.argv.slice(2)) {
   const json = args.includes('--json');
   const indexes = args.filter(arg => arg.startsWith('--index=')).map(arg => arg.slice('--index='.length));
   const targets = indexes.length ? indexes : DEFAULT_INDEXES;
-  const results = await Promise.all(targets.map(probeIndex));
+  const inspectPackages = args.includes('--inspect-packages');
+  const results = await Promise.all(targets.map(index => probeIndex(index, { inspectPackages })));
   if (json) console.log(JSON.stringify(results, null, 2));
   else printHuman(results);
   return results.some(result => result.status !== 'ok') ? 1 : 0;
