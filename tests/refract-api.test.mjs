@@ -100,3 +100,10 @@ test("Refract 429 uses server-supplied Retry-After delay", async () => {
       error.retryAfterMs === 13000,
   );
 });
+
+test("Refract is registered in the visible settings sidebar and tracker panel", () => {
+  const registry = readFileSync(new URL("../src/views/settings/tab-registry.ts", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../src/views/settings/trackers-panel.tsx", import.meta.url), "utf8");
+  assert.match(registry, /trackers:\s*\[[\s\S]*?id: "refract"/);
+  assert.match(panel, /active === "refract" && <RefractPanel/);
+});
