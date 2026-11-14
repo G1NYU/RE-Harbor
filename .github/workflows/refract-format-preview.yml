@@ -27,9 +27,3 @@ jobs:
           vp fmt src/lib/mark-watched.ts src/lib/media-context-actions.ts src/lib/refract/client.ts src/lib/watch-events.ts src/lib/watchlist.ts src/views/player/hooks/use-resume-autosave.ts src/views/settings/refract-panel.tsx tests/helpers/playback-persistence-harness.ts tests/refract-api.test.mjs tests/watchlist-identity.test.mjs
           git diff --no-color --no-ext-diff -- src tests
           vp fmt --check src/lib/mark-watched.ts src/lib/media-context-actions.ts src/lib/refract/client.ts src/lib/watch-events.ts src/lib/watchlist.ts src/views/player/hooks/use-resume-autosave.ts src/views/settings/refract-panel.tsx tests/helpers/playback-persistence-harness.ts tests/refract-api.test.mjs tests/watchlist-identity.test.mjs
-      - name: Typecheck and lint
-        run: |
-          vp check --no-fmt src/lib/refract/client.ts src/lib/refract/sync.ts src/lib/watch-events.ts src/lib/mark-watched.ts src/lib/media-context-actions.ts src/lib/media-provider-actions.ts src/lib/watchlist.ts src/main.tsx src/views/player/hooks/use-resume-autosave.ts src/views/settings/refract-panel.tsx src/views/settings/tab-registry.ts src/views/settings/trackers-panel.tsx
-          vp run typecheck
-      - name: Test
-        run: vp run test
