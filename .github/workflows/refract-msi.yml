@@ -1,0 +1,92 @@
+name: Refract Windows MSI Validation
+
+on:
+  push:
+    branches:
+      - feature/refract-native-sync-2026
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refract-msi-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HARBOR_CAPSTAN_OPTIONAL: "1"
+  HARBOR_LIBMPV_URL: "https://github.com/Harborofficial/Harbor/releases/download/libmpv-windows-x64/libmpv-2.dll"
+
+jobs:
+  refract-checks:
+    name: Refract focused validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript
+        run: pnpm run typecheck
+      - name: Refract API and synchronization tests
+        run: node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-inbound.test.mjs
+
+  windows-msi:
+    name: Harbor Refract isolated Windows MSI
+    needs: refract-checks
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.401"
+      - name: Stage Pokemon resources
+        shell: bash
+        run: node tools/pokemon-engine/build.mjs --fetch-source "$RUNNER_TEMP/harbor-pokemon-source" --output src-tauri/resources/pokemon-engine --artifacts "$RUNNER_TEMP/harbor-pokemon-build"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare binaries and fonts
+        run: pnpm run setup
+      - name: Configure isolated Refract install
+        shell: pwsh
+        run: |
+          @'
+          {
+            "productName": "Harbor Refract Test",
+            "identifier": "app.harbor.refract-test",
+            "plugins": {
+              "updater": {
+                "endpoints": []
+              }
+            }
+          }
+          '@ | Set-Content -Path src-tauri/tauri.refract-test.conf.json -Encoding utf8
+      - name: Build Windows MSI
+        run: pnpm tauri build --bundles msi --config src-tauri/tauri.refract-test.conf.json
+      - name: Upload Windows MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-refract-test-windows-msi
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 14
