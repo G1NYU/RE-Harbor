@@ -29,7 +29,6 @@ jobs:
       - name: Build and test standalone embedded engine
         run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml
 
-
   harbor-contract:
     name: Harbor native fixture connector (Linux)
     runs-on: ubuntu-24.04

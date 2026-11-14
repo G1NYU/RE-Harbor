@@ -8,12 +8,12 @@ Harbor has a Rust MusicConnector trait with search, resolve, and optional catalo
 
 8SPINE documents JavaScript modules with searchTracks(query, limit) and getTrackStreamUrl(id, quality). Repository indexes group modules under the literal category:modules key; download fields point to executable modules, not music search API endpoints.
 
-| Repository index | Observation |
-| --- | --- |
-| https://jimmy-iota.vercel.app/index.json | Available; advertises a plain JavaScript module |
+| Repository index                                                                  | Observation                                                   |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| https://jimmy-iota.vercel.app/index.json                                          | Available; advertises a plain JavaScript module               |
 | https://raw.githubusercontent.com/a1xh1m5/reverb-spine/refs/heads/main/index.json | Available; Reverb package begins with the opaque 8SM1. prefix |
-| https://8spine-modules.vercel.app/index.json | HTTP 404 at inspection |
-| https://kinetic.xander12.workers.dev/index.json | Reports upstream index HTTP 404 at inspection |
+| https://8spine-modules.vercel.app/index.json                                      | HTTP 404 at inspection                                        |
+| https://kinetic.xander12.workers.dev/index.json                                   | Reports upstream index HTTP 404 at inspection                 |
 
 These statuses may change. The supplied Mornye Roaming project provides an interesting parallel example of an extensible desktop client, but its own extension format does not establish interoperability with 8SPINE modules.
 
@@ -49,6 +49,7 @@ The probe checks index format, relative download resolution, HTTP failures, HTTP
 Reverb's downloaded content begins with "8SM1.", not JavaScript. The publicly linked 8SPINE API reference does not define that package format or its unpacking procedure. Do not treat it as executable JS. Supporting such packages requires a documented, legitimate loader/format from 8SPINE or the module author.
 
 Reference links:
+
 - https://8spine.club/documentation#api-reference
 - https://github.com/Harborofficial/Harbor/tree/beta-branch/src-tauri/src/music
 - https://github.com/Harborofficial/Harbor/blob/beta-branch/src-tauri/src/music/worker.rs

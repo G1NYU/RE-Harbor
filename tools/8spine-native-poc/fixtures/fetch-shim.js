@@ -10,8 +10,12 @@
     configurable: false,
     writable: false,
     value: async (url, options = {}) => {
-      if (typeof url !== "string" || options === null || typeof options !== "object" ||
-          Object.keys(options).some(key => key !== "method")) {
+      if (
+        typeof url !== "string" ||
+        options === null ||
+        typeof options !== "object" ||
+        Object.keys(options).some((key) => key !== "method")
+      ) {
         throw new Error("invalid-request");
       }
       const reply = parse(bridge(stringify({ url, method: options.method ?? "GET" })));

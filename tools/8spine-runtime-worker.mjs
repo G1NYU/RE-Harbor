@@ -1,5 +1,5 @@
 // Development-only worker. Never accepts downloaded or caller-supplied source.
-import vm from 'node:vm';
+import vm from "node:vm";
 
 const FIXTURES = Object.freeze({
   catalog: `return {
@@ -33,14 +33,18 @@ async function run() {
   const chunks = [];
   for await (const chunk of process.stdin) {
     size += chunk.length;
-    if (size > MAX_INPUT) throw new Error('input-limit');
+    if (size > MAX_INPUT) throw new Error("input-limit");
     chunks.push(chunk);
   }
-  const request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  if (!Object.hasOwn(FIXTURES, request.fixture) || !['search', 'resolve'].includes(request.operation))
-    throw new Error('invalid-request');
+  const request = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  if (
+    !Object.hasOwn(FIXTURES, request.fixture) ||
+    !["search", "resolve"].includes(request.operation)
+  )
+    throw new Error("invalid-request");
   const ctx = vm.createContext(Object.assign(Object.create(null), { console: undefined }), {
-    codeGeneration: { strings: false, wasm: false }, microtaskMode: 'afterEvaluate',
+    codeGeneration: { strings: false, wasm: false },
+    microtaskMode: "afterEvaluate",
   });
   // Only a fixed local fixture is interpolated as code. Request data is JSON, never code.
   const payload = JSON.stringify(JSON.stringify(request));
@@ -52,17 +56,27 @@ async function run() {
       : moduleInstance.getTrackStreamUrl(input.trackId, input.quality))
       .then(value => { globalThis.__result = JSON.stringify(value); }, () => { globalThis.__failed = true; });`;
   vm.runInContext(source, ctx, { timeout: 200 });
-  if (ctx.__failed) throw new Error('fixture-failed');
-  if (typeof ctx.__result !== 'string') throw new Error('unsettled-result');
-  if (Buffer.byteLength(ctx.__result) > MAX_OUTPUT) throw new Error('output-limit');
+  if (ctx.__failed) throw new Error("fixture-failed");
+  if (typeof ctx.__result !== "string") throw new Error("unsettled-result");
+  if (Buffer.byteLength(ctx.__result) > MAX_OUTPUT) throw new Error("output-limit");
   return JSON.parse(ctx.__result);
 }
 try {
   const result = await run();
   process.stdout.write(JSON.stringify({ ok: true, result }));
 } catch (error) {
-  const known = ['input-limit', 'output-limit', 'invalid-request', 'fixture-failed', 'unsettled-result'];
-  const code = error?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT' ? 'execution-timeout'
-    : known.includes(error?.message) ? error.message : 'worker-failed';
+  const known = [
+    "input-limit",
+    "output-limit",
+    "invalid-request",
+    "fixture-failed",
+    "unsettled-result",
+  ];
+  const code =
+    error?.code === "ERR_SCRIPT_EXECUTION_TIMEOUT"
+      ? "execution-timeout"
+      : known.includes(error?.message)
+        ? error.message
+        : "worker-failed";
   process.stdout.write(JSON.stringify({ ok: false, error: code }));
 }
