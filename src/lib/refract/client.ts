@@ -4,7 +4,7 @@ import { readSharedSecret, writeSharedSecret } from "@/lib/secret-store";
 const KEY = "harbor.refract.key.v1";
 const ENABLED_KEY = "harbor.refract.enabled.v1";
 const AUTO_THRESHOLD_KEY = "harbor.refract.auto-threshold.v1";
-export const REFRACT_AUTO_THRESHOLDS = [50, 60, 70, 80, 85] as const;
+export const REFRACT_AUTO_THRESHOLDS = ["3m", "5m", "10m", 50, 60, 70, 80, 85] as const;
 export type RefractAutoThreshold = (typeof REFRACT_AUTO_THRESHOLDS)[number];
 const DEFAULT_AUTO_THRESHOLD: RefractAutoThreshold = 70;
 const API = "https://getrefract.app/v1";
@@ -44,24 +44,24 @@ export function setRefractEnabled(enabled: boolean): void {
 }
 export function getRefractAutoThreshold(): RefractAutoThreshold {
   try {
-    const raw = Number(localStorage.getItem(AUTO_THRESHOLD_KEY));
-    return REFRACT_AUTO_THRESHOLDS.find((value) => value === raw) ?? DEFAULT_AUTO_THRESHOLD;
+    const raw = localStorage.getItem(AUTO_THRESHOLD_KEY);
+    return REFRACT_AUTO_THRESHOLDS.find((value) => String(value) === raw) ?? DEFAULT_AUTO_THRESHOLD;
   } catch {
     return DEFAULT_AUTO_THRESHOLD;
   }
 }
-export function setRefractAutoThreshold(value: number): void {
-  if (REFRACT_AUTO_THRESHOLDS.some((allowed) => allowed === value))
+export function setRefractAutoThreshold(value: number | string): void {
+  if (REFRACT_AUTO_THRESHOLDS.some((allowed) => String(allowed) === String(value)))
     localStorage.setItem(AUTO_THRESHOLD_KEY, String(value));
 }
-/** Compare playback position, not elapsed wall-clock time; unknown durations never qualify. */
+/** Use the media position, not wall-clock time. Seeking may cross the threshold. */
 export function refractPlaybackReached(positionSec: number, durationSec: number): boolean {
-  return (
-    Number.isFinite(positionSec) &&
-    Number.isFinite(durationSec) &&
-    durationSec > 0 &&
-    positionSec >= (durationSec * getRefractAutoThreshold()) / 100
-  );
+  if (!Number.isFinite(positionSec) || !Number.isFinite(durationSec) || durationSec <= 0)
+    return false;
+  const threshold = getRefractAutoThreshold();
+  const target =
+    typeof threshold === "string" ? Number.parseInt(threshold, 10) * 60 : (durationSec * threshold) / 100;
+  return positionSec >= target;
 }
 async function request<T>(
   key: string,

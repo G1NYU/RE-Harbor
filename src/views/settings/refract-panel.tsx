@@ -5,7 +5,6 @@ import {
   getRefractAutoThreshold,
   REFRACT_AUTO_THRESHOLDS,
   setRefractAutoThreshold,
-  type RefractAutoThreshold,
   refractEnabled,
   saveRefractKey,
   setRefractEnabled,
@@ -151,7 +150,10 @@ export function RefractPanel() {
               value={threshold}
               disabled={!enabled}
               onChange={(event) => {
-                const value = Number(event.target.value) as RefractAutoThreshold;
+                const value = REFRACT_AUTO_THRESHOLDS.find(
+                  (option) => String(option) === event.target.value,
+                );
+                if (value === undefined) return;
                 setRefractAutoThreshold(value);
                 setThreshold(value);
               }}
@@ -159,14 +161,16 @@ export function RefractPanel() {
             >
               {REFRACT_AUTO_THRESHOLDS.map((value) => (
                 <option key={value} value={value}>
-                  {value}%{value === 70 ? " (recommended)" : ""}
+                  {typeof value === "string"
+                    ? `After ${Number.parseInt(value, 10)} minutes`
+                    : `${value}%${value === 70 ? " (default)" : ""}`}
                 </option>
               ))}
             </select>
             <p className={ROW_DESC}>
-              Automatically log a movie or episode as watched in Refract when playback reaches
-              this percentage. Seeking past the threshold also qualifies. This is watched history,
-              not a live playback position; imported watches can affect Harbor's watched status.
+              Log a movie or episode in Refract when playback reaches the selected time or percentage.
+              Seeking past it also qualifies. Early logging counts as watched in Refract, not partially
+              watched, and can advance Up Next or affect Harbor's watched state through reverse sync.
             </p>
           </div>
           <p className={ROW_DESC}>

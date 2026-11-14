@@ -134,3 +134,29 @@ test("automatic Refract playback threshold defaults to 70 percent and is configu
     globalThis.localStorage = original;
   }
 });
+
+test("time-based Refract logging supports 3, 5 and 10 minutes", () => {
+  const original = globalThis.localStorage;
+  const storage = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+  };
+  try {
+    const { client } = harness();
+    for (const [mode, seconds] of [["3m", 180], ["5m", 300], ["10m", 600]]) {
+      client.setRefractAutoThreshold(mode);
+      assert.equal(client.getRefractAutoThreshold(), mode);
+      assert.equal(client.refractPlaybackReached(seconds - 1, 2700), false);
+      assert.equal(client.refractPlaybackReached(seconds, 2700), true);
+      assert.equal(client.refractPlaybackReached(seconds, 7200), true);
+      assert.equal(client.refractPlaybackReached(seconds, 0), false);
+    }
+    client.setRefractAutoThreshold("invalid");
+    assert.equal(client.getRefractAutoThreshold(), "10m");
+    client.setRefractAutoThreshold(70);
+    assert.equal(client.getRefractAutoThreshold(), 70);
+  } finally {
+    globalThis.localStorage = original;
+  }
+});
