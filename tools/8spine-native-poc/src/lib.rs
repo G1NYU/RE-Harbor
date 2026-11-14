@@ -2,6 +2,8 @@
 mod broker;
 // Host-only development API; never exposed to the JavaScript runtime.
 pub mod http_transport;
+// Harbor-shaped fixture adapter, not registered with the application yet.
+pub mod adapter;
 use rquickjs::{Context, Function, Promise, Runtime};
 use std::cell::Cell;
 use std::rc::Rc;
