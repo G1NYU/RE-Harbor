@@ -2,6 +2,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useT } from "@/lib/i18n";
 import {
   getRefractKey,
+  getRefractAutoThreshold,
+  REFRACT_AUTO_THRESHOLDS,
+  setRefractAutoThreshold,
+  type RefractAutoThreshold,
   refractEnabled,
   saveRefractKey,
   setRefractEnabled,
@@ -26,6 +30,7 @@ export function RefractPanel() {
   const t = useT();
   const [connected, setConnected] = useState(() => getRefractKey() !== null);
   const [enabled, setEnabled] = useState(() => refractEnabled());
+  const [threshold, setThreshold] = useState(getRefractAutoThreshold);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -137,6 +142,33 @@ export function RefractPanel() {
               }
             }}
           />
+          <div className="flex max-w-xl flex-col gap-2">
+            <label htmlFor="refract-auto-threshold" className="text-[14px] font-medium text-ink">
+              Automatic watch threshold
+            </label>
+            <select
+              id="refract-auto-threshold"
+              value={threshold}
+              disabled={!enabled}
+              onChange={(event) => {
+                const value = Number(event.target.value) as RefractAutoThreshold;
+                setRefractAutoThreshold(value);
+                setThreshold(value);
+              }}
+              className="h-11 w-48 rounded-[10px] border border-edge bg-elevated px-3 text-ink"
+            >
+              {REFRACT_AUTO_THRESHOLDS.map((value) => (
+                <option key={value} value={value}>
+                  {value}%{value === 70 ? " (recommended)" : ""}
+                </option>
+              ))}
+            </select>
+            <p className={ROW_DESC}>
+              Automatically log a movie or episode as watched in Refract when playback reaches
+              this percentage. Seeking past the threshold also qualifies. This is watched history,
+              not a live playback position; imported watches can affect Harbor's watched status.
+            </p>
+          </div>
           <p className={ROW_DESC}>
             {status.synced} sent · {status.pending} pending · {status.failed} unmatched
             {status.message ? ` · ${status.message}` : ""}

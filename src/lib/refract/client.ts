@@ -3,6 +3,10 @@ import { readSharedSecret, writeSharedSecret } from "@/lib/secret-store";
 
 const KEY = "harbor.refract.key.v1";
 const ENABLED_KEY = "harbor.refract.enabled.v1";
+const AUTO_THRESHOLD_KEY = "harbor.refract.auto-threshold.v1";
+export const REFRACT_AUTO_THRESHOLDS = [50, 60, 70, 80, 85] as const;
+export type RefractAutoThreshold = (typeof REFRACT_AUTO_THRESHOLDS)[number];
+const DEFAULT_AUTO_THRESHOLD: RefractAutoThreshold = 70;
 const API = "https://getrefract.app/v1";
 
 export type RefractLookup = {
@@ -37,6 +41,27 @@ export function refractEnabled(): boolean {
 }
 export function setRefractEnabled(enabled: boolean): void {
   localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
+}
+export function getRefractAutoThreshold(): RefractAutoThreshold {
+  try {
+    const raw = Number(localStorage.getItem(AUTO_THRESHOLD_KEY));
+    return REFRACT_AUTO_THRESHOLDS.find((value) => value === raw) ?? DEFAULT_AUTO_THRESHOLD;
+  } catch {
+    return DEFAULT_AUTO_THRESHOLD;
+  }
+}
+export function setRefractAutoThreshold(value: number): void {
+  if (REFRACT_AUTO_THRESHOLDS.some((allowed) => allowed === value))
+    localStorage.setItem(AUTO_THRESHOLD_KEY, String(value));
+}
+/** Compare playback position, not elapsed wall-clock time; unknown durations never qualify. */
+export function refractPlaybackReached(positionSec: number, durationSec: number): boolean {
+  return (
+    Number.isFinite(positionSec) &&
+    Number.isFinite(durationSec) &&
+    durationSec > 0 &&
+    positionSec >= (durationSec * getRefractAutoThreshold()) / 100
+  );
 }
 async function request<T>(
   key: string,

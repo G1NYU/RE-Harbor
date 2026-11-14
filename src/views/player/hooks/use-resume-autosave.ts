@@ -3,7 +3,8 @@ import { markAnimeWatching, syncAnimeProgress } from "@/lib/anilist/sync";
 import { markMalWatching, syncMalProgress } from "@/lib/mal/sync";
 import { getSession as getAnilistSession } from "@/lib/anilist/session";
 import { getSession as getMalSession } from "@/lib/mal/session";
-import { activeProfileId } from "@/lib/active-profile-id";
+import { activeProfileId, activeProfileIsPrimary } from "@/lib/active-profile-id";
+import { refractEnabled, refractPlaybackReached } from "@/lib/refract/client";
 import { animeIdentityEligible, resolveAnimeIdentity } from "@/lib/streams/anime-identity";
 import { resolveTrackerAnimeEntry } from "@/lib/anime-tracker-entry";
 import {
@@ -232,7 +233,13 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
       setMovieWatchedLocal(id, true);
       clearLocalCw(id, current.ownerId);
     }
-    if (finished && !current.refractCompleted) {
+    const refractReached =
+      !current.refractCompleted &&
+      activeProfileId() === (current.ownerId ?? "default") &&
+      activeProfileIsPrimary() &&
+      refractEnabled() &&
+      refractPlaybackReached(pos, sn.durationSec);
+    if ((finished || refractReached) && !current.refractCompleted) {
       current.refractCompleted = true;
       recordWatchEvent(
         {

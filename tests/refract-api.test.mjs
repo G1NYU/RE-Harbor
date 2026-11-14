@@ -107,3 +107,30 @@ test("Refract is registered in the visible settings sidebar and tracker panel", 
   assert.match(registry, /trackers:\s*\[[\s\S]*?id: "refract"/);
   assert.match(panel, /active === "refract" && <RefractPanel/);
 });
+
+test("automatic Refract playback threshold defaults to 70 percent and is configurable", () => {
+  const original = globalThis.localStorage;
+  const storage = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+  };
+  try {
+    const { client } = harness();
+    assert.equal(client.getRefractAutoThreshold(), 70);
+    assert.equal(client.refractPlaybackReached(699, 1000), false);
+    assert.equal(client.refractPlaybackReached(700, 1000), true);
+    assert.equal(client.refractPlaybackReached(700, 0), false);
+    assert.equal(client.refractPlaybackReached(700, Infinity), false);
+    client.setRefractAutoThreshold(50);
+    assert.equal(client.getRefractAutoThreshold(), 50);
+    assert.equal(client.refractPlaybackReached(500, 1000), true);
+    client.setRefractAutoThreshold(0);
+    assert.equal(client.getRefractAutoThreshold(), 50);
+    client.setRefractAutoThreshold(85);
+    assert.equal(client.refractPlaybackReached(849, 1000), false);
+    assert.equal(client.refractPlaybackReached(850, 1000), true);
+  } finally {
+    globalThis.localStorage = original;
+  }
+});
