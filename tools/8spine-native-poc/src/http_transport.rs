@@ -21,7 +21,7 @@ pub struct NetworkGrant {
     hosts: BTreeSet<String>,
 }
 
-fn valid_dns_name(name: &str) -> bool {
+pub(crate) fn valid_dns_name(name: &str) -> bool {
     name.len() <= 253
         && name.contains('.')
         && name.split('.').all(|label| {

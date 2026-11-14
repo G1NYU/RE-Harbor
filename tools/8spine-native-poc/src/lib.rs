@@ -4,6 +4,8 @@ mod broker;
 pub mod http_transport;
 // Harbor-shaped fixture adapter, not registered with the application yet.
 pub mod adapter;
+// Host-owned metadata and consent model; no package execution.
+pub mod module_manager;
 use rquickjs::{Context, Function, Promise, Runtime};
 use std::cell::Cell;
 use std::rc::Rc;
