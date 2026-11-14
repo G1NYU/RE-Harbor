@@ -439,9 +439,10 @@ export async function setContextWatched(
         }
       }
       if (watched) {
-        const mapped = nativeAnime && !isMovie && options.imdbId && !options.providerEpisode
-          ? refractMappedEpisodes(episodes)
-          : undefined;
+        const mapped =
+          nativeAnime && !isMovie && options.imdbId && !options.providerEpisode
+            ? refractMappedEpisodes(episodes)
+            : undefined;
         const unsafeAnime = nativeAnime && !isMovie && !options.providerEpisode && !mapped;
         recordWatchEvent(
           {
@@ -451,22 +452,25 @@ export async function setContextWatched(
             poster: meta.poster,
             at: Date.now(),
           },
-          unsafeAnime ? undefined : {
-            externalId: options.imdbId,
-            episodes: isMovie
-              ? undefined
-              : options.providerEpisode
-                ? [
-                    {
-                      season: options.providerEpisode.season,
-                      episode: options.providerEpisode.episode,
-                    },
-                  ]
-                : mapped ?? episodes.map((item) => ({
-                    season: item.imdbSeason ?? item.season,
-                    episode: item.imdbEpisode ?? item.episode,
-                  })),
-          },
+          unsafeAnime
+            ? undefined
+            : {
+                externalId: options.imdbId,
+                episodes: isMovie
+                  ? undefined
+                  : options.providerEpisode
+                    ? [
+                        {
+                          season: options.providerEpisode.season,
+                          episode: options.providerEpisode.episode,
+                        },
+                      ]
+                    : (mapped ??
+                      episodes.map((item) => ({
+                        season: item.imdbSeason ?? item.season,
+                        episode: item.imdbEpisode ?? item.episode,
+                      }))),
+              },
         );
       }
     },

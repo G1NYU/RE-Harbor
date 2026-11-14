@@ -241,14 +241,21 @@ test("watchlist action hooks both acknowledged and legacy paths", () => {
 test("rapid watchlist toggles preserve write order for the same identity", async () => {
   let finishAdd;
   let markStarted;
-  const started = new Promise((resolve) => { markStarted = resolve; });
+  const started = new Promise((resolve) => {
+    markStarted = resolve;
+  });
   const h = harness((_url, init) => {
-    if (init.method === "GET") return new Response(JSON.stringify({
-      data: [{ type: "show", ids: { refract: "fixture-show" } }],
-    }));
+    if (init.method === "GET")
+      return new Response(
+        JSON.stringify({
+          data: [{ type: "show", ids: { refract: "fixture-show" } }],
+        }),
+      );
     if (init.method === "PUT") {
       markStarted();
-      return new Promise((resolve) => { finishAdd = resolve; });
+      return new Promise((resolve) => {
+        finishAdd = resolve;
+      });
     }
     return new Response(null, { status: 204 });
   });
@@ -260,10 +267,16 @@ test("rapid watchlist toggles preserve write order for the same identity", async
     await started;
     const remove = h.client.syncRefractWatchlist("rfk_fixture", title, false, () => {});
     await new Promise((resolve) => setImmediate(resolve));
-    assert.deepEqual(h.calls.map(({ init }) => init.method), ["GET", "PUT"]);
+    assert.deepEqual(
+      h.calls.map(({ init }) => init.method),
+      ["GET", "PUT"],
+    );
     finishAdd(new Response("{}", { status: 201 }));
     await Promise.all([add, remove]);
-    assert.deepEqual(h.calls.map(({ init }) => init.method), ["GET", "PUT", "GET", "DELETE"]);
+    assert.deepEqual(
+      h.calls.map(({ init }) => init.method),
+      ["GET", "PUT", "GET", "DELETE"],
+    );
   } finally {
     globalThis.window = original;
   }

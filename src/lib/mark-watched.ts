@@ -176,13 +176,14 @@ export async function markMetaWatched(
   if (eps.length > 0) {
     setManualWatchedMany(meta.id, eps, true);
     // The legacy bulk action lacks verified anime episode mappings.
-    if (!/^(kitsu|mal|anilist|anidb):/.test(meta.id) && meta.type !== "anime") recordRefractWatch(
-      { id: meta.id, type: "series", name: meta.name, poster: meta.poster, at: Date.now() },
-      {
-        externalId: resolvedImdb ?? (tmdbId != null ? `tmdb:tv:${tmdbId}` : undefined),
-        episodes: eps,
-      },
-    );
+    if (!/^(kitsu|mal|anilist|anidb):/.test(meta.id) && meta.type !== "anime")
+      recordRefractWatch(
+        { id: meta.id, type: "series", name: meta.name, poster: meta.poster, at: Date.now() },
+        {
+          externalId: resolvedImdb ?? (tmdbId != null ? `tmdb:tv:${tmdbId}` : undefined),
+          episodes: eps,
+        },
+      );
   }
   if (!isNuvioProviderActive()) void syncSeriesWatchedToStremio(meta, resolvedImdb);
   const isAnime = /^(kitsu|mal|anilist|anidb):/.test(meta.id);

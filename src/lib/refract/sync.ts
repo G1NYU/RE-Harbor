@@ -109,7 +109,10 @@ function append(s: Store, job: Job): void {
 export function enqueueRefractWatch(event: WatchEvent, hint: RefractHint = {}): void {
   // A single personal key must never accidentally receive another Harbor profile's watches.
   if (!refractEnabled() || !activeProfileIsPrimary()) return;
-  const sourceId = parseRefractHistoryId(hint.externalId || "", event.type === "movie" ? "movie" : "episode")
+  const sourceId = parseRefractHistoryId(
+    hint.externalId || "",
+    event.type === "movie" ? "movie" : "episode",
+  )
     ? hint.externalId!
     : event.id;
   const at = event.at || Date.now();

@@ -65,7 +65,9 @@ function harness() {
     setKey: (v) => {
       key = v;
     },
-    setLookup: (v) => { client.lookupRefract = v; },
+    setLookup: (v) => {
+      client.lookupRefract = v;
+    },
     setOffline: (v) => {
       offline = v;
     },
@@ -174,7 +176,12 @@ test("disabling sync during a lookup preserves the queued watch without sending 
   const h = harness();
   try {
     let finish;
-    h.setLookup(() => new Promise((resolve) => { finish = resolve; }));
+    h.setLookup(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     h.sync.enqueueRefractWatch(movieEvent());
     h.setEnabled(false);
     finish([{ ids: { refract: "movie-ref" } }]);

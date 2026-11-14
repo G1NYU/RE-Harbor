@@ -22,8 +22,12 @@ export function refractMappedEpisodes(
     !mapped.length ||
     mapped.some(
       ({ season, episode }) =>
-        season == null || !Number.isInteger(season) || season < 0 ||
-        episode == null || !Number.isInteger(episode) || episode < 1,
+        season == null ||
+        !Number.isInteger(season) ||
+        season < 0 ||
+        episode == null ||
+        !Number.isInteger(episode) ||
+        episode < 1,
     )
   )
     return undefined;

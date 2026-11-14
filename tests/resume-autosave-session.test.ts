@@ -273,13 +273,20 @@ test("Refract waits for verified anime identity and episode mapping", () => {
   const p = playbackParams(1, 1, { resolvedImdbId: null, resolvedImdbVerified: false });
   p.src.meta.id = "kitsu:12";
   h.render(p);
-  const playing = { ...p, snap: { ...p.snap, status: "playing", positionSec: 180, durationSec: 3600 } };
+  const playing = {
+    ...p,
+    snap: { ...p.snap, status: "playing", positionSec: 180, durationSec: 3600 },
+  };
   h.render(playing);
   h.clock(180);
   h.tick();
   assert.equal(h.refractWatches.length, 0);
-  h.render({ ...playing, resolvedImdbId: "tt200", resolvedImdbVerified: true,
-    src: { ...p.src, episode: { ...p.src.episode, imdbSeason: 2, imdbEpisode: 4 } } });
+  h.render({
+    ...playing,
+    resolvedImdbId: "tt200",
+    resolvedImdbVerified: true,
+    src: { ...p.src, episode: { ...p.src.episode, imdbSeason: 2, imdbEpisode: 4 } },
+  });
   h.clock(184);
   h.tick();
   assert.equal(h.refractWatches.length, 1);
