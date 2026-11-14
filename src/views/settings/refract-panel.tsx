@@ -2,6 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useT } from "@/lib/i18n";
 import {
   getRefractKey,
+  clearRefractWatchlistStatus,
+  refractWatchlistStatus,
+  subscribeRefractWatchlistStatus,
   getRefractAutoThreshold,
   REFRACT_AUTO_THRESHOLDS,
   setRefractAutoThreshold,
@@ -36,6 +39,9 @@ export function RefractPanel() {
   const [showKey, setShowKey] = useState(false);
   const [status, setStatus] = useState(refractStatus);
   const [incoming, setIncoming] = useState(refractInboundStatus);
+  const [watchlist, setWatchlist] = useState(refractWatchlistStatus);
+
+  useEffect(() => subscribeRefractWatchlistStatus(() => setWatchlist(refractWatchlistStatus())), []);
 
   useEffect(
     () =>
@@ -57,6 +63,7 @@ export function RefractPanel() {
       // Never replay watches from another Refract account after replacing a key.
       resetRefractSync();
       resetRefractInboundSync();
+      clearRefractWatchlistStatus();
       saveRefractKey(key);
       setRefractEnabled(true);
       setConnected(true);
@@ -79,6 +86,7 @@ export function RefractPanel() {
     saveRefractKey(null);
     resetRefractSync();
     resetRefractInboundSync();
+    clearRefractWatchlistStatus();
     setConnected(false);
     setEnabled(false);
     setMessage("Disconnected from Refract.");
@@ -86,13 +94,13 @@ export function RefractPanel() {
 
   return (
     <Section
-      title={t("Refract watched-history sync")}
-      subtitle={t("Sync completed movies and episodes between Harbor and Refract.")}
+      title={t("Refract sync")}
+      subtitle={t("Sync watched history and Harbor watchlist changes with Refract.")}
     >
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            Create a Refract API key with profile:read, library:read, history:read and
+            Create a Refract API key with profile:read, library:read, library:write, history:read and
             history:write. Never share or commit the key.
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
@@ -127,7 +135,7 @@ export function RefractPanel() {
             {t("Refract key saved in Harbor's credential store")}
           </p>
           <ToggleRow
-            label={t("Sync watched movies and episodes in both directions")}
+            label={t("Sync watched history and watchlist")}
             sub={t(
               "Refract imports add verified watches without removing local history. Only the primary Harbor profile is synced.",
             )}
@@ -172,6 +180,15 @@ export function RefractPanel() {
               Seeking past it also qualifies. Early logging counts as watched in Refract, not partially
               watched, and can advance Up Next or affect Harbor's watched state through reverse sync.
             </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[14px] font-medium text-ink">Harbor → Refract Plan to Watch</p>
+            <p className={ROW_DESC}>
+              New watchlist additions and removals are sent automatically while sync is enabled.
+              Requires library:write; reconnect with an updated key if needed. Existing Refract
+              history and other library statuses are preserved.
+            </p>
+            {watchlist && <p role="status" className={ROW_DESC}>{watchlist}</p>}
           </div>
           <p className={ROW_DESC}>
             {status.synced} sent · {status.pending} pending · {status.failed} unmatched

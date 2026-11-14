@@ -10,6 +10,7 @@ const DEFAULT_AUTO_THRESHOLD: RefractAutoThreshold = 70;
 const API = "https://getrefract.app/v1";
 
 export type RefractLookup = {
+  type?: "movie" | "show" | "episode";
   ids?: { refract?: string | number };
   show?: { ids?: { refract?: string | number } };
   episode?: { season?: number; number?: number };
@@ -19,6 +20,7 @@ export class RefractApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly retryAfterMs = 0,
+    public readonly code?: string,
   ) {
     super(`Refract HTTP ${status}`);
     this.name = "RefractApiError";
@@ -66,7 +68,7 @@ export function refractPlaybackReached(positionSec: number, durationSec: number)
 async function request<T>(
   key: string,
   path: string,
-  method: "GET" | "PUT" | "POST" = "GET",
+  method: "GET" | "PUT" | "POST" | "DELETE" = "GET",
   body?: unknown,
   idempotencyKey?: string,
 ): Promise<T> {
@@ -83,9 +85,17 @@ async function request<T>(
   });
   if (!response.ok) {
     const retry = Number(response.headers.get("Retry-After"));
+    let code: string | undefined;
+    try {
+      const problem = await response.json();
+      if (typeof problem?.code === "string") code = problem.code;
+    } catch {
+      // Not every HTTP error has a JSON problem body.
+    }
     throw new RefractApiError(
       response.status,
       Number.isFinite(retry) && retry > 0 ? retry * 1000 : 0,
+      code,
     );
   }
   if (response.status === 204) return undefined as T;
@@ -153,7 +163,7 @@ export async function lookupRefract(
   key: string,
   idType: "imdb" | "tmdb" | "tvdb",
   externalId: string,
-  type: "movie" | "episode",
+  type: "movie" | "show" | "episode",
   season?: number,
   episode?: number,
   numbering?: "tmdb" | "tvdb" | "absolute",
@@ -205,4 +215,110 @@ export async function writeRefractEpisode(
     "PUT",
     { watched_at: new Date(watchedAt).toISOString() },
   );
+}
+
+/** Watchlist membership is separate from watched history and other library statuses. */
+export type RefractWatchlistInput = { id: string; type?: string; imdbId?: string | null };
+type WatchlistIdentity = {
+  idType: "imdb" | "tmdb" | "tvdb";
+  id: string;
+  type: "movie" | "show";
+};
+export function refractWatchlistIdentity(input: RefractWatchlistInput): WatchlistIdentity | null {
+  const tmdb = /^tmdb:(movie|tv):(\d+)$/.exec(input.id);
+  const tvdb = /^tvdb:(\d+)$/.exec(input.id);
+  const type =
+    input.type === "movie"
+      ? "movie"
+      : ["series", "tv", "show", "anime"].includes(input.type ?? "")
+        ? "show"
+        : !input.type && tmdb
+          ? tmdb[1] === "movie" ? "movie" : "show"
+          : !input.type && tvdb
+            ? "show"
+            : null;
+  if (!type) return null;
+  if (tmdb && tmdb[1] !== (type === "movie" ? "movie" : "tv")) return null;
+  if (tvdb && type !== "show") return null;
+  const imdb = /^(?:imdb:)?(tt\d+)$/.exec(input.imdbId ?? "") ??
+    /^(?:imdb:)?(tt\d+)$/.exec(input.id);
+  if (imdb) return { idType: "imdb", id: imdb[1], type };
+  if (tmdb) return { idType: "tmdb", id: tmdb[2], type };
+  if (tvdb) return { idType: "tvdb", id: tvdb[1], type };
+  return null;
+}
+
+export async function writeRefractWatchlist(
+  key: string,
+  id: string | number,
+  on: boolean,
+): Promise<"updated" | "protected"> {
+  try {
+    await request(key, `/watchlist/${encodeURIComponent(String(id))}`, on ? "PUT" : "DELETE");
+    return "updated";
+  } catch (error) {
+    if (error instanceof RefractApiError && error.code === "IN_LIBRARY") return "protected";
+    throw error;
+  }
+}
+
+let watchlistMessage = "";
+const WATCHLIST_EVENT = "harbor:refract-watchlist-changed";
+export function refractWatchlistStatus(): string {
+  return watchlistMessage;
+}
+export function subscribeRefractWatchlistStatus(fn: () => void): () => void {
+  window.addEventListener(WATCHLIST_EVENT, fn);
+  return () => window.removeEventListener(WATCHLIST_EVENT, fn);
+}
+function reportWatchlist(message: string): void {
+  watchlistMessage = message;
+  window.dispatchEvent(new Event(WATCHLIST_EVENT));
+}
+export function clearRefractWatchlistStatus(): void {
+  reportWatchlist("");
+}
+
+/** Account/profile guards are rechecked after lookup, before writing membership. */
+export async function syncRefractWatchlist(
+  key: string,
+  input: RefractWatchlistInput,
+  on: boolean,
+  assertCurrent: () => void,
+): Promise<string | undefined> {
+  try {
+    assertCurrent();
+    const identity = refractWatchlistIdentity(input);
+    if (!identity) {
+      const reason = "No verified IMDb/TMDB/TVDB identity is available for this title.";
+      reportWatchlist(reason);
+      return reason;
+    }
+    const matches = await lookupRefract(key, identity.idType, identity.id, identity.type);
+    assertCurrent();
+    const ids = [...new Set(matches
+      .filter((match) => match.type === identity.type && match.ids?.refract != null)
+      .map((match) => String(match.ids!.refract)))];
+    if (ids.length !== 1 || !ids[0]) {
+      const reason = "Refract could not uniquely identify this title.";
+      reportWatchlist(reason);
+      return reason;
+    }
+    const result = await writeRefractWatchlist(key, ids[0], on);
+    assertCurrent();
+    if (result === "protected") {
+      reportWatchlist("Refract preserved an existing library entry or viewing history.");
+      return;
+    }
+    reportWatchlist(on ? "Added to Refract Plan to Watch." : "Removed from Refract Plan to Watch.");
+  } catch (error) {
+    // Do not report an old account's result after a profile/key switch.
+    assertCurrent();
+    const reason =
+      error instanceof RefractApiError && error.status === 403
+        ? "Refract watchlist requires library:write. Reconnect with a key that has this scope."
+        : "Refract could not confirm the watchlist change. Try again.";
+    reportWatchlist(reason);
+    return reason;
+  }
 }
