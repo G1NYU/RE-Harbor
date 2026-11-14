@@ -120,3 +120,28 @@ fn broker_rejects_unapproved_requests_and_caps_usage() {
     input["query"] = json!("policy:missing");
     assert_eq!(run(input)["result"], json!({"status": 404, "ok": false}));
 }
+
+#[test]
+fn adapter_worker_json_stdio() {
+    fn request(input: Value) -> Value {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_harbor-8spine-native-poc"));
+        command.arg("--harbor-adapter-fixture").env_clear();
+        #[cfg(windows)]
+        if let Some(root) = std::env::var_os("SystemRoot") {
+            command.env("SystemRoot", root);
+        }
+        let mut child = command.stdin(Stdio::piped()).stdout(Stdio::piped())
+            .stderr(Stdio::null()).spawn().unwrap();
+        child.stdin.take().unwrap().write_all(input.to_string().as_bytes()).unwrap();
+        let reply = child.wait_with_output().unwrap();
+        assert!(reply.status.success());
+        serde_json::from_slice(&reply.stdout).unwrap()
+    }
+    let tracks = request(search("catalog"));
+    assert_eq!(tracks["ok"], true);
+    assert_eq!(tracks["result"][0]["connectorId"], "8spine-fixture-catalog");
+    let result = request(json!({"fixture":"catalog","operation":"resolve",
+        "track": tracks["result"][0], "quality":"HIGH"}));
+    assert_eq!(result["result"]["url"], "https://example.invalid/fixture.wav");
+    assert_eq!(request(json!({"fixture":"arbitrary","operation":"search","query":"test","limit":1}))["error"], "invalid-request");
+}
