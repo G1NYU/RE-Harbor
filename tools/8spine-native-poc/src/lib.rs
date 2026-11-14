@@ -1,5 +1,7 @@
 //! Development fixture only. No downloaded JavaScript or real network access.
 mod broker;
+// Host-only development API; never exposed to the JavaScript runtime.
+pub mod http_transport;
 use rquickjs::{Context, Function, Promise, Runtime};
 use std::cell::Cell;
 use std::rc::Rc;
