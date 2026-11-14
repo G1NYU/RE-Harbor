@@ -1,5 +1,8 @@
-//! Development fixture only. No downloaded JavaScript, networking, or host APIs.
-use rquickjs::{Context, Promise, Runtime};
+//! Development fixture only. No downloaded JavaScript or real network access.
+mod broker;
+use rquickjs::{Context, Function, Promise, Runtime};
+use std::cell::Cell;
+use std::rc::Rc;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
@@ -11,6 +14,7 @@ const STACK: usize = 256 * 1024;
 fn fixture(name: &str) -> Option<&'static str> {
     Some(match name {
         "catalog" => include_str!("../fixtures/catalog.js"),
+        "broker" => include_str!("../fixtures/broker.js"),
         "capabilities" => r#"return { searchTracks() { return {
             process: typeof process, require: typeof require, fetch: typeof fetch,
             timers: typeof setTimeout, os: typeof os, std: typeof std,
@@ -71,7 +75,8 @@ pub fn handle(input: &[u8]) -> Result<Value, &'static str> {
     let deadline = Instant::now() + Duration::from_millis(350);
     runtime.set_interrupt_handler(Some(Box::new(move || Instant::now() >= deadline)));
     let context = Context::full(&runtime).map_err(|_| "runtime-init")?;
-    // No module loader, native callbacks, fetch, filesystem, environment or shell.
+    // Only the compiled-in broker fixture receives the simulated fetch capability.
+    // No real HTTP transport, filesystem, environment, shell or module loader.
     let data = serde_json::to_string(&request.to_string()).map_err(|_| "invalid-request")?;
     let script = format!(
         r#"(async () => {{
@@ -85,6 +90,15 @@ pub fn handle(input: &[u8]) -> Result<Value, &'static str> {
         }})()"#
     );
     let result = context.with(|ctx| {
+        if request["fixture"] == "broker" {
+            let broker = Rc::new(broker::Broker::new(deadline));
+            let calls = Rc::new(Cell::new(0usize));
+            let function = Function::new(ctx.clone(), move |payload: String| {
+                broker.request(&calls, &payload)
+            })?;
+            ctx.globals().set("__fixtureBroker", function)?;
+            ctx.eval::<(), _>(include_str!("../fixtures/fetch-shim.js"))?;
+        }
         let promise: Promise = ctx.eval(script)?;
         promise.finish::<String>()
     });

@@ -77,3 +77,46 @@ fn standalone_worker_json_stdio() {
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["result"]["tracks"][0]["id"], 42);
 }
+
+#[test]
+fn fixture_fetch_success_and_resolution() {
+    let got = run(search("broker"));
+    assert_eq!(got["ok"], true, "{got}");
+    assert_eq!(got["result"]["tracks"][0]["id"], 42);
+    assert_eq!(got["result"]["rawBridge"], "undefined");
+    let got = run(resolve("broker"));
+    assert_eq!(got["result"]["streamUrl"], "https://example.invalid/fixture.wav");
+    assert_eq!(got["result"]["track"]["audioQuality"], "LOSSLESS");
+}
+
+#[test]
+fn broker_rejects_unapproved_requests_and_caps_usage() {
+    for (case, code) in [
+        ("http", "destination-denied"),
+        ("private", "destination-denied"),
+        ("ipv6", "destination-denied"),
+        ("metadata", "destination-denied"),
+        ("alias", "destination-denied"),
+        ("credentials", "destination-denied"),
+        ("port", "destination-denied"),
+        ("fragment", "destination-denied"),
+        ("post", "method-denied"),
+        ("headers", "invalid-request"),
+        ("redirect", "redirect-denied"),
+        ("oversized", "response-size"),
+        ("route", "route-denied"),
+        ("budget", "request-limit"),
+        ("size", "request-size"),
+    ] {
+        let mut input = search("broker");
+        input["query"] = json!(format!("policy:{case}"));
+        assert_eq!(
+            run(input),
+            json!({"ok": true, "result": {"denied": true, "code": code}}),
+            "{case}",
+        );
+    }
+    let mut input = search("broker");
+    input["query"] = json!("policy:missing");
+    assert_eq!(run(input)["result"], json!({"status": 404, "ok": false}));
+}
