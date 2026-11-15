@@ -18,6 +18,8 @@ pub const MAX_INPUT: usize = 8 * 1024;
 const MAX_OUTPUT: usize = 256 * 1024;
 const MEMORY: usize = 16 * 1024 * 1024;
 const STACK: usize = 256 * 1024;
+// Exact, locally authored source. This is not an allowlist of third-party code.
+const IMPORTED_FIXTURE: &str = include_str!("../fixtures/imported.js");
 
 fn fixture(name: &str) -> Option<&'static str> {
     Some(match name {
@@ -41,19 +43,29 @@ fn fixture(name: &str) -> Option<&'static str> {
 }
 
 // A bounded JSON protocol avoids passing host handles or interpolating user code.
-fn validated_request(input: &[u8]) -> Result<(Value, &'static str), &'static str> {
+fn validated_request(input: &[u8]) -> Result<(Value, String), &'static str> {
     if input.len() > MAX_INPUT {
         return Err("input-limit");
     }
     let req: Value = serde_json::from_slice(input).map_err(|_| "invalid-request")?;
     let object = req.as_object().ok_or("invalid-request")?;
     if object.keys().any(|k| {
-        !matches!(k.as_str(), "fixture" | "operation" | "query" | "limit" | "trackId" | "quality")
+        !matches!(k.as_str(), "fixture" | "operation" | "query" | "limit" | "trackId" | "quality" | "source")
     }) {
         return Err("invalid-request");
     }
-    let source = fixture(req["fixture"].as_str().ok_or("invalid-request")?)
-        .ok_or("invalid-request")?;
+    let name = req["fixture"].as_str().ok_or("invalid-request")?;
+    let source = if name == "imported-fixture" {
+        // A caller cannot authorize arbitrary JavaScript by supplying a hash.
+        // The child verifies the actual transmitted source against its own
+        // trusted built-in copy before constructing any engine context.
+        let source = req["source"].as_str().ok_or("invalid-request")?;
+        if source != IMPORTED_FIXTURE { return Err("invalid-request"); }
+        source.to_owned()
+    } else {
+        if object.contains_key("source") { return Err("invalid-request"); }
+        fixture(name).ok_or("invalid-request")?.to_owned()
+    };
     match req["operation"].as_str() {
         Some("search") => {
             let query = req["query"].as_str().ok_or("invalid-request")?;

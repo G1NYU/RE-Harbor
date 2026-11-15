@@ -28,4 +28,16 @@ async fn windows_supervised_fixture() {
     assert_eq!(failed["ok"], false);
     assert_eq!(failed["error"], "execution-timeout");
     assert_eq!(supervisor.run_fixture(&search).await.unwrap()["ok"], true);
+
+    let (mut manager, key, package, permit) = imported::approved();
+    let result = supervisor.run_approved_fixture(&manager, &permit, &package, &imported::search()).await.unwrap();
+    imported::check_search(&result);
+    let result = supervisor.run_approved_fixture(&manager, &permit, &package, &imported::resolve()).await.unwrap();
+    imported::check_resolve(&result);
+    assert_eq!(supervisor.run_fixture(&imported::raw_request()).await, Err("fixture-consent-required"));
+    manager.disable(&key).unwrap();
+    assert_eq!(supervisor.run_approved_fixture(&manager, &permit, &package, &imported::search()).await, Err("revoked"));
 }
+
+#[path = "support_imported/mod.rs"]
+mod imported;

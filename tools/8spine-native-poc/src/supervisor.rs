@@ -1,6 +1,22 @@
 //! Development supervisor. Only the trusted compiled-in fixture protocol is accepted.
 //! A separate Linux experiment requires real namespace isolation; there is no fallback.
-use serde_json::Value;
+use serde_json::{json, Value};
+use crate::module_manager::{ModuleManager, ModulePermit};
+
+fn approved_fixture_input(manager: &ModuleManager, permit: &ModulePermit,
+    bytes: &[u8], operation: &Value) -> Result<Value, &'static str> {
+    let source = manager.approved_source_body(permit, bytes)?;
+    if source != crate::IMPORTED_FIXTURE { return Err("fixture-source-denied"); }
+    let mut request = operation.as_object().ok_or("invalid-request")?.clone();
+    if request.contains_key("fixture") || request.contains_key("source") {
+        return Err("invalid-request");
+    }
+    request.insert("fixture".to_owned(), json!("imported-fixture"));
+    request.insert("source".to_owned(), json!(source));
+    let request = Value::Object(request);
+    crate::validated_request(&serde_json::to_vec(&request).map_err(|_| "invalid-request")?)?;
+    Ok(request)
+}
 use std::{path::{Path, PathBuf}, process::Stdio, time::Duration};
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, process::Command};
 
@@ -86,6 +102,19 @@ impl Supervisor {
     pub async fn run_fixture(&self, request: &Value) -> Result<Value, &'static str> {
         let input = serde_json::to_vec(request).map_err(|_| "invalid-request")?;
         crate::validated_request(&input)?;
+        if request["fixture"] == "imported-fixture" { return Err("fixture-consent-required"); }
+        self.exchange(&[], &input).await
+    }
+
+    /// End-to-end consent and source transport test. Isolation is mandatory.
+    /// Only the exact locally authored fixture can reach the engine.
+    pub async fn run_approved_fixture(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8], operation: &Value) -> Result<Value, &'static str> {
+        if !matches!(self.isolation, Isolation::LinuxNamespace) {
+            return Err("sandbox-unavailable");
+        }
+        let request = approved_fixture_input(manager, permit, bytes, operation)?;
+        let input = serde_json::to_vec(&request).map_err(|_| "invalid-request")?;
         self.exchange(&[], &input).await
     }
 
@@ -124,6 +153,17 @@ impl WindowsFixtureSupervisor {
     }
 
     pub async fn run_fixture(&self, request: &Value) -> Result<Value, &'static str> {
+        if request["fixture"] == "imported-fixture" { return Err("fixture-consent-required"); }
+        self.run_request(request).await
+    }
+
+    pub async fn run_approved_fixture(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8], operation: &Value) -> Result<Value, &'static str> {
+        let request = approved_fixture_input(manager, permit, bytes, operation)?;
+        self.run_request(&request).await
+    }
+
+    async fn run_request(&self, request: &Value) -> Result<Value, &'static str> {
         let input = serde_json::to_vec(request).map_err(|_| "invalid-request")?;
         // Deliberately match the smaller Windows harness input cap.
         if input.len() > 1024 { return Err("input-limit"); }

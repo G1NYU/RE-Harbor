@@ -60,4 +60,18 @@ async fn linux_namespace_isolation() {
     assert_eq!(catalog["ok"], true);
     assert_eq!(catalog["result"]["tracks"][0]["id"], 42);
     assert_eq!(fs::read_to_string(path).unwrap(), "synthetic test sentinel");
+
+    let (mut manager, key, package, permit) = imported::approved();
+    let result = worker.run_approved_fixture(&manager, &permit, &package, &imported::search()).await.unwrap();
+    imported::check_search(&result);
+    let result = worker.run_approved_fixture(&manager, &permit, &package, &imported::resolve()).await.unwrap();
+    imported::check_resolve(&result);
+    let bypass = imported::raw_request();
+    assert_eq!(worker.run_fixture(&bypass).await, Err("fixture-consent-required"));
+    manager.disable(&key).unwrap();
+    assert_eq!(worker.run_approved_fixture(&manager, &permit, &package, &imported::search()).await, Err("revoked"));
 }
+
+#[cfg(target_os = "linux")]
+#[path = "support_imported/mod.rs"]
+mod imported;
