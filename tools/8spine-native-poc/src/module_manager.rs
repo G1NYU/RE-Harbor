@@ -1,9 +1,12 @@
-//! Host-only catalog/staging/consent model. No downloads, disk writes or execution.
+//! Host-only catalog/staging/consent model. No downloads or execution.
+mod store;
+pub use store::{load_state, save_state};
 use crate::http_transport::{valid_dns_name, NetworkGrant};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use url::{Host, Url};
 
 const MAX_INDEX: usize = 256 * 1024;
@@ -40,15 +43,15 @@ fn approved_url(raw: &str, base: Option<&Url>) -> Result<Url, &'static str> {
     Ok(url)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModuleKey {
     pub repository: String,
     pub id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogEntry {
     pub key: ModuleKey,
     pub name: String,
@@ -107,7 +110,7 @@ pub fn parse_catalog(repository: &str, bytes: &[u8]) -> Result<Vec<CatalogEntry>
     Ok(entries.into_values().collect())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PackageFormat {
     JavascriptCandidate,
@@ -140,6 +143,9 @@ pub struct StagedModule {
     hosts: BTreeSet<String>,
     #[serde(skip)]
     generation: u64,
+    // A persisted fingerprint is only metadata until the actual bytes are restaged.
+    #[serde(skip)]
+    verified: bool,
 }
 
 impl StagedModule {
@@ -153,12 +159,15 @@ pub struct ModulePermit {
     key: ModuleKey,
     fingerprint: String,
     generation: u64,
+    owner: Arc<()>,
 }
 
 #[derive(Default)]
 pub struct ModuleManager {
     staged: BTreeMap<ModuleKey, StagedModule>,
     generation: u64,
+    owner: Arc<()>,
+    repositories: BTreeSet<String>,
 }
 
 impl ModuleManager {
@@ -168,6 +177,28 @@ impl ModuleManager {
     }
 
     pub fn get(&self, key: &ModuleKey) -> Option<&StagedModule> { self.staged.get(key) }
+
+    pub fn repositories(&self) -> impl Iterator<Item = &str> {
+        self.repositories.iter().map(String::as_str)
+    }
+
+    pub fn modules(&self) -> impl Iterator<Item = &StagedModule> { self.staged.values() }
+
+    pub fn add_repository(&mut self, input: &str) -> Result<String, &'static str> {
+        let canonical = store::repository_index(input)?;
+        if !self.repositories.contains(&canonical) && self.repositories.len() >= store::MAX_REPOSITORIES {
+            return Err("repository-limit");
+        }
+        self.repositories.insert(canonical.clone());
+        Ok(canonical)
+    }
+
+    /// Forget the repository and revoke all of its staged module permits.
+    pub fn remove_repository(&mut self, input: &str) -> Result<bool, &'static str> {
+        let canonical = store::repository_index(input)?;
+        self.staged.retain(|key, _| key.repository != canonical);
+        Ok(self.repositories.remove(&canonical))
+    }
 
     /// Explicit staging only. Caller must independently retrieve the selected package.
     /// The bytes are inspected/fingerprinted but never saved or executed by this model.
@@ -185,13 +216,13 @@ impl ModuleManager {
         if &canonical != entry { return Err("invalid-metadata"); }
         let sha = fingerprint(bytes);
         let format = classify(bytes);
-        if self.staged.get(&entry.key).is_some_and(|prior| prior.entry == *entry && prior.fingerprint == sha) {
+        if self.staged.get(&entry.key).is_some_and(|prior| prior.verified && prior.entry == *entry && prior.fingerprint == sha && prior.format == format) {
             return Ok(format);
         }
         let generation = self.next_generation()?;
         self.staged.insert(entry.key.clone(), StagedModule {
             entry: entry.clone(), fingerprint: sha, format, enabled: false,
-            hosts: BTreeSet::new(), generation,
+            hosts: BTreeSet::new(), generation, verified: true,
         });
         Ok(format)
     }
@@ -200,6 +231,7 @@ impl ModuleManager {
     pub fn approve(&mut self, key: &ModuleKey, expected_sha: &str, hosts: &[&str]) -> Result<(), &'static str> {
         let row = self.staged.get(key).ok_or("not-staged")?;
         if row.fingerprint != expected_sha { return Err("stale-approval"); }
+        if !row.verified { return Err("package-not-verified"); }
         if row.format != PackageFormat::JavascriptCandidate { return Err("unsupported-package"); }
         // Bind the grant to the SHA as well as module scope, not the advertised version alone.
         NetworkGrant::new(&row.entry.key.id, &row.fingerprint, hosts)?;
@@ -226,13 +258,14 @@ impl ModuleManager {
     pub fn permit(&self, key: &ModuleKey, bytes: &[u8]) -> Result<ModulePermit, &'static str> {
         let row = self.staged.get(key).ok_or("not-staged")?;
         if !row.enabled { return Err("disabled"); }
-        if bytes.len() > MAX_PACKAGE || fingerprint(bytes) != row.fingerprint { return Err("package-mismatch"); }
-        Ok(ModulePermit { key: key.clone(), fingerprint: row.fingerprint.clone(), generation: row.generation })
+        if !row.verified || bytes.len() > MAX_PACKAGE || fingerprint(bytes) != row.fingerprint || classify(bytes) != PackageFormat::JavascriptCandidate { return Err("package-mismatch"); }
+        Ok(ModulePermit { key: key.clone(), fingerprint: row.fingerprint.clone(), generation: row.generation, owner: Arc::clone(&self.owner) })
     }
 
     /// No worker may mint this grant. Disable, remove, or restaging invalidates permits.
     /// A future supervisor must also recheck immediately before writes and cancel active tasks.
     pub fn network_grant(&self, permit: &ModulePermit) -> Result<NetworkGrant, &'static str> {
+        if !Arc::ptr_eq(&self.owner, &permit.owner) { return Err("revoked"); }
         let row = self.staged.get(&permit.key).ok_or("revoked")?;
         if !row.enabled || row.generation != permit.generation || row.fingerprint != permit.fingerprint {
             return Err("revoked");
