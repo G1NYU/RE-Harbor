@@ -1,3 +1,5 @@
+#![cfg_attr(all(windows, feature = "windows-sandbox-fixture"), windows_subsystem = "windows")]
+
 use harbor_8spine_native_poc::{envelope, MAX_INPUT};
 use harbor_8spine_native_poc::adapter::{self, FixtureModule, HarborTrack, Quality};
 use serde_json::{json, Value};

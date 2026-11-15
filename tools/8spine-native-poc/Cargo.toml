@@ -6,6 +6,9 @@ publish = false
 
 [workspace]
 
+[features]
+windows-sandbox-fixture = []
+
 [dependencies]
 rquickjs = { version = "=0.14.0", default-features = false, features = ["std"] }
 serde_json = "1"

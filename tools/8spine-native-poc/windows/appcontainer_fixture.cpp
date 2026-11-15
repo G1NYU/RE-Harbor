@@ -299,7 +299,7 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
     PROCESS_INFORMATION pi{};
     Child child;
     require(CreateProcessW(worker.c_str(), line.data(), nullptr, nullptr, TRUE,
-        EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+        EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT,
         environment.data(), worker.parent_path().c_str(), &si.StartupInfo, &pi), "CreateProcess AppContainer");
     child.process.h = pi.hProcess;
     child.thread.h = pi.hThread;
