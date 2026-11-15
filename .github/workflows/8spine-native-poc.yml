@@ -210,6 +210,18 @@ jobs:
           HARBOR_8SPINE_TEST_LAUNCHER: ${{ runner.temp }}/8spine-appcontainer-fixture.exe
         run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --features windows-sandbox-fixture --test windows_supervisor -- --ignored --exact windows_supervised_fixture
 
+  live-catalog:
+    name: Live 8SPINE catalog (external network)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Fetch only the user-approved repository index
+        run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --test live_catalog -- --ignored --exact live_catalog_index --nocapture
+
   frontend:
     name: Full frontend validation
     runs-on: ubuntu-24.04

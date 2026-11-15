@@ -1,8 +1,9 @@
 //! Host-only transport prototype. Do not expose grants, pins or this API to JS.
-//! No resolver or persisted consent store is implemented here.
+//! Host-owned bounded DNS resolution; no persisted consent store.
 use reqwest::{Client, redirect::Policy};
 use std::collections::BTreeSet;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use url::{Host, Url};
 
@@ -10,6 +11,33 @@ const MAX_REQUEST: usize = 4096;
 const MAX_CALLS: usize = 8;
 const MAX_BODY: usize = 32 * 1024;
 const MAX_PINS: usize = 16;
+const MAX_DNS_ANSWERS: usize = 64;
+const DNS_TIME: Duration = Duration::from_secs(3);
+// The OS resolver may continue in a blocking thread after an async timeout.
+// Refuse additional lookups while that thread is still occupied.
+static DNS_BUSY: AtomicBool = AtomicBool::new(false);
+
+struct ResolverSlot;
+impl Drop for ResolverSlot {
+    fn drop(&mut self) { DNS_BUSY.store(false, Ordering::Release); }
+}
+
+fn select_public_ipv4(answers: impl IntoIterator<Item = SocketAddr>) -> Result<Vec<IpAddr>, &'static str> {
+    let mut pins = BTreeSet::new();
+    for (i, answer) in answers.into_iter().enumerate() {
+        if i >= MAX_DNS_ANSWERS || answer.port() != 443 { return Err("address-denied"); }
+        // IPv6 is deliberately not eligible for connection. An IPv4 answer
+        // outside our public-address policy rejects the whole lookup.
+        if let IpAddr::V4(ip) = answer.ip() {
+            if !public_v4(ip) { return Err("address-denied"); }
+            pins.insert(IpAddr::V4(ip));
+            if pins.len() > MAX_PINS { return Err("address-denied"); }
+        }
+    }
+    let pins: Vec<_> = pins.into_iter().collect();
+    vetted_pins(&pins)?;
+    Ok(pins)
+}
 const TOTAL_TIME: Duration = Duration::from_secs(10);
 const REQUEST_TIME: Duration = Duration::from_secs(5);
 
@@ -182,6 +210,30 @@ impl AuthorizedRequest {
             .map_err(|_| "transport-init")
     }
 
+    /// Resolve only the already-authorized hostname, and connect only to the
+    /// returned vetted IPv4 pins. No module chooses a resolver or an address.
+    pub(crate) async fn send_resolved_bytes(self, limit: usize) -> Result<(u16, Vec<u8>), &'static str> {
+        let remaining = self.deadline.checked_duration_since(Instant::now()).ok_or("deadline")?;
+        if remaining.is_zero() { return Err("deadline"); }
+        if DNS_BUSY.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
+            return Err("resolver-busy");
+        }
+        let slot = ResolverSlot;
+        let host = self.host.clone();
+        let lookup_host = host.clone();
+        // A trailing dot requests an absolute DNS name rather than applying
+        // local suffix search. TLS still uses the original authorized hostname.
+        let lookup = tokio::task::spawn_blocking(move || {
+            let _slot = slot;
+            let absolute = format!("{lookup_host}.");
+            let answers = (absolute.as_str(), 443).to_socket_addrs().map_err(|_| "dns-failed")?;
+            select_public_ipv4(answers)
+        });
+        let pins = tokio::time::timeout(remaining.min(DNS_TIME), lookup).await
+            .map_err(|_| "dns-timeout")?.map_err(|_| "dns-failed")??;
+        self.send_bounded_bytes(&host, &pins, limit).await
+    }
+
     /// Consume the capability once. DNS answers must come from the trusted host,
     /// never the module. No invocation from QuickJS or worker stdin exists yet.
     pub async fn send(self, resolved_host: &str, ips: &[IpAddr]) -> Result<HttpReply, &'static str> {
@@ -268,6 +320,19 @@ mod tests {
         }
         assert_eq!(vetted_pins(&[]), Err("address-denied"));
         assert_eq!(vetted_pins(&["8.8.8.8".parse().unwrap()]).unwrap()[0].port(), 443);
+    }
+
+    #[test]
+    fn resolver_selects_only_bounded_public_ipv4() {
+        let public: SocketAddr = "8.8.8.8:443".parse().unwrap();
+        let private: SocketAddr = "127.0.0.1:443".parse().unwrap();
+        let ipv6: SocketAddr = "[2606:4700::1111]:443".parse().unwrap();
+        let mapped: SocketAddr = "[::ffff:127.0.0.1]:443".parse().unwrap();
+        assert_eq!(select_public_ipv4([public, ipv6, mapped, public]), Ok(vec![public.ip()]));
+        assert_eq!(select_public_ipv4([public, private]), Err("address-denied"));
+        assert_eq!(select_public_ipv4([ipv6]), Err("address-denied"));
+        assert_eq!(select_public_ipv4([public; MAX_DNS_ANSWERS + 1]), Err("address-denied"));
+        assert_eq!(select_public_ipv4(["8.8.8.8:80".parse().unwrap()]), Err("address-denied"));
     }
 
     #[test]

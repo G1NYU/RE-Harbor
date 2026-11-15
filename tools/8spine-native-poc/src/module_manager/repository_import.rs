@@ -56,6 +56,13 @@ impl CatalogFetch {
 
     pub fn hostname(&self) -> &str { self.request.hostname() }
 
+    /// Host-owned live lookup. No caller-supplied DNS pins.
+    pub async fn fetch_live(self, manager: &ModuleManager) -> Result<RepositoryCatalog, &'static str> {
+        registered(manager, &self.repository)?;
+        let (status, bytes) = self.request.send_resolved_bytes(MAX_INDEX).await?;
+        accept_catalog(manager, self.repository, status, &bytes)
+    }
+
     pub async fn fetch(self, manager: &ModuleManager, resolved_host: &str,
         pins: &[IpAddr]) -> Result<RepositoryCatalog, &'static str> {
         registered(manager, &self.repository)?;
@@ -81,6 +88,12 @@ impl PackageFetch {
 
     /// Hold the exclusive host manager borrow across retrieval and staging.
     /// A repository cannot be removed during this operation.
+    pub async fn fetch_and_stage_live(self, manager: &mut ModuleManager) -> Result<PackageFormat, &'static str> {
+        registered(manager, &self.row.key.repository)?;
+        let (status, bytes) = self.request.send_resolved_bytes(MAX_PACKAGE).await?;
+        accept_package(manager, &self.row, status, &bytes)
+    }
+
     pub async fn fetch_and_stage(self, manager: &mut ModuleManager,
         resolved_host: &str, pins: &[IpAddr]) -> Result<PackageFormat, &'static str> {
         registered(manager, &self.row.key.repository)?;
