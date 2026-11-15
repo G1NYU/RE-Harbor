@@ -138,8 +138,8 @@ pub struct HttpReply {
     pub body: String,
 }
 
-fn append_bounded(body: &mut Vec<u8>, chunk: &[u8]) -> Result<(), &'static str> {
-    if chunk.len() > MAX_BODY.saturating_sub(body.len()) {
+fn append_bounded(body: &mut Vec<u8>, chunk: &[u8], limit: usize) -> Result<(), &'static str> {
+    if chunk.len() > limit.saturating_sub(body.len()) {
         return Err("response-size");
     }
     body.extend_from_slice(chunk);
@@ -185,21 +185,30 @@ impl AuthorizedRequest {
     /// Consume the capability once. DNS answers must come from the trusted host,
     /// never the module. No invocation from QuickJS or worker stdin exists yet.
     pub async fn send(self, resolved_host: &str, ips: &[IpAddr]) -> Result<HttpReply, &'static str> {
+        let (status, body) = self.send_bounded_bytes(resolved_host, ips, MAX_BODY).await?;
+        Ok(HttpReply { status, body: String::from_utf8(body).map_err(|_| "invalid-utf8")? })
+    }
+
+    // Host repository ingestion needs opaque bytes and a larger, independently
+    // bounded response. Never expose this variant to a module or fetch shim.
+    pub(crate) async fn send_bounded_bytes(self, resolved_host: &str, ips: &[IpAddr],
+        limit: usize) -> Result<(u16, Vec<u8>), &'static str> {
+        if limit == 0 || limit > 2 * 1024 * 1024 { return Err("response-size"); }
         let client = self.client(resolved_host, ips)?;
         let mut response = client.get(self.url)
-            .header(reqwest::header::ACCEPT, "application/json, text/plain")
+            .header(reqwest::header::ACCEPT, "application/json, text/plain, application/octet-stream")
             .header(reqwest::header::ACCEPT_ENCODING, "identity")
             .send().await.map_err(|_| "network-failed")?;
         let status = response.status().as_u16();
         check_status(status)?;
-        if response.content_length().is_some_and(|n| n > MAX_BODY as u64) {
+        if response.content_length().is_some_and(|n| n > limit as u64) {
             return Err("response-size");
         }
         let mut body = Vec::new();
         while let Some(chunk) = response.chunk().await.map_err(|_| "network-failed")? {
-            append_bounded(&mut body, &chunk)?;
+            append_bounded(&mut body, &chunk, limit)?;
         }
-        Ok(HttpReply { status, body: String::from_utf8(body).map_err(|_| "invalid-utf8")? })
+        Ok((status, body))
     }
 }
 
@@ -264,8 +273,8 @@ mod tests {
     #[test]
     fn response_bounds_and_redirects() {
         let mut body = Vec::new();
-        append_bounded(&mut body, &vec![b'a'; MAX_BODY]).unwrap();
-        assert_eq!(append_bounded(&mut body, b"x"), Err("response-size"));
+        append_bounded(&mut body, &vec![b'a'; MAX_BODY], MAX_BODY).unwrap();
+        assert_eq!(append_bounded(&mut body, b"x", MAX_BODY), Err("response-size"));
         assert_eq!(body.len(), MAX_BODY);
         assert_eq!(check_status(302), Err("redirect-denied"));
         assert_eq!(check_status(404), Ok(()));

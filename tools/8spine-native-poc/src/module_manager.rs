@@ -1,5 +1,6 @@
 //! Host-only catalog/staging/consent model. No downloads or execution.
 mod store;
+pub mod repository_import;
 pub use store::{load_state, save_state};
 use crate::http_transport::{valid_dns_name, NetworkGrant};
 use serde::{Deserialize, Serialize};
