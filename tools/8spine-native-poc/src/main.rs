@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::io::{self, Read, Write};
 
 fn main() {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     if std::env::args().nth(1).as_deref() == Some("--isolation-probe") {
         isolation_probe();
         return;
@@ -64,7 +64,7 @@ fn adapter_reply(input: &[u8]) -> Value {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 fn isolation_probe() {
     use std::{net::{SocketAddr, TcpStream}, time::Duration};
     // Compiled-in diagnostic only: inspect access to a synthetic host sentinel

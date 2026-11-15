@@ -163,6 +163,29 @@ jobs:
       - name: Test real host filesystem and network denial
         run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --test supervisor linux_namespace_isolation -- --ignored --exact
 
+  windows-isolation:
+    name: Windows AppContainer isolation (fixture-only)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build trusted fixture worker
+        run: cargo build --manifest-path tools/8spine-native-poc/Cargo.toml
+      - name: Build native AppContainer harness
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b 1
+          cl /nologo /EHsc /std:c++17 /W4 /DUNICODE /D_UNICODE tools\8spine-native-poc\windows\appcontainer_fixture.cpp /Fe:"%RUNNER_TEMP%\8spine-appcontainer-fixture.exe" /link userenv.lib advapi32.lib ole32.lib
+          if errorlevel 1 exit /b 1
+      - name: Test AppContainer identity, filesystem and loopback denial
+        shell: pwsh
+        run: |
+          & ./tools/8spine-native-poc/windows/test-appcontainer.ps1 -Harness "$env:RUNNER_TEMP/8spine-appcontainer-fixture.exe" -Worker "$env:GITHUB_WORKSPACE/tools/8spine-native-poc/target/debug/harbor-8spine-native-poc.exe"
+
   frontend:
     name: Full frontend validation
     runs-on: ubuntu-24.04
