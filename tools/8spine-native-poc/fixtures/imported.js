@@ -4,9 +4,8 @@ return {
   name: "Imported fixture",
   version: "1",
   searchTracks(query, limit) {
-    const tracks = track.title.toLowerCase().includes(query.toLowerCase())
-      ? [track].slice(0, limit)
-      : [];
+    const matches = track.title.toLowerCase().includes(query.toLowerCase());
+    const tracks = matches ? [track].slice(0, limit) : [];
     return { tracks, total: tracks.length };
   },
   getTrackStreamUrl(id, quality) {

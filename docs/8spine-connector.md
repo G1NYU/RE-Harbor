@@ -165,3 +165,7 @@ Run 43714457582 passed all eight integration-related jobs. The live index and di
 ## Imported fixture execution validated
 
 Run 43716209541 passed the dedicated Linux namespace test and both Windows AppContainer tests, including the imported fixture search, resolve, consent bypass rejection and revocation assertions. Live repository retrieval, disabled packed package staging and both native fixture suites also passed. Frontend validation stopped solely at the formatter check for the new imported.js fixture; this patch wraps its long conditional expression without changing behavior. The unrelated native seeding regression remains unchanged (1,487 passed, one failed, 74 ignored). No live third-party execution or playback is enabled. Next validation is pending.
+
+## Frontend formatting follow-up
+
+Run 43718070698 passed seven integration jobs, including both Windows isolation jobs, Linux isolation, native fixture suites, native connector and live catalog. The frontend formatter still rejected imported.js after the previous line-wrap attempt; it did not reach lint or frontend tests. Replace the long conditional with two short statements of equivalent behavior rather than guessing another line wrap. The independent native regression remains unchanged (1,487 passed, one failed, 74 ignored). No new execution permissions are introduced. CI validation is pending; the exact formatter output has not been reproduced locally.
