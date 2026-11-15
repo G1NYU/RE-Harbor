@@ -80,44 +80,7 @@ impl Supervisor {
         let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
         let mut cmd = self.command()?;
         cmd.current_dir(private.path()).args(args);
-        let mut child = cmd.spawn().map_err(|_| "worker-spawn")?;
-        let mut stdin = child.stdin.take().ok_or("worker-stdin")?;
-        let stdout = child.stdout.take().ok_or("worker-stdout")?;
-        let mut out = Vec::new();
-        let result = tokio::time::timeout(self.wall, async {
-            // Drain and write concurrently: a compromised process must not deadlock
-            // the parent with full IPC buffers, and the output is strictly bounded.
-            let write = async {
-                stdin.write_all(input).await.map_err(|_| "worker-input")?;
-                drop(stdin);
-                Ok::<(), &'static str>(())
-            };
-            let read = async {
-                stdout.take((MAX_REPLY + 1) as u64).read_to_end(&mut out)
-                    .await.map_err(|_| "worker-output")?;
-                if out.len() > MAX_REPLY { return Err("worker-output-limit"); }
-                Ok::<(), &'static str>(())
-            };
-            tokio::try_join!(write, read)?;
-            if !child.wait().await.map_err(|_| "worker-wait")?.success() {
-                return Err("worker-exit");
-            }
-            Ok::<(), &'static str>(())
-        }).await;
-        match result {
-            Ok(Ok(())) => check_reply(&out),
-            other => {
-                // kill_on_drop also covers task cancellation. Explicitly stop and
-                // reap the worker on a transport failure or wall timeout.
-                let _ = child.start_kill();
-                let _ = tokio::time::timeout(Duration::from_secs(1), child.wait()).await;
-                match other {
-                    Ok(Err(error)) => Err(error),
-                    Err(_) => Err("worker-timeout"),
-                    Ok(Ok(())) => unreachable!(),
-                }
-            }
-        }
+        exchange_command(cmd, input, self.wall).await
     }
 
     pub async fn run_fixture(&self, request: &Value) -> Result<Value, &'static str> {
@@ -137,6 +100,95 @@ impl Supervisor {
         self.exchange(&[std::ffi::OsStr::new("--isolation-probe"), sentinel.as_os_str(),
             std::ffi::OsStr::new(&address)], b"").await
     }
+}
+
+// The external launcher is trusted host infrastructure, never a module.
+// Its own five-second worker deadline and kill-on-close job are independent
+// of this outer deadline. This API is not registered with production Harbor.
+#[cfg(windows)]
+pub struct WindowsFixtureSupervisor {
+    worker: PathBuf,
+    launcher: PathBuf,
+}
+
+#[cfg(windows)]
+impl WindowsFixtureSupervisor {
+    pub fn new(worker: &Path, launcher: &Path) -> Result<Self, &'static str> {
+        fn trusted_file(path: &Path) -> Result<PathBuf, &'static str> {
+            if !path.is_absolute() { return Err("invalid-supervisor"); }
+            let canonical = path.canonicalize().map_err(|_| "sandbox-unavailable")?;
+            if !canonical.is_file() { return Err("sandbox-unavailable"); }
+            Ok(canonical)
+        }
+        Ok(Self { worker: trusted_file(worker)?, launcher: trusted_file(launcher)? })
+    }
+
+    pub async fn run_fixture(&self, request: &Value) -> Result<Value, &'static str> {
+        let input = serde_json::to_vec(request).map_err(|_| "invalid-request")?;
+        // Deliberately match the smaller Windows harness input cap.
+        if input.len() > 1024 { return Err("input-limit"); }
+        crate::validated_request(&input)?;
+        // Copy the trusted build into a disposable directory: the launcher
+        // attaches a fresh profile-specific ACL only to this copy and folder.
+        let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
+        let copy = private.path().join("harbor-8spine-native-poc.exe");
+        std::fs::copy(&self.worker, &copy).map_err(|_| "worker-copy")?;
+        let mut cmd = Command::new(&self.launcher);
+        cmd.arg("--fixture-request").arg(&copy)
+            .current_dir(private.path()).env_clear()
+            .stdin(Stdio::piped()).stdout(Stdio::piped())
+            .stderr(Stdio::null()).kill_on_drop(true);
+        // Required host profile-resolution inputs for the trusted launcher.
+        // No PATH, credentials or other inherited runner environment.
+        for key in ["SystemRoot", "LOCALAPPDATA", "USERPROFILE"] {
+            let value = std::env::var_os(key).ok_or("sandbox-unavailable")?;
+            if !Path::new(&value).is_absolute() { return Err("sandbox-unavailable"); }
+            cmd.env(key, value);
+        }
+        exchange_command(cmd, &input, Duration::from_secs(15)).await
+    }
+}
+
+async fn exchange_command(mut cmd: Command, input: &[u8], wall: Duration) -> Result<Value, &'static str> {
+    let mut child = cmd.spawn().map_err(|_| "worker-spawn")?;
+    let mut stdin = child.stdin.take().ok_or("worker-stdin")?;
+    let stdout = child.stdout.take().ok_or("worker-stdout")?;
+    let mut out = Vec::new();
+    let result = tokio::time::timeout(wall, async {
+        // Drain and write concurrently: a compromised process must not deadlock
+        // the parent with full IPC buffers, and the output is strictly bounded.
+        let write = async {
+            stdin.write_all(input).await.map_err(|_| "worker-input")?;
+            drop(stdin);
+            Ok::<(), &'static str>(())
+        };
+        let read = async {
+            stdout.take((MAX_REPLY + 1) as u64).read_to_end(&mut out)
+                .await.map_err(|_| "worker-output")?;
+            if out.len() > MAX_REPLY { return Err("worker-output-limit"); }
+            Ok::<(), &'static str>(())
+        };
+        tokio::try_join!(write, read)?;
+        if !child.wait().await.map_err(|_| "worker-wait")?.success() {
+            return Err("worker-exit");
+        }
+        Ok::<(), &'static str>(())
+    }).await;
+    match result {
+        Ok(Ok(())) => check_reply(&out),
+        other => {
+            // kill_on_drop also covers task cancellation. Explicitly stop and
+            // reap the worker on a transport failure or wall timeout.
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(Duration::from_secs(1), child.wait()).await;
+            match other {
+                Ok(Err(error)) => Err(error),
+                Err(_) => Err("worker-timeout"),
+                Ok(Ok(())) => unreachable!(),
+            }
+        }
+    }
+
 }
 
 fn check_reply(bytes: &[u8]) -> Result<Value, &'static str> {

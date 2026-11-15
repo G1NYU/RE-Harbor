@@ -350,6 +350,28 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
 
 int wmain(int argc, wchar_t** argv) {
     try {
+        // Host-only mode: one bounded JSON request over stdin, one response.
+        // The Rust worker accepts compiled-in fixtures only; there is no source
+        // loading, no user-selected command line and no direct-run fallback.
+        if (argc == 3 && std::wstring(argv[1]) == L"--fixture-request") {
+            const fs::path worker = fs::absolute(argv[2]);
+            if (worker.filename() != L"harbor-8spine-native-poc.exe" ||
+                !fs::is_regular_file(worker))
+                fail("invalid fixture worker", ERROR_INVALID_PARAMETER);
+            std::string input;
+            char ch = 0;
+            while (std::cin.get(ch)) {
+                if (input.size() >= 1024) fail("fixture input limit", ERROR_INVALID_PARAMETER);
+                input += ch;
+            }
+            if (!std::cin.eof() || input.empty()) fail("fixture input", ERROR_INVALID_DATA);
+            Profile profile;
+            grant_read_execute(worker.parent_path(), profile.sid);
+            grant_read_execute(worker, profile.sid);
+            PrivateDesktop private_desktop(profile);
+            std::cout << run_fixture(worker, profile, private_desktop, L"", input);
+            return 0;
+        }
         if (argc != 4) fail("expected copied worker, test sentinel, loopback port", ERROR_INVALID_PARAMETER);
         const fs::path worker = fs::absolute(argv[1]);
         const fs::path sentinel = fs::absolute(argv[2]);

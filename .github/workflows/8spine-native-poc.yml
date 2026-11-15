@@ -203,6 +203,12 @@ jobs:
         shell: pwsh
         run: |
           & ./tools/8spine-native-poc/windows/test-appcontainer.ps1 -Harness "$env:RUNNER_TEMP/8spine-appcontainer-fixture.exe" -Worker "$env:GITHUB_WORKSPACE/tools/8spine-native-poc/target/debug/harbor-8spine-native-poc.exe" -StartupProbe "$env:RUNNER_TEMP/8spine-startup-probe.exe"
+      - name: Test Rust supervisor through native AppContainer launcher
+        shell: pwsh
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+          HARBOR_8SPINE_TEST_LAUNCHER: ${{ runner.temp }}/8spine-appcontainer-fixture.exe
+        run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --features windows-sandbox-fixture --test windows_supervisor -- --ignored --exact windows_supervised_fixture
 
   frontend:
     name: Full frontend validation
