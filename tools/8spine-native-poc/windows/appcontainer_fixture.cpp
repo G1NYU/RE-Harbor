@@ -190,7 +190,19 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
     wchar_t root[MAX_PATH + 1]{};
     UINT root_len = GetWindowsDirectoryW(root, MAX_PATH + 1);
     if (!root_len || root_len > MAX_PATH) fail("GetWindowsDirectory");
-    std::wstring environment = L"SystemRoot=" + std::wstring(root);
+    // Windows resolves the AppContainer profile using LOCALAPPDATA and
+    // redirects that variable to the container's private profile at launch.
+    // Retain only the required profile input and SystemRoot; never inherit
+    // PATH, runner secrets, or the full parent environment.
+    const DWORD size = GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
+    if (size < 2 || size > 32767) fail("LOCALAPPDATA required for AppContainer profile", ERROR_ENVVAR_NOT_FOUND);
+    std::vector<wchar_t> local(size);
+    const DWORD count = GetEnvironmentVariableW(L"LOCALAPPDATA", local.data(), size);
+    if (!count || count >= size || !fs::path(local.data()).is_absolute())
+        fail("invalid LOCALAPPDATA for AppContainer profile", ERROR_INVALID_DATA);
+    std::wstring environment = L"LOCALAPPDATA=" + std::wstring(local.data(), count);
+    environment.push_back(L'\0');
+    environment += L"SystemRoot=" + std::wstring(root);
     environment.push_back(L'\0');
     environment.push_back(L'\0');
     std::wstring line = quoted(worker.wstring()) + args;
