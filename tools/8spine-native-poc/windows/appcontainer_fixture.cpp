@@ -177,11 +177,11 @@ struct Attributes {
     LPPROC_THREAD_ATTRIBUTE_LIST list = nullptr;
     Attributes() {
         SIZE_T size = 0;
-        InitializeProcThreadAttributeList(nullptr, 3, 0, &size);
+        InitializeProcThreadAttributeList(nullptr, 4, 0, &size);
         if (!size || GetLastError() != ERROR_INSUFFICIENT_BUFFER) fail("attribute size");
         storage.resize(size);
         auto ptr = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
-        require(InitializeProcThreadAttributeList(ptr, 3, 0, &size), "attribute init");
+        require(InitializeProcThreadAttributeList(ptr, 4, 0, &size), "attribute init");
         list = ptr;
     }
     ~Attributes() { if (list) DeleteProcThreadAttributeList(list); }
@@ -215,14 +215,23 @@ void verify_token(HANDLE process, PSID expected) {
     auto info = reinterpret_cast<TOKEN_APPCONTAINER_INFORMATION*>(raw.data());
     if (!info->TokenAppContainer || !EqualSid(info->TokenAppContainer, expected))
         fail("unexpected worker AppContainer SID", ERROR_ACCESS_DENIED);
+    // Verify the actual token, not just the requested security attributes.
+    DWORD caps_size = 0;
+    GetTokenInformation(token.h, TokenCapabilities, nullptr, 0, &caps_size);
+    if (!caps_size || GetLastError() != ERROR_INSUFFICIENT_BUFFER) fail("token capabilities size");
+    std::vector<unsigned char> cap_bytes(caps_size);
+    require(GetTokenInformation(token.h, TokenCapabilities, cap_bytes.data(),
+        caps_size, &used), "TokenCapabilities");
+    const auto caps = reinterpret_cast<TOKEN_GROUPS*>(cap_bytes.data());
+    if (caps->GroupCount != 0) fail("unexpected worker capabilities", ERROR_ACCESS_DENIED);
 }
 
 struct Child {
     Handle process, thread;
     ~Child() {
         if (process.h) {
-            // Job close covers the assigned child; explicitly terminate even if
-            // failure occurred before assignment or resume.
+            // The job is assigned at creation; explicit termination also
+            // handles initialization failures before the suspended child resumes.
             DWORD code = 0;
             if (GetExitCodeProcess(process.h, &code) && code == STILL_ACTIVE) {
                 TerminateProcess(process.h, 1);
@@ -276,6 +285,11 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
     limits.ProcessMemoryLimit = 128ULL * 1024 * 1024;
     require(SetInformationJobObject(job.h, JobObjectExtendedLimitInformation,
         &limits, sizeof(limits)), "SetInformationJobObject");
+    // Assign the kill-on-close Job Object atomically during CreateProcessW.
+    // If the launcher dies before token verification or resume, the worker
+    // must already belong to the job. Never retry with post-creation assignment.
+    HANDLE jobs[] = {job.h};
+    attrs.add(PROC_THREAD_ATTRIBUTE_JOB_LIST, jobs, sizeof(jobs));
 
     wchar_t root[MAX_PATH + 1]{};
     UINT root_len = GetWindowsDirectoryW(root, MAX_PATH + 1);
@@ -308,7 +322,10 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
 
     verify_token(child.process.h, profile.sid);
     std::cerr << "Verified actual child AppContainer token\n";
-    require(AssignProcessToJobObject(job.h, child.process.h), "AssignProcessToJobObject");
+    BOOL in_job = FALSE;
+    require(IsProcessInJob(child.process.h, job.h, &in_job), "verify worker job membership");
+    if (!in_job) fail("worker missing from creation-time job", ERROR_ACCESS_DENIED);
+    std::cerr << "Verified creation-time Job Object membership\n";
     if (ResumeThread(child.thread.h) == static_cast<DWORD>(-1)) fail("ResumeThread");
 
     std::string output;
