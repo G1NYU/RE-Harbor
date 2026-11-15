@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <userenv.h>
 #include <aclapi.h>
+#include <sddl.h>
 #include <objbase.h>
 #include <filesystem>
 #include <iostream>
@@ -84,6 +85,93 @@ void grant_read_execute(const fs::path& file, PSID sid) {
     if (error != ERROR_SUCCESS) fail("grant fixture read execute", error);
 }
 
+// A non-interactive CI/service window station may deny USER32 initialization
+// for a Low-IL AppContainer. Use a brand-new, noninteractive station and
+// desktop with an explicit Low label and only test-specific principals.
+// Never edit the DACL or integrity label of the caller's station or desktop.
+std::wstring sid_string(PSID sid) {
+    LPWSTR raw = nullptr;
+    require(ConvertSidToStringSidW(sid, &raw), "ConvertSidToStringSidW");
+    std::wstring value(raw);
+    LocalFree(raw);
+    return value;
+}
+
+std::wstring current_user_sid() {
+    Handle token;
+    require(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token.h), "parent token");
+    DWORD size = 0, used = 0;
+    GetTokenInformation(token.h, TokenUser, nullptr, 0, &size);
+    if (!size || GetLastError() != ERROR_INSUFFICIENT_BUFFER) fail("parent SID size");
+    std::vector<unsigned char> raw(size);
+    require(GetTokenInformation(token.h, TokenUser, raw.data(), size, &used), "parent SID");
+    return sid_string(reinterpret_cast<TOKEN_USER*>(raw.data())->User.Sid);
+}
+
+struct Descriptor {
+    PSECURITY_DESCRIPTOR value = nullptr;
+    SECURITY_ATTRIBUTES attrs{};
+    explicit Descriptor(const std::wstring& sddl) {
+        require(ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.c_str(), SDDL_REVISION_1, &value, nullptr), "private desktop SDDL");
+        attrs = {sizeof(attrs), value, FALSE};
+    }
+    ~Descriptor() { if (value) LocalFree(value); }
+    Descriptor(const Descriptor&) = delete;
+};
+
+struct PrivateDesktop {
+    HWINSTA station = nullptr;
+    HDESK desktop = nullptr;
+    std::wstring name;
+
+    explicit PrivateDesktop(const Profile& profile) {
+        DWORD session = 0;
+        require(ProcessIdToSessionId(GetCurrentProcessId(), &session), "parent session");
+        std::cerr << "AppContainer parent session: " << session << "\n";
+        // The profile name includes a random GUID. All permissions below
+        // apply exclusively to these new, disposable desktop objects.
+        const std::wstring station_name = profile.name + L".Station";
+        const std::wstring user = current_user_sid();
+        const std::wstring app = sid_string(profile.sid);
+        const std::wstring common = L"D:P(A;;GA;;;SY)(A;;GA;;;" + user + L")";
+        Descriptor station_sd(common + L"(A;;0x000f037f;;;RC)(A;;0x00020327;;;" +
+            app + L")S:(ML;;NW;;;LW)");
+        Descriptor desktop_sd(common + L"(A;;0x000f01ff;;;RC)(A;;0x000f01ff;;;" +
+            app + L")S:(ML;;NW;;;LW)");
+        const HWINSTA original = GetProcessWindowStation();
+        if (!original) fail("GetProcessWindowStation");
+        station = CreateWindowStationW(station_name.c_str(), 0, WINSTA_ALL_ACCESS, &station_sd.attrs);
+        if (!station) fail("CreateWindowStationW");
+        if (!SetProcessWindowStation(station)) {
+            DWORD error = GetLastError();
+            CloseWindowStation(station); station = nullptr;
+            fail("select private station", error);
+        }
+        // This single-threaded harness creates no UI windows. Always restore
+        // the original station before launching any child.
+        desktop = CreateDesktopW(L"Worker", nullptr, nullptr, 0,
+            DESKTOP_READOBJECTS | DESKTOP_CREATEWINDOW | DESKTOP_WRITEOBJECTS |
+            READ_CONTROL, &desktop_sd.attrs);
+        const DWORD create_error = desktop ? ERROR_SUCCESS : GetLastError();
+        if (!SetProcessWindowStation(original)) {
+            // The harness cannot safely continue after restoration failure.
+            fail("restore parent station");
+        }
+        if (!desktop) {
+            CloseWindowStation(station); station = nullptr;
+            fail("CreateDesktopW", create_error);
+        }
+        name = station_name + L"\\Worker";
+        std::cerr << "Private low-integrity window station and desktop created\n";
+    }
+    ~PrivateDesktop() {
+        if (desktop) CloseDesktop(desktop);
+        if (station) CloseWindowStation(station);
+    }
+    PrivateDesktop(const PrivateDesktop&) = delete;
+};
+
 struct Attributes {
     std::vector<unsigned char> storage;
     LPPROC_THREAD_ATTRIBUTE_LIST list = nullptr;
@@ -145,7 +233,7 @@ struct Child {
 };
 
 std::string run_fixture(const fs::path& worker, const Profile& profile,
-                        const std::wstring& args, const std::string& input) {
+                        const PrivateDesktop& private_desktop, const std::wstring& args, const std::string& input) {
     if (input.size() > 1024) fail("fixture input limit", ERROR_INVALID_PARAMETER);
     Handle child_in, parent_in, parent_out, child_out;
     pipe_pair(child_in, parent_in);
@@ -172,6 +260,8 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
     STARTUPINFOEXW si{};
     si.StartupInfo.cb = sizeof(si);
     si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    std::wstring desktop_name = private_desktop.name;
+    si.StartupInfo.lpDesktop = desktop_name.data();
     si.StartupInfo.hStdInput = child_in.h;
     si.StartupInfo.hStdOutput = child_out.h;
     si.StartupInfo.hStdError = child_out.h;
@@ -217,6 +307,7 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
     child_out.close();
 
     verify_token(child.process.h, profile.sid);
+    std::cerr << "Verified actual child AppContainer token\n";
     require(AssignProcessToJobObject(job.h, child.process.h), "AssignProcessToJobObject");
     if (ResumeThread(child.thread.h) == static_cast<DWORD>(-1)) fail("ResumeThread");
 
@@ -269,8 +360,9 @@ int wmain(int argc, wchar_t** argv) {
         grant_read_execute(worker, profile.sid);
         const std::wstring args = L" --isolation-probe " + quoted(sentinel.wstring()) +
             L" " + quoted(L"127.0.0.1:" + port);
-        const auto probe = run_fixture(worker, profile, args, "");
-        const auto catalog = run_fixture(worker, profile, L"",
+        PrivateDesktop private_desktop(profile);
+        const auto probe = run_fixture(worker, profile, private_desktop, args, "");
+        const auto catalog = run_fixture(worker, profile, private_desktop, L"",
             R"({"fixture":"catalog","operation":"search","query":"test tone","limit":10})");
         std::cout << probe << catalog;
         return 0;
