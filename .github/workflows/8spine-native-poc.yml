@@ -1,0 +1,104 @@
+name: 8SPINE native fixture runtime
+on:
+  push:
+    branches: [feature/8spine-upstream]
+    paths:
+      - "tools/8spine-native-poc/**"
+      - "tools/8spine-*.mjs"
+      - "tests/8spine-*.mjs"
+      - "docs/8spine-connector.md"
+      - "src-tauri/src/music/fixture_8spine.rs"
+      - "src-tauri/src/music.rs"
+      - ".github/workflows/8spine-native-poc.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    name: Native fixture (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build and test standalone embedded engine
+        run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml
+
+  harbor-contract:
+    name: Harbor native fixture connector (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev libgtk-3-dev libmpv-dev libpulse-dev librsvg2-dev libssl-dev libudev-dev libwebkit2gtk-4.1-dev pkg-config
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+            tools/8spine-native-poc
+      - name: Build fixture worker
+        run: cargo build --manifest-path tools/8spine-native-poc/Cargo.toml
+      - name: Test actual Harbor connector registry and worker IPC
+        env:
+          TAURI_CONFIG: '{"bundle":{"externalBin":[],"resources":[]}}'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HARBOR_8SPINE_TEST_WORKER="$GITHUB_WORKSPACE/tools/8spine-native-poc/target/debug/harbor-8spine-native-poc"
+          test -x "$HARBOR_8SPINE_TEST_WORKER"
+          cargo test --manifest-path src-tauri/Cargo.toml --lib music::fixture_8spine::tests::native_fixture_registration -- --ignored --exact
+
+      - name: Full Harbor native suite
+        env:
+          TAURI_CONFIG: '{"bundle":{"externalBin":[],"resources":[]}}'
+          HARBOR_GAME_TEST_ROOT: ${{ runner.temp }}/harbor-game-tests
+        run: |
+          mkdir -p "$HARBOR_GAME_TEST_ROOT"
+          cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
+
+  frontend:
+    name: Full frontend validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          version: 1.5.1
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Formatting and lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git diff --name-only 2fbc673dd15994e60c8109f5a7e3446efa2dd449 HEAD | grep -E '\.(md|yml|mjs|js|toml)$')
+          vp fmt --check "${files[@]}"
+          mapfile -t code < <(printf '%s\n' "${files[@]}" | grep -E '\.(js|mjs)$')
+          vp check --no-fmt "${code[@]}"
+      - name: Focused JavaScript tests
+        run: node --test tests/8spine-probe.test.mjs tests/8spine-fixture-contract.test.mjs tests/8spine-runtime.test.mjs
+      - name: Typecheck
+        run: vp run typecheck
+      - name: Full frontend tests
+        run: vp run test

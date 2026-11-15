@@ -2,6 +2,8 @@ mod audio;
 mod catalog_commands;
 mod commands;
 mod connector;
+#[cfg(test)]
+mod fixture_8spine;
 mod connectors;
 mod db;
 #[cfg(not(feature = "music-sidecar"))]
