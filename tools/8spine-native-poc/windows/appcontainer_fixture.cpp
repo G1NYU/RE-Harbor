@@ -324,12 +324,17 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
             char buf[4096];
             DWORD got = 0;
             require(ReadFile(parent_out.h, buf, std::min<DWORD>(available, sizeof(buf)), &got, nullptr), "ReadFile");
+            if (!got) fail("zero-byte fixture read", ERROR_INVALID_DATA);
             if (output.size() + got > MAX_REPLY) fail("fixture output limit", ERROR_BUFFER_OVERFLOW);
             output.append(buf, got);
         } else {
             const DWORD state = WaitForSingleObject(child.process.h, 10);
             if (state == WAIT_FAILED) fail("wait fixture");
-            if (state == WAIT_OBJECT_0) break;
+            // The process can finish between PeekNamedPipe and the wait.
+            // A signaled process is not EOF: the final bytes may have arrived
+            // after the peek. Drain until the last writer closes the pipe.
+            // A leaked writer cannot hang the supervisor past WALL_MS.
+            if (state == WAIT_OBJECT_0) Sleep(1);
         }
     }
     const auto elapsed = GetTickCount64() - start;
@@ -338,6 +343,7 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
     DWORD code = 0;
     require(GetExitCodeProcess(child.process.h, &code), "GetExitCodeProcess");
     if (code != 0) fail("worker exit", code);
+    std::cerr << "Fixture exited successfully; drained bytes: " << output.size() << "\n";
     if (output.empty()) fail("empty fixture response", ERROR_INVALID_DATA);
     return output;
 }

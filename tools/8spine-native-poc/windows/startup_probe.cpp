@@ -9,5 +9,10 @@ extern "C" void WINAPI fixture_entry() {
     const HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
     const BOOL ok = output && output != INVALID_HANDLE_VALUE &&
         WriteFile(output, marker, sizeof(marker) - 1, &written, nullptr);
-    ExitProcess(ok && written == sizeof(marker) - 1 ? 0 : 1);
+    // Distinct exit codes separate an invalid standard handle, an unsuccessful
+    // write and a short write from a successful marker or a loader failure.
+    if (!output || output == INVALID_HANDLE_VALUE) ExitProcess(11);
+    if (!ok) ExitProcess(12);
+    if (written != sizeof(marker) - 1) ExitProcess(13);
+    ExitProcess(0);
 }
