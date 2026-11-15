@@ -10,6 +10,9 @@ return {
   },
   getTrackStreamUrl(id, quality) {
     if (id !== track.id) throw new Error("Unknown track");
-    return { streamUrl: "https://example.invalid/fixture.wav", track: { id, audioQuality: quality } };
+    return {
+      streamUrl: "https://example.invalid/fixture.wav",
+      track: { id, audioQuality: quality },
+    };
   },
 };

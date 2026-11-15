@@ -169,3 +169,7 @@ Run 43716209541 passed the dedicated Linux namespace test and both Windows AppCo
 ## Frontend formatting follow-up
 
 Run 43718070698 passed seven integration jobs, including both Windows isolation jobs, Linux isolation, native fixture suites, native connector and live catalog. The frontend formatter still rejected imported.js after the previous line-wrap attempt; it did not reach lint or frontend tests. Replace the long conditional with two short statements of equivalent behavior rather than guessing another line wrap. The independent native regression remains unchanged (1,487 passed, one failed, 74 ignored). No new execution permissions are introduced. CI validation is pending; the exact formatter output has not been reproduced locally.
+
+## Formatter diagnostics
+
+Run 43727239941 again passed seven integration jobs; the frontend formatter reported only imported.js, and the independent native regression remains unchanged (1,487 passed, one failed, 74 ignored). The fixture has a remaining 102-character return statement; expand the object in the same style as catalog.js. More importantly, on formatter failure the disposable CI checkout now runs the same formatter and emits the exact diff before exiting unsuccessfully. No check is skipped, no changes are committed by CI, and no execution permissions are altered. This gives actionable evidence if the formatting hypothesis is wrong. Validation is pending.

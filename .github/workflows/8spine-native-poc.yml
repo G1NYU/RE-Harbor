@@ -247,7 +247,12 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t files < <(git diff --name-only 2fbc673dd15994e60c8109f5a7e3446efa2dd449 HEAD | grep -E '\.(md|yml|mjs|js|toml)$')
-          vp fmt --check "${files[@]}"
+          if ! vp fmt --check "${files[@]}"; then
+            # Report the exact formatter diff in the disposable checkout.
+            vp fmt "${files[@]}"
+            git diff -- "${files[@]}"
+            exit 1
+          fi
           mapfile -t code < <(printf '%s\n' "${files[@]}" | grep -E '\.(js|mjs)$')
           vp check --no-fmt "${code[@]}"
       - name: Focused JavaScript tests
