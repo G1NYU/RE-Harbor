@@ -1,5 +1,6 @@
 //! Host-only catalog/staging/consent model. No downloads or execution.
 mod store;
+mod source_format;
 pub mod repository_import;
 pub use store::{load_state, save_state};
 use crate::http_transport::{valid_dns_name, NetworkGrant};
@@ -133,9 +134,7 @@ fn fingerprint(bytes: &[u8]) -> String {
 
 fn classify(bytes: &[u8]) -> PackageFormat {
     if bytes.starts_with(b"8SM1.") { return PackageFormat::Packed8sm1; }
-    let Ok(source) = std::str::from_utf8(bytes) else { return PackageFormat::Unknown; };
-    let trimmed = source.trim_start();
-    if trimmed.starts_with("export ") || trimmed.starts_with("return ") {
+    if source_format::module_body(bytes).is_ok() {
         PackageFormat::JavascriptCandidate
     } else {
         PackageFormat::Unknown
@@ -271,6 +270,17 @@ impl ModuleManager {
         Ok(ModulePermit { key: key.clone(), fingerprint: row.fingerprint.clone(), generation: row.generation, owner: Arc::clone(&self.owner) })
     }
 
+    /// Prepare a documented plain source body as inert text for a future
+    /// isolated worker. This is not a syntax validator or execution entry point.
+    /// The exact original bytes (not the normalized body) are consent-bound.
+    pub fn approved_source_body(&self, permit: &ModulePermit, bytes: &[u8]) -> Result<String, &'static str> {
+        self.network_grant(permit)?;
+        if bytes.len() > MAX_PACKAGE || fingerprint(bytes) != permit.fingerprint {
+            return Err("package-mismatch");
+        }
+        source_format::module_body(bytes)
+    }
+
     /// No worker may mint this grant. Disable, remove, or restaging invalidates permits.
     /// A future supervisor must also recheck immediately before writes and cancel active tasks.
     pub fn network_grant(&self, permit: &ModulePermit) -> Result<NetworkGrant, &'static str> {
@@ -337,11 +347,14 @@ mod tests {
         manager.approve(&row.key, &hash, &["api.example.com"]).unwrap();
         assert_eq!(manager.permit(&row.key, b"return {};").err(), Some("package-mismatch"));
         let permit = manager.permit(&row.key, JS).unwrap();
+        assert_eq!(manager.approved_source_body(&permit, JS).unwrap().as_bytes(), JS);
+        assert_eq!(manager.approved_source_body(&permit, b"return {};"), Err("package-mismatch"));
         let grant = manager.network_grant(&permit).unwrap();
         let mut session = crate::http_transport::NetworkSession::new(&grant, &row.key.id, &hash).unwrap();
         assert!(session.authorize("GET", "https://api.example.com/catalog").is_ok());
         assert!(session.authorize("GET", "https://other.example.com/catalog").is_err());
         manager.disable(&row.key).unwrap();
+        assert_eq!(manager.approved_source_body(&permit, JS), Err("revoked"));
         assert_eq!(manager.network_grant(&permit).err(), Some("revoked"));
     }
 
