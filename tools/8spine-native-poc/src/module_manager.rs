@@ -98,6 +98,14 @@ pub fn parse_catalog(repository: &str, bytes: &[u8]) -> Result<Vec<CatalogEntry>
             inspected += 1;
             if inspected > MAX_ENTRIES { return Err("catalog-limit"); }
             if raw["type"] != "MODULE" { continue; }
+            // The live index also advertises app-specific loaders as MODULE.
+            // This connector is music-source only; explicit loader tags/labels
+            // are not source candidates. Other metadata is never a trust grant.
+            if ["tags", "labels"].iter().any(|field| raw.get(*field)
+                .and_then(Value::as_array).is_some_and(|items| items.iter()
+                    .any(|item| item.as_str().is_some_and(|s| s.trim().eq_ignore_ascii_case("loader"))))) {
+                continue;
+            }
             // Records without a concrete package URL (access-only) are not installable.
             let Ok(row) = entry(&repository, raw) else { continue; };
             if let Some(prior) = entries.get(&row.key) {
@@ -298,7 +306,13 @@ mod tests {
         local["download"] = json!("https://127.0.0.1/package");
         let mut art = module();
         art["type"] = json!("ARTWORK");
-        let rows = catalog(REPO, vec![module(), module(), access, local, art]);
+        let mut loader = module();
+        loader["id"] = json!("app-loader");
+        loader["labels"] = json!(["export", " Loader "]);
+        let mut tagged_loader = module();
+        tagged_loader["id"] = json!("another-loader");
+        tagged_loader["tags"] = json!(["LOADER"]);
+        let rows = catalog(REPO, vec![module(), module(), access, local, art, loader, tagged_loader]);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].download, "https://modules.example.com/modules/test.8spine");
         let other = catalog("https://other.example.com/index.json", vec![module()]);

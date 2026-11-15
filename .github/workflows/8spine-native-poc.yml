@@ -222,6 +222,9 @@ jobs:
       - name: Fetch only the user-approved repository index
         run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --test live_catalog -- --ignored --exact live_catalog_index --nocapture
 
+      - name: Inspect one fixed public package without executing it
+        run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --test live_catalog -- --ignored --exact live_public_package_metadata --nocapture
+
   frontend:
     name: Full frontend validation
     runs-on: ubuntu-24.04
