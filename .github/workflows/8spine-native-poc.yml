@@ -101,7 +101,65 @@ jobs:
       - name: Install namespace sandbox
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap
+          sudo apt-get install -y bubblewrap apparmor-profiles apparmor-utils
+      - name: Build trusted fixture executable
+        run: cargo build --manifest-path tools/8spine-native-poc/Cargo.toml
+      - name: Diagnose namespace launch and provision scoped distro profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/bwrap --version
+          sysctl kernel.apparmor_restrict_unprivileged_userns || true
+          dpkg-query -W bubblewrap apparmor-profiles apparmor-utils
+          worker="$GITHUB_WORKSPACE/tools/8spine-native-poc/target/debug/harbor-8spine-native-poc"
+          test -x "$worker"
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          cd "$work"
+          # Reproduce the production-shaped fixture invocation without redacting
+          # launcher stderr. Only a compiled-in, synthetic music fixture is run.
+          sandbox_args=(--unshare-user --unshare-pid --unshare-net --unshare-ipc --unshare-uts --disable-userns --die-with-parent --new-session --cap-drop ALL --clearenv --dev /dev --size 16777216 --tmpfs /tmp --chdir /tmp)
+          for lib in /lib /lib64 /usr/lib /usr/lib64; do
+            if [[ -d "$lib" ]]; then
+              sandbox_args+=(--ro-bind "$lib" "$lib")
+            fi
+          done
+          sandbox_args+=(--ro-bind "$worker" /worker -- /worker)
+          probe() {
+            printf '%s' '{"fixture":"catalog","operation":"search","query":"test tone","limit":10}' |
+              timeout 8s /usr/bin/bwrap "${sandbox_args[@]}" >reply.json 2>launcher.err
+          }
+          if ! probe; then
+            cat launcher.err >&2
+            if ! grep -Eiq 'operation not permitted|permission denied|no permissions to create|not allowed' launcher.err; then
+              echo "::error::Namespace preflight failed for a reason other than a known permission restriction."
+              exit 1
+            fi
+            if [[ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null)" != "1" ]]; then
+              echo "::error::Namespace launch failed without the expected Ubuntu AppArmor restriction."
+              exit 1
+            fi
+            profile=/etc/apparmor.d/bwrap-userns-restrict
+            shipped=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+            profiles="$(sudo aa-status)"
+            if grep -qi 'bwrap' <<< "$profiles"; then
+              echo "::error::A Bubblewrap profile is already active; refusing to replace or stack profiles."
+              exit 1
+            fi
+            if [[ ! -f "$profile" ]]; then
+              test -f "$shipped"
+              sudo install -m 0644 "$shipped" "$profile"
+            fi
+            sudo apparmor_parser -r "$profile"
+            # Preserve the global user-namespace restriction. Do not elevate the
+            # worker, disable AppArmor, share the host network, or fall back.
+            test "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)" = "1"
+            if ! probe; then
+              cat launcher.err >&2
+              exit 1
+            fi
+          fi
+          python3 -c 'import json; r=json.load(open("reply.json")); assert r["ok"] is True and r["result"]["tracks"][0]["id"] == 42'
       - name: Test real host filesystem and network denial
         run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --test supervisor linux_namespace_isolation -- --ignored --exact
 
