@@ -6,6 +6,8 @@ pub mod http_transport;
 pub mod adapter;
 // Host-owned metadata and consent model; no package execution.
 pub mod module_manager;
+// Fixture-only host process supervision and optional Linux namespace isolation.
+pub mod supervisor;
 use rquickjs::{Context, Function, Promise, Runtime};
 use std::cell::Cell;
 use std::rc::Rc;

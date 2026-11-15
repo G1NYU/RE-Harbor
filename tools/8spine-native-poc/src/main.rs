@@ -4,6 +4,11 @@ use serde_json::{json, Value};
 use std::io::{self, Read, Write};
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    if std::env::args().nth(1).as_deref() == Some("--isolation-probe") {
+        isolation_probe();
+        return;
+    }
     // Read at most the input limit plus one byte, then emit a single JSON message.
     let mut input = Vec::new();
     let reply = if io::stdin()
@@ -57,4 +62,26 @@ fn adapter_reply(input: &[u8]) -> Value {
         Ok(result) => json!({"ok": true, "result": result}),
         Err(error) => json!({"ok": false, "error": error}),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn isolation_probe() {
+    use std::{net::{SocketAddr, TcpStream}, time::Duration};
+    // Compiled-in diagnostic only: inspect access to a synthetic host sentinel
+    // and a test-owned loopback listener. Never return bytes or connect elsewhere.
+    let args: Vec<_> = std::env::args_os().collect();
+    let result = (|| {
+        if args.len() != 4 { return None; }
+        let addr: SocketAddr = args[3].to_str()?.parse().ok()?;
+        if !addr.ip().is_loopback() { return None; }
+        let readable = std::fs::File::open(&args[2]).is_ok();
+        let network = TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok();
+        Some(json!({"hostFileReadable": readable, "hostNetworkReachable": network,
+            "pathPresent": std::env::var_os("PATH").is_some()}))
+    })();
+    let reply = match result {
+        Some(result) => json!({"ok": true, "result": result}),
+        None => json!({"ok": false, "error": "invalid-request"}),
+    };
+    let _ = writeln!(io::stdout().lock(), "{reply}");
 }
