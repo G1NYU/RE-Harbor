@@ -172,7 +172,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build trusted fixture worker
+      - name: Build trusted fixture worker with static CRT
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
         run: cargo build --manifest-path tools/8spine-native-poc/Cargo.toml
       - name: Build native AppContainer harness
         shell: cmd
@@ -181,12 +183,18 @@ jobs:
           if errorlevel 1 exit /b 1
           cl /nologo /EHsc /std:c++17 /W4 /DUNICODE /D_UNICODE tools\8spine-native-poc\windows\appcontainer_fixture.cpp /Fe:"%RUNNER_TEMP%\8spine-appcontainer-fixture.exe" /link userenv.lib advapi32.lib ole32.lib user32.lib
           if errorlevel 1 exit /b 1
+          cl /nologo /c /GS- /Zl /O1 tools\8spine-native-poc\windows\startup_probe.cpp /Fo:"%RUNNER_TEMP%\8spine-startup-probe.obj"
+          if errorlevel 1 exit /b 1
+          link /nologo /nodefaultlib /entry:fixture_entry /subsystem:console /out:"%RUNNER_TEMP%\8spine-startup-probe.exe" "%RUNNER_TEMP%\8spine-startup-probe.obj" kernel32.lib
+          if errorlevel 1 exit /b 1
+          dumpbin /dependents "%RUNNER_TEMP%\8spine-startup-probe.exe"
+          if errorlevel 1 exit /b 1
           dumpbin /dependents tools\8spine-native-poc\target\debug\harbor-8spine-native-poc.exe
           if errorlevel 1 exit /b 1
       - name: Test AppContainer identity, filesystem and loopback denial
         shell: pwsh
         run: |
-          & ./tools/8spine-native-poc/windows/test-appcontainer.ps1 -Harness "$env:RUNNER_TEMP/8spine-appcontainer-fixture.exe" -Worker "$env:GITHUB_WORKSPACE/tools/8spine-native-poc/target/debug/harbor-8spine-native-poc.exe"
+          & ./tools/8spine-native-poc/windows/test-appcontainer.ps1 -Harness "$env:RUNNER_TEMP/8spine-appcontainer-fixture.exe" -Worker "$env:GITHUB_WORKSPACE/tools/8spine-native-poc/target/debug/harbor-8spine-native-poc.exe" -StartupProbe "$env:RUNNER_TEMP/8spine-startup-probe.exe"
 
   frontend:
     name: Full frontend validation

@@ -361,9 +361,25 @@ int wmain(int argc, wchar_t** argv) {
         const std::wstring args = L" --isolation-probe " + quoted(sentinel.wstring()) +
             L" " + quoted(L"127.0.0.1:" + port);
         PrivateDesktop private_desktop(profile);
+        const fs::path startup = worker.parent_path() / L"8spine-startup-probe.exe";
+        if (!fs::is_regular_file(startup)) fail("startup diagnostic missing", ERROR_FILE_NOT_FOUND);
+        grant_read_execute(startup, profile.sid);
+        bool startup_ok = false;
+        try {
+            const auto response = run_fixture(startup, profile, private_desktop, L"", "");
+            startup_ok = response == "startup-ok\n" || response == "startup-ok\r\n";
+            std::cerr << "Minimal kernel32 startup probe: " << (startup_ok ? "passed" : "invalid response") << "\n";
+        } catch (const std::exception& error) {
+            std::cerr << "Minimal kernel32 startup probe failed: " << error.what() << "\n";
+        }
+        // Still run the real fixture so one diagnostic failure cannot hide the
+        // other. A passing job requires both, with identical confinement.
+        std::cerr << "Starting Rust containment probe\n";
         const auto probe = run_fixture(worker, profile, private_desktop, args, "");
+        std::cerr << "Starting Rust catalog fixture\n";
         const auto catalog = run_fixture(worker, profile, private_desktop, L"",
             R"({"fixture":"catalog","operation":"search","query":"test tone","limit":10})");
+        if (!startup_ok) fail("minimal startup probe failed", ERROR_INVALID_DATA);
         std::cout << probe << catalog;
         return 0;
     } catch (const std::exception& error) {

@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$Harness,
-    [Parameter(Mandatory=$true)][string]$Worker
+    [Parameter(Mandatory=$true)][string]$Worker,
+    [Parameter(Mandatory=$true)][string]$StartupProbe
 )
 $ErrorActionPreference = 'Stop'
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ("harbor-8spine-" + [guid]::NewGuid().ToString("N"))
@@ -11,6 +12,7 @@ try {
     New-Item -ItemType Directory -Path $bin | Out-Null
     $copy = Join-Path $bin "harbor-8spine-native-poc.exe"
     Copy-Item -LiteralPath $Worker -Destination $copy
+    Copy-Item -LiteralPath $StartupProbe -Destination (Join-Path $bin '8spine-startup-probe.exe')
     $sentinel = Join-Path $root "host-only.txt"
     [System.IO.File]::WriteAllText($sentinel, "synthetic test sentinel")
     if ([System.IO.File]::ReadAllText($sentinel) -ne "synthetic test sentinel") { throw "Host file baseline failed" }
