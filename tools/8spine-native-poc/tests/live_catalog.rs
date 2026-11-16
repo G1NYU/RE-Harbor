@@ -74,4 +74,38 @@ fn live_public_package_metadata() {
     });
     runtime.shutdown_timeout(Duration::from_secs(1));
     println!("Public SoundCloud package staged, disabled; format: {:?}", result.expect("public package retrieval"));
+    inspect_plain_community_package();
+
+}
+
+// A second public repository publishes the documented export-const format.
+// Pin both the index and package to a source commit; inspect format only.
+// No provider requests, grants, execution, or source redistribution.
+fn inspect_plain_community_package() {
+    use harbor_8spine_native_poc::module_manager::PackageFormat;
+    const INDEX: &str = "https://raw.githubusercontent.com/Jawsh777/8spine-modules/99dda6b2a57e6c076705802b2d595f97b05dbe0f/dist/module-source.json";
+    const DOWNLOAD: &str = "https://raw.githubusercontent.com/Jawsh777/8spine-modules/99dda6b2a57e6c076705802b2d595f97b05dbe0f/dist/cerberus.8spine";
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all().build().expect("runtime");
+    let result = runtime.block_on(async {
+        let mut manager = ModuleManager::default();
+        manager.add_repository(INDEX)?;
+        let catalog = CatalogFetch::prepare(&manager, INDEX)?
+            .fetch_live(&manager).await?;
+        let row = catalog.entries().iter().find(|row| row.key.id == "cerberus")
+            .ok_or("catalog-entry-missing")?;
+        if row.version != "v1.0.0" { return Err("unexpected-package-version"); }
+        let key = row.key.clone();
+        let fetch = catalog.prepare_package(&manager, &key, DOWNLOAD)?;
+        let format = fetch.fetch_and_stage_live(&mut manager).await?;
+        let staged = manager.get(&key).ok_or("not-staged")?;
+        if format != PackageFormat::JavascriptCandidate || staged.enabled() ||
+            staged.status() != "disabled" || staged.hosts().count() != 0 ||
+            staged.fingerprint().len() != 64 {
+            return Err("unexpected-plain-package-state");
+        }
+        Ok::<_, &'static str>(format)
+    });
+    runtime.shutdown_timeout(Duration::from_secs(1));
+    println!("Pinned community package staged, disabled; format: {:?}", result.expect("plain package retrieval"));
 }

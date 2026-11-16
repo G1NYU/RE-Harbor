@@ -99,7 +99,11 @@ pub fn parse_catalog(repository: &str, bytes: &[u8]) -> Result<Vec<CatalogEntry>
         for raw in list {
             inspected += 1;
             if inspected > MAX_ENTRIES { return Err("catalog-limit"); }
-            if raw["type"] != "MODULE" { continue; }
+            // Some independent repositories use category:music and omit the
+            // redundant type field. Only that explicit music category is
+            // eligible; null or any other explicit type is still rejected.
+            let legacy_music = category == "category:music" && raw.get("type").is_none();
+            if raw["type"] != "MODULE" && !legacy_music { continue; }
             // The live index also advertises app-specific loaders as MODULE.
             // This connector is music-source only; explicit loader tags/labels
             // are not source candidates. Other metadata is never a trust grant.
@@ -347,6 +351,35 @@ mod tests {
         let raw = json!({"category:modules":[module(), conflict]}).to_string();
         assert_eq!(parse_catalog(REPO, raw.as_bytes()), Err("catalog-conflict"));
         assert_eq!(parse_catalog(REPO, &vec![b'x'; MAX_INDEX + 1]), Err("index-limit"));
+    }
+
+    #[test]
+    fn explicit_music_category_accepts_untyped_community_entries_only() {
+        let mut plain = module();
+        plain.as_object_mut().unwrap().remove("type");
+        plain["download"] = json!("community.js");
+        let mut loader = plain.clone();
+        loader["id"] = json!("loader");
+        loader["labels"] = json!(["LOADER"]);
+        let mut artwork = plain.clone();
+        artwork["id"] = json!("art");
+        artwork["type"] = json!("ARTWORK");
+        let mut null = plain.clone();
+        null["id"] = json!("null");
+        null["type"] = Value::Null;
+        let mut untyped = plain.clone();
+        untyped["id"] = json!("untyped");
+        let raw = json!({
+            "category:music": [plain, loader, artwork, null],
+            "category:modules": [untyped]
+        }).to_string();
+        let entries = parse_catalog(REPO, raw.as_bytes()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].key.id, "fixture");
+        assert_eq!(entries[0].download, "https://modules.example.com/community.js");
+        let mut manager = ModuleManager::default();
+        manager.stage(&entries[0], JS).unwrap();
+        assert_eq!(manager.get(&entries[0].key).unwrap().status(), "disabled");
     }
 
     #[test]
