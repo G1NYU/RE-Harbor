@@ -147,6 +147,17 @@ impl Supervisor {
     }
 
     #[cfg(target_os = "linux")]
+    pub async fn run_configured(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8], operation: Value, settings: &Value) -> Result<Value, &'static str> {
+        if !matches!(self.isolation, Isolation::LinuxNamespace) { return Err("sandbox-unavailable"); }
+        let input = crate::host_bridge::configured_input(manager, permit, bytes, operation, settings)?;
+        let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
+        let mut cmd = self.command()?;
+        cmd.current_dir(private.path()).arg("--approved-search");
+        crate::host_bridge::exchange_approved_search(cmd, manager, permit, input).await
+    }
+
+    #[cfg(target_os = "linux")]
     pub async fn run_approved_resolve(&self, manager: &ModuleManager, permit: &ModulePermit,
         bytes: &[u8], track_id: &Value, quality: &str) -> Result<Value, &'static str> {
         if !matches!(self.isolation, Isolation::LinuxNamespace) { return Err("sandbox-unavailable"); }
@@ -230,6 +241,25 @@ impl WindowsFixtureSupervisor {
     pub async fn run_approved_search(&self, manager: &ModuleManager, permit: &ModulePermit,
         bytes: &[u8], query: &str, limit: usize) -> Result<Value, &'static str> {
         let input = crate::host_bridge::approved_search_input(manager, permit, bytes, query, limit)?;
+        let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
+        let copy = private.path().join("harbor-8spine-native-poc.exe");
+        std::fs::copy(&self.worker, &copy).map_err(|_| "worker-copy")?;
+        let mut cmd = Command::new(&self.launcher);
+        cmd.arg("--approved-search").arg(&copy)
+            .current_dir(private.path()).env_clear()
+            .stdin(Stdio::piped()).stdout(Stdio::piped())
+            .stderr(Stdio::null()).kill_on_drop(true);
+        for key in ["SystemRoot", "LOCALAPPDATA", "USERPROFILE"] {
+            let value = std::env::var_os(key).ok_or("sandbox-unavailable")?;
+            if !Path::new(&value).is_absolute() { return Err("sandbox-unavailable"); }
+            cmd.env(key, value);
+        }
+        crate::host_bridge::exchange_approved_search(cmd, manager, permit, input).await
+    }
+
+    pub async fn run_configured(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8], operation: Value, settings: &Value) -> Result<Value, &'static str> {
+        let input = crate::host_bridge::configured_input(manager, permit, bytes, operation, settings)?;
         let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
         let copy = private.path().join("harbor-8spine-native-poc.exe");
         std::fs::copy(&self.worker, &copy).map_err(|_| "worker-copy")?;

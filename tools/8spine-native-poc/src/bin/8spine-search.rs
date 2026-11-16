@@ -15,6 +15,10 @@ struct Search {
     limit: Option<usize>,
     track_id: Option<Value>,
     quality: Option<String>,
+    #[serde(default)]
+    describe: bool,
+    #[serde(default)]
+    settings: Option<Value>,
 }
 
 #[cfg(any(target_os = "linux", windows))]
@@ -34,6 +38,19 @@ async fn run(input: Search) -> Result<Value, &'static str> {
     #[cfg(windows)]
     let worker = harbor_8spine_native_poc::supervisor::WindowsFixtureSupervisor::new(
         &dir.join("harbor-8spine-native-poc.exe"), &dir.join("8spine-sandbox.exe"))?;
+    if input.describe {
+        return worker.run_configured(&manager,&permit,bytes,json!({"describe":true}),&json!({})).await;
+    }
+    if let Some(chosen) = input.settings {
+        let schema = worker.run_configured(&manager,&permit,bytes,json!({"describe":true}),&json!({})).await?;
+        let values = harbor_8spine_native_poc::settings::values(&schema,&chosen)?;
+        let operation = match (input.query,input.limit,input.track_id) {
+            (Some(query),Some(limit),None) => json!({"query":query,"limit":limit}),
+            (None,None,Some(id)) => json!({"trackId":id,"quality":values["quality"].as_str().or(input.quality.as_deref()).unwrap_or("HIGH")}),
+            _ => return Err("invalid-request"),
+        };
+        return worker.run_configured(&manager,&permit,bytes,operation,&values).await;
+    }
     match (input.query, input.limit, input.track_id) {
         (Some(query), Some(limit), None) if input.quality.is_none() => worker.run_approved_search(&manager, &permit, bytes, &query, limit).await,
         (None, None, Some(track_id)) => worker.run_approved_resolve(&manager, &permit, bytes, &track_id, input.quality.as_deref().unwrap_or("HIGH")).await,

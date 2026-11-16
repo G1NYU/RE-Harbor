@@ -17,6 +17,7 @@ struct SourceStatus {
     fingerprint: String,
     playback: bool,
     quality: String,
+    settings: Value,
 }
 
 struct Active {
@@ -67,8 +68,8 @@ pub fn music_8spine_runtime_status(app: tauri::AppHandle, state: tauri::State<'_
 
 #[tauri::command]
 pub async fn music_8spine_enable(app: tauri::AppHandle, state: tauri::State<'_, MusicState>,
-    entry: CatalogEntry, fingerprint: String, hosts: Vec<String>, playback: bool, quality: String) -> Result<String, String> {
-    if !matches!(quality.as_str(), "LOW" | "HIGH" | "LOSSLESS") { return Err("invalid-quality".to_owned()); }
+    entry: CatalogEntry, fingerprint: String, hosts: Vec<String>, playback: bool, quality: String, settings: Value) -> Result<String, String> {
+    if !matches!(quality.as_str(), "LOW" | "HIGH" | "LOSSLESS") || !settings.is_object() || settings.to_string().len() > 32768 { return Err("invalid-quality".to_owned()); }
     let runner = runtime(&app).ok_or("sandbox-unavailable")?;
     let host_refs = hosts.iter().map(String::as_str).collect::<Vec<_>>();
     NetworkGrant::new(&entry.key.id, &fingerprint, &host_refs)?;
@@ -82,13 +83,27 @@ pub async fn music_8spine_enable(app: tauri::AppHandle, state: tauri::State<'_, 
     let mut guard = state.eightspine.0.lock().map_err(|_| "source-state")?;
     if guard.len() >= 8 || guard.contains_key(&connector_id) { return Err("source-limit-or-already-enabled".to_owned()); }
     let enabled = Arc::new(AtomicBool::new(true));
-    let status = SourceStatus { entry: entry.clone(), connector_id: connector_id.clone(), fingerprint: fingerprint.clone(), playback, quality: quality.clone() };
+    let status = SourceStatus { entry: entry.clone(), connector_id: connector_id.clone(), fingerprint: fingerprint.clone(), playback, quality: quality.clone(), settings: settings.clone() };
     state.registry.register(Box::new(SearchConnector {
         connector_id: connector_id.clone(), entry, fingerprint, hosts, package, runner,
-        enabled: enabled.clone(), playback, quality, busy: tokio::sync::Mutex::new(()),
+        enabled: enabled.clone(), playback, quality, settings, busy: tokio::sync::Mutex::new(()),
     }))?;
     guard.insert(connector_id.clone(), Active { status, enabled });
     Ok(connector_id)
+}
+
+#[tauri::command]
+pub async fn music_8spine_describe_settings(app: tauri::AppHandle, entry: CatalogEntry, fingerprint: String) -> Result<Value,String> {
+    let runner=runtime(&app).ok_or("sandbox-unavailable")?;
+    let bytes=retrieve_package(&entry).await?;
+    if bytes.len()>128*1024 || format!("{:x}",Sha256::digest(&bytes))!=fingerprint { return Err("package-changed".to_owned()); }
+    verify_plain(&bytes)?;
+    let package=String::from_utf8(bytes).map_err(|_|"unsupported-package")?;
+    // The metadata operation is denied all network requests by the host and
+    // receives no fetch capability. This placeholder grant cannot be used.
+    let connector=SearchConnector { connector_id:id(&entry),entry,fingerprint,hosts:vec!["example.com".to_owned()],package,runner,
+        enabled:Arc::new(AtomicBool::new(true)),playback:false,quality:"HIGH".to_owned(),settings:json!({}),busy:tokio::sync::Mutex::new(()) };
+    connector.invoke_runtime(json!({"describe":true})).await
 }
 
 fn disable(state: &MusicState, connector_id: &str, active: &mut BTreeMap<String, Active>) -> Result<(), String> {
@@ -125,6 +140,7 @@ struct SearchConnector {
     enabled: Arc<AtomicBool>,
     playback: bool,
     quality: String,
+    settings: Value,
     busy: tokio::sync::Mutex<()>,
 }
 
@@ -133,6 +149,7 @@ impl SearchConnector {
         if !self.enabled.load(Ordering::Acquire) { return Err("source-disabled".to_owned()); }
         let mut request = json!({"entry":self.entry,"fingerprint":self.fingerprint,
             "hosts":self.hosts,"package":self.package});
+        if operation["describe"] != true { request["settings"] = self.settings.clone(); }
         request.as_object_mut().ok_or("invalid-request")?.extend(operation.as_object().ok_or("invalid-request")?.clone());
         let payload = serde_json::to_vec(&request).map_err(|_| "invalid-request")?;
         if payload.len() > 2 * 1024 * 1024 { return Err("input-limit".to_owned()); }
@@ -149,7 +166,7 @@ impl SearchConnector {
         let mut stdin = child.stdin.take().ok_or("runtime-input")?;
         let stdout = child.stdout.take().ok_or("runtime-output")?;
         let mut out = Vec::new();
-        tokio::time::timeout(Duration::from_secs(28), async {
+        tokio::time::timeout(Duration::from_secs(55), async {
             stdin.write_all(&payload).await.map_err(|_| "runtime-input")?;
             drop(stdin);
             stdout.take(256 * 1024 + 1).read_to_end(&mut out).await.map_err(|_| "runtime-output")?;

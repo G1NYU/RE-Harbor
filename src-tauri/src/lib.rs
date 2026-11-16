@@ -1896,6 +1896,8 @@ pub fn run() {
             #[cfg(feature = "music")]
             music::eightspine_search::music_8spine_enable,
             #[cfg(feature = "music")]
+            music::eightspine_search::music_8spine_describe_settings,
+            #[cfg(feature = "music")]
             music::eightspine_search::music_8spine_disable,
             #[cfg(feature = "music")]
             music::eightspine_search::music_8spine_disable_repository,

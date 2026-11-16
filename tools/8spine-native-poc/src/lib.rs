@@ -1,6 +1,7 @@
 //! Development fixture only. No downloaded JavaScript or real network access.
 mod broker;
 mod catalog;
+pub mod settings;
 #[cfg(any(target_os = "linux", windows))]
 pub mod host_bridge;
 // Host-only development API; never exposed to the JavaScript runtime.
@@ -115,16 +116,18 @@ fn evaluate(input: &[u8], bridge: Option<fn(String) -> String>) -> Result<Value,
 #[cfg(any(target_os = "linux", windows))]
 fn evaluate_approved_search(input: &Value, bridge: fn(String) -> String) -> Result<Value, &'static str> {
     let object = input.as_object().ok_or("invalid-request")?;
-    if object.len() != 3 { return Err("invalid-request"); }
+    if object.len() > 4 { return Err("invalid-request"); }
     let source = input["source"].as_str().filter(|s| !s.is_empty() && s.len() <= 128 * 1024)
         .ok_or("input-limit")?;
-    let request = if object.contains_key("trackId") {
+    let mut request = if input["describe"] == true && object.len() == 2 {
+        json!({"operation":"settings"})
+    } else if object.contains_key("trackId") {
         let id = &input["trackId"];
         if !(id.as_str().is_some_and(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
             || id.as_i64().is_some_and(|n| (-9007199254740991..=9007199254740991).contains(&n))) {
             return Err("invalid-request");
         }
-        let quality = input["quality"].as_str().filter(|q| matches!(*q, "LOW" | "HIGH" | "LOSSLESS"))
+        let quality = input["quality"].as_str().filter(|q| !q.is_empty() && q.len() <= 128 && !q.chars().any(char::is_control))
             .ok_or("invalid-request")?;
         json!({"operation":"resolve","trackId":id,"quality":quality})
     } else {
@@ -134,7 +137,8 @@ fn evaluate_approved_search(input: &Value, bridge: fn(String) -> String) -> Resu
             .ok_or("invalid-request")?;
         json!({"operation":"search","query":query,"limit":limit})
     };
-    evaluate_body(&request, source, Some(bridge))
+    if let Some(settings) = input.get("settings") { request["settings"] = settings.clone(); }
+    evaluate_body(&request, source, if input["describe"] == true { None } else { Some(bridge) })
 }
 
 fn evaluate_body(request: &Value, source: &str, bridge: Option<fn(String) -> String>) -> Result<Value, &'static str> {
@@ -152,9 +156,14 @@ fn evaluate_body(request: &Value, source: &str, bridge: Option<fn(String) -> Str
             "use strict";
             const input = JSON.parse({data});
             const moduleInstance = (function () {{ {source} }})();
-            const result = input.operation === "search"
-                ? await moduleInstance.searchTracks(input.query, input.limit)
-                : await moduleInstance.getTrackStreamUrl(input.trackId, input.quality);
+            const settings = Object.create(null);
+            for (const [key, value] of Object.entries(input.settings || {{}})) settings[key] = {{ value }};
+            const context = {{ settings }};
+            const result = input.operation === "settings"
+                ? (moduleInstance.settings || {{}})
+                : input.operation === "search"
+                    ? await moduleInstance.searchTracks(input.query, input.limit, context)
+                    : await moduleInstance.getTrackStreamUrl(input.trackId, input.quality, context);
             return JSON.stringify(result);
         }})()"#
     );

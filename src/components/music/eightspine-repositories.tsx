@@ -19,6 +19,9 @@ type Preview = {
 };
 
 type Active = { entry: Entry; connectorId: string; fingerprint: string; playback: boolean; quality: string };
+type SettingValue = string | number | boolean;
+type Setting = { type: "selector" | "text" | "toggle" | "boolean"; label: string; description: string; defaultValue: SettingValue; options?: { label: string; value: SettingValue }[] };
+type Schema = Record<string, Setting>;
 type RuntimeStatus = { available: boolean; active: Active[] };
 
 type Inspection = {
@@ -65,6 +68,8 @@ export function EightSpineRepositories() {
   const [hosts, setHosts] = useState("");
   const [playback, setPlayback] = useState(false);
   const [quality, setQuality] = useState("HIGH");
+  const [schema, setSchema] = useState<Schema | null>(null);
+  const [settings, setSettings] = useState<Record<string, SettingValue>>({});
 
   async function updateRuntime() {
     setRuntime(await invoke<RuntimeStatus>("music_8spine_runtime_status"));
@@ -78,7 +83,7 @@ export function EightSpineRepositories() {
     if (!active) {
       const inspection = inspections[sourceKey(entry)];
       if (inspection?.format === "javascript-candidate" && runtime.available) {
-        setApproval(inspection); setHosts(""); setPlayback(false); setQuality("HIGH");
+        setApproval(inspection); setHosts(""); setPlayback(false); setQuality("HIGH"); setSchema(null); setSettings({});
       }
       return;
     }
@@ -88,13 +93,30 @@ export function EightSpineRepositories() {
     finally { busy.current = false; setPending(false); }
   }
 
-  async function enable() {
+  async function loadSettings() {
     if (!approval || busy.current) return;
+    busy.current = true; setPending(true); setError("");
+    try {
+      const result = await invoke<Schema>("music_8spine_describe_settings", { entry: approval.entry, fingerprint: approval.fingerprint });
+      setSchema(result);
+      let saved: Record<string, SettingValue> = {};
+      try { saved = JSON.parse(readMusicPreference("harbor.8spine.settings." + approval.fingerprint) ?? "{}"); } catch { /* use defaults */ }
+      setSettings(Object.fromEntries(Object.entries(result).map(([key, field]) => {
+        const prior = saved?.[key];
+        return [key, field.type === "selector" && field.options?.some((o) => o.value === prior) ? prior : field.defaultValue];
+      })));
+    } catch (reason) { setError(errorText(reason)); }
+    finally { busy.current = false; setPending(false); }
+  }
+
+  async function enable() {
+    if (!approval || !schema || busy.current) return;
     const domains = [...new Set(hosts.split(/[\\s,]+/).filter(Boolean))];
     if (!domains.length) return;
     busy.current = true; setPending(true); setError("");
     try {
-      await invoke("music_8spine_enable", { entry: approval.entry, fingerprint: approval.fingerprint, hosts: domains, playback, quality });
+      await invoke("music_8spine_enable", { entry: approval.entry, fingerprint: approval.fingerprint, hosts: domains, playback, quality, settings });
+      writeMusicPreference("harbor.8spine.settings." + approval.fingerprint, JSON.stringify(Object.fromEntries(Object.entries(settings).filter(([key]) => schema[key]?.type === "selector"))));
       await updateRuntime(); setApproval(null);
     } catch (reason) { setError(errorText(reason)); }
     finally { busy.current = false; setPending(false); }
@@ -217,7 +239,21 @@ export function EightSpineRepositories() {
             <input type="checkbox" checked={playback} onChange={(event) => setPlayback(event.target.checked)} disabled={pending} />
             Allow direct audio playback (up to 64 MiB)
           </label>
-          {playback && (
+          {schema === null && <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => void loadSettings()}>Load module settings (isolated, offline)</button>}
+          {schema && Object.entries(schema).map(([key, field]) => (
+            <label key={key} className="flex flex-col gap-1 text-xs text-ink-muted">
+              <strong className="text-sm text-ink">{field.label}</strong>
+              {field.description}
+              {field.type === "selector" ? (
+                <select value={String(field.options?.findIndex((option) => option.value === settings[key]) ?? -1)} disabled={pending} onChange={(event) => { const option = field.options?.[Number(event.target.value)]; if (option) setSettings((current) => ({ ...current, [key]: option.value })); }} className="rounded-md border border-edge-soft bg-surface p-2 text-sm text-ink">
+                  {field.options?.map((option, index) => <option key={index} value={index}>{option.label}</option>)}
+                </select>
+              ) : field.type === "text" ? (
+                <input value={String(settings[key] ?? "")} maxLength={512} disabled={pending} onChange={(event) => setSettings((current) => ({ ...current, [key]: event.target.value }))} className="rounded-md border border-edge-soft bg-surface p-2 text-sm text-ink" />
+              ) : <input type="checkbox" checked={settings[key] === true} disabled={pending} onChange={(event) => setSettings((current) => ({ ...current, [key]: event.target.checked }))} />}
+            </label>
+          ))}
+          {playback && schema && !schema.quality && (
             <label className="flex items-center gap-2 text-xs text-ink-muted">
               Preferred quality
               <select value={quality} onChange={(event) => setQuality(event.target.value)} disabled={pending} className="rounded-md border border-edge-soft bg-surface p-2 text-sm text-ink">
@@ -229,7 +265,7 @@ export function EightSpineRepositories() {
             </label>
           )}
           <div className="flex gap-2">
-            <button type="button" disabled={pending || !hosts.trim()} className={SECONDARY_BUTTON} onClick={() => void enable()}>Enable source</button>
+            <button type="button" disabled={pending || !hosts.trim() || !schema} className={SECONDARY_BUTTON} onClick={() => void enable()}>Enable source</button>
             <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => setApproval(null)}>Cancel</button>
           </div>
         </div>

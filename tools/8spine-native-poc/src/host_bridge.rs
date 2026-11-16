@@ -32,6 +32,22 @@ pub fn approved_search_worker() -> io::Result<()> {
     write_frame(io::stdout().lock(), &json!({"reply":reply}))
 }
 
+pub(crate) fn configured_input(manager: &ModuleManager, permit: &ModulePermit, bytes: &[u8],
+    operation: Value, settings: &Value) -> Result<Value, &'static str> {
+    let mut input = if operation["describe"] == true {
+        json!({"describe":true,"source":manager.approved_source_body(permit, bytes)?})
+    } else if let Some(id) = operation.get("trackId") {
+        approved_resolve_input(manager, permit, bytes, id, operation["quality"].as_str().ok_or("invalid-request")?)?
+    } else {
+        approved_search_input(manager, permit, bytes, operation["query"].as_str().ok_or("invalid-request")?,
+            operation["limit"].as_u64().filter(|n| (1..=50).contains(n)).ok_or("invalid-request")? as usize)?
+    };
+    if operation["describe"] != true { input["settings"] = settings.clone(); }
+    if input["source"].as_str().is_none_or(|s| s.len() > MAX_SOURCE)
+        || serde_json::to_vec(&input).map_err(|_| "invalid-request")?.len() > MAX_FRAME { return Err("input-limit"); }
+    Ok(input)
+}
+
 pub(crate) fn approved_search_input(manager: &ModuleManager, permit: &ModulePermit,
     bytes: &[u8], query: &str, limit: usize) -> Result<Value, &'static str> {
     let source = manager.approved_source_body(permit, bytes)?;
@@ -47,7 +63,7 @@ pub(crate) fn approved_search_input(manager: &ModuleManager, permit: &ModulePerm
 
 pub(crate) fn approved_resolve_input(manager: &ModuleManager, permit: &ModulePermit,
     bytes: &[u8], track_id: &Value, quality: &str) -> Result<Value, &'static str> {
-    if !matches!(quality, "LOW" | "HIGH" | "LOSSLESS") { return Err("invalid-request"); }
+    if quality.is_empty() || quality.len() > 128 || quality.chars().any(char::is_control) { return Err("invalid-request"); }
     let source = manager.approved_source_body(permit, bytes)?;
     if source.len() > MAX_SOURCE { return Err("input-limit"); }
     if !(track_id.as_str().is_some_and(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
@@ -216,8 +232,9 @@ pub(crate) async fn exchange(mut cmd: Command, manager: &ModuleManager, permit: 
 // invocation. No direct sockets and no media URL resolution in this protocol.
 pub(crate) async fn exchange_approved_search(mut cmd: Command, manager: &ModuleManager,
     permit: &ModulePermit, input: Value) -> Result<Value, &'static str> {
+    let describe = input["describe"] == true;
     let limit = input["limit"].as_u64().map(|n| n as usize);
-    if limit.is_none() && input.get("trackId").is_none() { return Err("invalid-request"); }
+    if !describe && limit.is_none() && input.get("trackId").is_none() { return Err("invalid-request"); }
     let mut broker = ModuleNetworkBroker::new(manager, permit)?;
     let mut child = cmd.spawn().map_err(|_| "worker-spawn")?;
     let mut stdin = child.stdin.take().ok_or("worker-stdin")?;
@@ -231,6 +248,7 @@ pub(crate) async fn exchange_approved_search(mut cmd: Command, manager: &ModuleM
             let obj = frame.as_object().ok_or("worker-protocol")?;
             if obj.len() != 1 { return Err("worker-protocol"); }
             if let Some(payload) = obj.get("request").and_then(Value::as_str) {
+                if describe { return Err("settings-network-denied"); }
                 if calls >= MAX_CALLS { return Err("request-limit"); }
                 calls += 1;
                 let reply = match broker.request(manager, payload.as_bytes()).await {
@@ -241,6 +259,7 @@ pub(crate) async fn exchange_approved_search(mut cmd: Command, manager: &ModuleM
             } else if let Some(reply) = obj.get("reply") {
                 if reply.as_object().map(|o| o.len()) != Some(2) { return Err("worker-protocol"); }
                 let output = match reply["ok"].as_bool() {
+                    Some(true) if describe => crate::settings::sanitize_schema(&reply["result"])?,
                     Some(true) => match limit {
                         Some(limit) => sanitized_search(&reply["result"], limit)?,
                         None => sanitized_resolve(&reply["result"], manager, permit)?,
