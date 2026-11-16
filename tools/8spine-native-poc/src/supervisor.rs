@@ -169,7 +169,7 @@ impl WindowsFixtureSupervisor {
     }
 
     pub async fn run_fixture(&self, request: &Value) -> Result<Value, &'static str> {
-        if request["fixture"] == "imported-fixture" { return Err("fixture-consent-required"); }
+        if matches!(request["fixture"].as_str(), Some("imported-fixture" | "host-broker")) { return Err("fixture-consent-required"); }
         self.run_request(request).await
     }
 
@@ -177,6 +177,29 @@ impl WindowsFixtureSupervisor {
         bytes: &[u8], operation: &Value) -> Result<Value, &'static str> {
         let request = approved_fixture_input(manager, permit, bytes, operation)?;
         self.run_request(&request).await
+    }
+
+    /// Fixed, compiled-in network fixture. The trusted launcher passes only
+    /// the host's two protocol pipe handles to the zero-capability child.
+    pub async fn run_host_broker_fixture(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8]) -> Result<Value, &'static str> {
+        if manager.approved_source_body(permit, bytes)? != crate::host_bridge::SOURCE {
+            return Err("fixture-source-denied");
+        }
+        let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
+        let copy = private.path().join("harbor-8spine-native-poc.exe");
+        std::fs::copy(&self.worker, &copy).map_err(|_| "worker-copy")?;
+        let mut cmd = Command::new(&self.launcher);
+        cmd.arg("--host-broker-fixture").arg(&copy)
+            .current_dir(private.path()).env_clear()
+            .stdin(Stdio::piped()).stdout(Stdio::piped())
+            .stderr(Stdio::null()).kill_on_drop(true);
+        for key in ["SystemRoot", "LOCALAPPDATA", "USERPROFILE"] {
+            let value = std::env::var_os(key).ok_or("sandbox-unavailable")?;
+            if !Path::new(&value).is_absolute() { return Err("sandbox-unavailable"); }
+            cmd.env(key, value);
+        }
+        crate::host_bridge::exchange(cmd, manager, permit).await
     }
 
     async fn run_request(&self, request: &Value) -> Result<Value, &'static str> {

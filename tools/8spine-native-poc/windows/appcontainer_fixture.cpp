@@ -242,9 +242,22 @@ struct Child {
 };
 
 std::string run_fixture(const fs::path& worker, const Profile& profile,
-                        const PrivateDesktop& private_desktop, const std::wstring& args, const std::string& input) {
+                        const PrivateDesktop& private_desktop, const std::wstring& args, const std::string& input, bool broker = false) {
     if (input.size() > 1024) fail("fixture input limit", ERROR_INVALID_PARAMETER);
     Handle child_in, parent_in, parent_out, child_out;
+    if (broker) {
+        // No extra forwarding thread or inherited host handles. The launcher
+        // duplicates precisely the Rust host's two anonymous protocol pipes.
+        // A fixed worker mode and the existing explicit handle list apply.
+        for (auto which : {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE}) {
+            HANDLE source = GetStdHandle(which);
+            if (!source || source == INVALID_HANDLE_VALUE || GetFileType(source) != FILE_TYPE_PIPE)
+                fail("broker requires protocol pipes", ERROR_INVALID_HANDLE);
+            HANDLE* target = which == STD_INPUT_HANDLE ? &child_in.h : &child_out.h;
+            require(DuplicateHandle(GetCurrentProcess(), source, GetCurrentProcess(), target,
+                0, TRUE, DUPLICATE_SAME_ACCESS), "duplicate broker pipe");
+        }
+    } else {
     pipe_pair(child_in, parent_in);
     pipe_pair(parent_out, child_out);
     require(SetHandleInformation(parent_in.h, HANDLE_FLAG_INHERIT, 0), "parent stdin inheritance");
@@ -256,6 +269,7 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
         if (sent != input.size()) fail("short fixture input", ERROR_WRITE_FAULT);
     }
     parent_in.close();
+    }
 
     SECURITY_CAPABILITIES security{};
     security.AppContainerSid = profile.sid;
@@ -328,6 +342,17 @@ std::string run_fixture(const fs::path& worker, const Profile& profile,
     std::cerr << "Verified creation-time Job Object membership\n";
     if (ResumeThread(child.thread.h) == static_cast<DWORD>(-1)) fail("ResumeThread");
 
+    if (broker) {
+        // Only the Rust host speaks the binary protocol. The launcher holds
+        // no job-bearing handle in the child and fails closed on timeout.
+        if (WaitForSingleObject(child.process.h, 15000) != WAIT_OBJECT_0)
+            fail("broker fixture wall deadline", WAIT_TIMEOUT);
+        DWORD code = 0;
+        require(GetExitCodeProcess(child.process.h, &code), "GetExitCodeProcess");
+        if (code != 0) fail("broker worker exit", code);
+        return {};
+    }
+
     std::string output;
     const ULONGLONG start = GetTickCount64();
     while (true) {
@@ -370,6 +395,17 @@ int wmain(int argc, wchar_t** argv) {
         // Host-only mode: one bounded JSON request over stdin, one response.
         // The Rust worker accepts compiled-in fixtures only; there is no source
         // loading, no user-selected command line and no direct-run fallback.
+        if (argc == 3 && std::wstring(argv[1]) == L"--host-broker-fixture") {
+            const fs::path worker = fs::absolute(argv[2]);
+            if (worker.filename() != L"harbor-8spine-native-poc.exe" || !fs::is_regular_file(worker))
+                fail("invalid broker fixture worker", ERROR_INVALID_PARAMETER);
+            Profile profile;
+            grant_read_execute(worker.parent_path(), profile.sid);
+            grant_read_execute(worker, profile.sid);
+            PrivateDesktop private_desktop(profile);
+            run_fixture(worker, profile, private_desktop, L" --host-broker-fixture", "", true);
+            return 0;
+        }
         if (argc == 3 && std::wstring(argv[1]) == L"--fixture-request") {
             const fs::path worker = fs::absolute(argv[2]);
             if (worker.filename() != L"harbor-8spine-native-poc.exe" ||

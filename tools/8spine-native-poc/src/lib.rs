@@ -1,6 +1,6 @@
 //! Development fixture only. No downloaded JavaScript or real network access.
 mod broker;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 pub mod host_bridge;
 // Host-only development API; never exposed to the JavaScript runtime.
 pub mod http_transport;
@@ -27,7 +27,7 @@ fn fixture(name: &str) -> Option<&'static str> {
     Some(match name {
         "catalog" => include_str!("../fixtures/catalog.js"),
         "broker" => include_str!("../fixtures/broker.js"),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         "host-broker" => host_bridge::SOURCE,
         "capabilities" => r#"return { searchTracks() { return {
             process: typeof process, require: typeof require, fetch: typeof fetch,

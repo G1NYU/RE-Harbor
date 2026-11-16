@@ -1,4 +1,4 @@
-//! Linux-only fixture IPC. Child has no sockets; host owns all network access.
+//! Linux and Windows fixture IPC. Child has no sockets; host owns all network access.
 //! Fixed compiled-in source and endpoint, no general module loader.
 use crate::module_manager::{ModuleManager, ModulePermit, network_broker::ModuleNetworkBroker};
 use serde_json::{json, Value};
@@ -75,7 +75,8 @@ pub(crate) async fn exchange(mut cmd: Command, manager: &ModuleManager, permit: 
     let mut child = cmd.spawn().map_err(|_| "worker-spawn")?;
     let mut stdin = child.stdin.take().ok_or("worker-stdin")?;
     let mut stdout = child.stdout.take().ok_or("worker-stdout")?;
-    let result = tokio::time::timeout(Duration::from_secs(15), async {
+    let wall = if cfg!(windows) { 22 } else { 15 };
+    let result = tokio::time::timeout(Duration::from_secs(wall), async {
         let mut calls = 0;
         loop {
             let frame = read_async(&mut stdout).await?;

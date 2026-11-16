@@ -37,7 +37,31 @@ async fn windows_supervised_fixture() {
     assert_eq!(supervisor.run_fixture(&imported::raw_request()).await, Err("fixture-consent-required"));
     manager.disable(&key).unwrap();
     assert_eq!(supervisor.run_approved_fixture(&manager, &permit, &package, &imported::search()).await, Err("revoked"));
+    host_broker_checks(&supervisor).await;
 }
 
 #[path = "support_imported/mod.rs"]
 mod imported;
+
+async fn host_broker_checks(supervisor: &WindowsFixtureSupervisor) {
+    use harbor_8spine_native_poc::{host_bridge::SOURCE, module_manager::{ModuleManager, parse_catalog}};
+    let repo = "https://8spine-modules.pages.dev/index.json";
+    let raw = br#"{"category:modules":[{"id":"bridge-fixture","name":"Bridge fixture","version":"1","type":"MODULE","download":"fixture.js"}]}"#;
+    let entry = parse_catalog(repo, raw).unwrap().remove(0);
+    let mut manager = ModuleManager::default();
+    manager.stage(&entry, SOURCE.as_bytes()).unwrap();
+    let sha = manager.get(&entry.key).unwrap().fingerprint().to_owned();
+    manager.approve(&entry.key, &sha, &["api.example.com"]).unwrap();
+    let permit = manager.permit(&entry.key, SOURCE.as_bytes()).unwrap();
+    let denied = supervisor.run_host_broker_fixture(&manager, &permit, SOURCE.as_bytes()).await.unwrap();
+    assert_eq!(denied, json!({"ok":false,"error":"fixture-failed"}));
+    manager.disable(&entry.key).unwrap();
+    assert_eq!(supervisor.run_host_broker_fixture(&manager, &permit, SOURCE.as_bytes()).await, Err("revoked"));
+    let bypass = json!({"fixture":"host-broker","operation":"search","query":"catalog","limit":1});
+    assert_eq!(supervisor.run_fixture(&bypass).await, Err("fixture-consent-required"));
+    manager.approve(&entry.key, &sha, &["8spine-modules.pages.dev"]).unwrap();
+    let permit = manager.permit(&entry.key, SOURCE.as_bytes()).unwrap();
+    let live = supervisor.run_host_broker_fixture(&manager, &permit, SOURCE.as_bytes()).await.unwrap();
+    assert_eq!(live["ok"], true);
+    assert!(live["result"]["categories"].as_u64().unwrap() > 0);
+}
