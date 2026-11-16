@@ -113,6 +113,15 @@ jobs:
           } | ConvertTo-Json -Depth 10
           $configPath = Join-Path $env:RUNNER_TEMP '8spine-beta.json'
           $config | Set-Content -Encoding utf8 $configPath
+          # ort-sys rc.10 copies DLLs to three destinations without creating
+          # their parent directories. Tauri's build layout can place the
+          # computed base under release/build rather than release.
+          foreach ($base in @('src-tauri/target/release/build', 'src-tauri/target/release')) {
+            foreach ($suffix in @('examples', 'deps')) {
+              New-Item -ItemType Directory -Force (Join-Path $base $suffix) | Out-Null
+            }
+          }
+          $env:RUST_BACKTRACE = '1'
           pnpm tauri build --bundles msi --config "$configPath"
           if ($LASTEXITCODE -ne 0) { throw "Tauri beta build failed" }
       - name: Upload unsigned beta installer
