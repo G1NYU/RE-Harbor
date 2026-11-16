@@ -25,22 +25,7 @@ struct SavedModule {
     format: PackageFormat,
 }
 
-/// Accept the repository homepage or an explicit index JSON URL.
-/// Do not fetch it or follow additional indexes here.
-pub(super) fn repository_index(input: &str) -> Result<String, &'static str> {
-    let mut url = approved_url(input, None)?;
-    if url.query().is_some() || !input.starts_with("https://") {
-        return Err("invalid-url");
-    }
-    if url.path().ends_with('/') {
-        url = url.join("index.json").map_err(|_| "invalid-url")?;
-    } else if url.path().rsplit('/').next().is_some_and(|s| !s.ends_with(".json")) {
-        let path = format!("{}/index.json", url.path());
-        url.set_path(&path);
-    }
-    if url.as_str().len() > 4096 { return Err("invalid-url"); }
-    Ok(url.to_string())
-}
+pub(super) use crate::catalog::repository_index;
 
 fn valid_fingerprint(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))

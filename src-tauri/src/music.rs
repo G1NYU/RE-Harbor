@@ -2,6 +2,7 @@ mod audio;
 mod catalog_commands;
 mod commands;
 mod connector;
+pub mod eightspine_catalog;
 #[cfg(test)]
 mod fixture_8spine;
 mod connectors;

@@ -1,5 +1,6 @@
 //! Development fixture only. No downloaded JavaScript or real network access.
 mod broker;
+mod catalog;
 #[cfg(any(target_os = "linux", windows))]
 pub mod host_bridge;
 // Host-only development API; never exposed to the JavaScript runtime.

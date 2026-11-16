@@ -1888,6 +1888,8 @@ pub fn run() {
             #[cfg(feature = "music")]
             music::music_health,
             #[cfg(feature = "music")]
+            music::eightspine_catalog::music_8spine_preview_repository,
+            #[cfg(feature = "music")]
             music::music_source_candidates,
             #[cfg(feature = "music")]
             music::music_spotify_status,

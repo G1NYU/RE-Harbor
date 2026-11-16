@@ -8,6 +8,10 @@ on:
       - "tests/8spine-*.mjs"
       - "docs/8spine-connector.md"
       - "src-tauri/src/music/fixture_8spine.rs"
+      - "src-tauri/src/music/eightspine_catalog.rs"
+      - "src-tauri/src/lib.rs"
+      - "src/components/music/eightspine-repositories.tsx"
+      - "src/components/music/music-connections.tsx"
       - "src-tauri/src/music.rs"
       - ".github/workflows/8spine-native-poc.yml"
   workflow_dispatch:
@@ -62,6 +66,7 @@ jobs:
           export HARBOR_8SPINE_TEST_WORKER="$GITHUB_WORKSPACE/tools/8spine-native-poc/target/debug/harbor-8spine-native-poc"
           test -x "$HARBOR_8SPINE_TEST_WORKER"
           cargo test --manifest-path src-tauri/Cargo.toml --lib music::fixture_8spine::tests::native_fixture_registration -- --ignored --exact
+          cargo test --manifest-path src-tauri/Cargo.toml --lib music::eightspine_catalog::tests::public_repository_preview -- --ignored --exact
 
   harbor-regression:
     name: Full Harbor native regression (independent)

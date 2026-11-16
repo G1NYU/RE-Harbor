@@ -19,6 +19,7 @@ import { loadConnections } from "@/lib/music/catalog";
 import { hydrateMusicSourceConsent } from "@/lib/music/source-consent";
 import type { MusicConnection, MusicConnectionKind } from "@/lib/music/types";
 import { MusicSourceConsent } from "./music-source-consent";
+import { EightSpineRepositories } from "./eightspine-repositories";
 
 const GROUPS: Array<{ kind: MusicConnectionKind; label: string }> = [
   { kind: "local", label: "music.connections.local" },
@@ -225,6 +226,7 @@ export function MusicConnections({ focusId, onClose }: { focusId?: string; onClo
           <p className="px-5 py-8 text-[13px] text-ink-subtle">{t("music.connections.empty")}</p>
         )}
 
+        <EightSpineRepositories />
         {status !== "error" &&
           groups.map((group) => (
             <section key={group.kind}>
