@@ -1,5 +1,5 @@
 //! Host-owned request handling for a future isolated worker IPC bridge.
-//! No worker is wired to this API yet. Only bounded text GET responses.
+//! Only bounded text GET responses; the fixture bridge is isolated.
 use super::{ModuleManager, ModulePermit};
 use crate::http_transport::{AuthorizedRequest, HttpReply, NetworkSession};
 use serde::Deserialize;
@@ -35,6 +35,18 @@ impl<'p> ModuleNetworkBroker<'p> {
         if frame.len() > MAX_FRAME { return Err("request-size"); }
         let frame: RequestFrame = serde_json::from_slice(frame).map_err(|_| "invalid-request")?;
         self.session.authorize(&frame.method, &frame.url)
+    }
+
+    /// Fixed synthetic music response. Authorization is identical to a real GET,
+    /// but this reserved fixture path never contacts the external server.
+    #[cfg(any(target_os = "linux", windows))]
+    pub(crate) fn synthetic_music_fixture(&mut self, manager: &ModuleManager, frame: &[u8]) -> Result<HttpReply, &'static str> {
+        self.authorize(manager, frame)?;
+        let request: RequestFrame = serde_json::from_slice(frame).map_err(|_| "invalid-request")?;
+        if request.url != "https://8spine-modules.pages.dev/__harbor_synthetic_music_fixture" {
+            return Err("destination-denied");
+        }
+        Ok(HttpReply { status: 200, body: r#"{"tracks":[{"id":42,"title":"Synthetic test tone"}]}"#.to_owned() })
     }
 
     /// The host owns DNS and TLS. No headers, credentials or pins from the

@@ -64,4 +64,5 @@ async fn host_broker_checks(supervisor: &WindowsFixtureSupervisor) {
     let live = supervisor.run_host_broker_fixture(&manager, &permit, SOURCE.as_bytes()).await.unwrap();
     assert_eq!(live["ok"], true);
     assert!(live["result"]["categories"].as_u64().unwrap() > 0);
+    assert_eq!(live["result"]["tracks"], json!([{"id":42,"title":"Synthetic test tone"}]));
 }

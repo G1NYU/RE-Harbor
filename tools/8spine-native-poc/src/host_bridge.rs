@@ -10,7 +10,10 @@ pub const SOURCE: &str = r#"return {
         const response = await fetch("https://8spine-modules.pages.dev/index.json");
         if (!response.ok) throw new Error("http-status");
         const catalog = await response.json();
-        return { categories: Object.keys(catalog).filter(key => key.startsWith("category:")).length };
+        const music = await fetch("https://8spine-modules.pages.dev/__harbor_synthetic_music_fixture");
+        if (!music.ok) throw new Error("music-status");
+        const data = await music.json();
+        return { categories: Object.keys(catalog).filter(key => key.startsWith("category:")).length, tracks: data.tracks };
     }
 };"#;
 
@@ -89,17 +92,22 @@ pub(crate) async fn exchange(mut cmd: Command, manager: &ModuleManager, permit: 
                 // this experiment as a general network proxy.
                 let expected = json!({"url":"https://8spine-modules.pages.dev/index.json","method":"GET"});
                 let parsed: Value = serde_json::from_str(payload).map_err(|_| "worker-protocol")?;
-                if parsed != expected { return Err("worker-protocol"); }
-                let reply = match broker.request(manager, payload.as_bytes()).await {
+                let synthetic = json!({"url":"https://8spine-modules.pages.dev/__harbor_synthetic_music_fixture","method":"GET"});
+                let response = if calls == 1 && parsed == expected {
+                    broker.request(manager, payload.as_bytes()).await
+                } else if calls == 2 && parsed == synthetic {
+                    broker.synthetic_music_fixture(manager, payload.as_bytes())
+                } else { return Err("worker-protocol"); };
+                let reply = match response {
                     Ok(reply) => json!({"ok":true,"response":{"status":reply.status,"body":reply.body}}),
                     Err(code) => json!({"ok":false,"error":code}),
                 };
                 write_async(&mut stdin, &reply).await?;
             } else if let Some(reply) = obj.get("reply") {
-                if calls != 1 { return Err("worker-protocol"); }
                 let ok = reply["ok"].as_bool().ok_or("worker-protocol")?;
+                if (ok && calls != 2) || (!ok && !(1..=2).contains(&calls)) { return Err("worker-protocol"); }
                 if reply.as_object().map(|o| o.len()) != Some(2) ||
-                    (ok && !reply["result"]["categories"].is_u64()) ||
+                    (ok && (!reply["result"]["categories"].is_u64() || reply["result"]["tracks"] != json!([{"id":42,"title":"Synthetic test tone"}]))) ||
                     (!ok && reply["error"] != "fixture-failed") {
                     return Err("worker-protocol");
                 }
