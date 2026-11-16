@@ -1,0 +1,124 @@
+name: 8SPINE Windows beta
+
+on:
+  push:
+    branches: [feature/8spine-upstream]
+    paths:
+      - ".github/workflows/8spine-windows-beta.yml"
+      - "tools/8spine-native-poc/**"
+      - "src-tauri/src/music/eightspine*.rs"
+      - "src/components/music/eightspine-repositories.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eightspine-windows-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+  HARBOR_CAPSTAN_OPTIONAL: "1"
+
+jobs:
+  beta:
+    if: github.ref == 'refs/heads/feature/8spine-upstream'
+    runs-on: windows-2025
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+            tools/8spine-native-poc
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.401"
+      - name: Build Pokémon engine and corresponding source bundle
+        run: node tools/pokemon-engine/build.mjs --fetch-source "${{ runner.temp }}/harbor-pokemon-source" --output src-tauri/resources/pokemon-engine --artifacts "${{ runner.temp }}/harbor-pokemon-build"
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare build assets
+        run: pnpm run setup
+      - name: Build isolated worker and trusted host
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+        run: cargo build --release --manifest-path tools/8spine-native-poc/Cargo.toml --features windows-sandbox-fixture
+      - name: Build native AppContainer launcher
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b 1
+          cl /nologo /MT /EHsc /std:c++17 /W4 /DUNICODE /D_UNICODE tools\8spine-native-poc\windows\appcontainer_fixture.cpp /Fe:"%RUNNER_TEMP%\8spine-sandbox.exe" /link userenv.lib advapi32.lib ole32.lib user32.lib
+          if errorlevel 1 exit /b 1
+      - name: Stage runtime and smoke-test release binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = New-Item -ItemType Directory -Force src-tauri/resources/8spine
+          Copy-Item tools/8spine-native-poc/target/release/8spine-search.exe $dir.FullName
+          Copy-Item tools/8spine-native-poc/target/release/harbor-8spine-native-poc.exe $dir.FullName
+          Copy-Item "$env:RUNNER_TEMP/8spine-sandbox.exe" $dir.FullName
+          $file = "tools/8spine-native-poc/examples/commons-public-domain.js"
+          $payload = @{
+            entry = @{
+              key = @{ id = 'commons-public-domain'; repository = 'https://modules.example.com/index.json' }
+              name = 'Commons public-domain audio'
+              version = '1.0.0'
+              download = 'https://modules.example.com/commons-public-domain.js'
+              author = 'Harbor development example'
+            }
+            fingerprint = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            hosts = @('upload.wikimedia.org')
+            package = [System.IO.File]::ReadAllText((Resolve-Path $file))
+            describe = $true
+          } | ConvertTo-Json -Depth 10 -Compress
+          $output = $payload | & "$($dir.FullName)/8spine-search.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Host runner failed" }
+          $reply = $output | ConvertFrom-Json
+          if ($reply.ok -ne $true) { throw "Isolated runtime smoke test failed: $output" }
+      - name: Build separate unsigned beta MSI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $config = @{
+            productName = 'Harbor 8SPINE Beta'
+            identifier = 'app.harbor.eightspine.beta'
+            bundle = @{
+              createUpdaterArtifacts = $false
+              resources = @{
+                'resources/8spine/8spine-search.exe' = '8spine/8spine-search.exe'
+                'resources/8spine/harbor-8spine-native-poc.exe' = '8spine/harbor-8spine-native-poc.exe'
+                'resources/8spine/8spine-sandbox.exe' = '8spine/8spine-sandbox.exe'
+              }
+            }
+            plugins = @{ updater = @{ endpoints = @() } }
+          } | ConvertTo-Json -Depth 10
+          $configPath = Join-Path $env:RUNNER_TEMP '8spine-beta.json'
+          $config | Set-Content -Encoding utf8 $configPath
+          pnpm tauri build --target x86_64-pc-windows-msvc --bundles msi --config "$configPath"
+          if ($LASTEXITCODE -ne 0) { throw "Tauri beta build failed" }
+      - name: Upload unsigned beta installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-8spine-windows-beta
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 14
