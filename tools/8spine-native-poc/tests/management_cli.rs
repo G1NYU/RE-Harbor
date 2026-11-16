@@ -21,6 +21,8 @@ fn metadata_cli_persists_repository_and_never_enables_execution() {
     assert_eq!(added["result"]["repositories"][0], "https://modules.example.com/index.json");
     assert_eq!(invoke(root, &["list"]).1, added);
     assert_eq!(invoke(root, &["enable", "fixture"]).1["error"], "invalid-command");
+    assert_eq!(invoke(root, &["inspect", "https://modules.example.com/", "fixture", "https://files.example.com/fixture"]).1["error"], "invalid-command");
+    assert_eq!(invoke(root, &["inspect", "https://unregistered.example.com/", "fixture", "1", "https://files.example.com/fixture"]).1["error"], "repository-not-registered");
     assert_eq!(invoke(root, &["add", "https://127.0.0.1/"]).1["error"], "invalid-url");
     assert_eq!(invoke(root, &["browse", "https://unregistered.example.com/"]).1["error"], "repository-not-registered");
     assert_eq!(invoke(root, &["list"]).1, added);

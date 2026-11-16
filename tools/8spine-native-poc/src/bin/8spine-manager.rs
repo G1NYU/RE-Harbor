@@ -64,13 +64,14 @@ async fn run(root: &Path, args: &[String]) -> Result<Value, &'static str> {
                 .fetch_live(&manager).await?;
             Ok(json!({"entries":catalog.entries(),"executionAvailable":false}))
         }
-        [command, repository, id, exact_url] if command == "inspect" => {
+        [command, repository, id, version, exact_url] if command == "inspect" => {
             // An explicit command names the exact URL presented to the user
             // by browse. Refetch the catalog and refuse changed selection.
             let catalog = CatalogFetch::prepare(&manager, repository)?
                 .fetch_live(&manager).await?;
             let row = catalog.entries().iter().find(|row| &row.key.id == id)
                 .ok_or("catalog-entry-missing")?;
+            if &row.version != version { return Err("catalog-version-changed"); }
             let key = row.key.clone();
             let fetch = catalog.prepare_package(&manager, &key, exact_url)?;
             fetch.fetch_and_stage_live(&mut manager).await?;
@@ -86,7 +87,7 @@ fn main() {
     // command execution, package persistence or execution grants are accepted.
     let args: Vec<_> = std::env::args().skip(1).collect();
     let result = if args.len() < 2 {
-        Err("usage: 8spine-manager <absolute-state-directory> <list|add|browse|inspect|remove-module|remove-repository> [arguments]")
+        Err("usage: 8spine-manager <absolute-state-directory> <list|add|browse|inspect|remove-module|remove-repository> [arguments]; inspect requires repository, id, version, exact URL")
     } else {
         match tokio::runtime::Builder::new_current_thread().enable_all().build() {
             Ok(runtime) => {
