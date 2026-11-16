@@ -177,3 +177,7 @@ Run 43727239941 again passed seven integration jobs; the frontend formatter repo
 ## Two-request isolated music fixture
 
 Run 43819204364 passed all eight integration jobs; independent regression remains the same seeding failure (1487 passed, one failed, 74 ignored). The next fixture performs the real authorized catalog GET and a second permission-checked synthetic music request through the same isolated IPC session on Linux and Windows. The reserved second URL is intercepted locally and never contacted; no provider playback or downloaded code runs. The host verifies request order and the exact synthetic track result. Run 43832204482 passed all seven native, isolation and live catalog jobs; frontend stopped on an extra blank line in this document, now removed. The independent seeding failure is unchanged. In-flight revocation and packed 8SM1 remain unresolved.
+
+## Windows beta packaging validation
+
+Run 43895375215 reached Tauri compilation after staging and smoke-testing the isolated release runtime. The build failed in ort-sys 2.0.0-rc.10, build.rs:126, with Windows path-not-found error 3 while handling DirectML.dll under the explicit target build directory. Harbor's existing Windows app-build workflow uses the native default target without an explicit --target. This change follows that layout and adjusts the MSI artifact path accordingly; it does not disable ONNX, change runtime confinement, or skip tests. The installer is not yet available. Validation of the packaging correction is pending.

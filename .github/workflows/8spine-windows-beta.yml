@@ -113,12 +113,12 @@ jobs:
           } | ConvertTo-Json -Depth 10
           $configPath = Join-Path $env:RUNNER_TEMP '8spine-beta.json'
           $config | Set-Content -Encoding utf8 $configPath
-          pnpm tauri build --target x86_64-pc-windows-msvc --bundles msi --config "$configPath"
+          pnpm tauri build --bundles msi --config "$configPath"
           if ($LASTEXITCODE -ne 0) { throw "Tauri beta build failed" }
       - name: Upload unsigned beta installer
         uses: actions/upload-artifact@v4
         with:
           name: harbor-8spine-windows-beta
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          path: src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 14
