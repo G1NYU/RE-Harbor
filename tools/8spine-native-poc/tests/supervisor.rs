@@ -71,6 +71,7 @@ async fn linux_namespace_isolation() {
     manager.disable(&key).unwrap();
     assert_eq!(worker.run_approved_fixture(&manager, &permit, &package, &imported::search()).await, Err("revoked"));
     host_broker_checks(&worker).await;
+    approved_plain_search(&worker).await;
 }
 
 #[cfg(target_os = "linux")]
@@ -102,4 +103,31 @@ async fn host_broker_checks(worker: &Supervisor) {
     assert_eq!(live["ok"], true);
     assert!(live["result"]["categories"].as_u64().unwrap() > 0);
     assert_eq!(live["result"]["tracks"], json!([{"id":42,"title":"Synthetic test tone"}]));
+}
+
+#[cfg(target_os = "linux")]
+async fn approved_plain_search(worker: &Supervisor) {
+    let repo = "https://8spine-modules.pages.dev/index.json";
+    let raw = br#"{"category:modules":[{"id":"plain","type":"MODULE","name":"Plain test","version":"1","download":"plain.js"}]}"#;
+    let row = harbor_8spine_native_poc::module_manager::parse_catalog(repo, raw).unwrap().remove(0);
+    let source = br#"return { async searchTracks(query, limit) {
+        const response = await fetch("https://8spine-modules.pages.dev/index.json");
+        if (!response.ok) throw new Error("http-status");
+        const data = await response.json();
+        if (!Object.keys(data).length) throw new Error("empty");
+        return { tracks: [{id: query, title: query, artist: "Local test", duration: 5,
+            streamUrl: "file:///forbidden", artwork: "http://127.0.0.1/private"}], total: 1 };
+    } };"#;
+    let mut manager = harbor_8spine_native_poc::module_manager::ModuleManager::default();
+    manager.stage(&row, source).unwrap();
+    let fingerprint = manager.get(&row.key).unwrap().fingerprint().to_owned();
+    manager.approve(&row.key, &fingerprint, &["api.example.com"]).unwrap();
+    let permit = manager.permit(&row.key, source).unwrap();
+    assert_eq!(worker.run_approved_search(&manager, &permit, source, "test tone", 1).await, Err("module-search-failed"));
+    manager.disable(&row.key).unwrap();
+    assert_eq!(worker.run_approved_search(&manager, &permit, source, "test tone", 1).await, Err("revoked"));
+    manager.approve(&row.key, &fingerprint, &["8spine-modules.pages.dev"]).unwrap();
+    let permit = manager.permit(&row.key, source).unwrap();
+    let result = worker.run_approved_search(&manager, &permit, source, "test tone", 1).await.unwrap();
+    assert_eq!(result, json!({"tracks":[{"id":"test tone","title":"test tone","artist":"Local test","duration":5.0}],"total":1}));
 }

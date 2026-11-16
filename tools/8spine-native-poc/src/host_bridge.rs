@@ -20,6 +20,57 @@ pub const SOURCE: &str = r#"return {
 // JSON escaping can expand a 32 KiB text body by up to six times.
 const MAX_FRAME: usize = 256 * 1024 + 1024;
 const MAX_CALLS: usize = 8;
+const MAX_SOURCE: usize = 128 * 1024;
+
+pub fn approved_search_worker() -> io::Result<()> {
+    let input: Value = serde_json::from_slice(&read_frame(io::stdin().lock())?)
+        .map_err(io::Error::other)?;
+    let reply = match crate::evaluate_approved_search(&input, request) {
+        Ok(result) => json!({"ok":true,"result":result}),
+        Err(error) => json!({"ok":false,"error":error}),
+    };
+    write_frame(io::stdout().lock(), &json!({"reply":reply}))
+}
+
+pub(crate) fn approved_search_input(manager: &ModuleManager, permit: &ModulePermit,
+    bytes: &[u8], query: &str, limit: usize) -> Result<Value, &'static str> {
+    let source = manager.approved_source_body(permit, bytes)?;
+    if source.len() > MAX_SOURCE || query.trim().is_empty() || query.len() > 512 || !(1..=50).contains(&limit) {
+        return Err("invalid-request");
+    }
+    let request = json!({"source":source,"query":query,"limit":limit});
+    if serde_json::to_vec(&request).map_err(|_| "invalid-request")?.len() > MAX_FRAME {
+        return Err("input-limit");
+    }
+    Ok(request)
+}
+
+// Return only bounded music metadata. Never forward arbitrary module artwork,
+// playback URLs, headers or unknown fields to the application.
+fn sanitized_search(raw: &Value, limit: usize) -> Result<Value, &'static str> {
+    let tracks = raw["tracks"].as_array().ok_or("invalid-search-result")?;
+    let total = raw["total"].as_u64().ok_or("invalid-search-result")?;
+    if tracks.len() > limit || total < tracks.len() as u64 { return Err("invalid-search-result"); }
+    let mut ids = std::collections::BTreeSet::new();
+    let mut safe = Vec::new();
+    for track in tracks {
+        let id = &track["id"];
+        if !(id.as_str().is_some_and(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
+            || id.as_i64().is_some_and(|n| (-9007199254740991..=9007199254740991).contains(&n))) {
+            return Err("invalid-track-id");
+        }
+        if !ids.insert(id.to_string()) { return Err("duplicate-track-id"); }
+        let title = track["title"].as_str().filter(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
+            .ok_or("invalid-metadata")?;
+        let artist = track["artist"].as_str().filter(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
+            .ok_or("invalid-metadata")?;
+        let duration = track["duration"].as_f64().filter(|d| d.is_finite() && *d > 0.0 && *d <= 86400.0)
+            .ok_or("invalid-duration")?;
+        safe.push(json!({"id":id,"title":title,"artist":artist,"duration":duration}));
+    }
+    Ok(json!({"tracks":safe,"total":total}))
+}
+
 
 fn read_frame(mut reader: impl Read) -> io::Result<Vec<u8>> {
     let mut size = [0; 4];
@@ -125,6 +176,63 @@ pub(crate) async fn exchange(mut cmd: Command, manager: &ModuleManager, permit: 
     }).await;
     match result {
         Ok(Ok(reply)) => Ok(reply),
+        other => {
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(Duration::from_secs(1), child.wait()).await;
+            match other {
+                Ok(Err(code)) => Err(code),
+                Err(_) => Err("worker-timeout"),
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+// Generic, experimental search only. The host owns the permit throughout the
+// invocation. No direct sockets and no media URL resolution in this protocol.
+pub(crate) async fn exchange_approved_search(mut cmd: Command, manager: &ModuleManager,
+    permit: &ModulePermit, input: Value) -> Result<Value, &'static str> {
+    let limit = input["limit"].as_u64().ok_or("invalid-request")? as usize;
+    let mut broker = ModuleNetworkBroker::new(manager, permit)?;
+    let mut child = cmd.spawn().map_err(|_| "worker-spawn")?;
+    let mut stdin = child.stdin.take().ok_or("worker-stdin")?;
+    let mut stdout = child.stdout.take().ok_or("worker-stdout")?;
+    let wall = if cfg!(windows) { 22 } else { 15 };
+    let result = tokio::time::timeout(Duration::from_secs(wall), async {
+        write_async(&mut stdin, &input).await?;
+        let mut calls = 0;
+        loop {
+            let frame = read_async(&mut stdout).await?;
+            let obj = frame.as_object().ok_or("worker-protocol")?;
+            if obj.len() != 1 { return Err("worker-protocol"); }
+            if let Some(payload) = obj.get("request").and_then(Value::as_str) {
+                if calls >= MAX_CALLS { return Err("request-limit"); }
+                calls += 1;
+                let reply = match broker.request(manager, payload.as_bytes()).await {
+                    Ok(reply) => json!({"ok":true,"response":{"status":reply.status,"body":reply.body}}),
+                    Err(error) => json!({"ok":false,"error":error}),
+                };
+                write_async(&mut stdin, &reply).await?;
+            } else if let Some(reply) = obj.get("reply") {
+                if reply.as_object().map(|o| o.len()) != Some(2) { return Err("worker-protocol"); }
+                let output = match reply["ok"].as_bool() {
+                    Some(true) => sanitized_search(&reply["result"], limit)?,
+                    Some(false) => return Err("module-search-failed"),
+                    None => return Err("worker-protocol"),
+                };
+                drop(stdin);
+                let mut extra = [0; 1];
+                if stdout.read(&mut extra).await.map_err(|_| "worker-output")? != 0 {
+                    return Err("worker-protocol");
+                }
+                if !child.wait().await.map_err(|_| "worker-wait")?.success() { return Err("worker-exit"); }
+                manager.network_grant(permit)?;
+                return Ok(output);
+            } else { return Err("worker-protocol"); }
+        }
+    }).await;
+    match result {
+        Ok(Ok(output)) => Ok(output),
         other => {
             let _ = child.start_kill();
             let _ = tokio::time::timeout(Duration::from_secs(1), child.wait()).await;

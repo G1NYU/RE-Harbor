@@ -395,7 +395,7 @@ int wmain(int argc, wchar_t** argv) {
         // Host-only mode: one bounded JSON request over stdin, one response.
         // The Rust worker accepts compiled-in fixtures only; there is no source
         // loading, no user-selected command line and no direct-run fallback.
-        if (argc == 3 && std::wstring(argv[1]) == L"--host-broker-fixture") {
+        if (argc == 3 && (std::wstring(argv[1]) == L"--host-broker-fixture" || std::wstring(argv[1]) == L"--approved-search")) {
             const fs::path worker = fs::absolute(argv[2]);
             if (worker.filename() != L"harbor-8spine-native-poc.exe" || !fs::is_regular_file(worker))
                 fail("invalid broker fixture worker", ERROR_INVALID_PARAMETER);
@@ -403,7 +403,8 @@ int wmain(int argc, wchar_t** argv) {
             grant_read_execute(worker.parent_path(), profile.sid);
             grant_read_execute(worker, profile.sid);
             PrivateDesktop private_desktop(profile);
-            run_fixture(worker, profile, private_desktop, L" --host-broker-fixture", "", true);
+            const auto mode = std::wstring(argv[1]) == L"--approved-search" ? L" --approved-search" : L" --host-broker-fixture";
+            run_fixture(worker, profile, private_desktop, mode, "", true);
             return 0;
         }
         if (argc == 3 && std::wstring(argv[1]) == L"--fixture-request") {

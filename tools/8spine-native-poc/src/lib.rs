@@ -101,6 +101,32 @@ fn evaluate(input: &[u8], bridge: Option<fn(String) -> String>) -> Result<Value,
     if (request["fixture"] == "host-broker") != bridge.is_some() {
         return Err("invalid-request");
     }
+    let value = evaluate_body(&request, &source, bridge)?;
+    if request["operation"] == "resolve"
+        && value["streamUrl"] != "https://example.invalid/fixture.wav"
+    {
+        return Err("fixture-url-rejected");
+    }
+    Ok(value)
+}
+
+// Experimental plain-source search worker only. Host permission and OS
+// isolation must be established before invoking this private worker entry.
+#[cfg(any(target_os = "linux", windows))]
+fn evaluate_approved_search(input: &Value, bridge: fn(String) -> String) -> Result<Value, &'static str> {
+    let object = input.as_object().ok_or("invalid-request")?;
+    if object.len() != 3 { return Err("invalid-request"); }
+    let source = input["source"].as_str().filter(|s| !s.is_empty() && s.len() <= 128 * 1024)
+        .ok_or("input-limit")?;
+    let query = input["query"].as_str().filter(|q| !q.trim().is_empty() && q.len() <= 512)
+        .ok_or("invalid-request")?;
+    let limit = input["limit"].as_u64().filter(|n| (1..=50).contains(n))
+        .ok_or("invalid-request")?;
+    let request = json!({"operation":"search","query":query,"limit":limit});
+    evaluate_body(&request, source, Some(bridge))
+}
+
+fn evaluate_body(request: &Value, source: &str, bridge: Option<fn(String) -> String>) -> Result<Value, &'static str> {
     let runtime = Runtime::new().map_err(|_| "runtime-init")?;
     runtime.set_memory_limit(MEMORY);
     runtime.set_max_stack_size(STACK);
@@ -147,13 +173,7 @@ fn evaluate(input: &[u8], bridge: Option<fn(String) -> String>) -> Result<Value,
     if raw.len() > MAX_OUTPUT {
         return Err("output-limit");
     }
-    let value: Value = serde_json::from_str(&raw).map_err(|_| "invalid-output")?;
-    if request["operation"] == "resolve"
-        && value["streamUrl"] != "https://example.invalid/fixture.wav"
-    {
-        return Err("fixture-url-rejected");
-    }
-    Ok(value)
+    serde_json::from_str(&raw).map_err(|_| "invalid-output")
 }
 
 pub fn envelope(input: &[u8]) -> Value {

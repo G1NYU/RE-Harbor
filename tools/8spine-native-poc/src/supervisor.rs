@@ -134,6 +134,18 @@ impl Supervisor {
         crate::host_bridge::exchange(cmd, manager, permit).await
     }
 
+    /// Experimental search through actual namespace isolation only.
+    #[cfg(target_os = "linux")]
+    pub async fn run_approved_search(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8], query: &str, limit: usize) -> Result<Value, &'static str> {
+        if !matches!(self.isolation, Isolation::LinuxNamespace) { return Err("sandbox-unavailable"); }
+        let input = crate::host_bridge::approved_search_input(manager, permit, bytes, query, limit)?;
+        let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
+        let mut cmd = self.command()?;
+        cmd.current_dir(private.path()).arg("--approved-search");
+        crate::host_bridge::exchange_approved_search(cmd, manager, permit, input).await
+    }
+
     /// Host diagnostic: checks a synthetic sentinel and loopback listener.
     /// No arbitrary-source execution path is introduced.
     #[cfg(target_os = "linux")]
@@ -200,6 +212,27 @@ impl WindowsFixtureSupervisor {
             cmd.env(key, value);
         }
         crate::host_bridge::exchange(cmd, manager, permit).await
+    }
+
+    /// Experimental search through the same zero-capability AppContainer and
+    /// framed IPC as the validated host broker fixture.
+    pub async fn run_approved_search(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8], query: &str, limit: usize) -> Result<Value, &'static str> {
+        let input = crate::host_bridge::approved_search_input(manager, permit, bytes, query, limit)?;
+        let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
+        let copy = private.path().join("harbor-8spine-native-poc.exe");
+        std::fs::copy(&self.worker, &copy).map_err(|_| "worker-copy")?;
+        let mut cmd = Command::new(&self.launcher);
+        cmd.arg("--approved-search").arg(&copy)
+            .current_dir(private.path()).env_clear()
+            .stdin(Stdio::piped()).stdout(Stdio::piped())
+            .stderr(Stdio::null()).kill_on_drop(true);
+        for key in ["SystemRoot", "LOCALAPPDATA", "USERPROFILE"] {
+            let value = std::env::var_os(key).ok_or("sandbox-unavailable")?;
+            if !Path::new(&value).is_absolute() { return Err("sandbox-unavailable"); }
+            cmd.env(key, value);
+        }
+        crate::host_bridge::exchange_approved_search(cmd, manager, permit, input).await
     }
 
     async fn run_request(&self, request: &Value) -> Result<Value, &'static str> {
