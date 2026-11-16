@@ -18,6 +18,9 @@ return {
   },
   getTrackStreamUrl(id) {
     if (id !== "solfeggietto") throw new Error("unknown track");
-    return { streamUrl: "https://upload.wikimedia.org/wikipedia/commons/d/d4/Carl_Philipp_Emanuel_Bach_-_Solfeggietto.ogg" };
+    return {
+      streamUrl:
+        "https://upload.wikimedia.org/wikipedia/commons/d/d4/Carl_Philipp_Emanuel_Bach_-_Solfeggietto.ogg",
+    };
   },
 };

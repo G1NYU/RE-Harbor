@@ -10,6 +10,7 @@ use url::{Host, Url};
 const MAX_REQUEST: usize = 4096;
 const MAX_CALLS: usize = 8;
 const MAX_BODY: usize = 32 * 1024;
+pub(crate) const MAX_AUDIO_BYTES: usize = 64 * 1024 * 1024;
 const MAX_PINS: usize = 16;
 const MAX_DNS_ANSWERS: usize = 64;
 const DNS_TIME: Duration = Duration::from_secs(3);
@@ -188,7 +189,7 @@ impl AuthorizedRequest {
         &self.host
     }
 
-    fn client(&self, resolved_host: &str, ips: &[IpAddr]) -> Result<Client, &'static str> {
+    fn client(&self, resolved_host: &str, ips: &[IpAddr], request_time: Duration) -> Result<Client, &'static str> {
         let remaining = self.deadline.checked_duration_since(Instant::now()).ok_or("deadline")?;
         if remaining.is_zero() { return Err("deadline"); }
         if resolved_host != self.host { return Err("address-denied"); }
@@ -206,7 +207,7 @@ impl AuthorizedRequest {
             .no_deflate()
             .no_zstd()
             .resolve_to_addrs(&self.host, &pins)
-            .timeout(remaining.min(REQUEST_TIME))
+            .timeout(remaining.min(request_time))
             .connect_timeout(remaining.min(Duration::from_secs(3)))
             .build()
             .map_err(|_| "transport-init")
@@ -215,6 +216,23 @@ impl AuthorizedRequest {
     /// Resolve only the already-authorized hostname, and connect only to the
     /// returned vetted IPv4 pins. No module chooses a resolver or an address.
     pub(crate) async fn send_resolved_bytes(self, limit: usize) -> Result<(u16, Vec<u8>), &'static str> {
+        if limit == 0 || limit > 2 * 1024 * 1024 { return Err("response-size"); }
+        let pins = self.resolve_pins().await?;
+        let host = self.host.clone();
+        self.send_bounded_bytes(&host, &pins, limit).await
+    }
+
+    // Separate host-only audio retrieval. Not exposed to module fetch or index
+    // ingestion. Only an already-authorized exact destination may reach it.
+    pub(crate) async fn send_audio_bytes(mut self) -> Result<(u16, Vec<u8>), &'static str> {
+        if Instant::now() >= self.deadline { return Err("deadline"); }
+        self.deadline = Instant::now() + Duration::from_secs(90);
+        let pins = self.resolve_pins().await?;
+        let host = self.host.clone();
+        self.read_bounded_bytes(&host, &pins, MAX_AUDIO_BYTES, Duration::from_secs(85), "audio/*, application/octet-stream").await
+    }
+
+    async fn resolve_pins(&self) -> Result<Vec<IpAddr>, &'static str> {
         let remaining = self.deadline.checked_duration_since(Instant::now()).ok_or("deadline")?;
         if remaining.is_zero() { return Err("deadline"); }
         if DNS_BUSY.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
@@ -233,7 +251,7 @@ impl AuthorizedRequest {
         });
         let pins = tokio::time::timeout(remaining.min(DNS_TIME), lookup).await
             .map_err(|_| "dns-timeout")?.map_err(|_| "dns-failed")??;
-        self.send_bounded_bytes(&host, &pins, limit).await
+        Ok(pins)
     }
 
     /// Consume the capability once. DNS answers must come from the trusted host,
@@ -248,9 +266,14 @@ impl AuthorizedRequest {
     pub(crate) async fn send_bounded_bytes(self, resolved_host: &str, ips: &[IpAddr],
         limit: usize) -> Result<(u16, Vec<u8>), &'static str> {
         if limit == 0 || limit > 2 * 1024 * 1024 { return Err("response-size"); }
-        let client = self.client(resolved_host, ips)?;
+        self.read_bounded_bytes(resolved_host, ips, limit, REQUEST_TIME, "application/json, text/plain, application/octet-stream").await
+    }
+
+    async fn read_bounded_bytes(self, resolved_host: &str, ips: &[IpAddr], limit: usize,
+        request_time: Duration, accept: &str) -> Result<(u16, Vec<u8>), &'static str> {
+        let client = self.client(resolved_host, ips, request_time)?;
         let mut response = client.get(self.url)
-            .header(reqwest::header::ACCEPT, "application/json, text/plain, application/octet-stream")
+            .header(reqwest::header::ACCEPT, accept)
             .header(reqwest::header::ACCEPT_ENCODING, "identity")
             .send().await.map_err(|_| "network-failed")?;
         let status = response.status().as_u16();
@@ -353,9 +376,9 @@ mod tests {
         let mut session = NetworkSession::new(&grant, "fixture-module", "1").unwrap();
         let request = session.authorize("GET", "https://catalog.example.com/search").unwrap();
         let pins = ["8.8.8.8".parse().unwrap()];
-        assert!(request.client("other.example.com", &pins).is_err());
-        assert!(request.client("catalog.example.com", &["127.0.0.1".parse().unwrap()]).is_err());
-        assert!(request.client("catalog.example.com", &pins).is_ok());
+        assert!(request.client("other.example.com", &pins, REQUEST_TIME).is_err());
+        assert!(request.client("catalog.example.com", &["127.0.0.1".parse().unwrap()], REQUEST_TIME).is_err());
+        assert!(request.client("catalog.example.com", &pins, REQUEST_TIME).is_ok());
         // No socket is opened: test the same send entry point with denied pins.
         assert_eq!(request.send("catalog.example.com", &["127.0.0.1".parse().unwrap()]).await, Err("address-denied"));
     }

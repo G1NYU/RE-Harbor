@@ -16,6 +16,7 @@ struct SourceStatus {
     connector_id: String,
     fingerprint: String,
     playback: bool,
+    quality: String,
 }
 
 struct Active {
@@ -66,7 +67,8 @@ pub fn music_8spine_runtime_status(app: tauri::AppHandle, state: tauri::State<'_
 
 #[tauri::command]
 pub async fn music_8spine_enable(app: tauri::AppHandle, state: tauri::State<'_, MusicState>,
-    entry: CatalogEntry, fingerprint: String, hosts: Vec<String>, playback: bool) -> Result<String, String> {
+    entry: CatalogEntry, fingerprint: String, hosts: Vec<String>, playback: bool, quality: String) -> Result<String, String> {
+    if !matches!(quality.as_str(), "LOW" | "HIGH" | "LOSSLESS") { return Err("invalid-quality".to_owned()); }
     let runner = runtime(&app).ok_or("sandbox-unavailable")?;
     let host_refs = hosts.iter().map(String::as_str).collect::<Vec<_>>();
     NetworkGrant::new(&entry.key.id, &fingerprint, &host_refs)?;
@@ -80,10 +82,10 @@ pub async fn music_8spine_enable(app: tauri::AppHandle, state: tauri::State<'_, 
     let mut guard = state.eightspine.0.lock().map_err(|_| "source-state")?;
     if guard.len() >= 8 || guard.contains_key(&connector_id) { return Err("source-limit-or-already-enabled".to_owned()); }
     let enabled = Arc::new(AtomicBool::new(true));
-    let status = SourceStatus { entry: entry.clone(), connector_id: connector_id.clone(), fingerprint: fingerprint.clone(), playback };
+    let status = SourceStatus { entry: entry.clone(), connector_id: connector_id.clone(), fingerprint: fingerprint.clone(), playback, quality: quality.clone() };
     state.registry.register(Box::new(SearchConnector {
         connector_id: connector_id.clone(), entry, fingerprint, hosts, package, runner,
-        enabled: enabled.clone(), playback, busy: tokio::sync::Mutex::new(()),
+        enabled: enabled.clone(), playback, quality, busy: tokio::sync::Mutex::new(()),
     }))?;
     guard.insert(connector_id.clone(), Active { status, enabled });
     Ok(connector_id)
@@ -122,6 +124,7 @@ struct SearchConnector {
     runner: PathBuf,
     enabled: Arc<AtomicBool>,
     playback: bool,
+    quality: String,
     busy: tokio::sync::Mutex<()>,
 }
 
@@ -201,9 +204,14 @@ impl MusicConnector for SearchConnector {
             return Err("invalid-track".to_owned());
         }
         let id: Value = serde_json::from_str(raw_id).map_err(|_| "invalid-track")?;
-        let resolved = self.invoke_runtime(json!({"trackId":id})).await?;
+        let resolved = self.invoke_runtime(json!({"trackId":id,"quality":self.quality})).await?;
         let url = resolved["streamUrl"].as_str().ok_or("invalid-stream")?;
+        // Bound memory across all enabled connectors; catalog calls retain
+        // their own small response ceilings.
+        let _download = AUDIO_DOWNLOAD.lock().await;
+        if !self.enabled.load(Ordering::Acquire) { return Err("source-disabled".to_owned()); }
         let bytes = download_audio(&self.entry.key.id, &self.fingerprint, &self.hosts, url).await?;
+        let format = audio_format(&bytes).ok_or("unsupported-audio-format")?;
         if !self.enabled.load(Ordering::Acquire) { return Err("source-disabled".to_owned()); }
         let state = app.state::<MusicState>();
         let dir = app.path().app_cache_dir().map_err(|_| "audio-cache")?.join("8spine-audio");
@@ -211,8 +219,11 @@ impl MusicConnector for SearchConnector {
         let meta = std::fs::symlink_metadata(&dir).map_err(|_| "audio-cache")?;
         if !meta.is_dir() || meta.file_type().is_symlink() { return Err("audio-cache".to_owned()); }
         let mut files = state.eightspine.1.lock().map_err(|_| "audio-cache")?;
-        if files.len() >= 32 { return Err("session audio cache full; restart Harbor".to_owned()); }
-        let path = dir.join(format!("{}.ogg", uuid::Uuid::new_v4()));
+        let used: u64 = files.iter().filter_map(|p| std::fs::metadata(p).ok().map(|m| m.len())).sum();
+        if files.len() >= 64 || used.saturating_add(bytes.len() as u64) > 512 * 1024 * 1024 {
+            return Err("session audio cache full; restart Harbor".to_owned());
+        }
+        let path = dir.join(format!("{}.{}", uuid::Uuid::new_v4(), format.extension));
         use std::io::Write;
         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).map_err(|_| "audio-cache")?;
         if file.write_all(&bytes).is_err() {
@@ -223,27 +234,77 @@ impl MusicConnector for SearchConnector {
         drop(file);
         let url = match path.to_str() { Some(s) => s.to_owned(), None => { let _ = std::fs::remove_file(&path); return Err("audio-cache".to_owned()); } };
         files.push(path);
-        Ok(MusicStream { url, mime_type: "audio/ogg".to_owned(), bitrate: 0, http_headers: Default::default() })
+        Ok(MusicStream { url, mime_type: format.mime.to_owned(), bitrate: 0, http_headers: Default::default() })
     }
 }
 
- // Deliberate first playback limit: no HLS, playlists, arbitrary mpv URLs,
+ static AUDIO_DOWNLOAD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+ // Direct audio only: no HLS, playlists, arbitrary mpv URLs,
  // redirects, request headers or files selected by the module.
  async fn download_audio(module: &str, fingerprint: &str, hosts: &[String], url: &str) -> Result<Vec<u8>, String> {
      let refs = hosts.iter().map(String::as_str).collect::<Vec<_>>();
      let grant = NetworkGrant::new(module, fingerprint, &refs)?;
      let mut session = NetworkSession::new(&grant, module, fingerprint)?;
-     let (status, bytes) = session.authorize("GET", url)?.send_resolved_bytes(2 * 1024 * 1024).await?;
-     if status != 200 || !ogg_vorbis(&bytes) { return Err("Only direct Ogg Vorbis audio up to 2 MiB is supported in this preview".to_owned()); }
+     let (status, bytes) = session.authorize("GET", url)?.send_audio_bytes().await?;
+     if status != 200 || audio_format(&bytes).is_none() { return Err("Unsupported direct audio or invalid response".to_owned()); }
      Ok(bytes)
  }
 
- fn ogg_vorbis(bytes: &[u8]) -> bool {
-     // An Ogg BOS page whose first packet is the Vorbis identification header.
-     if bytes.len() < 35 || &bytes[..5] != b"OggS\0" || bytes[5] != 2 { return false; }
-     let segments = bytes[26] as usize;
-     let offset = 27 + segments;
-     segments > 0 && bytes[27] >= 30 && bytes.get(offset..offset + 7) == Some(b"\x01vorbis".as_slice())
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ struct AudioFormat { extension: &'static str, mime: &'static str }
+
+ fn audio_format(bytes: &[u8]) -> Option<AudioFormat> {
+     let format = |extension, mime| Some(AudioFormat { extension, mime });
+     // Only recognize known direct audio signatures, never trust a URL
+     // extension, MIME supplied by a module or an arbitrary playlist.
+     if bytes.starts_with(b"fLaC") && bytes.len() >= 42 && bytes[4] & 0x7f == 0
+         && bytes[5..8] == [0, 0, 34] {
+         return format("flac", "audio/flac");
+     }
+     if bytes.len() >= 35 && &bytes[..5] == b"OggS\0" && bytes[5] == 2 {
+         let segments = bytes[26] as usize;
+         let offset = 27 + segments;
+         if segments > 0 && bytes[27] >= 30 && bytes.get(offset..offset + 7) == Some(b"\x01vorbis".as_slice()) {
+             return format("ogg", "audio/ogg");
+         }
+         if segments > 0 && bytes[27] >= 19 && bytes.get(offset..offset + 8) == Some(b"OpusHead".as_slice()) {
+             return format("opus", "audio/ogg");
+         }
+     }
+     // ID3 is metadata, not proof of audio. Check the actual frame following
+     // the size-bounded, synchsafe tag. Never interpret ID3 payload as a URL.
+     let data = if bytes.starts_with(b"ID3") {
+         let header = bytes.get(..10)?;
+         if !matches!(header[3], 2..=4) || header[6..10].iter().any(|b| b & 0x80 != 0) { return None; }
+         let size = header[6..10].iter().fold(0usize, |n, b| (n << 7) | usize::from(*b));
+         let footer = if header[3] == 4 && header[5] & 0x10 != 0 { 10 } else { 0 };
+         bytes.get(10 + size + footer..)?
+     } else { bytes };
+     let header = data.get(..7)?;
+     if header[0] != 0xff { return None; }
+     // AAC ADTS: valid sync, layer, sample-frequency index and frame bounds.
+     if header[1] & 0xf6 == 0xf0 && ((header[2] >> 2) & 15) < 13 {
+         let length = (usize::from(header[3] & 3) << 11) | (usize::from(header[4]) << 3) | usize::from(header[5] >> 5);
+         let min = if header[1] & 1 == 0 { 9 } else { 7 };
+         if length >= min && length <= data.len() { return format("aac", "audio/aac"); }
+     }
+     // MPEG Layer III: reject reserved version, sample rate and bitrate.
+     if header[1] & 0xe0 == 0xe0 && (header[1] >> 3) & 3 != 1
+         && (header[1] >> 1) & 3 == 1 && (1..=14).contains(&(header[2] >> 4))
+         && (header[2] >> 2) & 3 != 3 {
+         let version = (header[1] >> 3) & 3;
+         let rate_index = usize::from(header[2] >> 4);
+         let rate = if version == 3 {
+             [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320][rate_index]
+         } else { [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160][rate_index] };
+         let base = [44100,48000,32000][usize::from((header[2] >> 2) & 3)];
+         let sample_rate = if version == 3 { base } else if version == 2 { base / 2 } else { base / 4 };
+         let coefficient = if version == 3 { 144000 } else { 72000 };
+         let length = coefficient * rate / sample_rate + usize::from((header[2] >> 1) & 1);
+         if length >= 7 && length <= data.len() { return format("mp3", "audio/mpeg"); }
+     }
+     None
  }
 
  #[cfg(test)]
@@ -288,12 +349,20 @@ impl MusicConnector for SearchConnector {
 
      #[test]
      fn audio_signature_denies_non_audio_and_truncated_headers() {
-         assert!(!ogg_vorbis(b"#EXTM3U\nfile:///private"));
-         assert!(!ogg_vorbis(b"OggS"));
+         assert!(audio_format(b"#EXTM3U\nfile:///private").is_none());
+         assert!(audio_format(b"OggS").is_none());
          let mut bytes = vec![0; 64];
          bytes[..5].copy_from_slice(b"OggS\0");
          bytes[5] = 2; bytes[26] = 1; bytes[27] = 30;
          bytes[28..35].copy_from_slice(b"\x01vorbis");
-         assert!(ogg_vorbis(&bytes));
+         assert_eq!(audio_format(&bytes).unwrap().extension, "ogg");
+         bytes[28..36].copy_from_slice(b"OpusHead");
+         assert_eq!(audio_format(&bytes).unwrap().extension, "opus");
+         let mut flac = vec![0; 42]; flac[..4].copy_from_slice(b"fLaC"); flac[7] = 34;
+         assert_eq!(audio_format(&flac).unwrap().extension, "flac");
+         let mut mp3 = vec![0; 417]; mp3[..4].copy_from_slice(&[0xff,0xfb,0x90,0x64]);
+         assert_eq!(audio_format(&mp3).unwrap().extension, "mp3");
+         assert_eq!(audio_format(&[0xff,0xf1,0x50,0x80,0,0xff,0xfc]).unwrap().extension, "aac");
+         assert!(audio_format(b"ID3\x04\0\0\0\0\0\0#EXTM3U").is_none());
      }
  }

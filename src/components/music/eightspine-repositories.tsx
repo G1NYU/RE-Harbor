@@ -18,7 +18,7 @@ type Preview = {
   executionAvailable: boolean;
 };
 
-type Active = { entry: Entry; connectorId: string; fingerprint: string; playback: boolean };
+type Active = { entry: Entry; connectorId: string; fingerprint: string; playback: boolean; quality: string };
 type RuntimeStatus = { available: boolean; active: Active[] };
 
 type Inspection = {
@@ -64,6 +64,7 @@ export function EightSpineRepositories() {
   const [approval, setApproval] = useState<Inspection | null>(null);
   const [hosts, setHosts] = useState("");
   const [playback, setPlayback] = useState(false);
+  const [quality, setQuality] = useState("HIGH");
 
   async function updateRuntime() {
     setRuntime(await invoke<RuntimeStatus>("music_8spine_runtime_status"));
@@ -77,7 +78,7 @@ export function EightSpineRepositories() {
     if (!active) {
       const inspection = inspections[sourceKey(entry)];
       if (inspection?.format === "javascript-candidate" && runtime.available) {
-        setApproval(inspection); setHosts(""); setPlayback(false);
+        setApproval(inspection); setHosts(""); setPlayback(false); setQuality("HIGH");
       }
       return;
     }
@@ -93,7 +94,7 @@ export function EightSpineRepositories() {
     if (!domains.length) return;
     busy.current = true; setPending(true); setError("");
     try {
-      await invoke("music_8spine_enable", { entry: approval.entry, fingerprint: approval.fingerprint, hosts: domains, playback });
+      await invoke("music_8spine_enable", { entry: approval.entry, fingerprint: approval.fingerprint, hosts: domains, playback, quality });
       await updateRuntime(); setApproval(null);
     } catch (reason) { setError(errorText(reason)); }
     finally { busy.current = false; setPending(false); }
@@ -181,7 +182,7 @@ export function EightSpineRepositories() {
         8SPINE repositories
       </h3>
       <p className="text-[13px] text-ink-muted">
-        Add an HTTPS JSON repository to discover music sources. Experimental search and direct Ogg Vorbis playback (up to 2 MiB).
+        Add an HTTPS JSON repository to discover music sources. Experimental search and direct MP3, AAC (ADTS), FLAC, Ogg Vorbis and Opus playback (up to 64 MiB).
       </p>
       <form
         className="flex flex-wrap items-center gap-2"
@@ -214,8 +215,19 @@ export function EightSpineRepositories() {
           <input aria-label="Allowed hostnames" value={hosts} onChange={(event) => setHosts(event.target.value)} maxLength={4096} disabled={pending} className="rounded-md border border-edge-soft bg-surface p-2 text-sm text-ink" placeholder="api.example.com" />
           <label className="flex items-center gap-2 text-xs text-ink-muted">
             <input type="checkbox" checked={playback} onChange={(event) => setPlayback(event.target.checked)} disabled={pending} />
-            Allow direct Ogg Vorbis audio playback (up to 2 MiB)
+            Allow direct audio playback (up to 64 MiB)
           </label>
+          {playback && (
+            <label className="flex items-center gap-2 text-xs text-ink-muted">
+              Preferred quality
+              <select value={quality} onChange={(event) => setQuality(event.target.value)} disabled={pending} className="rounded-md border border-edge-soft bg-surface p-2 text-sm text-ink">
+                <option value="LOW">Low</option>
+                <option value="HIGH">High</option>
+                <option value="LOSSLESS">Lossless</option>
+              </select>
+              Actual format and bitrate depend on the source.
+            </label>
+          )}
           <div className="flex gap-2">
             <button type="button" disabled={pending || !hosts.trim()} className={SECONDARY_BUTTON} onClick={() => void enable()}>Enable source</button>
             <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => setApproval(null)}>Cancel</button>

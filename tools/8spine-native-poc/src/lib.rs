@@ -124,8 +124,9 @@ fn evaluate_approved_search(input: &Value, bridge: fn(String) -> String) -> Resu
             || id.as_i64().is_some_and(|n| (-9007199254740991..=9007199254740991).contains(&n))) {
             return Err("invalid-request");
         }
-        if input["quality"] != "HIGH" { return Err("invalid-request"); }
-        json!({"operation":"resolve","trackId":id,"quality":"HIGH"})
+        let quality = input["quality"].as_str().filter(|q| matches!(*q, "LOW" | "HIGH" | "LOSSLESS"))
+            .ok_or("invalid-request")?;
+        json!({"operation":"resolve","trackId":id,"quality":quality})
     } else {
         let query = input["query"].as_str().filter(|q| !q.trim().is_empty() && q.len() <= 512)
             .ok_or("invalid-request")?;

@@ -148,9 +148,9 @@ impl Supervisor {
 
     #[cfg(target_os = "linux")]
     pub async fn run_approved_resolve(&self, manager: &ModuleManager, permit: &ModulePermit,
-        bytes: &[u8], track_id: &Value) -> Result<Value, &'static str> {
+        bytes: &[u8], track_id: &Value, quality: &str) -> Result<Value, &'static str> {
         if !matches!(self.isolation, Isolation::LinuxNamespace) { return Err("sandbox-unavailable"); }
-        let input = crate::host_bridge::approved_resolve_input(manager, permit, bytes, track_id)?;
+        let input = crate::host_bridge::approved_resolve_input(manager, permit, bytes, track_id, quality)?;
         let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
         let mut cmd = self.command()?;
         cmd.current_dir(private.path()).arg("--approved-search");
@@ -247,8 +247,8 @@ impl WindowsFixtureSupervisor {
     }
 
     pub async fn run_approved_resolve(&self, manager: &ModuleManager, permit: &ModulePermit,
-        bytes: &[u8], track_id: &Value) -> Result<Value, &'static str> {
-        let input = crate::host_bridge::approved_resolve_input(manager, permit, bytes, track_id)?;
+        bytes: &[u8], track_id: &Value, quality: &str) -> Result<Value, &'static str> {
+        let input = crate::host_bridge::approved_resolve_input(manager, permit, bytes, track_id, quality)?;
         let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
         let copy = private.path().join("harbor-8spine-native-poc.exe");
         std::fs::copy(&self.worker, &copy).map_err(|_| "worker-copy")?;

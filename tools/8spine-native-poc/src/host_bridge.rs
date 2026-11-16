@@ -46,14 +46,15 @@ pub(crate) fn approved_search_input(manager: &ModuleManager, permit: &ModulePerm
 }
 
 pub(crate) fn approved_resolve_input(manager: &ModuleManager, permit: &ModulePermit,
-    bytes: &[u8], track_id: &Value) -> Result<Value, &'static str> {
+    bytes: &[u8], track_id: &Value, quality: &str) -> Result<Value, &'static str> {
+    if !matches!(quality, "LOW" | "HIGH" | "LOSSLESS") { return Err("invalid-request"); }
     let source = manager.approved_source_body(permit, bytes)?;
     if source.len() > MAX_SOURCE { return Err("input-limit"); }
     if !(track_id.as_str().is_some_and(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
         || track_id.as_i64().is_some_and(|n| (-9007199254740991..=9007199254740991).contains(&n))) {
         return Err("invalid-request");
     }
-    let request = json!({"source":source,"trackId":track_id,"quality":"HIGH"});
+    let request = json!({"source":source,"trackId":track_id,"quality":quality});
     if serde_json::to_vec(&request).map_err(|_| "invalid-request")?.len() > MAX_FRAME { return Err("input-limit"); }
     Ok(request)
 }
