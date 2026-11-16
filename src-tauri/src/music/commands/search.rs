@@ -64,6 +64,12 @@ pub(super) async fn resolve_track(
     track: &MusicTrack,
 ) -> Result<MusicStream, String> {
     state.db.upsert_track(track)?;
+    if let Some(id) = track.connector_id.as_deref().filter(|id| id.starts_with("8spine-")) {
+        // Never reuse a persisted stream or a track-provided URL after revocation.
+        let connector = state.registry.get(id).ok_or("8SPINE source is disabled")?;
+        if !connector.playable() { return Err("8SPINE playback is disabled".to_owned()); }
+        return connector.resolve(app, track).await;
+    }
     if let Some(url) = track
         .playback_url
         .as_deref()

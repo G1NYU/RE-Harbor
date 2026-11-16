@@ -1,6 +1,6 @@
-//! Opt-in experimental search-only connectors. No external module code in Harbor's process.
+//! Opt-in experimental connector search and bounded audio playback. No external module code in Harbor's process.
 use super::{connector::{ConnectorHealth, MusicConnector}, MusicState, MusicStream, MusicTrack};
-use super::eightspine_catalog::{catalog::CatalogEntry, http_transport::NetworkGrant, retrieve_package, verify_plain};
+use super::eightspine_catalog::{catalog::CatalogEntry, http_transport::{NetworkGrant, NetworkSession}, retrieve_package, verify_plain};
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -15,6 +15,7 @@ struct SourceStatus {
     entry: CatalogEntry,
     connector_id: String,
     fingerprint: String,
+    playback: bool,
 }
 
 struct Active {
@@ -23,7 +24,15 @@ struct Active {
 }
 
 #[derive(Default)]
-pub(super) struct ActiveSources(Mutex<BTreeMap<String, Active>>);
+pub(super) struct ActiveSources(Mutex<BTreeMap<String, Active>>, Mutex<Vec<PathBuf>>);
+
+impl Drop for ActiveSources {
+    fn drop(&mut self) {
+        if let Ok(files) = self.1.get_mut() {
+            for path in files.drain(..) { let _ = std::fs::remove_file(path); }
+        }
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,7 +66,7 @@ pub fn music_8spine_runtime_status(app: tauri::AppHandle, state: tauri::State<'_
 
 #[tauri::command]
 pub async fn music_8spine_enable(app: tauri::AppHandle, state: tauri::State<'_, MusicState>,
-    entry: CatalogEntry, fingerprint: String, hosts: Vec<String>) -> Result<String, String> {
+    entry: CatalogEntry, fingerprint: String, hosts: Vec<String>, playback: bool) -> Result<String, String> {
     let runner = runtime(&app).ok_or("sandbox-unavailable")?;
     let host_refs = hosts.iter().map(String::as_str).collect::<Vec<_>>();
     NetworkGrant::new(&entry.key.id, &fingerprint, &host_refs)?;
@@ -71,10 +80,10 @@ pub async fn music_8spine_enable(app: tauri::AppHandle, state: tauri::State<'_, 
     let mut guard = state.eightspine.0.lock().map_err(|_| "source-state")?;
     if guard.len() >= 8 || guard.contains_key(&connector_id) { return Err("source-limit-or-already-enabled".to_owned()); }
     let enabled = Arc::new(AtomicBool::new(true));
-    let status = SourceStatus { entry: entry.clone(), connector_id: connector_id.clone(), fingerprint: fingerprint.clone() };
+    let status = SourceStatus { entry: entry.clone(), connector_id: connector_id.clone(), fingerprint: fingerprint.clone(), playback };
     state.registry.register(Box::new(SearchConnector {
         connector_id: connector_id.clone(), entry, fingerprint, hosts, package, runner,
-        enabled: enabled.clone(), busy: tokio::sync::Mutex::new(()),
+        enabled: enabled.clone(), playback, busy: tokio::sync::Mutex::new(()),
     }))?;
     guard.insert(connector_id.clone(), Active { status, enabled });
     Ok(connector_id)
@@ -112,16 +121,17 @@ struct SearchConnector {
     package: String,
     runner: PathBuf,
     enabled: Arc<AtomicBool>,
+    playback: bool,
     busy: tokio::sync::Mutex<()>,
 }
 
 impl SearchConnector {
-    async fn tracks(&self, query: &str, limit: usize) -> Result<Vec<MusicTrack>, String> {
-        let _guard = self.busy.try_lock().map_err(|_| "source-busy")?;
+    async fn invoke_runtime(&self, operation: Value) -> Result<Value, String> {
         if !self.enabled.load(Ordering::Acquire) { return Err("source-disabled".to_owned()); }
-        let limit = limit.clamp(1, 50);
-        let payload = serde_json::to_vec(&json!({"entry":self.entry,"fingerprint":self.fingerprint,
-            "hosts":self.hosts,"package":self.package,"query":query,"limit":limit})).map_err(|_| "invalid-request")?;
+        let mut request = json!({"entry":self.entry,"fingerprint":self.fingerprint,
+            "hosts":self.hosts,"package":self.package});
+        request.as_object_mut().ok_or("invalid-request")?.extend(operation.as_object().ok_or("invalid-request")?.clone());
+        let payload = serde_json::to_vec(&request).map_err(|_| "invalid-request")?;
         if payload.len() > 2 * 1024 * 1024 { return Err("input-limit".to_owned()); }
         let mut command = tokio::process::Command::new(&self.runner);
         command.env_clear().stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).kill_on_drop(true);
@@ -148,7 +158,14 @@ impl SearchConnector {
         if !self.enabled.load(Ordering::Acquire) { return Err("source-disabled".to_owned()); }
         let reply: Value = serde_json::from_slice(&out).map_err(|_| "runtime-output")?;
         if reply["ok"] != true { return Err("8SPINE source search failed".to_owned()); }
-        let rows = reply["result"]["tracks"].as_array().ok_or("invalid-tracks")?;
+        Ok(reply["result"].clone())
+    }
+
+    async fn tracks(&self, query: &str, limit: usize) -> Result<Vec<MusicTrack>, String> {
+        let _guard = self.busy.try_lock().map_err(|_| "source-busy")?;
+        let limit = limit.clamp(1, 50);
+        let result = self.invoke_runtime(json!({"query":query,"limit":limit})).await?;
+        let rows = result["tracks"].as_array().ok_or("invalid-tracks")?;
         if rows.len() > limit { return Err("invalid-tracks".to_owned()); }
         rows.iter().map(|row| {
             let source_id = serde_json::to_string(&row["id"]).map_err(|_| "invalid-track")?;
@@ -172,7 +189,111 @@ impl MusicConnector for SearchConnector {
     fn name(&self) -> &str { &self.entry.name }
     fn health(&self) -> ConnectorHealth { if self.enabled.load(Ordering::Acquire) { ConnectorHealth::Unknown } else { ConnectorHealth::Offline } }
     fn searchable(&self) -> bool { self.enabled.load(Ordering::Acquire) }
-    fn playable(&self) -> bool { false }
+    fn playable(&self) -> bool { self.playback && self.enabled.load(Ordering::Acquire) }
     async fn search(&self, _: &tauri::AppHandle, query: &str, limit: usize) -> Result<Vec<MusicTrack>, String> { self.tracks(query, limit).await }
-    async fn resolve(&self, _: &tauri::AppHandle, _: &MusicTrack) -> Result<MusicStream, String> { Err("8SPINE playback is not available yet".to_owned()) }
+    async fn resolve(&self, app: &tauri::AppHandle, track: &MusicTrack) -> Result<MusicStream, String> {
+        if !self.playable() || track.connector_id.as_deref() != Some(self.connector_id.as_str()) {
+            return Err("8SPINE playback is disabled".to_owned());
+        }
+        let _guard = self.busy.try_lock().map_err(|_| "source-busy")?;
+        let raw_id = track.source_id.as_deref().ok_or("invalid-track")?;
+        if raw_id.len() > 4096 || track.id != format!("{}:{:x}", self.connector_id, Sha256::digest(raw_id.as_bytes())) {
+            return Err("invalid-track".to_owned());
+        }
+        let id: Value = serde_json::from_str(raw_id).map_err(|_| "invalid-track")?;
+        let resolved = self.invoke_runtime(json!({"trackId":id})).await?;
+        let url = resolved["streamUrl"].as_str().ok_or("invalid-stream")?;
+        let bytes = download_audio(&self.entry.key.id, &self.fingerprint, &self.hosts, url).await?;
+        if !self.enabled.load(Ordering::Acquire) { return Err("source-disabled".to_owned()); }
+        let state = app.state::<MusicState>();
+        let dir = app.path().app_cache_dir().map_err(|_| "audio-cache")?.join("8spine-audio");
+        std::fs::create_dir_all(&dir).map_err(|_| "audio-cache")?;
+        let meta = std::fs::symlink_metadata(&dir).map_err(|_| "audio-cache")?;
+        if !meta.is_dir() || meta.file_type().is_symlink() { return Err("audio-cache".to_owned()); }
+        let mut files = state.eightspine.1.lock().map_err(|_| "audio-cache")?;
+        if files.len() >= 32 { return Err("session audio cache full; restart Harbor".to_owned()); }
+        let path = dir.join(format!("{}.ogg", uuid::Uuid::new_v4()));
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).map_err(|_| "audio-cache")?;
+        if file.write_all(&bytes).is_err() {
+            drop(file);
+            let _ = std::fs::remove_file(&path);
+            return Err("audio-cache".to_owned());
+        }
+        drop(file);
+        let url = match path.to_str() { Some(s) => s.to_owned(), None => { let _ = std::fs::remove_file(&path); return Err("audio-cache".to_owned()); } };
+        files.push(path);
+        Ok(MusicStream { url, mime_type: "audio/ogg".to_owned(), bitrate: 0, http_headers: Default::default() })
+    }
 }
+
+ // Deliberate first playback limit: no HLS, playlists, arbitrary mpv URLs,
+ // redirects, request headers or files selected by the module.
+ async fn download_audio(module: &str, fingerprint: &str, hosts: &[String], url: &str) -> Result<Vec<u8>, String> {
+     let refs = hosts.iter().map(String::as_str).collect::<Vec<_>>();
+     let grant = NetworkGrant::new(module, fingerprint, &refs)?;
+     let mut session = NetworkSession::new(&grant, module, fingerprint)?;
+     let (status, bytes) = session.authorize("GET", url)?.send_resolved_bytes(2 * 1024 * 1024).await?;
+     if status != 200 || !ogg_vorbis(&bytes) { return Err("Only direct Ogg Vorbis audio up to 2 MiB is supported in this preview".to_owned()); }
+     Ok(bytes)
+ }
+
+ fn ogg_vorbis(bytes: &[u8]) -> bool {
+     // An Ogg BOS page whose first packet is the Vorbis identification header.
+     if bytes.len() < 35 || &bytes[..5] != b"OggS\0" || bytes[5] != 2 { return false; }
+     let segments = bytes[26] as usize;
+     let offset = 27 + segments;
+     segments > 0 && bytes[27] >= 30 && bytes.get(offset..offset + 7) == Some(b"\x01vorbis".as_slice())
+ }
+
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+     #[tokio::test]
+     #[ignore = "explicit public-domain audio download and libmpv playback"]
+     async fn public_domain_audio_playback() {
+         use libmpv2::{events::{Event, EventContext}, Mpv};
+         use std::time::Instant;
+         let bytes = download_audio("commons-public-domain", "1", &["upload.wikimedia.org".to_owned()],
+             "https://upload.wikimedia.org/wikipedia/commons/d/d4/Carl_Philipp_Emanuel_Bach_-_Solfeggietto.ogg").await.unwrap();
+         let path = std::env::temp_dir().join(format!("8spine-licensed-{}.ogg", uuid::Uuid::new_v4()));
+         struct Cleanup(PathBuf);
+         impl Drop for Cleanup { fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); } }
+         let _cleanup = Cleanup(path.clone());
+         std::fs::write(&path, bytes).unwrap();
+         let mpv = Mpv::with_initializer(|init| {
+             for (key, value) in [("ao","null"),("vo","null"),("terminal","no"),
+                 ("idle","yes"),("keep-open","yes"),("pause","yes")] { init.set_property(key,value)?; }
+             Ok(())
+         }).expect("headless player");
+         let mut events = EventContext::new(mpv.ctx);
+         crate::mpv::mpv_argv_command(&mpv, &["loadfile", path.to_str().unwrap(), "replace"]).unwrap();
+         let deadline = Instant::now() + Duration::from_secs(10);
+         loop {
+             if matches!(events.wait_event(0.0), Some(Ok(Event::FileLoaded))) { break; }
+             assert!(Instant::now() < deadline, "licensed audio failed to load");
+             tokio::time::sleep(Duration::from_millis(10)).await;
+         }
+         let duration = mpv.get_property::<f64>("duration").unwrap();
+         assert!((duration - 63.72).abs() < 1.0, "decoded duration {duration}");
+         mpv.set_property("pause", false).unwrap();
+         let deadline = Instant::now() + Duration::from_secs(5);
+         while mpv.get_property::<f64>("time-pos").unwrap_or(0.0) < 0.25 {
+             assert!(Instant::now() < deadline, "public-domain music playback did not advance");
+             tokio::time::sleep(Duration::from_millis(10)).await;
+         }
+         drop(events);
+         drop(mpv);
+     }
+
+     #[test]
+     fn audio_signature_denies_non_audio_and_truncated_headers() {
+         assert!(!ogg_vorbis(b"#EXTM3U\nfile:///private"));
+         assert!(!ogg_vorbis(b"OggS"));
+         let mut bytes = vec![0; 64];
+         bytes[..5].copy_from_slice(b"OggS\0");
+         bytes[5] = 2; bytes[26] = 1; bytes[27] = 30;
+         bytes[28..35].copy_from_slice(b"\x01vorbis");
+         assert!(ogg_vorbis(&bytes));
+     }
+ }

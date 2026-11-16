@@ -118,11 +118,21 @@ fn evaluate_approved_search(input: &Value, bridge: fn(String) -> String) -> Resu
     if object.len() != 3 { return Err("invalid-request"); }
     let source = input["source"].as_str().filter(|s| !s.is_empty() && s.len() <= 128 * 1024)
         .ok_or("input-limit")?;
-    let query = input["query"].as_str().filter(|q| !q.trim().is_empty() && q.len() <= 512)
-        .ok_or("invalid-request")?;
-    let limit = input["limit"].as_u64().filter(|n| (1..=50).contains(n))
-        .ok_or("invalid-request")?;
-    let request = json!({"operation":"search","query":query,"limit":limit});
+    let request = if object.contains_key("trackId") {
+        let id = &input["trackId"];
+        if !(id.as_str().is_some_and(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
+            || id.as_i64().is_some_and(|n| (-9007199254740991..=9007199254740991).contains(&n))) {
+            return Err("invalid-request");
+        }
+        if input["quality"] != "HIGH" { return Err("invalid-request"); }
+        json!({"operation":"resolve","trackId":id,"quality":"HIGH"})
+    } else {
+        let query = input["query"].as_str().filter(|q| !q.trim().is_empty() && q.len() <= 512)
+            .ok_or("invalid-request")?;
+        let limit = input["limit"].as_u64().filter(|n| (1..=50).contains(n))
+            .ok_or("invalid-request")?;
+        json!({"operation":"search","query":query,"limit":limit})
+    };
     evaluate_body(&request, source, Some(bridge))
 }
 

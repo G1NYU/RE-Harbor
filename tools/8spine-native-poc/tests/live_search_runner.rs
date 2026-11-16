@@ -26,3 +26,26 @@ fn live_search_runner() {
     assert!(tracks.iter().all(|t| t.get("streamUrl").is_none() && t.get("artwork").is_none()));
     println!("Returned {} real song metadata result(s) through the search runner",tracks.len());
 }
+
+#[test]
+#[ignore = "requires Linux namespace isolation"]
+#[cfg(target_os = "linux")]
+fn resolve_public_domain_audio() {
+    let package = include_str!("../examples/commons-public-domain.js");
+    let mut input = json!({"entry":{"key":{"id":"commons-public-domain","repository":"https://modules.example.com/index.json"},
+        "name":"Commons public-domain audio","version":"1.0.0","download":"https://modules.example.com/commons-public-domain.js","author":"Harbor development example"},
+        "fingerprint":format!("{:x}",Sha256::digest(package.as_bytes())),
+        "hosts":["upload.wikimedia.org"],"package":package,"trackId":"solfeggietto"});
+    fn run(input: &Value) -> Value {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_8spine-search")).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
+        child.stdin.take().unwrap().write_all(input.to_string().as_bytes()).unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(out.status.success());
+        serde_json::from_slice(&out.stdout).unwrap()
+    }
+    let result = run(&input);
+    assert_eq!(result["ok"],true, "{result}");
+    assert_eq!(result["result"]["streamUrl"], "https://upload.wikimedia.org/wikipedia/commons/d/d4/Carl_Philipp_Emanuel_Bach_-_Solfeggietto.ogg");
+    input["hosts"] = json!(["example.com"]);
+    assert_eq!(run(&input)["ok"],false);
+}

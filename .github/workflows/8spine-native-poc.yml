@@ -69,6 +69,7 @@ jobs:
           test -x "$HARBOR_8SPINE_TEST_WORKER"
           cargo test --manifest-path src-tauri/Cargo.toml --lib music::fixture_8spine::tests::native_fixture_registration -- --ignored --exact
           cargo test --manifest-path src-tauri/Cargo.toml --lib music::eightspine_catalog::tests::public_repository_preview -- --ignored --exact
+          cargo test --manifest-path src-tauri/Cargo.toml --lib music::eightspine_search::tests::public_domain_audio_playback -- --ignored --exact --nocapture
 
   harbor-regression:
     name: Full Harbor native regression (independent)

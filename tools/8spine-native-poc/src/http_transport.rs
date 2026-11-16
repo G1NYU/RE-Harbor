@@ -197,6 +197,7 @@ impl AuthorizedRequest {
         // Preserve the original hostname for SNI and certificate validation.
         Client::builder()
             .https_only(true)
+            .user_agent("Harbor-8SPINE/0.1 (https://github.com/G1NYU/RE-Harbor)")
             .no_proxy()
             .redirect(Policy::none())
             .referer(false)

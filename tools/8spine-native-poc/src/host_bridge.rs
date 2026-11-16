@@ -45,6 +45,29 @@ pub(crate) fn approved_search_input(manager: &ModuleManager, permit: &ModulePerm
     Ok(request)
 }
 
+pub(crate) fn approved_resolve_input(manager: &ModuleManager, permit: &ModulePermit,
+    bytes: &[u8], track_id: &Value) -> Result<Value, &'static str> {
+    let source = manager.approved_source_body(permit, bytes)?;
+    if source.len() > MAX_SOURCE { return Err("input-limit"); }
+    if !(track_id.as_str().is_some_and(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control))
+        || track_id.as_i64().is_some_and(|n| (-9007199254740991..=9007199254740991).contains(&n))) {
+        return Err("invalid-request");
+    }
+    let request = json!({"source":source,"trackId":track_id,"quality":"HIGH"});
+    if serde_json::to_vec(&request).map_err(|_| "invalid-request")?.len() > MAX_FRAME { return Err("input-limit"); }
+    Ok(request)
+}
+
+// Only an approved HTTPS destination is returned; no module-controlled headers,
+// manifests or local paths. Harbor downloads bytes using its own network grant.
+fn sanitized_resolve(raw: &Value, manager: &ModuleManager, permit: &ModulePermit) -> Result<Value, &'static str> {
+    let url = raw["streamUrl"].as_str().ok_or("invalid-stream")?;
+    let grant = manager.network_grant(permit)?;
+    // Use the permit-owned grant directly rather than a caller-supplied host.
+    manager.authorize_media_url(permit, &grant, url)?;
+    Ok(json!({"streamUrl":url}))
+}
+
 // Return only bounded music metadata. Never forward arbitrary module artwork,
 // playback URLs, headers or unknown fields to the application.
 fn sanitized_search(raw: &Value, limit: usize) -> Result<Value, &'static str> {
@@ -192,7 +215,8 @@ pub(crate) async fn exchange(mut cmd: Command, manager: &ModuleManager, permit: 
 // invocation. No direct sockets and no media URL resolution in this protocol.
 pub(crate) async fn exchange_approved_search(mut cmd: Command, manager: &ModuleManager,
     permit: &ModulePermit, input: Value) -> Result<Value, &'static str> {
-    let limit = input["limit"].as_u64().ok_or("invalid-request")? as usize;
+    let limit = input["limit"].as_u64().map(|n| n as usize);
+    if limit.is_none() && input.get("trackId").is_none() { return Err("invalid-request"); }
     let mut broker = ModuleNetworkBroker::new(manager, permit)?;
     let mut child = cmd.spawn().map_err(|_| "worker-spawn")?;
     let mut stdin = child.stdin.take().ok_or("worker-stdin")?;
@@ -216,7 +240,10 @@ pub(crate) async fn exchange_approved_search(mut cmd: Command, manager: &ModuleM
             } else if let Some(reply) = obj.get("reply") {
                 if reply.as_object().map(|o| o.len()) != Some(2) { return Err("worker-protocol"); }
                 let output = match reply["ok"].as_bool() {
-                    Some(true) => sanitized_search(&reply["result"], limit)?,
+                    Some(true) => match limit {
+                        Some(limit) => sanitized_search(&reply["result"], limit)?,
+                        None => sanitized_resolve(&reply["result"], manager, permit)?,
+                    },
                     Some(false) => return Err("module-search-failed"),
                     None => return Err("worker-protocol"),
                 };

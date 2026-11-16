@@ -11,8 +11,9 @@ struct Search {
     fingerprint: String,
     hosts: Vec<String>,
     package: String,
-    query: String,
-    limit: usize,
+    query: Option<String>,
+    limit: Option<usize>,
+    track_id: Option<Value>,
 }
 
 #[cfg(any(target_os = "linux", windows))]
@@ -32,7 +33,11 @@ async fn run(input: Search) -> Result<Value, &'static str> {
     #[cfg(windows)]
     let worker = harbor_8spine_native_poc::supervisor::WindowsFixtureSupervisor::new(
         &dir.join("harbor-8spine-native-poc.exe"), &dir.join("8spine-sandbox.exe"))?;
-    worker.run_approved_search(&manager, &permit, bytes, &input.query, input.limit).await
+    match (input.query, input.limit, input.track_id) {
+        (Some(query), Some(limit), None) => worker.run_approved_search(&manager, &permit, bytes, &query, limit).await,
+        (None, None, Some(track_id)) => worker.run_approved_resolve(&manager, &permit, bytes, &track_id).await,
+        _ => Err("invalid-request"),
+    }
 }
 
 #[cfg(not(any(target_os = "linux", windows)))]

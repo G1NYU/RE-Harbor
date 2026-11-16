@@ -191,6 +191,13 @@ impl ModuleManager {
         source_format::module_body(bytes)
     }
 
+    pub(crate) fn authorize_media_url(&self, permit: &ModulePermit, grant: &NetworkGrant, url: &str) -> Result<(), &'static str> {
+        self.network_grant(permit)?;
+        let mut session = crate::http_transport::NetworkSession::new(grant, &permit.key.id, &permit.fingerprint)?;
+        session.authorize("GET", url)?;
+        Ok(())
+    }
+
     /// No worker may mint this grant. Disable, remove, or restaging invalidates permits.
     /// A future supervisor must also recheck immediately before writes and cancel active tasks.
     pub fn network_grant(&self, permit: &ModulePermit) -> Result<NetworkGrant, &'static str> {

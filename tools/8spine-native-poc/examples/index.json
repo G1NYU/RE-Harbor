@@ -7,6 +7,14 @@
       "type": "MODULE",
       "author": "Harbor development example",
       "download": "itunes-metadata.js"
+    },
+    {
+      "id": "commons-public-domain",
+      "name": "Commons public-domain audio",
+      "version": "1.0.0",
+      "type": "MODULE",
+      "author": "Harbor development example",
+      "download": "commons-public-domain.js"
     }
   ]
 }
