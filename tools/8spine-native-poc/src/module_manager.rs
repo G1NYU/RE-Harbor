@@ -158,6 +158,20 @@ pub struct StagedModule {
 }
 
 impl StagedModule {
+    pub fn entry(&self) -> &CatalogEntry { &self.entry }
+    pub fn verified(&self) -> bool { self.verified }
+    pub fn hosts(&self) -> impl Iterator<Item = &str> { self.hosts.iter().map(String::as_str) }
+
+    /// Display status only; never an execution authorization.
+    pub fn status(&self) -> &'static str {
+        match self.format {
+            PackageFormat::Packed8sm1 | PackageFormat::Unknown => "unsupported",
+            PackageFormat::JavascriptCandidate if !self.verified => "needs-verification",
+            PackageFormat::JavascriptCandidate if self.enabled => "approved",
+            PackageFormat::JavascriptCandidate => "disabled",
+        }
+    }
+
     pub fn fingerprint(&self) -> &str { &self.fingerprint }
     pub fn format(&self) -> PackageFormat { self.format }
     pub fn enabled(&self) -> bool { self.enabled }
@@ -333,6 +347,29 @@ mod tests {
         let raw = json!({"category:modules":[module(), conflict]}).to_string();
         assert_eq!(parse_catalog(REPO, raw.as_bytes()), Err("catalog-conflict"));
         assert_eq!(parse_catalog(REPO, &vec![b'x'; MAX_INDEX + 1]), Err("index-limit"));
+    }
+
+    #[test]
+    fn management_status_distinguishes_approval_and_unsupported_formats() {
+        let row = catalog(REPO, vec![module()]).remove(0);
+        let mut manager = ModuleManager::default();
+        manager.stage(&row, JS).unwrap();
+        let staged = manager.get(&row.key).unwrap();
+        assert_eq!(staged.entry(), &row);
+        assert!(staged.verified());
+        assert_eq!(staged.status(), "disabled");
+        assert_eq!(staged.hosts().count(), 0);
+        let hash = staged.fingerprint().to_owned();
+        manager.approve(&row.key, &hash, &["api.example.com"]).unwrap();
+        let staged = manager.get(&row.key).unwrap();
+        assert_eq!(staged.status(), "approved");
+        assert_eq!(staged.hosts().collect::<Vec<_>>(), vec!["api.example.com"]);
+        manager.disable(&row.key).unwrap();
+        assert_eq!(manager.get(&row.key).unwrap().status(), "disabled");
+        manager.stage(&row, b"8SM1.opaque").unwrap();
+        assert_eq!(manager.get(&row.key).unwrap().status(), "unsupported");
+        assert!(manager.remove(&row.key));
+        assert!(manager.get(&row.key).is_none());
     }
 
     #[test]
