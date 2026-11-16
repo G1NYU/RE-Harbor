@@ -6,6 +6,13 @@ use serde_json::{json, Value};
 use std::io::{self, Read, Write};
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    if std::env::args().nth(1).as_deref() == Some("--host-broker-fixture") {
+        if harbor_8spine_native_poc::host_bridge::worker_main().is_err() {
+            std::process::exit(1);
+        }
+        return;
+    }
     #[cfg(any(target_os = "linux", windows))]
     if std::env::args().nth(1).as_deref() == Some("--isolation-probe") {
         isolation_probe();

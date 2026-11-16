@@ -1,5 +1,7 @@
 //! Development fixture only. No downloaded JavaScript or real network access.
 mod broker;
+#[cfg(target_os = "linux")]
+pub mod host_bridge;
 // Host-only development API; never exposed to the JavaScript runtime.
 pub mod http_transport;
 // Harbor-shaped fixture adapter, not registered with the application yet.
@@ -25,6 +27,8 @@ fn fixture(name: &str) -> Option<&'static str> {
     Some(match name {
         "catalog" => include_str!("../fixtures/catalog.js"),
         "broker" => include_str!("../fixtures/broker.js"),
+        #[cfg(target_os = "linux")]
+        "host-broker" => host_bridge::SOURCE,
         "capabilities" => r#"return { searchTracks() { return {
             process: typeof process, require: typeof require, fetch: typeof fetch,
             timers: typeof setTimeout, os: typeof os, std: typeof std,
@@ -88,11 +92,18 @@ fn validated_request(input: &[u8]) -> Result<(Value, String), &'static str> {
 }
 
 pub fn handle(input: &[u8]) -> Result<Value, &'static str> {
+    evaluate(input, None)
+}
+
+fn evaluate(input: &[u8], bridge: Option<fn(String) -> String>) -> Result<Value, &'static str> {
     let (request, source) = validated_request(input)?;
+    if (request["fixture"] == "host-broker") != bridge.is_some() {
+        return Err("invalid-request");
+    }
     let runtime = Runtime::new().map_err(|_| "runtime-init")?;
     runtime.set_memory_limit(MEMORY);
     runtime.set_max_stack_size(STACK);
-    let deadline = Instant::now() + Duration::from_millis(350);
+    let deadline = Instant::now() + if bridge.is_some() { Duration::from_secs(12) } else { Duration::from_millis(350) };
     runtime.set_interrupt_handler(Some(Box::new(move || Instant::now() >= deadline)));
     let context = Context::full(&runtime).map_err(|_| "runtime-init")?;
     // Only the compiled-in broker fixture receives the simulated fetch capability.
@@ -116,6 +127,10 @@ pub fn handle(input: &[u8]) -> Result<Value, &'static str> {
             let function = Function::new(ctx.clone(), move |payload: String| {
                 broker.request(&calls, &payload)
             })?;
+            ctx.globals().set("__fixtureBroker", function)?;
+            ctx.eval::<(), _>(include_str!("../fixtures/fetch-shim.js"))?;
+        } else if let Some(bridge) = bridge {
+            let function = Function::new(ctx.clone(), bridge)?;
             ctx.globals().set("__fixtureBroker", function)?;
             ctx.eval::<(), _>(include_str!("../fixtures/fetch-shim.js"))?;
         }

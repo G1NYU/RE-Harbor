@@ -70,8 +70,35 @@ async fn linux_namespace_isolation() {
     assert_eq!(worker.run_fixture(&bypass).await, Err("fixture-consent-required"));
     manager.disable(&key).unwrap();
     assert_eq!(worker.run_approved_fixture(&manager, &permit, &package, &imported::search()).await, Err("revoked"));
+    host_broker_checks(&worker).await;
 }
 
 #[cfg(target_os = "linux")]
 #[path = "support_imported/mod.rs"]
 mod imported;
+
+#[cfg(target_os = "linux")]
+async fn host_broker_checks(worker: &Supervisor) {
+    use harbor_8spine_native_poc::{host_bridge::SOURCE, module_manager::{ModuleManager, parse_catalog}};
+    let repo = "https://8spine-modules.pages.dev/index.json";
+    let raw = br#"{"category:modules":[{"id":"bridge-fixture","name":"Bridge fixture","version":"1","type":"MODULE","download":"fixture.js"}]}"#;
+    let entry = parse_catalog(repo, raw).unwrap().remove(0);
+    let mut manager = ModuleManager::default();
+    manager.stage(&entry, SOURCE.as_bytes()).unwrap();
+    let sha = manager.get(&entry.key).unwrap().fingerprint().to_owned();
+    // Exercise denial through the actual confined worker without network I/O.
+    manager.approve(&entry.key, &sha, &["api.example.com"]).unwrap();
+    let permit = manager.permit(&entry.key, SOURCE.as_bytes()).unwrap();
+    let denied = worker.run_host_broker_fixture(&manager, &permit, SOURCE.as_bytes()).await.unwrap();
+    assert_eq!(denied, json!({"ok":false,"error":"fixture-failed"}));
+    manager.disable(&entry.key).unwrap();
+    assert_eq!(worker.run_host_broker_fixture(&manager, &permit, SOURCE.as_bytes()).await, Err("revoked"));
+    assert_eq!(worker.run_fixture(&search("host-broker")).await, Err("fixture-consent-required"));
+    // Explicit CI smoke: JS in the isolated process requests the fixed public
+    // index via IPC; only the host performs HTTPS. No package is executed.
+    manager.approve(&entry.key, &sha, &["8spine-modules.pages.dev"]).unwrap();
+    let permit = manager.permit(&entry.key, SOURCE.as_bytes()).unwrap();
+    let live = worker.run_host_broker_fixture(&manager, &permit, SOURCE.as_bytes()).await.unwrap();
+    assert_eq!(live["ok"], true);
+    assert!(live["result"]["categories"].as_u64().unwrap() > 0);
+}

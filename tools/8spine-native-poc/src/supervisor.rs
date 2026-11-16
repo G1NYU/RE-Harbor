@@ -102,7 +102,7 @@ impl Supervisor {
     pub async fn run_fixture(&self, request: &Value) -> Result<Value, &'static str> {
         let input = serde_json::to_vec(request).map_err(|_| "invalid-request")?;
         crate::validated_request(&input)?;
-        if request["fixture"] == "imported-fixture" { return Err("fixture-consent-required"); }
+        if matches!(request["fixture"].as_str(), Some("imported-fixture" | "host-broker")) { return Err("fixture-consent-required"); }
         self.exchange(&[], &input).await
     }
 
@@ -116,6 +116,22 @@ impl Supervisor {
         let request = approved_fixture_input(manager, permit, bytes, operation)?;
         let input = serde_json::to_vec(&request).map_err(|_| "invalid-request")?;
         self.exchange(&[], &input).await
+    }
+
+    /// Fixed compiled-in network fixture only; no third-party source execution.
+    #[cfg(target_os = "linux")]
+    pub async fn run_host_broker_fixture(&self, manager: &ModuleManager, permit: &ModulePermit,
+        bytes: &[u8]) -> Result<Value, &'static str> {
+        if !matches!(self.isolation, Isolation::LinuxNamespace) {
+            return Err("sandbox-unavailable");
+        }
+        if manager.approved_source_body(permit, bytes)? != crate::host_bridge::SOURCE {
+            return Err("fixture-source-denied");
+        }
+        let private = tempfile::tempdir().map_err(|_| "worker-directory")?;
+        let mut cmd = self.command()?;
+        cmd.current_dir(private.path()).arg("--host-broker-fixture");
+        crate::host_bridge::exchange(cmd, manager, permit).await
     }
 
     /// Host diagnostic: checks a synthetic sentinel and loopback listener.
