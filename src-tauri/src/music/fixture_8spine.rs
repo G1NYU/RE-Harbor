@@ -116,5 +116,67 @@ mod tests {
         let mut wrong = tracks[0].clone();
         wrong.source_id = Some("\"42\"".to_owned());
         assert!(connector.resolve_descriptor(&wrong).await.is_err());
+        // The descriptor URL is intentionally non-routable. Only the trusted
+        // harness may map this exact fixture identity to generated local audio.
+        // No module-provided URL or file path reaches libmpv.
+        assert_eq!(tracks[0].source_id.as_deref(), Some("42"));
+        assert_eq!(stream.mime_type, "audio/wav");
+        #[cfg(not(target_os = "android"))]
+        play_fixture_audio(&stream).await;
+
+    }
+
+    #[cfg(not(target_os = "android"))]
+    async fn play_fixture_audio(stream: &MusicStream) {
+        use libmpv2::{events::{Event, EventContext}, Mpv};
+        use std::time::Instant;
+
+        assert_eq!(stream.url, "https://example.invalid/fixture.wav");
+        assert!(stream.http_headers.is_empty());
+        let path = std::env::temp_dir().join(format!("8spine-audio-{}.wav", uuid::Uuid::new_v4()));
+        struct RemoveFixture(PathBuf);
+        impl Drop for RemoveFixture {
+            fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); }
+        }
+        let _cleanup = RemoveFixture(path.clone());
+        // Original, five-second mono tone: no third-party media or credentials.
+        let mut writer = hound::WavWriter::create(&path, hound::WavSpec {
+            channels: 1, sample_rate: 48000, bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        }).expect("create original tone");
+        for i in 0..48000 * 5 {
+            let phase = 2.0 * std::f64::consts::PI * 440.0 * f64::from(i) / 48000.0;
+            writer.write_sample((8192.0 * phase.sin()) as i16).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        let mpv = Mpv::with_initializer(|init| {
+            for (key, value) in [
+                ("ao", "null"), ("vo", "null"), ("terminal", "no"),
+                ("idle", "yes"), ("keep-open", "yes"), ("pause", "yes"),
+            ] { init.set_property(key, value)?; }
+            Ok(())
+        }).expect("headless Harbor libmpv player");
+        let mut events = EventContext::new(mpv.ctx);
+        crate::mpv::mpv_argv_command(&mpv, &["loadfile", path.to_str().unwrap(), "replace"])
+            .expect("load trusted local audio");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if matches!(events.wait_event(0.0), Some(Ok(Event::FileLoaded))) { break; }
+            assert!(Instant::now() < deadline, "8SPINE audio fixture failed to load");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let duration = mpv.get_property::<f64>("duration").expect("decoded duration");
+        assert!((duration - 5.0).abs() < 0.1);
+        let sample_rate = mpv.get_property::<i64>("audio-params/samplerate").expect("decoded sample rate");
+        assert_eq!(sample_rate, 48000);
+        mpv.set_property("pause", false).expect("start decoding");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while mpv.get_property::<f64>("time-pos").unwrap_or(0.0) < 0.25 {
+            assert!(Instant::now() < deadline, "8SPINE fixture playback did not advance");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(events);
+        drop(mpv);
     }
 }
