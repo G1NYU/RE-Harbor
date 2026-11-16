@@ -43,6 +43,7 @@ const REQUEST_TIME: Duration = Duration::from_secs(5);
 
 /// Construct only in trusted host code after explicit module/version/host consent.
 /// This value is deliberately not deserializable from worker arguments.
+#[derive(Clone)]
 pub struct NetworkGrant {
     module: String,
     version: String,
@@ -84,8 +85,8 @@ impl NetworkGrant {
 }
 
 /// A short-lived, per-invocation budget. A future supervisor must also support revocation.
-pub struct NetworkSession<'a> {
-    grant: &'a NetworkGrant,
+pub struct NetworkSession {
+    grant: NetworkGrant,
     deadline: Instant,
     calls: usize,
 }
@@ -96,12 +97,12 @@ pub struct AuthorizedRequest {
     deadline: Instant,
 }
 
-impl<'a> NetworkSession<'a> {
-    pub fn new(grant: &'a NetworkGrant, module: &str, version: &str) -> Result<Self, &'static str> {
+impl NetworkSession {
+    pub fn new(grant: &NetworkGrant, module: &str, version: &str) -> Result<Self, &'static str> {
         if grant.module != module || grant.version != version {
             return Err("grant-scope");
         }
-        Ok(Self { grant, deadline: Instant::now() + TOTAL_TIME, calls: 0 })
+        Ok(Self { grant: grant.clone(), deadline: Instant::now() + TOTAL_TIME, calls: 0 })
     }
 
     /// Before DNS lookup, use only the host-owned permission list.

@@ -2,6 +2,7 @@
 mod store;
 mod source_format;
 pub mod repository_import;
+pub mod network_broker;
 pub use store::{load_state, save_state};
 use crate::http_transport::{valid_dns_name, NetworkGrant};
 use serde::{Deserialize, Serialize};
