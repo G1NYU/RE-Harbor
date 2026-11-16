@@ -804,7 +804,7 @@ async function recoverySources(
       (candidate) =>
         candidate.health !== "offline" &&
         candidate.track.connectorId !== "catalog" &&
-        musicPlaybackSourceAllowed(candidate.track.connectorId) &&
+        musicPlaybackSourceAllowed(candidate.track) &&
         !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
     );
   const cached = usable(await sourcesFor(track).catch(() => []));
