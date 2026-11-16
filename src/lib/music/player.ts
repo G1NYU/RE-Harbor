@@ -795,10 +795,22 @@ const SOURCE_ATTEMPT_CEILING = 6;
 // than quietly playing something else under the same name.
 let explicitSource: string | null = null;
 
-async function recoverySources(track: MusicTrack): Promise<MusicSourceCandidate[]> {
-  const cached = await sourcesFor(track).catch(() => null);
-  if (cached && cached.length > 0) return cached;
-  return await sourcesFor(track, SOURCE_TTL_MS, true).catch(() => []);
+async function recoverySources(
+  track: MusicTrack,
+  failedAttempts: Set<string>,
+): Promise<MusicSourceCandidate[]> {
+  const usable = (candidates: MusicSourceCandidate[]) =>
+    candidates.filter(
+      (candidate) =>
+        candidate.health !== "offline" &&
+        candidate.track.connectorId !== "catalog" &&
+        musicPlaybackSourceAllowed(candidate.track.connectorId) &&
+        !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
+    );
+  const cached = usable(await sourcesFor(track).catch(() => []));
+  if (cached.length > 0) return cached;
+  // A nonempty but exhausted cache is not evidence that no source is available.
+  return usable(await sourcesFor(track, SOURCE_TTL_MS, true).catch(() => []));
 }
 
 async function nextPlayableSource(
@@ -807,7 +819,7 @@ async function nextPlayableSource(
 ): Promise<MusicTrack | null> {
   if (attemptTrack.mediaKind === "video") return null;
   if (failedAttempts.size >= SOURCE_ATTEMPT_CEILING) return null;
-  const candidates = await recoverySources(attemptTrack);
+  const candidates = await recoverySources(attemptTrack, failedAttempts);
   const usable = candidates.filter(
     (candidate) =>
       candidate.health !== "offline" &&
@@ -974,7 +986,7 @@ export async function playMusic(
           const candidates =
             chosenByHand || attemptTrack.mediaKind === "video"
               ? []
-              : await recoverySources(attemptTrack);
+              : await recoverySources(attemptTrack, failedAttempts);
           if (!ownsRequest()) return;
           const usable = candidates.filter(
             (candidate) =>
@@ -1023,7 +1035,7 @@ export async function playMusic(
         if (!searchedAlternatives && track.mediaKind !== "video") {
           searchedAlternatives = true;
           const failedTrack = track;
-          const candidates = await sourcesFor(track).catch(() => []);
+          const candidates = await recoverySources(track, failedAttempts);
           if (!ownsRequest()) return;
           alternatives = candidates
             .filter(

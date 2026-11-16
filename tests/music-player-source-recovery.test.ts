@@ -14,7 +14,7 @@ const spotify: MusicTrack = {
 };
 const alternative: MusicTrack = { ...spotify, id: "soundcloud:one", connectorId: "soundcloud" };
 
-function fixture(failImmediately = false) {
+function fixture(failImmediately = false, exhaustedCache = false) {
   const source = readFileSync(new URL("../src/lib/music/player.ts", import.meta.url), "utf8");
   const tree = ts.createSourceFile("player.ts", source, ts.ScriptTarget.Latest, true);
   const functions = tree.statements.filter(node => ts.isFunctionDeclaration(node) &&
@@ -40,8 +40,10 @@ function fixture(failImmediately = false) {
     rankByExplicitness: (candidates: unknown[]) => candidates, explicitnessOf: () => 0,
     musicPlaybackSourceAllowed: () => true,
     readMusicPreference: () => null, clampMusicVolume: (volume: number) => volume,
-    sourcesFor: async () => {
+    sourcesFor: async (_track: MusicTrack, _ttl?: number, refresh?: boolean) => {
       lookups++;
+      if (exhaustedCache && !refresh)
+        return [{ connectorId: "spotify", health: "healthy", track: spotify }];
       return [{ connectorId: "soundcloud", health: "healthy", track: alternative }];
     },
     invoke: async (command: string, args: { track: MusicTrack }) => {
@@ -86,6 +88,15 @@ test("automatic playback still recovers and a new request clears the manual sour
   await h.play(spotify);
   assert.deepEqual(h.attempts.map(track => track.connectorId), ["spotify", "spotify", "soundcloud"]);
   assert.equal(h.lookups(), 1);
+  assert.equal(h.state.current?.connectorId, "soundcloud");
+  assert.equal(h.state.error, null);
+});
+
+test("an exhausted cached source list is refreshed before automatic playback gives up", async () => {
+  const h = fixture(true, true);
+  await h.play(spotify);
+  assert.deepEqual(h.attempts.map(track => track.connectorId), ["spotify", "soundcloud"]);
+  assert.equal(h.lookups(), 2);
   assert.equal(h.state.current?.connectorId, "soundcloud");
   assert.equal(h.state.error, null);
 });
