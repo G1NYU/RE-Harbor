@@ -1,0 +1,12 @@
+{
+  "category:music": [
+    {
+      "id": "harbor-itunes-metadata",
+      "name": "iTunes (metadata only)",
+      "version": "1.0.0",
+      "type": "MODULE",
+      "author": "Harbor development example",
+      "download": "itunes-metadata.js"
+    }
+  ]
+}

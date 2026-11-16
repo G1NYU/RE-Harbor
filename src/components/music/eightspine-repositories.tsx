@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { invalidateMusicHealth } from "@/lib/music/sources";
 import { readMusicPreference, writeMusicPreference } from "@/lib/music/preferences";
 import { SECONDARY_BUTTON, errorText } from "./music-connections/connection-row";
 
@@ -17,6 +18,9 @@ type Preview = {
   executionAvailable: boolean;
 };
 
+type Active = { entry: Entry; connectorId: string; fingerprint: string };
+type RuntimeStatus = { available: boolean; active: Active[] };
+
 type Inspection = {
   entry: Entry;
   fingerprint: string;
@@ -27,7 +31,7 @@ type Inspection = {
 const sourceKey = (entry: Entry) => JSON.stringify([entry.key.repository, entry.key.id, entry.version, entry.download]);
 const formatLabel = (format: Inspection["format"]) =>
   format === "javascript-candidate"
-    ? "JavaScript detected — runtime pending"
+    ? "JavaScript detected"
     : format === "packed8sm1"
       ? "Packed module — unsupported"
       : "Unrecognized package format";
@@ -56,6 +60,43 @@ export function EightSpineRepositories() {
   const [loaded, setLoaded] = useState<string[]>([]);
   const [inspections, setInspections] = useState<Record<string, Inspection>>({});
   const [selected, setSelected] = useState<Entry | null>(null);
+  const [runtime, setRuntime] = useState<RuntimeStatus>({ available: false, active: [] });
+  const [approval, setApproval] = useState<Inspection | null>(null);
+  const [hosts, setHosts] = useState("");
+
+  async function updateRuntime() {
+    setRuntime(await invoke<RuntimeStatus>("music_8spine_runtime_status"));
+    invalidateMusicHealth();
+  }
+  useEffect(() => { void updateRuntime().catch(() => undefined); }, []);
+
+  async function toggle(entry: Entry) {
+    if (busy.current) return;
+    const active = runtime.active.find((a) => sourceKey(a.entry) === sourceKey(entry));
+    if (!active) {
+      const inspection = inspections[sourceKey(entry)];
+      if (inspection?.format === "javascript-candidate" && runtime.available) {
+        setApproval(inspection); setHosts("");
+      }
+      return;
+    }
+    busy.current = true; setPending(true); setError("");
+    try { await invoke("music_8spine_disable", { connectorId: active.connectorId }); await updateRuntime(); }
+    catch (reason) { setError(errorText(reason)); }
+    finally { busy.current = false; setPending(false); }
+  }
+
+  async function enable() {
+    if (!approval || busy.current) return;
+    const domains = [...new Set(hosts.split(/[\\s,]+/).filter(Boolean))];
+    if (!domains.length) return;
+    busy.current = true; setPending(true); setError("");
+    try {
+      await invoke("music_8spine_enable", { entry: approval.entry, fingerprint: approval.fingerprint, hosts: domains });
+      await updateRuntime(); setApproval(null);
+    } catch (reason) { setError(errorText(reason)); }
+    finally { busy.current = false; setPending(false); }
+  }
 
   function save(next: Preview[]) {
     setRepositories(next);
@@ -78,6 +119,9 @@ export function EightSpineRepositories() {
         existing < 0
           ? [...repositories, result]
           : repositories.map((row) => (row.repository === result.repository ? result : row));
+      await invoke("music_8spine_disable_repository", { repository: result.repository });
+      await updateRuntime();
+      setApproval(null);
       save(next);
       setInspections((current) =>
         Object.fromEntries(Object.entries(current).filter(([, item]) => item.entry.key.repository !== result.repository)),
@@ -115,12 +159,19 @@ export function EightSpineRepositories() {
     }
   }
 
-  function remove(repository: string) {
+  async function remove(repository: string) {
     if (busy.current) return;
+    busy.current = true; setPending(true); setError("");
+    try {
+    await invoke("music_8spine_disable_repository", { repository });
+    await updateRuntime();
+    setApproval(null);
     save(repositories.filter((item) => item.repository !== repository));
     setLoaded((current) => current.filter((item) => item !== repository));
     setInspections((current) => Object.fromEntries(Object.entries(current).filter(([, item]) => item.entry.key.repository !== repository)));
     setSelected(null);
+    } catch (reason) { setError(errorText(reason)); }
+    finally { busy.current = false; setPending(false); }
   }
 
   return (
@@ -129,8 +180,7 @@ export function EightSpineRepositories() {
         8SPINE repositories
       </h3>
       <p className="text-[13px] text-ink-muted">
-        Add an HTTPS JSON repository to discover music sources. Preview only: playback and source
-        activation are not available yet.
+        Add an HTTPS JSON repository to discover music sources. Experimental search only. Playback is not available.
       </p>
       <form
         className="flex flex-wrap items-center gap-2"
@@ -154,6 +204,19 @@ export function EightSpineRepositories() {
         </button>
       </form>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {!runtime.available && <p className="text-xs text-ink-muted">Search sandbox binaries are not installed.</p>}
+      {approval && (
+        <div className="flex flex-col gap-2 rounded-md border border-edge-soft bg-surface p-3">
+          <strong className="text-sm text-ink">Enable {approval.entry.name} for this session?</strong>
+          <p className="break-all text-xs text-ink-muted">Package SHA-256: {approval.fingerprint}</p>
+          <p className="text-xs text-ink-muted">Permit only exact HTTPS hostnames you explicitly trust, separated by commas. This enables search, not playback.</p>
+          <input aria-label="Allowed hostnames" value={hosts} onChange={(event) => setHosts(event.target.value)} maxLength={4096} disabled={pending} className="rounded-md border border-edge-soft bg-surface p-2 text-sm text-ink" placeholder="api.example.com" />
+          <div className="flex gap-2">
+            <button type="button" disabled={pending || !hosts.trim()} className={SECONDARY_BUTTON} onClick={() => void enable()}>Enable search</button>
+            <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => setApproval(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
       {selected && (
         <div className="flex flex-col gap-2 rounded-md border border-edge-soft bg-surface p-3">
           <strong className="text-sm text-ink">Inspect {selected.name}?</strong>
@@ -178,7 +241,7 @@ export function EightSpineRepositories() {
             <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => void load(repository.repository)}>
               {loaded.includes(repository.repository) ? "Refresh" : "Load sources"}
             </button>
-            <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => remove(repository.repository)}>
+            <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => void remove(repository.repository)}>
               Remove
             </button>
           </div>
@@ -203,8 +266,8 @@ export function EightSpineRepositories() {
                   {inspections[sourceKey(entry)] ? "Reinspect" : "Inspect"}
                 </button>
               <label className="flex items-center gap-2 text-xs text-ink-muted">
-                Not available yet
-                <input type="checkbox" role="switch" checked={false} disabled aria-label={`Enable ${entry.name}`} />
+                {runtime.active.some((a) => sourceKey(a.entry) === sourceKey(entry)) ? "Search enabled" : "Off"}
+                <input type="checkbox" role="switch" checked={runtime.active.some((a) => sourceKey(a.entry) === sourceKey(entry))} disabled={pending || (!runtime.active.some((a) => sourceKey(a.entry) === sourceKey(entry)) && (!runtime.available || inspections[sourceKey(entry)]?.format !== "javascript-candidate"))} onChange={() => void toggle(entry)} aria-label={`Enable ${entry.name}`} />
               </label>
               </div>
             </div>

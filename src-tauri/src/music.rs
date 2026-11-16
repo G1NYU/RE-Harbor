@@ -3,6 +3,7 @@ mod catalog_commands;
 mod commands;
 mod connector;
 pub mod eightspine_catalog;
+pub mod eightspine_search;
 #[cfg(test)]
 mod fixture_8spine;
 mod connectors;
@@ -141,6 +142,7 @@ const ACTIVE_MODULE_SPOTIFY: u8 = 4;
 pub struct MusicState {
     db: db::MusicDb,
     registry: registry::ConnectorRegistry,
+    eightspine: eightspine_search::ActiveSources,
     engine: engine::MusicEngine,
     spotify: Arc<spotify::SpotifyState>,
     active_engine: AtomicU8,
@@ -168,6 +170,7 @@ impl MusicState {
             db: db::MusicDb::new(),
             engine: engine::MusicEngine::new(),
             registry,
+            eightspine: eightspine_search::ActiveSources::default(),
             spotify,
             active_engine: AtomicU8::new(ACTIVE_NONE),
             external_primary: AtomicU8::new(0),

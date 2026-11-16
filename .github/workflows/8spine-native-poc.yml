@@ -9,6 +9,8 @@ on:
       - "docs/8spine-connector.md"
       - "src-tauri/src/music/fixture_8spine.rs"
       - "src-tauri/src/music/eightspine_catalog.rs"
+      - "src-tauri/src/music/eightspine_search.rs"
+      - "src-tauri/src/music/registry.rs"
       - "src-tauri/src/lib.rs"
       - "src/components/music/eightspine-repositories.tsx"
       - "src/components/music/music-connections.tsx"
@@ -167,6 +169,8 @@ jobs:
           python3 -c 'import json; r=json.load(open("reply.json")); assert r["ok"] is True and r["result"]["tracks"][0]["id"] == 42'
       - name: Test real host filesystem and network denial
         run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --test supervisor linux_namespace_isolation -- --ignored --exact
+      - name: Search real song metadata through the host runner
+        run: cargo test --manifest-path tools/8spine-native-poc/Cargo.toml --test live_search_runner -- --ignored --exact --nocapture
 
   windows-isolation:
     name: Windows AppContainer isolation (fixture-only, ${{ matrix.os }})

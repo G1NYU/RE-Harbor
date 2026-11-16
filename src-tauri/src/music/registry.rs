@@ -44,6 +44,12 @@ impl ConnectorRegistry {
         Ok(())
     }
 
+    pub(super) fn remove_8spine(&self, id: &str) -> Result<(), String> {
+        if !id.starts_with("8spine-") { return Err("Invalid 8SPINE connector".to_owned()); }
+        self.connectors.write().map_err(|_| "Music connector registry unavailable".to_owned())?.remove(id);
+        Ok(())
+    }
+
     pub fn get(&self, id: &str) -> Option<Arc<dyn MusicConnector>> {
         self.connectors.read().ok()?.get(id).cloned()
     }

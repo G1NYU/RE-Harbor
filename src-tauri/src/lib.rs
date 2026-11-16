@@ -1892,6 +1892,14 @@ pub fn run() {
             #[cfg(feature = "music")]
             music::eightspine_catalog::music_8spine_inspect_source,
             #[cfg(feature = "music")]
+            music::eightspine_search::music_8spine_runtime_status,
+            #[cfg(feature = "music")]
+            music::eightspine_search::music_8spine_enable,
+            #[cfg(feature = "music")]
+            music::eightspine_search::music_8spine_disable,
+            #[cfg(feature = "music")]
+            music::eightspine_search::music_8spine_disable_repository,
+            #[cfg(feature = "music")]
             music::music_source_candidates,
             #[cfg(feature = "music")]
             music::music_spotify_status,

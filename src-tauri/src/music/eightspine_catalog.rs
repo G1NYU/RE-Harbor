@@ -1,10 +1,10 @@
 //! Metadata-only repository import. No source execution, no playback registration.
 #[allow(dead_code)]
 #[path = "../../../tools/8spine-native-poc/src/http_transport.rs"]
-mod http_transport;
+pub(super) mod http_transport;
 #[allow(dead_code)]
 #[path = "../../../tools/8spine-native-poc/src/catalog.rs"]
-mod catalog;
+pub(super) mod catalog;
 
 #[path = "../../../tools/8spine-native-poc/src/module_manager/source_format.rs"]
 mod source_format;
@@ -91,13 +91,22 @@ pub async fn music_8spine_inspect_source(entry: CatalogEntry) -> Result<PackageI
 }
 
 async fn inspect_source(expected: CatalogEntry) -> Result<PackageInspection, &'static str> {
+    let bytes = retrieve_package(&expected).await?;
+    inspect_bytes(expected, &bytes)
+}
+
+pub(super) fn verify_plain(bytes: &[u8]) -> Result<(), &'static str> {
+    source_format::module_body(bytes).map(|_| ())
+}
+
+pub(super) async fn retrieve_package(expected: &CatalogEntry) -> Result<Vec<u8>, &'static str> {
     // Re-read only the exact selected repository and compare every catalog
     // field, including version and URL, before touching the package.
     let catalog = preview(&expected.key.repository).await?;
     let row = selected_entry(&catalog, &expected)?;
     let (status, bytes) = fetch_exact(&row.download, MAX_PACKAGE).await?;
     if status != 200 { return Err("package-http-status"); }
-    inspect_bytes(row.clone(), &bytes)
+    Ok(bytes)
 }
 
 #[cfg(test)]
