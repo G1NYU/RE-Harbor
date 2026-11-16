@@ -1,0 +1,33 @@
+name: Music reliability
+
+on:
+  push:
+    branches: [feature/music-reliability]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: music-reliability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Typecheck
+        run: vp run typecheck
+      - name: Music regression tests
+        run: node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/music-*.test.ts
