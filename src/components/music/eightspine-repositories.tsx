@@ -17,6 +17,21 @@ type Preview = {
   executionAvailable: boolean;
 };
 
+type Inspection = {
+  entry: Entry;
+  fingerprint: string;
+  format: "javascript-candidate" | "packed8sm1" | "unknown";
+  executionAvailable: boolean;
+};
+
+const sourceKey = (entry: Entry) => JSON.stringify([entry.key.repository, entry.key.id, entry.version, entry.download]);
+const formatLabel = (format: Inspection["format"]) =>
+  format === "javascript-candidate"
+    ? "JavaScript detected — runtime pending"
+    : format === "packed8sm1"
+      ? "Packed module — unsupported"
+      : "Unrecognized package format";
+
 const KEY = "harbor.music.8spine-repositories.preview.v1";
 const MAX_REPOSITORIES = 32;
 
@@ -39,6 +54,8 @@ export function EightSpineRepositories() {
   const busy = useRef(false);
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState<string[]>([]);
+  const [inspections, setInspections] = useState<Record<string, Inspection>>({});
+  const [selected, setSelected] = useState<Entry | null>(null);
 
   function save(next: Preview[]) {
     setRepositories(next);
@@ -62,8 +79,34 @@ export function EightSpineRepositories() {
           ? [...repositories, result]
           : repositories.map((row) => (row.repository === result.repository ? result : row));
       save(next);
+      setInspections((current) =>
+        Object.fromEntries(Object.entries(current).filter(([, item]) => item.entry.key.repository !== result.repository)),
+      );
+      setSelected(null);
       setLoaded((current) => [...new Set([...current, result.repository])]);
       setUrl("");
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      busy.current = false;
+      setPending(false);
+    }
+  }
+
+  async function inspect(entry: Entry) {
+    if (busy.current) return;
+    busy.current = true;
+    setPending(true);
+    setError("");
+    const key = sourceKey(entry);
+    setInspections((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== key)));
+    try {
+      const result = await invoke<Inspection>("music_8spine_inspect_source", { entry });
+      if (sourceKey(result.entry) !== key || result.executionAvailable) {
+        throw new Error("Unexpected source inspection response.");
+      }
+      setInspections((current) => ({ ...current, [key]: result }));
+      setSelected(null);
     } catch (reason) {
       setError(errorText(reason));
     } finally {
@@ -76,6 +119,8 @@ export function EightSpineRepositories() {
     if (busy.current) return;
     save(repositories.filter((item) => item.repository !== repository));
     setLoaded((current) => current.filter((item) => item !== repository));
+    setInspections((current) => Object.fromEntries(Object.entries(current).filter(([, item]) => item.entry.key.repository !== repository)));
+    setSelected(null);
   }
 
   return (
@@ -109,6 +154,23 @@ export function EightSpineRepositories() {
         </button>
       </form>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {selected && (
+        <div className="flex flex-col gap-2 rounded-md border border-edge-soft bg-surface p-3">
+          <strong className="text-sm text-ink">Inspect {selected.name}?</strong>
+          <p className="break-all text-xs text-ink-muted">{selected.download}</p>
+          <p className="text-xs text-ink-muted">
+            Download this exact package to identify its format. It will not be executed.
+          </p>
+          <div className="flex gap-2">
+            <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => void inspect(selected)}>
+              {pending ? "Inspecting…" : "Inspect package"}
+            </button>
+            <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => setSelected(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {repositories.map((repository) => (
         <div key={repository.repository} className="overflow-hidden rounded-lg bg-surface">
           <div className="flex flex-wrap items-center gap-2 p-3">
@@ -131,10 +193,20 @@ export function EightSpineRepositories() {
                   {entry.version}{entry.author ? ` · ${entry.author}` : ""}
                 </p>
               </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {inspections[sourceKey(entry)] && (
+                  <span className="text-xs text-ink-muted" title={inspections[sourceKey(entry)].fingerprint}>
+                    {formatLabel(inspections[sourceKey(entry)].format)}
+                  </span>
+                )}
+                <button type="button" disabled={pending} className={SECONDARY_BUTTON} onClick={() => setSelected(entry)}>
+                  {inspections[sourceKey(entry)] ? "Reinspect" : "Inspect"}
+                </button>
               <label className="flex items-center gap-2 text-xs text-ink-muted">
                 Not available yet
                 <input type="checkbox" role="switch" checked={false} disabled aria-label={`Enable ${entry.name}`} />
               </label>
+              </div>
             </div>
           ))}
         </div>
