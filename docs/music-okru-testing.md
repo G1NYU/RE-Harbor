@@ -35,3 +35,8 @@ PowerShell. Do not install unverified packages or share credentials to test it.
 A published Nov 2026 third-party SDK uses GET /queryMixedSuggestions with client=web&locale=ru and browser-style headers. The earlier local probe used legacy GET /tracks, which might not be a valid current endpoint. The fallback Cookie-only /tracks probe gave HTTP 404, so it was not a valid session test.
 
 Run scripts/music-okru-modern-probe.ps1 in Windows PowerShell 5.1. It only prints HTTP status and JSON field names, never the session, playback URL or track data. The optional -TrackId N argument makes a POST /play metadata request for a track your account is allowed to access. No download is attempted. Even if this passes, the Rust connector still uses the old endpoint, and must be updated after confirming the returned search shape.
+
+
+## Why the first browser-session POST returned HTTP 400
+
+A successful browser POST /play returned the play field, but the local probe received HTTP 400 using the same track ID. The precise cause is unconfirmed. The probe previously used a generic Referer and a form Content-Type including charset. Both now match the observed/published browser-compatible request pattern more closely. The script also prints only a allowlisted service error identifier (when returned) instead of raw responses. If HTTP 400 persists, inspect the *names only* of Query String Parameters and Form Data in Firefox's successful POST /play request, then compare with the test's expected parameter names: tid, ctx, client, locale, imgfmt. Never share session IDs, request URLs, response bodies or cookies.

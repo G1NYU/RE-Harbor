@@ -114,8 +114,23 @@ impl OkRuConnector {
             .header(reqwest::header::ACCEPT, "application/json, text/javascript, */*; q=0.01")
             .header(reqwest::header::ACCEPT_LANGUAGE, "ru-RU,ru;q=0.9,en;q=0.8")
             .header(reqwest::header::ORIGIN, "https://ok.ru")
-            .header(reqwest::header::REFERER, "https://ok.ru/")
+            .header(
+                reqwest::header::REFERER,
+                if route == "play" {
+                    let id = params.iter().find(|(key, _)| *key == "tid")
+                        .map(|(_, id)| id.as_str()).unwrap_or("");
+                    format!("https://ok.ru/music/profile/{id}")
+                } else {
+                    "https://ok.ru/".to_owned()
+                },
+            )
             .header("X-Requested-With", "XMLHttpRequest");
+        if route == "play" {
+            // WMF's browser endpoint is a POST with an empty form body.
+            request = request
+                .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(String::new());
+        }
         let response = request.send().await
             .map_err(|_| "OK.ru request failed; check session or connection")?;
         if !response.status().is_success() {
