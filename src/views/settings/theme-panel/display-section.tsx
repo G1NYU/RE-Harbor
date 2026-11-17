@@ -137,9 +137,10 @@ export function AmbienceSection() {
                 { value: "modern", label: t("Modern") },
                 { value: "retro", label: t("Retro") },
                 { value: "cinematic", label: t("Cinematic") },
+                { value: "void", label: "VOID · Soft graphite" },
               ]}
               onChange={(v) =>
-                update({ soundTheme: v as "none" | "glass" | "modern" | "retro" | "cinematic" })
+                update({ soundTheme: v as "none" | "glass" | "modern" | "retro" | "cinematic" | "void" })
               }
             />
           </SettingRow>
