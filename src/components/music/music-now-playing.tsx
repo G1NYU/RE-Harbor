@@ -361,6 +361,7 @@ export function MusicNowPlaying({
       />
       <section
         className="music-now-playing"
+        data-music-premium
         data-now-playing
         data-closing={closing ? "1" : undefined}
         data-immersive={immersive ? "1" : undefined}

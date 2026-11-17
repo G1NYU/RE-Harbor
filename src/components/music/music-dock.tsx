@@ -58,8 +58,9 @@ import { musicSourceName } from "@/lib/music/recovery";
 import { musicVolumeCeiling, useMusicAudioSettings } from "@/lib/music/audio-settings";
 import { getMusicSpeakerState, subscribeMusicSpeakerState } from "@/lib/music/casting";
 import "./music-dock.css";
+import "./music-premium.css";
 
-const DOCK_HEIGHT = 76;
+const DOCK_HEIGHT = 88;
 const TAB_HEIGHT = 48;
 const SKIP_AFTER_SECONDS = 20;
 const SETTLE_MS = 1200;
@@ -457,6 +458,7 @@ export function MusicDock() {
         key="music-dock-tab"
         ref={dockRef}
         data-music-dock
+        data-music-premium
         data-music-dock-tab
         data-art-colors={artworkColor ? "on" : undefined}
         aria-label={t("music.player")}
@@ -544,6 +546,7 @@ export function MusicDock() {
       key="music-dock-bar"
       ref={dockRef}
       data-music-dock
+      data-music-premium
       data-closing={collapseExit.closing || undefined}
       data-art-colors={artworkColor ? "on" : undefined}
       role={expanded ? "dialog" : undefined}

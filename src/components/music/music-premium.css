@@ -1,0 +1,276 @@
+/*
+ * Harbor Music / Listening Room — VOID x Catppuccin.
+ *
+ * Phase 2: layout and controls only. Intentionally no gradients, backdrop filters,
+ * album-art crossfades, image remounting, or additional playback subscriptions.
+ * Everything stays behind the music-only data attribute so other Harbor UI and
+ * upstream themes remain unaffected.
+ */
+
+[data-music-premium] {
+  --music-premium-base: #111019;
+  --music-premium-surface: #1b1925;
+  --music-premium-raised: #252231;
+  --music-premium-line: #393541;
+  --music-premium-text: #e1e3f3;
+  --music-premium-muted: #a5a9bd;
+  --music-premium-accent: #89b4fa;
+  --music-premium-accent-ink: #101522;
+  color: var(--music-premium-text);
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+}
+
+/* Keep the integrated dock visually distinct from video, manga and books. */
+[data-music-dock][data-music-premium]:not([data-music-dock-tab]),
+[data-music-dock][data-music-premium][data-art-colors]:not([data-music-dock-tab]) {
+  background: var(--music-premium-base);
+  border-block-start: 1px solid var(--music-premium-line);
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.20);
+  --color-ink: var(--music-premium-text);
+  --color-ink-muted: var(--music-premium-muted);
+  --color-ink-subtle: #82879e;
+  --color-canvas: var(--music-premium-base);
+  --color-elevated: var(--music-premium-surface);
+  --color-raised: var(--music-premium-raised);
+  --color-edge-soft: var(--music-premium-line);
+  --color-accent: var(--music-premium-accent);
+}
+
+/* Transport has clear 48/56px targets rather than a row of tiny glyphs. */
+[data-music-dock][data-music-premium]:not([data-music-dock-tab]) .music-dock-icon {
+  inline-size: 48px;
+  block-size: 48px;
+  border-radius: 12px;
+  color: var(--music-premium-muted);
+}
+[data-music-dock][data-music-premium] .music-dock-icon:hover,
+[data-music-dock][data-music-premium] .music-dock-icon:focus-visible {
+  background: var(--music-premium-raised);
+  color: var(--music-premium-text);
+}
+[data-music-dock][data-music-premium] .music-dock-icon-on,
+[data-music-dock][data-music-premium] .music-dock-icon[aria-pressed="true"] {
+  color: var(--music-premium-accent);
+}
+[data-music-dock][data-music-premium] .music-dock-play,
+[data-music-dock][data-music-premium][data-art-colors] .music-dock-play {
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: 15px;
+  background: var(--music-premium-accent);
+  color: var(--music-premium-accent-ink);
+}
+[data-music-dock][data-music-premium] .music-dock-play:hover:not(:disabled) {
+  background: #a5c8ff;
+}
+[data-music-dock][data-music-premium] .music-dock-play:focus-visible {
+  outline: 2px solid var(--music-premium-text);
+  outline-offset: 3px;
+}
+
+/* Artwork and metadata use more of the newly reserved 88px dock height. */
+[data-music-dock][data-music-premium]:not([data-music-dock-tab]) [data-music-dock-art] {
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: 11px;
+  border: 1px solid var(--music-premium-line);
+}
+[data-music-dock][data-music-premium] .music-dock-track {
+  gap: 15px;
+}
+[data-music-dock][data-music-premium] .music-dock-track button[title] {
+  color: var(--music-premium-text);
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+[data-music-dock][data-music-premium] .music-dock-track a {
+  color: var(--music-premium-muted);
+  font-size: 12px;
+}
+
+/* Always-visible, readable timeline; its real range input stays intact. */
+[data-music-dock][data-music-premium] .music-dock-seek-track {
+  block-size: 5px;
+  border-radius: 0;
+  background: var(--music-premium-line);
+}
+[data-music-dock][data-music-premium] .music-dock-seek-fill,
+[data-music-dock][data-music-premium][data-art-colors] .music-dock-seek-fill {
+  border-radius: 0;
+  background: var(--music-premium-accent);
+}
+[data-music-dock][data-music-premium] .music-dock-seek-thumb {
+  background: var(--music-premium-accent);
+  box-shadow: 0 0 0 2px var(--music-premium-base);
+}
+[data-music-dock][data-music-premium] .music-dock-vol-fill {
+  background: var(--music-premium-accent);
+}
+[data-music-dock][data-music-premium] .music-dock-vol-rail {
+  background: var(--music-premium-line);
+}
+
+/* Collapsed mini-player preserves usability without occupying half the screen. */
+[data-music-dock-tab][data-music-premium] .music-dock-tab,
+[data-music-dock-tab][data-music-premium][data-art-colors] .music-dock-tab {
+  background: var(--music-premium-surface);
+  border: 1px solid var(--music-premium-line);
+  border-block-end: 0;
+  box-shadow: 0 -7px 20px rgb(0 0 0 / 0.2);
+  color: var(--music-premium-text);
+}
+[data-music-dock-tab][data-music-premium] .music-dock-tab-title {
+  color: var(--music-premium-text);
+  font-weight: 750;
+}
+[data-music-dock-tab][data-music-premium] .music-dock-tab-artist {
+  color: var(--music-premium-muted);
+}
+[data-music-dock-tab][data-music-premium] .music-dock-tab-line > span {
+  background: var(--music-premium-accent);
+}
+[data-music-dock-tab][data-music-premium] .music-dock-tab-play {
+  background: var(--music-premium-accent);
+  color: var(--music-premium-accent-ink);
+}
+
+/* The expanded view is a dedicated listening space, not a fullscreen hero banner. */
+.music-now-playing[data-music-premium],
+[data-art-colors] .music-now-playing[data-music-premium] {
+  --music-now-edge: clamp(22px, 4vw, 78px);
+  --music-now-ring: 5px;
+  --color-canvas: var(--music-premium-base);
+  --color-surface: var(--music-premium-surface);
+  --color-elevated: var(--music-premium-surface);
+  --color-raised: var(--music-premium-raised);
+  --color-ink: var(--music-premium-text);
+  --color-ink-muted: var(--music-premium-muted);
+  --color-ink-subtle: #82879e;
+  --color-edge-soft: var(--music-premium-line);
+  --color-accent: var(--music-premium-accent);
+  padding-block-start: clamp(48px, 6vh, 86px);
+  background: var(--music-premium-base);
+}
+.music-now-playing[data-music-premium] .music-now-header {
+  max-width: 1360px;
+  margin-block-end: 36px;
+}
+.music-now-playing[data-music-premium] .music-now-back {
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--music-premium-text);
+}
+.music-now-playing[data-music-premium] .music-now-back svg {
+  opacity: 1;
+  transform: none;
+  width: 20px;
+  margin-inline-end: 8px;
+  animation: none;
+}
+.music-now-playing[data-music-premium] .music-now-options button {
+  min-height: 44px;
+  border: 1px solid var(--music-premium-line);
+  border-radius: 10px;
+  color: var(--music-premium-muted);
+}
+.music-now-playing[data-music-premium] .music-now-options button:hover {
+  background: var(--music-premium-raised);
+  color: var(--music-premium-text);
+}
+.music-now-playing[data-music-premium] .music-now-layout,
+.music-now-playing[data-music-premium] .music-now-footer {
+  max-width: 1280px;
+  gap: clamp(34px, 5vw, 92px);
+}
+.music-now-playing[data-music-premium] .music-now-art-column {
+  max-width: 560px;
+}
+.music-now-playing[data-music-premium] .music-now-artwork {
+  background: var(--music-premium-surface);
+  border: 1px solid var(--music-premium-line);
+  border-radius: 18px;
+}
+.music-now-playing[data-music-premium] .music-now-source {
+  display: inline-flex;
+  min-height: 38px;
+  gap: 10px;
+  padding-inline: 12px;
+  margin-block-end: 22px;
+  border: 1px solid var(--music-premium-line);
+  border-radius: 10px;
+  color: var(--music-premium-accent);
+  font-weight: 700;
+}
+.music-now-playing[data-music-premium] .music-now-content h1 {
+  font-size: clamp(34px, 4.3vw, 68px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+.music-now-playing[data-music-premium] .music-now-artist {
+  font-size: clamp(18px, 1.65vw, 25px);
+  color: var(--music-premium-muted);
+}
+.music-now-playing[data-music-premium] .music-now-actions {
+  gap: 8px;
+  margin-block: 26px 32px;
+}
+.music-now-playing[data-music-premium] .music-now-action {
+  inline-size: 50px;
+  block-size: 50px;
+  border: 1px solid var(--music-premium-line);
+  border-radius: 12px;
+  color: var(--music-premium-muted);
+}
+.music-now-playing[data-music-premium] .music-now-action:hover,
+.music-now-playing[data-music-premium] .music-now-action[aria-pressed="true"] {
+  background: var(--music-premium-raised);
+  color: var(--music-premium-accent);
+}
+.music-now-playing[data-music-premium] .music-now-tabs {
+  gap: 6px;
+  border-block-end: 1px solid var(--music-premium-line);
+}
+.music-now-playing[data-music-premium] .music-now-tabs [role="tab"] {
+  min-height: 48px;
+  padding-inline: 15px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--music-premium-muted);
+}
+.music-now-playing[data-music-premium] .music-now-tabs [aria-selected="true"] {
+  color: var(--music-premium-accent);
+  border-block-end-color: var(--music-premium-accent);
+}
+.music-now-playing[data-music-premium] .music-now-panel {
+  padding-block-start: 14px;
+}
+
+/* Responsive layouts keep existing queue, cast and title interactions reachable. */
+@container (max-width: 900px) {
+  .music-now-playing[data-music-premium] .music-now-layout,
+  .music-now-playing[data-music-premium] .music-now-footer {
+    gap: 26px;
+  }
+}
+@container (max-width: 700px) {
+  [data-music-dock][data-music-premium]:not([data-music-dock-tab]) .music-dock-icon {
+    inline-size: 42px;
+    block-size: 42px;
+  }
+  [data-music-dock][data-music-premium]:not([data-music-dock-tab]) .music-dock-play {
+    inline-size: 48px;
+    block-size: 48px;
+  }
+  [data-music-dock][data-music-premium]:not([data-music-dock-tab]) [data-music-dock-art] {
+    inline-size: 44px;
+    block-size: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-music-premium] .music-dock-play,
+  [data-music-premium] .music-dock-icon {
+    transition: none;
+  }
+}
