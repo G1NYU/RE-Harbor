@@ -1,4 +1,4 @@
-type SoundTheme = "none" | "glass" | "modern" | "retro" | "cinematic";
+type SoundTheme = "none" | "glass" | "modern" | "retro" | "cinematic" | "void";
 
 class SoundEffects {
   private ctx: AudioContext | null = null;
@@ -90,6 +90,10 @@ class SoundEffects {
   navigate(dir: "up" | "down" | "left" | "right", soundType: "light" | "movie" = "light") {
     if (this.activeTheme === "none") return;
     const up = dir === "up" || dir === "left";
+    if (this.activeTheme === "void") {
+      this.playTone(up ? 360 : 410, "sine", 0.035, soundType === "light" ? 0.009 : 0.012);
+      return;
+    }
     if (this.activeTheme === "modern") {
       if (soundType === "light") this.playTone(420, "sine", 0.03, 0.03);
       else this.playTone(310, "sine", 0.04, 0.045);
@@ -112,7 +116,10 @@ class SoundEffects {
 
   open() {
     if (this.activeTheme === "none") return;
-    if (this.activeTheme === "glass") this.playGlass({ freq: 720, dur: 0.5, vol: 0.04, modRatio: 3 });
+    if (this.activeTheme === "void") {
+      this.playTone(392, "sine", 0.11, 0.018);
+      this.playTone(523.25, "sine", 0.14, 0.012);
+    } else if (this.activeTheme === "glass") this.playGlass({ freq: 720, dur: 0.5, vol: 0.04, modRatio: 3 });
     else if (this.activeTheme === "modern") {
       this.playTone(523.25, "sine", 0.3, 0.03);
       this.playTone(659.25, "sine", 0.3, 0.025);
@@ -200,7 +207,8 @@ class SoundEffects {
 
   close() {
     if (this.activeTheme === "none") return;
-    if (this.activeTheme === "glass") this.playGlass({ freq: 560, dur: 0.3, vol: 0.03 });
+    if (this.activeTheme === "void") this.playTone(300, "sine", 0.09, 0.013);
+    else if (this.activeTheme === "glass") this.playGlass({ freq: 560, dur: 0.3, vol: 0.03 });
     else if (this.activeTheme === "modern") {
       this.playTone(392.0, "sine", 0.22, 0.03);
       this.playTone(329.63, "sine", 0.22, 0.02);
@@ -215,6 +223,7 @@ class SoundEffects {
 
   hover() {
     if (this.activeTheme === "none") return;
+    if (this.activeTheme === "void") return; // Keep hover silent in the low-distraction interface.
     if (this.activeTheme === "glass") this.playGlass({ freq: 2200, dur: 0.05, vol: 0.015 });
     else if (this.activeTheme === "modern") this.playTone(1200, "sine", 0.015, 0.01);
     else if (this.activeTheme === "retro") {
@@ -228,7 +237,8 @@ class SoundEffects {
 
   click() {
     if (this.activeTheme === "none") return;
-    if (this.activeTheme === "glass") this.playGlass({ freq: 1500, dur: 0.08, vol: 0.04 });
+    if (this.activeTheme === "void") this.playTone(480, "sine", 0.032, 0.014);
+    else if (this.activeTheme === "glass") this.playGlass({ freq: 1500, dur: 0.08, vol: 0.04 });
     else if (this.activeTheme === "modern") this.playTone(400, "sine", 0.05, 0.035);
     else if (this.activeTheme === "retro") {
       this.playTone(520, "square", 0.022, 0.007);
@@ -244,7 +254,9 @@ class SoundEffects {
   volumeChange(isUp: boolean) {
     if (this.activeTheme === "none") return;
 
-    if (this.activeTheme === "glass") {
+    if (this.activeTheme === "void") {
+      this.playTone(isUp ? 470 : 370, "sine", 0.03, 0.009);
+    } else if (this.activeTheme === "glass") {
       this.playGlass({ freq: isUp ? 1750 : 1250, dur: 0.05, vol: 0.012 });
     } else if (this.activeTheme === "modern") {
       this.playTone(isUp ? 620 : 420, "sine", 0.04, 0.02);
