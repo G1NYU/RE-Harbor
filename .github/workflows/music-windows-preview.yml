@@ -1,8 +1,8 @@
-name: VOID Native Windows Preview
+name: VOID + Refract Windows Preview
 
 on:
   push:
-    branches: [feature/void-native-rebuild-n]
+    branches: [feature/void-refract-preview]
     paths:
       - ".github/workflows/music-windows-preview.yml"
       - "src/**"
@@ -31,7 +31,7 @@ jobs:
       HARBOR_CAPSTAN_OPTIONAL: "1"
       HARBOR_POKEMON_OPTIONAL: "1"
     steps:
-      - name: Checkout VOID Native branch
+      - name: Checkout VOID/Refract preview branch
         uses: actions/checkout@v6
 
       - name: Set up Rust
@@ -65,7 +65,7 @@ jobs:
           pnpm run setup
           if ($LASTEXITCODE -ne 0) { throw "Setup failed" }
 
-      - name: Build isolated VOID Native preview
+      - name: Build isolated VOID/Refract preview
         shell: pwsh
         run: |
           pnpm tauri build --no-bundle --config src-tauri/tauri.music-preview.conf.json
@@ -89,13 +89,13 @@ jobs:
           if (-not (Test-Path -LiteralPath music-preview/harbor.exe)) { throw "Missing portable Harbor executable" }
           Remove-Item -LiteralPath music-preview/uninstall.exe -Force -ErrorAction SilentlyContinue
           @'
-          HARBOR VOID NATIVE PREVIEW (Windows x64)
+          VOID + REFRACT PREVIEW (Windows x64)
           ==================================
-          This is a portable test build from feature/void-native-rebuild-n, not a normal Harbor installer.
+          This is a portable test build from feature/void-refract-preview, not a normal Harbor installer.
 
           1. Extract this artifact to a new folder.
           2. Run harbor.exe from that folder.
-          3. Test VOID styling across Movies, Shows, Anime, Manga, Books, Games and Music.
+          3. Test Music backdrop and artwork, Movies, stream selector and Settings → Trackers → Refract.
           4. Do not use this preview as your everyday Harbor installation.
 
           The preview uses its own Tauri application identifier, app.harbor.voidnativepreview.
@@ -108,7 +108,7 @@ jobs:
       - name: Upload portable Windows preview
         uses: actions/upload-artifact@v4
         with:
-          name: harbor-void-native-windows-x64
+          name: harbor-void-refract-windows-x64
           path: music-preview/
           if-no-files-found: error
           retention-days: 7
