@@ -70,7 +70,12 @@ export function MusicListeningHome({
 
   return (
     <div className="music-room-home" data-music-premium>
-      <section className="music-room-feature" aria-label={t("music.home.title")}>
+      <section className="music-room-feature" aria-label={t("music.home.title")} data-has-art={subject?.artwork ? "1" : undefined}>
+        {subject?.artwork && (
+          <div className="music-room-backdrop" aria-hidden="true">
+            <img key={subjectKey} src={subject.artwork} alt="" decoding="async" draggable={false} />
+          </div>
+        )}
         <div className="music-room-feature-content">
           <span className="music-room-eyebrow">
             {subject ? t("music.hero.resumeKicker") : t("music.home.discover")}
