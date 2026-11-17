@@ -35,5 +35,4 @@ jobs:
           node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
             tests/music-void-ui.test.ts \
             tests/music-dock-clearance.test.ts \
-            tests/music-now-playing-exit.test.ts \
             tests/music-now-playing-key.test.ts

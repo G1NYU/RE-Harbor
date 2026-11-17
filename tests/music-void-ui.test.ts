@@ -39,3 +39,16 @@ test("phase two does not introduce expensive visual effects or external assets",
   assert.doesNotMatch(css, /url\s*\(/);
   assert.match(css, /prefers-reduced-motion/);
 });
+
+test("home replaces random rotating hero with stable personal music", () => {
+  const view = readFileSync("src/views/music.tsx", "utf8");
+  const home = readFileSync("src/views/music/music-listening-home.tsx", "utf8");
+  assert.match(view, /<MusicListeningHome/);
+  assert.doesNotMatch(view, /<MusicHomeHero/);
+  assert.match(home, /useMusicNowPlaying\(\)/);
+  assert.doesNotMatch(home, /useMusicPlayer\(\)/);
+  assert.doesNotMatch(home, /\bsetTimeout\s*\(/);
+  assert.doesNotMatch(home, /<MusicHeroMedia/);
+  assert.match(home, /recent\.filter/);
+  assert.match(home, /openSourcePicker/);
+});

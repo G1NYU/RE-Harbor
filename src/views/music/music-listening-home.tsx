@@ -10,7 +10,8 @@ import {
 } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";
-import { toggleMusicPlayback, useMusicPlayer } from "@/lib/music/player";
+import { getMusicState, toggleMusicPlayback } from "@/lib/music/player";
+import { useMusicNowPlaying } from "@/lib/music/use-now-playing";
 import { useMusicSourcePicker } from "@/components/music/music-source-picker";
 import type { MusicCatalogItem, MusicCatalogRow, MusicTrack } from "@/lib/music/types";
 import "./music-listening-home.css";
@@ -39,7 +40,8 @@ export function MusicListeningHome({
   onTastes: () => void;
 }) {
   const t = useT();
-  const player = useMusicPlayer();
+  const now = useMusicNowPlaying();
+  const activeTrack = getMusicState().current;
   const { openSourcePicker } = useMusicSourcePicker();
 
   // A deterministic personal selection: never rotate or autoplay a provider's
@@ -53,13 +55,13 @@ export function MusicListeningHome({
       return true;
     }).slice(0, 5);
   }, [recent]);
-  const subject = player.current ?? recents[0];
+  const subject = activeTrack ?? recents[0];
   const subjectKey = subject ? trackKey(subject) : "";
-  const isCurrent = subjectKey !== "" && !!player.current && subjectKey === trackKey(player.current);
-  const playing = isCurrent && player.phase === "playing";
+  const isCurrent = subjectKey !== "" && !!activeTrack && subjectKey === trackKey(activeTrack);
+  const playing = isCurrent && now.phase === "playing";
 
   const play = (track: MusicTrack) => {
-    if (player.current && trackKey(player.current) === trackKey(track)) {
+    if (activeTrack && trackKey(activeTrack) === trackKey(track)) {
       toggleMusicPlayback();
       return;
     }

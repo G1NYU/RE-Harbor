@@ -20,3 +20,12 @@ This is a **code prototype**, not a visually reviewed screenshot. It is isolated
 Inspect this build on Windows at regular and narrow window widths, including RTL and
 keyboard-only navigation. Then replace the existing music landing experience with a
 dedicated shelf/navigation system using already available music catalog data.
+
+## Hub refresh, first pass
+
+The For You default no longer mounts the animated, provider-selected editorial hero.
+It opens a personal Listening Room featuring the current or last listened recording,
+large stable artwork, direct library/provider/settings navigation, and recent tracks.
+It does not start automatic video previews or rotate a random track. Uses
+`useMusicNowPlaying` for playback identity and phase to avoid re-rendering
+its artwork on every progress tick.
