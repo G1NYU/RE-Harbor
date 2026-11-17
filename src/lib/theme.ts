@@ -57,7 +57,8 @@ export type FontPairId =
   | "cabinet-switzer"
   | "plex"
   | "plus-jakarta"
-  | "system";
+  | "system"
+  | "void-native";
 
 export type ThemeBackground = {
   image: string;
@@ -124,24 +125,28 @@ export type FontPair = {
 export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   "cool-grey": {
     id: "cool-grey",
-    name: "Harbor default",
-    blurb: "What ships out of the box.",
+    name: "VOID Native",
+    blurb: "Built-in VOID Lite Rebuild N. Flat graphite, cinematic artwork, no theme injection.",
     previewImage: harborPreview,
-    swatch: ["#2c2e36", "#3a3d47", "#dcdde4"],
+    swatch: ["#11111b", "#181825", "#6c7086"],
     tokens: {
-      "--color-canvas": "oklch(0.18 0.004 260)",
-      "--color-surface": "oklch(0.22 0.004 260)",
-      "--color-elevated": "oklch(0.27 0.004 260)",
-      "--color-raised": "oklch(0.32 0.004 260)",
-      "--color-ink": "oklch(0.97 0.003 260)",
-      "--color-ink-muted": "oklch(0.72 0.003 260)",
-      "--color-ink-subtle": "oklch(0.50 0.003 260)",
-      "--color-edge": "oklch(0.36 0.004 260 / 0.55)",
-      "--color-edge-soft": "oklch(0.36 0.004 260 / 0.25)",
-      "--color-accent": "oklch(0.78 0.13 60)",
-      "--color-accent-soft": "oklch(0.78 0.13 60 / 0.18)",
-      "--color-danger": "oklch(0.55 0.18 25)",
+      "--color-canvas": "#11111b",
+      "--color-surface": "#181825",
+      "--color-elevated": "#181825",
+      "--color-raised": "#1e1e2e",
+      "--color-ink": "#cdd6f4",
+      "--color-ink-muted": "#a6adc8",
+      "--color-ink-subtle": "#6c7086",
+      "--color-edge": "#313244",
+      "--color-edge-soft": "#1e1e2e",
+      "--color-accent": "#6c7086",
+      "--color-accent-soft": "#6c708620",
+      "--color-danger": "#b77677",
     },
+    fontPair: "void-native",
+    layout: "sidebar",
+    cardStyle: "flat",
+    buttonStyle: "flat",
   },
   nord: {
     id: "nord",
@@ -1826,6 +1831,13 @@ export const TEMPLATE_THEMES: ThemePreset[] = [
 ];
 
 export const FONT_PAIRS: Record<FontPairId, FontPair> = {
+  "void-native": {
+    id: "void-native",
+    name: "VOID Native",
+    blurb: "Rebuild N's sharp, heavyweight Helvetica-style UI.",
+    display: '"Arial", "Helvetica Neue", "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif',
+    sans: '"Arial", "Helvetica Neue", "Segoe UI Variable", "Segoe UI", Tahoma, system-ui, sans-serif',
+  },
   "sentient-switzer": {
     id: "sentient-switzer",
     name: "Sentient + Switzer",
@@ -1916,7 +1928,7 @@ export const DEFAULT_THEME: ThemeSettings = {
   preset: "cool-grey",
   backgroundImage: null,
   backgroundDim: 0.65,
-  fontPair: "sentient-switzer",
+  fontPair: "void-native",
   customColors: null,
 };
 
@@ -2008,6 +2020,7 @@ export function applyTheme(theme: ThemeSettings): void {
     root.style.setProperty(k, v);
   }
   root.dataset.themeMode = isLightColor(tokens["--color-canvas"]) ? "light" : "dark";
+  root.dataset.voidNative = theme.preset === "cool-grey" ? "1" : "0";
   // light-dark() is how album-art colours pick a readable lightness. Without a real
   // color-scheme it always resolves dark, so light themes got an invisible tint.
   root.style.colorScheme = root.dataset.themeMode;
