@@ -1184,6 +1184,7 @@ function MusicViewContent({ active }: { active: boolean }) {
       <main
         ref={scrollCb}
         data-music-view
+        data-music-tab={tab}
         data-music-opening={openingDetail === resolveGeneration.current || undefined}
         aria-busy={openingDetail === resolveGeneration.current || undefined}
         // A WS_CHILD webview is not clipped by a scrolling ancestor, so while YouTube Music is
