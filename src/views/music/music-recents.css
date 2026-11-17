@@ -12,8 +12,8 @@
 
 [data-music-view] .music-quick-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
   align-items: stretch;
   min-width: 0;
 }
@@ -22,13 +22,13 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
   min-width: 0;
-  min-height: 76px;
+  min-height: 132px;
   overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-edge-soft);
-  border-radius: 12px;
+  border-radius: 14px;
   text-align: start;
   transition: background-color 140ms ease, border-color 140ms ease;
 }
@@ -41,11 +41,11 @@
 [data-music-view] .music-quick-art {
   display: grid;
   place-items: center;
-  width: 76px;
-  height: 76px;
-  min-width: 76px;
+  width: 132px;
+  height: 132px;
+  min-width: 132px;
   overflow: hidden;
-  flex: 0 0 76px;
+  flex: 0 0 132px;
   background: var(--color-raised);
   color: var(--color-ink-muted);
 }
@@ -63,8 +63,8 @@
   flex: 1;
   flex-direction: column;
   justify-content: center;
-  gap: 3px;
-  padding: 10px 10px 10px 0;
+  gap: 7px;
+  padding: 18px 18px 18px 0;
 }
 
 [data-music-view] .music-quick-copy > button {
@@ -80,9 +80,9 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   color: var(--color-ink);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 740;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 [data-music-view] .music-quick-copy .music-quick-artist {
@@ -91,8 +91,8 @@
   max-width: 100%;
   overflow: hidden;
   color: var(--color-ink-muted);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 13.5px;
+  line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -100,10 +100,10 @@
 [data-music-view] .music-quick-indicators {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
-  min-height: 17px;
-  margin-top: 3px;
+  min-height: 19px;
+  margin-top: 5px;
   overflow: hidden;
   color: var(--color-ink-subtle);
 }
@@ -140,22 +140,21 @@
   color: var(--color-ink);
 }
 
-@media (max-width: 1240px) {
+@media (max-width: 820px) {
   [data-music-view] .music-quick-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 920px) {
-  [data-music-view] .music-quick-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 560px) {
-  [data-music-view] .music-quick-grid {
-    grid-template-columns: minmax(0, 1fr);
+  [data-music-view] .music-quick-item { min-height: 110px; gap: 14px; }
+  [data-music-view] .music-quick-art {
+    width: 110px;
+    height: 110px;
+    min-width: 110px;
+    flex-basis: 110px;
   }
+  [data-music-view] .music-quick-copy { padding: 12px 12px 12px 0; }
 }
 
 @media (hover: none) {
