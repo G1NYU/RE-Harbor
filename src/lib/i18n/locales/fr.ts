@@ -407,6 +407,76 @@ const fr: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  "Refract sync":
+    "Synchronisation Refract",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "Synchronisez l’historique de visionnage et les modifications de la liste à regarder Harbor avec Refract.",
+  "Refract personal API key":
+    "Clé API personnelle Refract",
+  "Verifying...":
+    "Vérification…",
+  "Connect Refract":
+    "Connecter Refract",
+  "Refract key saved in Harbor's secret store":
+    "Clé Refract enregistrée dans le coffre sécurisé de Harbor",
+  "Sync watched history and watchlist":
+    "Synchroniser l’historique et la liste à regarder",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Envoyer l’historique et les modifications de la liste à regarder de Harbor vers Refract. Seul le profil principal de Harbor est synchronisé.",
+  "Retry pending watches":
+    "Réessayer les visionnages en attente",
+  "Disconnect Refract":
+    "Déconnecter Refract",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Connecté à Refract ({identity}). La synchronisation de l’historique est activée.",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Impossible de vérifier la clé via Refract /v1/me. Vérifiez les autorisations et la connexion.",
+  "Disconnected from Refract.":
+    "Déconnecté de Refract.",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Créez une clé API personnelle dans Refract avec profile:read, library:read, library:write et history:write. Ne partagez ni ne publiez jamais cette clé.",
+  "Automatic watch threshold":
+    "Seuil de visionnage automatique",
+  "After {count} minutes":
+    "Après {count} minutes",
+  "{count}% (default)":
+    "{count} % (par défaut)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "Enregistrer un film ou un épisode dans Refract lorsque la lecture atteint la durée ou le pourcentage choisi. Avancer au-delà du seuil compte aussi. Un enregistrement anticipé marque le contenu comme vu, et non partiellement vu. Le seuil de fin de Harbor reste inchangé.",
+  "Harbor → Refract Plan to Watch":
+    "Harbor → Refract : à regarder",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "Les ajouts et retraits de la liste à regarder sont transmis automatiquement lorsque la synchronisation est activée. Nécessite library:write ; reconnectez-vous avec une clé mise à jour si nécessaire. L’historique Refract et les autres statuts sont conservés.",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "{sent} envoyés · {pending} en attente · {failed} sans correspondance",
+  "Unmatched items":
+    "Éléments sans correspondance",
+  "Refract queue full; unable to save another watch":
+    "File d’attente Refract pleine ; impossible d’enregistrer un autre visionnage",
+  "No verified IMDb/TMDB/TVDB identity": "Aucun identifiant IMDb/TMDB/TVDB vérifié",
+  "Movie not found in Refract": "Film introuvable dans Refract",
+  "Episode not found; verify season numbering":
+    "Épisode introuvable ; vérifiez la numérotation des saisons",
+  "Last watched item sent successfully": "Dernier visionnage envoyé avec succès",
+  "Unknown error": "Erreur inconnue",
+  "Some items could not be matched or sent":
+    "Impossible de faire correspondre ou d’envoyer certains éléments",
+  "Refract denied access; check key and permissions":
+    "Accès refusé par Refract ; vérifiez la clé et les autorisations",
+  "Network error; retry scheduled": "Erreur réseau ; nouvelle tentative programmée",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "Aucun identifiant IMDb/TMDB/TVDB vérifié pour ce titre.",
+  "Refract could not uniquely identify this title.":
+    "Refract n’a pas pu identifier ce titre de manière univoque.",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract a conservé une entrée existante de la bibliothèque ou de l’historique de visionnage.",
+  "Added to Refract Plan to Watch.": "Ajouté à la liste À regarder de Refract.",
+  "Removed from Refract Plan to Watch.": "Retiré de la liste À regarder de Refract.",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "La liste à regarder de Refract nécessite library:write. Reconnectez-vous avec une clé disposant de cette autorisation.",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract n’a pas pu confirmer la modification de la liste. Réessayez.",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default fr;
