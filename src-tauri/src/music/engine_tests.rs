@@ -412,3 +412,29 @@ fn listened_time_ignores_seek_jumps() {
     assert_eq!(listened_increment(Some(10.0), 120.0), 0.0);
     assert_eq!(listened_increment(Some(10.0), 9.0), 0.0);
 }
+
+#[test]
+fn network_audio_cache_has_bounded_lookahead_and_rebuffer_threshold() {
+    let mpv = super::core_setup::create_core("Harbor cache fixture").expect("isolated mpv");
+    super::core_setup::apply_network_cache(&mpv, "https://example.test/music.flac");
+    assert_eq!(mpv.get_property::<f64>("options/cache-secs").unwrap(), 90.0);
+    assert_eq!(
+        mpv.get_property::<f64>("options/cache-pause-wait").unwrap(),
+        2.0
+    );
+    assert_eq!(
+        mpv.get_property::<i64>("options/demuxer-max-bytes").unwrap(),
+        24 * 1024 * 1024
+    );
+    assert_eq!(
+        mpv.get_property::<i64>("options/demuxer-max-back-bytes").unwrap(),
+        8 * 1024 * 1024
+    );
+    let local = super::core_setup::create_core("Harbor local fixture").expect("isolated mpv");
+    super::core_setup::apply_network_cache(&local, "/music/local.flac");
+    assert_eq!(local.get_property::<f64>("options/cache-secs").unwrap(), 30.0);
+    assert_eq!(
+        local.get_property::<f64>("options/cache-pause-wait").unwrap(),
+        1.0
+    );
+}

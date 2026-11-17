@@ -37,13 +37,25 @@ pub(super) fn probe_core() -> Result<Mpv, String> {
     .map_err(|error| format!("Music output detection: {error}"))
 }
 
-pub(super) fn apply_network_cache(mpv: &Mpv) {
+pub(super) fn apply_network_cache(mpv: &Mpv, url: &str) {
+    // Keep the existing local-file behavior. Only HTTP(S) audio needs the larger
+    // lookahead and rebuffer threshold; do not increase memory use for local files.
+    let remote = url
+        .split_once("://")
+        .is_some_and(|(scheme, _)| {
+            scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
+        });
     let _ = mpv.set_property("cache", "yes");
-    let _ = mpv.set_property("cache-secs", "30");
+    let _ = mpv.set_property("cache-secs", if remote { "90" } else { "30" });
     let _ = mpv.set_property("cache-pause", "yes");
-    // mpv waits three seconds of cache before starting a stream by default. A music stream
-    // fills that window almost instantly, so the default only delays the first note.
-    let _ = mpv.set_property("cache-pause-wait", "1");
+    let _ = mpv.set_property("cache-pause-wait", if remote { "2" } else { "1" });
+    if remote {
+        // Limit per-deck packet memory, including the backward seek buffer.
+        let _ = mpv.set_property("demuxer-max-bytes", "24MiB");
+        let _ = mpv.set_property("demuxer-max-back-bytes", "8MiB");
+        // Do not add a mandatory startup delay to fast connections.
+        let _ = mpv.set_property("cache-pause-initial", "no");
+    }
     let _ = mpv.set_property("network-timeout", "30");
 }
 
