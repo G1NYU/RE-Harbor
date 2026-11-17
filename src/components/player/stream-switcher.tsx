@@ -336,6 +336,7 @@ export function StreamSwitcher({
         className="flex h-full max-h-[82vh] w-full max-w-[880px] flex-col overflow-hidden rounded-xl bg-elevated shadow-[0_28px_72px_-20px_rgba(0,0,0,0.85)] ring-1 ring-edge animate-in fade-in slide-in-from-bottom-2 duration-150">
         <header className="flex items-center justify-between gap-4 border-b border-edge-soft px-6 py-4">
           <div className="flex items-center gap-2.5">
+            <span data-void-stream-brand aria-hidden="true">VOID <small>STREAMS</small></span>
             <HoverTooltip
               label={t("Refresh sources")}
               side="bottom"
