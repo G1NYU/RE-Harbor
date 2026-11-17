@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from "react";
+import { useMemo, type MouseEvent, type ReactNode } from "react";
 import { LoaderCircle, Play, Radio } from "@/components/icons/music-icons";
 import { MusicPlaylistCover } from "@/components/music/music-playlist-cover";
 import { Poster } from "@/components/poster";
@@ -11,6 +11,7 @@ import type { AlbumExplicitMark } from "@/lib/music/album-explicit";
 import type { MusicCatalogItem } from "@/lib/music/types";
 import "./music-cover-card.css";
 import { useTrackPlaybackState } from "@/lib/music/use-track-playback-state";
+import { catalogCoverArt } from "@/lib/music/cover-art-url";
 import { MusicNowPlayingMark } from "./music-now-playing-mark";
 
 export type MusicCardBadge =
@@ -151,6 +152,7 @@ export function MusicCoverCard({
   const loading = playing || status.loading;
   const caption = subtitle ?? coverCardSubtitle(item);
   const seed = coverCardSeed(item);
+  const artwork = useMemo(() => catalogCoverArt(item.id, item.artwork), [item.id, item.artwork]);
   const chip = badge === undefined ? autoBadge(item) : badge;
   const activate = onOpen ?? onPlay;
   const playLabel = item.kind === "track"
@@ -175,7 +177,10 @@ export function MusicCoverCard({
               <MusicPlaylistCover artwork={item.artwork} seed={seed} className="rounded-md" />
             ) : (
               <Poster
-                src={item.artwork}
+                src={artwork.src}
+                fallbacks={artwork.fallbacks}
+                retryOnError={!artwork.stableMissing}
+                fallbackColor={artwork.stableMissing ? "#181825" : undefined}
                 seed={seed}
                 ratio="square"
                 className="w-full [--poster-radius:0px]"
