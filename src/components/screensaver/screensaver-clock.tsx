@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
+import { useSettings } from "@/lib/settings";
 
 export function useScreensaverClock(): { time: string; date: string } {
   const [now, setNow] = useState(() => new Date());
@@ -18,12 +19,22 @@ export function useScreensaverClock(): { time: string; date: string } {
 }
 
 export function ScreensaverBrand() {
+  const { settings } = useSettings();
+  const voidNative = settings.theme.preset === "cool-grey";
   return (
     <div className="flex items-center gap-2">
-      <HarborMark className="h-7 w-7 shrink-0 text-white/85 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]" />
-      <span className="font-display text-[26px] font-semibold tracking-tight text-white/85 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]">
-        Harbor
-      </span>
+      {voidNative ? (
+        <span data-void-screensaver-brand className="font-display text-[28px] font-extrabold tracking-[0.2em] text-[#cdd6f4]">
+          VOID
+        </span>
+      ) : (
+        <>
+          <HarborMark className="h-7 w-7 shrink-0 text-white/85 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]" />
+          <span className="font-display text-[26px] font-semibold tracking-tight text-white/85 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]">
+            Harbor
+          </span>
+        </>
+      )}
     </div>
   );
 }
