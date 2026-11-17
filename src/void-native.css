@@ -29,13 +29,13 @@ html[data-void-native="1"] ::selection {
 }
 
 /* React renders the wordmark; only the sidebar's existing structure is styled. */
-html[data-void-native="1"] aside[data-harbor-sidebar] {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] {
   background: var(--void-rail);
   border-inline-end-color: transparent;
   box-shadow: none;
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar] [data-harbor-sidebar-brand] {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] [data-harbor-sidebar-brand] {
   border-block-end: 0;
   gap: 0;
 }
@@ -56,7 +56,7 @@ html[data-void-native="1"] [data-void-native-mark] {
   font-size: 29px;
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar][data-collapsed="false"] [data-void-native-mark] {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"][data-collapsed="false"] [data-void-native-mark] {
   display: none;
 }
 
@@ -64,7 +64,7 @@ html[data-void-native="1"] [data-void-native-wordmark] {
   font-size: 30px;
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav] {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav] {
   border: 1px solid transparent;
   border-radius: 9px;
   min-height: 48px;
@@ -75,19 +75,19 @@ html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav] {
   transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav]:not([data-active]):hover {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav]:not([data-active]):hover {
   background-color: var(--void-panel);
   color: var(--void-ink);
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav][data-active] {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav][data-active] {
   background: var(--void-raised);
   border-color: var(--void-edge);
   color: var(--void-ink);
   box-shadow: none;
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav][data-active]::before {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav][data-active]::before {
   content: "";
   position: absolute;
   inset-inline-start: 0;
@@ -98,11 +98,11 @@ html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav][da
   pointer-events: none;
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav][data-active] [data-harbor-sidebar-icon] {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav][data-active] [data-harbor-sidebar-icon] {
   color: var(--void-steel-light);
 }
 
-html[data-void-native="1"] aside[data-harbor-sidebar] [data-harbor-sidebar-footer] {
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] [data-harbor-sidebar-footer] {
   background: #0b0b12;
   border-block-start-color: transparent;
 }
@@ -241,7 +241,55 @@ html[data-void-native="1"] :is(button, a, input):focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav] {
+  html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav] {
     transition: none;
   }
 }
+
+
+/* Static icon artwork recovered from VOID Rebuild N, now compiled into Harbor. */
+/* Original VOID artwork preserved as self-contained SVG masks. */
+/* Native Harbor buttons keep their original handlers and accessibility. */
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav] [data-harbor-sidebar-icon] {
+  position:relative;
+  display:inline-grid!important;
+  place-items:center;
+  width:27px;
+  height:27px;
+  flex:0 0 27px;
+  color:var(--void-muted);
+}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav][data-active] [data-harbor-sidebar-icon] {color:var(--void-steel);}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav]:not([data-active]):hover [data-harbor-sidebar-icon] {color:var(--void-steel-light);}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button:is([data-harbor-nav="home"], [data-harbor-nav="discover"], [data-harbor-nav="catalogs"], [data-harbor-nav="movies"], [data-harbor-nav="shows"], [data-harbor-nav="anime"], [data-harbor-nav="manga"], [data-harbor-nav="ebook"], [data-harbor-nav="music"], [data-harbor-nav="games"], [data-harbor-nav="live"], [data-harbor-nav="sports"], [data-harbor-nav="vod"], [data-harbor-nav="kids"], [data-harbor-nav="library"], [data-harbor-nav="collections"], [data-harbor-nav="collections-hub"], [data-harbor-nav="downloads"], [data-harbor-nav="calendar"], [data-harbor-nav="addons"], [data-harbor-nav="plugins"], [data-harbor-nav="settings"]) [data-harbor-sidebar-icon] > :first-child {display:none!important;}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button:is([data-harbor-nav="home"], [data-harbor-nav="discover"], [data-harbor-nav="catalogs"], [data-harbor-nav="movies"], [data-harbor-nav="shows"], [data-harbor-nav="anime"], [data-harbor-nav="manga"], [data-harbor-nav="ebook"], [data-harbor-nav="music"], [data-harbor-nav="games"], [data-harbor-nav="live"], [data-harbor-nav="sports"], [data-harbor-nav="vod"], [data-harbor-nav="kids"], [data-harbor-nav="library"], [data-harbor-nav="collections"], [data-harbor-nav="collections-hub"], [data-harbor-nav="downloads"], [data-harbor-nav="calendar"], [data-harbor-nav="addons"], [data-harbor-nav="plugins"], [data-harbor-nav="settings"]) [data-harbor-sidebar-icon]::before {
+  content:'';
+  display:block;
+  width:23px;
+  height:23px;
+  background:currentColor;
+  -webkit-mask:var(--void-nav-icon) center / contain no-repeat;
+  mask:var(--void-nav-icon) center / contain no-repeat;
+}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="home"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M12%202.6%202.4%2010.8h2.8V21h5.4v-6h2.8v6h5.4V10.8h2.8L12%202.6z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="discover"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M12%202a10%2010%200%20100%2020%2010%2010%200%20000-20zm4.2%205.8-1.9%206.5-6.5%201.9%201.9-6.5%206.5-1.9zM12%2010.7a1.3%201.3%200%20100%202.6%201.3%201.3%200%20000-2.6z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="catalogs"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%228%22%20height%3D%228%22%20rx%3D%222%22%2F%3E%3Crect%20x%3D%2213%22%20y%3D%223%22%20width%3D%228%22%20height%3D%228%22%20rx%3D%222%22%2F%3E%3Crect%20x%3D%223%22%20y%3D%2213%22%20width%3D%228%22%20height%3D%228%22%20rx%3D%222%22%2F%3E%3Crect%20x%3D%2213%22%20y%3D%2213%22%20width%3D%228%22%20height%3D%228%22%20rx%3D%222%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="movies"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5%203h14a2%202%200%20012%202v14a2%202%200%2001-2%202H5a2%202%200%2001-2-2V5a2%202%200%20012-2zm0%202v2h2V5H5zm0%204v2h2V9H5zm0%204v2h2v-2H5zm0%204v2h2v-2H5zM17%205v2h2V5h-2zm0%204v2h2V9h-2zm0%204v2h2v-2h-2zm0%204v2h2v-2h-2zM9%205v6h6V5H9zm0%208v6h6v-6H9z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="shows"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M4%204h16a2%202%200%20012%202v10a2%202%200%2001-2%202h-5l1.4%202.4H7.6L9%2018H4a2%202%200%2001-2-2V6a2%202%200%20012-2zm1%202.5v9h14v-9H5z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="anime"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20stroke%3D%22currentColor%22%20stroke-width%3D%220.16%22%20stroke-linejoin%3D%22round%22%20d%3D%22M12.081%2022.669L10.626%2022.669L8.902%2022.238L7.555%2021.484L6.881%2020.864L6.773%2020.648L6.962%2020.406L7.824%2020.029L8.309%2019.975L8.982%2019.625L7.016%2018.412L6.288%2017.577L5.965%2016.823L4.968%2016.419L4.241%2015.529L3.917%2014.128L4.241%2013.159L3.217%2011.003L3.352%2010.707L3.917%2010.626L3.378%208.686L3.378%206.585L3.594%205.776L3.944%205.318L4.16%205.318L4.348%205.561L4.806%206.665L5.291%206.073L5.507%206.019L5.642%205.184L6.18%203.944L6.665%203.244L7.501%202.516L7.932%202.462L8.12%202.651L8.12%203.028L7.959%203.352L8.632%203.54L9.71%202.732L11.38%201.87L12.889%201.385L14.236%201.277L14.533%201.519L14.398%201.708L13.105%201.816L11.973%202.139L10.788%202.678L9.387%203.54L8.066%204.86L7.285%206.234L7.204%205.992L7.528%204.968L8.12%203.89L7.662%203.863L7.204%204.268L6.8%205.318L6.719%205.022L6.881%204.375L7.447%203.055L6.935%203.567L6.288%204.753L6.073%205.399L6.019%206.369L5.426%206.531L5.426%207.07L5.803%207.986L5.722%208.174L4.968%207.312L4.806%207.635L4.618%207.447L4.052%206.127L3.81%207.016L3.81%208.471L3.971%209.279L4.133%209.494L4.079%209.71L4.51%2010.572L4.995%2011.003L4.914%2011.138L4.591%2011.192L3.836%2011.192L3.81%2011.326L4.779%2013.105L4.402%2013.859L4.86%2013.239L5.695%2014.506L5.318%2014.883L5.318%2015.26L5.615%2015.61L6.127%2015.799L5.749%2013.859L5.749%2012.242L5.911%2011.434L6.665%209.602L6.881%209.548L7.285%208.929L7.393%209.306L7.824%208.551L8.12%2010.572L8.929%2012.35L8.686%2012.377L7.555%2011.892L6.854%2011.892L6.638%2012.0L7.662%2012.216L9.009%2013.024L9.117%2013.293L9.279%2013.185L9.656%2013.347L10.114%2013.751L10.464%2014.317L10.653%2013.913L10.653%2013.536L10.114%2010.949L10.195%2010.707L11.138%2012.081L12.0%2012.835L11.784%2012.997L11.811%2013.401L14.128%2012.216L14.344%2012.216L14.721%2012.701L14.991%2011.892L15.691%2011.838L15.88%2012.081L15.987%2012.62L16.176%2014.586L16.904%2013.105L17.065%2013.105L16.338%2016.634L16.499%2016.311L16.93%2016.311L17.577%2016.041L18.035%2015.476L17.146%2016.203L16.526%2016.176L16.58%2015.745L17.038%2015.61L17.335%2015.26L17.335%2014.991L17.011%2014.56L17.604%2014.075L17.442%2013.913L17.766%2013.32L17.9%2013.185L18.089%2013.32L17.873%2012.835L18.736%2012.566L18.197%2011.973L19.544%2011.111L18.763%2010.815L18.224%2010.437L17.981%2010.087L19.301%209.36L19.813%208.848L18.816%208.875L18.466%208.686L19.194%208.497L19.813%208.147L19.086%207.851L17.793%206.989L16.769%206.504L15.799%206.288L14.667%206.396L14.425%206.315L16.499%205.695L16.823%205.48L12.997%205.372L12.027%205.642L11.542%205.911L11.461%205.776L12.566%204.887L13.886%204.268L13.536%203.917L12.889%203.917L12.189%204.294L11.38%204.995L11.299%204.86L11.677%204.106L12.943%202.57L13.751%202.085L14.075%202.031L14.155%202.166L12.97%203.298L14.021%203.594L14.586%204.106L14.586%204.429L13.913%204.887L17.2%205.049L17.442%205.345L17.011%205.938L17.038%206.073L19.032%207.312L20.217%207.689L20.352%207.824L20.352%208.147L20.729%208.309L20.729%208.578L20.352%209.117L18.897%2010.195L19.409%2010.545L20.056%2010.653L20.244%2011.057L19.84%2011.569L18.951%2012.135L19.221%2012.566L18.87%2012.97L18.466%2013.159L18.736%2013.751L18.789%2014.344L18.628%2015.206L18.305%2015.853L17.631%2016.472L16.823%2016.742L16.149%2017.954L15.583%2018.52L13.724%2019.679L15.583%2020.298L15.88%2020.595L15.88%2020.81L15.098%2021.538L14.075%2022.13L12.081%2022.669ZM12.35%2012.647L12.162%2012.512L11.784%2011.758L11.246%2010.357L10.761%208.74L10.841%208.551L11.731%209.71L13.994%2011.811L13.913%2011.946L12.35%2012.647ZM15.691%2011.784L15.098%2011.731L14.856%2011.542L14.64%2010.303L14.263%209.44L14.344%209.306L15.233%2010.464L15.718%2011.542L15.691%2011.784ZM12.808%2013.536L13.751%2013.024L14.425%2012.943L13.59%2013.024L12.943%2013.347L12.808%2013.536ZM8.605%2016.014L9.144%2015.637L9.414%2014.991L9.467%2014.506L9.548%2014.425L9.764%2014.694L9.898%2014.344L9.494%2013.886L8.686%2013.455L8.363%2013.347L7.716%2013.401L6.935%2013.913L6.827%2014.613L6.908%2014.694L7.016%2014.533L7.123%2014.586L7.15%2014.344L7.393%2014.048L7.932%2014.102L8.174%2014.613L8.066%2015.044L7.77%2015.287L7.555%2015.287L7.231%2015.018L7.204%2015.098L7.581%2015.745L7.878%2015.987L8.605%2016.014ZM14.586%2016.014L14.829%2015.934L15.503%2015.098L15.476%2015.018L15.206%2015.233L14.829%2015.179L14.586%2014.883L14.586%2014.344L15.098%2013.994L15.449%2014.182L15.637%2014.64L15.745%2014.533L15.853%2014.64L15.826%2014.021L15.529%2013.617L14.991%2013.401L14.075%2013.401L13.536%2013.563L12.701%2014.398L12.943%2014.748L13.078%2014.398L13.239%2014.398L13.401%2015.368L13.859%2015.934L14.586%2016.014ZM5.264%2016.068L4.699%2015.395L4.833%2015.745L5.264%2016.068ZM6.342%2016.607L6.207%2016.095L6.127%2016.338L6.342%2016.607ZM15.071%2018.385L15.718%2017.846L16.068%2017.227L15.071%2018.385ZM11.461%2021.78L12.943%2020.729L13.751%2020.352L14.209%2020.325L13.859%2020.137L13.239%2020.11L13.401%2019.409L13.859%2019.059L12.242%2019.813L11.273%2020.083L8.066%2018.655L9.36%2019.463L9.521%2020.164L9.44%2020.244L8.902%2020.137L8.471%2020.406L7.501%2020.675L7.555%2020.837L9.009%2021.645L8.551%2020.648L8.686%2020.352L8.956%2020.406L9.925%2020.783L11.326%2021.807L11.461%2021.78ZM13.94%2021.672L14.452%2021.43L15.395%2020.702L14.344%2020.352L14.371%2020.541L13.724%2021.672L13.94%2021.672Z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="manga"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M6%202h12a2%202%200%20012%202v13H7.5A1.5%201.5%200%20006%2018.5V2zm2%202.5v6h10v-6H8z%22%2F%3E%3Cpath%20d%3D%22M6%2020a2%202%200%20012-2h12v4H8a2%202%200%2001-2-2z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="ebook"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27black%27%3E%3Cpath%20d%3D%27M4%206.5A2.5%202.5%200%200%201%206.5%204H12v14H6.5A2.5%202.5%200%200%200%204%2020.5v-14z%27%2F%3E%3Cpath%20d%3D%27M20%206.5A2.5%202.5%200%200%200%2017.5%204H12v14h5.5a2.5%202.5%200%200%201%202.5%202.5v-14z%27%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="music"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M9%203.5%2020%202v13.2a3.3%203.3%200%2011-2-3V6.3l-7%201v10.4a3.3%203.3%200%2011-2-3V3.5z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="games"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M7%206h10c2.3%200%203.8%201.6%204.3%204l1.1%206c.5%202.8-2.4%204.7-4.4%202.8L15.3%2016H8.7L6%2018.8c-2%201.9-4.9%200-4.4-2.8l1.1-6C3.2%207.6%204.7%206%207%206zm-.8%203.5v2H4.3v1.7h1.9v2H8v-2h1.9v-1.7H8v-2zm10.3.5a1.25%201.25%200%201%200%200%202.5%201.25%201.25%200%200%200%200-2.5zm2.8%203a1.25%201.25%200%201%200%200%202.5%201.25%201.25%200%200%200%200-2.5z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="live"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%222.8%22%2F%3E%3Cpath%20d%3D%22M6.2%206.2a8.2%208.2%200%20000%2011.6l1.5-1.5a6.1%206.1%200%20010-8.6L6.2%206.2zm11.6%200-1.5%201.5a6.1%206.1%200%20010%208.6l1.5%201.5a8.2%208.2%200%20000-11.6zM3.4%203.4a12.2%2012.2%200%20000%2017.2l1.5-1.5a10.1%2010.1%200%20010-14.2L3.4%203.4zm17.2%200-1.5%201.5a10.1%2010.1%200%20010%2014.2l1.5%201.5a12.2%2012.2%200%20000-17.2z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="sports"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M7%203h10v2.2h3.2V8a4.2%204.2%200%2001-4%204.2%205.4%205.4%200%2001-2.9%202.9V17H16v3H8v-3h2.8v-1.9a5.4%205.4%200%2001-2.9-2.9A4.2%204.2%200%20013.8%208V5.2H7V3zM5.8%207.2V8c0%201%20.7%201.8%201.6%202V7.2H5.8zm12.4%200h-1.6V10c.9-.2%201.6-1%201.6-2v-.8z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="vod"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M4%204h16a2%202%200%20012%202v10a2%202%200%2001-2%202h-5l1.4%202.4H7.6L9%2018H4a2%202%200%2001-2-2V6a2%202%200%20012-2zm1%202.5v9h14v-9H5z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="kids"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5%203h14a2%202%200%20012%202v14a2%202%200%2001-2%202H5a2%202%200%2001-2-2V5a2%202%200%20012-2zm0%202v2h2V5H5zm0%204v2h2V9H5zm0%204v2h2v-2H5zm0%204v2h2v-2H5zM17%205v2h2V5h-2zm0%204v2h2V9h-2zm0%204v2h2v-2h-2zm0%204v2h2v-2h-2zM9%205v6h6V5H9zm0%208v6h6v-6H9z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="library"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%224.2%22%20height%3D%2218%22%20rx%3D%221.2%22%2F%3E%3Crect%20x%3D%229%22%20y%3D%223%22%20width%3D%224.2%22%20height%3D%2218%22%20rx%3D%221.2%22%2F%3E%3Cpath%20d%3D%22M15.1%204.6l3.9-1%203.3%2016.1-3.9%201-3.3-16.1z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="collections"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M6%203h12a1%201%200%20011%201v17.4l-7-4.2-7%204.2V4a1%201%200%20011-1z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="collections-hub"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M6%203h12a1%201%200%20011%201v17.4l-7-4.2-7%204.2V4a1%201%200%20011-1z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="downloads"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M10.8%203h2.4v8.6l3.2-3.2%201.7%201.7L12%2016%205.9%2010.1l1.7-1.7%203.2%203.2V3zM4%2018h16v3H4v-3z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="calendar"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M7%202h2v2h6V2h2v2h2a2%202%200%20012%202v14a2%202%200%2001-2%202H5a2%202%200%2001-2-2V6a2%202%200%20012-2h2V2zM5%2010v10h14V10H5zm2%202h3v3H7v-3z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="addons"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27black%27%3E%3Cpath%20d%3D%27M12%202%203.5%206.5v11L12%2022l8.5-4.5v-11L12%202zm0%202.2%206%203.1-6%203.2-6-3.2%206-3.1zm-6.5%204.6%205.5%202.9v7.7l-5.5-2.9V8.8zm13%200v7.7l-5.5%202.9v-7.7l5.5-2.9z%27%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="plugins"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M8%202h2v4h4V2h2v4h1a1%201%200%20011%201v4a6%206%200%2001-5%205.9V22h-2v-5.1A6%206%200%20016%2011V7a1%201%200%20011-1h1V2z%22%2F%3E%3C%2Fsvg%3E");}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="settings"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M12.000%203.900L13.951%202.192L15.827%202.761L16.500%205.265L17.728%206.272L20.315%206.444L21.239%208.173L19.944%2010.420L20.100%2012.000L21.808%2013.951L21.239%2015.827L18.735%2016.500L17.728%2017.728L17.556%2020.315L15.827%2021.239L13.580%2019.944L12.000%2020.100L10.049%2021.808L8.173%2021.239L7.500%2018.735L6.272%2017.728L3.685%2017.556L2.761%2015.827L4.056%2013.580L3.900%2012.000L2.192%2010.049L2.761%208.173L5.265%207.500L6.272%206.272L6.444%203.685L8.173%202.761L10.420%204.056Z%20M15.5%2012a3.5%203.5%200%201%201-7%200%203.5%203.5%200%200%201%207%200Z%22%2F%3E%3C%2Fsvg%3E");}
