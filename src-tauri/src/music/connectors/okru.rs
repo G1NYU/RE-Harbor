@@ -9,11 +9,11 @@ use std::sync::RwLock;
 use std::time::Duration;
 use url::Url;
 
-#[derive(Default, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 struct Artist { name: Option<String> }
 
-#[derive(Default, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct Track {
     id: Option<i64>,
@@ -24,10 +24,10 @@ struct Track {
     album_id: Option<i64>,
     all_artists: Vec<Artist>,
 }
-#[derive(Default, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 struct Album { id: Option<i64>, name: Option<String> }
-#[derive(Default, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 struct Response {
     error: Option<String>,
