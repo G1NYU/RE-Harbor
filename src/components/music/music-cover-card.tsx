@@ -152,7 +152,8 @@ export function MusicCoverCard({
   const loading = playing || status.loading;
   const caption = subtitle ?? coverCardSubtitle(item);
   const seed = coverCardSeed(item);
-  const artwork = useMemo(() => catalogCoverArt(item.id, item.artwork), [item.id, item.artwork]);
+  const cover = typeof item.artwork === "string" ? item.artwork : undefined;
+  const artwork = useMemo(() => catalogCoverArt(item.id, cover), [item.id, cover]);
   const chip = badge === undefined ? autoBadge(item) : badge;
   const activate = onOpen ?? onPlay;
   const playLabel = item.kind === "track"
