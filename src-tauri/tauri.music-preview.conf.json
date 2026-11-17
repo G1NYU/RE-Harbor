@@ -1,11 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Harbor Music Preview",
-  "identifier": "app.harbor.musicpreview",
+  "productName": "Harbor VOID Native Preview",
+  "identifier": "app.harbor.voidnativepreview",
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["harbor-music-preview"]
+        "schemes": [
+          "harbor-void-native-preview"
+        ]
       }
     },
     "updater": {
