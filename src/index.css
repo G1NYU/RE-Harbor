@@ -46,8 +46,8 @@
   --radius-xl: 20px;
   --radius-2xl: 28px;
 
-  --font-display: "Arial", "Helvetica Neue", "Bahnschrift", "Segoe UI", sans-serif;
-  --font-sans: "Arial", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", "General Sans", "Inter", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "General Sans", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-channel: "General Sans", "Switzer", "Inter", system-ui, sans-serif;
   --font-anime: "WonderfulFontyCure", "Sentient", "Georgia", serif;
