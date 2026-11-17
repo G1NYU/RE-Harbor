@@ -22,7 +22,7 @@ import {
   MusicConnections,
   useMusicConnections,
 } from "@/components/music/music-connections";
-import { MusicHomeHero } from "./music/music-home-hero";
+import { MusicListeningHome } from "./music/music-listening-home";
 import {
   MusicTastes,
   readMusicTastes,
@@ -1411,7 +1411,7 @@ function MusicViewContent({ active }: { active: boolean }) {
                 >
                   {tab === "forYou" && (
                     <section data-scroll-anchor="hero">
-                      <MusicHomeHero
+                      <MusicListeningHome
                         rows={data.homeRows}
                         recent={player.recents}
                         loading={data.homeStatus === "loading"}

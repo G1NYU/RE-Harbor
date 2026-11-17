@@ -1,0 +1,279 @@
+/* VOID / Catppuccin personal music home; no rotating editorial hero. */
+.music-room-home[data-music-premium] {
+  --music-room-bg: #111019;
+  --music-room-surface: #1b1925;
+  --music-room-raised: #252231;
+  --music-room-border: #393541;
+  --music-room-accent: #89b4fa;
+  --music-room-text: #e1e3f3;
+  --music-room-muted: #a5a9bd;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+}
+
+.music-room-home .music-room-feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 34%);
+  align-items: center;
+  gap: clamp(24px, 5vw, 84px);
+  min-height: 350px;
+  padding: clamp(24px, 3.5vw, 54px);
+  overflow: hidden;
+  border: 1px solid var(--music-room-border);
+  border-radius: 20px;
+  background: var(--music-room-bg);
+  color: var(--music-room-text);
+}
+
+.music-room-home .music-room-feature-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.music-room-home .music-room-eyebrow {
+  color: var(--music-room-accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.music-room-home .music-room-feature h2 {
+  width: 100%;
+  margin: 20px 0 12px;
+  color: var(--music-room-text);
+  font-size: clamp(32px, 3.65vw, 58px);
+  font-weight: 800;
+  line-height: 1.09;
+  letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.music-room-home .music-room-description {
+  margin: 0;
+  color: var(--music-room-muted);
+  font-size: clamp(15px, 1.2vw, 19px);
+  line-height: 1.55;
+}
+
+.music-room-home .music-room-feature-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.music-room-home .music-room-main-action,
+.music-room-home .music-room-secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.music-room-home .music-room-main-action {
+  background: var(--music-room-accent);
+  color: #101522;
+}
+
+.music-room-home .music-room-main-action:hover {
+  background: #a5c8ff;
+}
+
+.music-room-home .music-room-secondary-action {
+  border: 1px solid var(--music-room-border);
+  color: var(--music-room-text);
+}
+
+.music-room-home .music-room-secondary-action:hover {
+  background: var(--music-room-raised);
+}
+
+.music-room-home .music-room-cover-shell {
+  width: min(100%, 330px);
+  justify-self: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--music-room-border);
+  border-radius: 17px;
+  background: var(--music-room-surface);
+}
+
+.music-room-home .music-room-cover,
+.music-room-home .music-room-cover-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.music-room-home .music-room-cover-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--music-room-accent);
+}
+
+.music-room-home .music-room-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.music-room-home .music-room-shortcuts button {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+  min-height: 72px;
+  padding: 16px 18px;
+  border: 1px solid var(--music-room-border);
+  border-radius: 14px;
+  background: var(--music-room-surface);
+  color: var(--music-room-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: start;
+}
+
+.music-room-home .music-room-shortcuts button:hover,
+.music-room-home .music-room-recent-track:hover {
+  background: var(--music-room-raised);
+}
+
+.music-room-home .music-room-shortcuts button > svg:first-child {
+  flex: none;
+  color: var(--music-room-accent);
+}
+
+.music-room-home .music-room-shortcuts button > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-room-home .music-room-shortcuts button > svg:last-child {
+  flex: none;
+  color: var(--music-room-muted);
+}
+
+.music-room-home .music-room-recent {
+  min-width: 0;
+  margin-top: 10px;
+}
+
+.music-room-home .music-room-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.music-room-home .music-room-section-heading h3 {
+  color: var(--music-room-text);
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.music-room-home .music-room-section-heading button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 8px 10px;
+  color: var(--music-room-muted);
+  font-size: 13px;
+}
+
+.music-room-home .music-room-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.music-room-home .music-room-recent-track {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+  padding: 10px;
+  border-radius: 13px;
+  text-align: start;
+  color: var(--music-room-text);
+}
+
+.music-room-home .music-room-recent-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--music-room-surface);
+}
+
+.music-room-home .music-room-recent-title,
+.music-room-home .music-room-recent-artist {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-room-home .music-room-recent-title {
+  font-size: 14px;
+  font-weight: 750;
+}
+.music-room-home .music-room-recent-artist {
+  font-size: 12px;
+  color: var(--music-room-muted);
+}
+.music-room-home button:focus-visible {
+  outline: 2px solid var(--music-room-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1050px) {
+  .music-room-home .music-room-shortcuts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .music-room-home .music-room-recent-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .music-room-home .music-room-feature {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .music-room-home .music-room-cover-shell {
+    grid-row: 1;
+    width: min(100%, 210px);
+    justify-self: start;
+  }
+  .music-room-home .music-room-feature h2 {
+    font-size: clamp(30px, 7vw, 44px);
+  }
+  .music-room-home .music-room-recent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 450px) {
+  .music-room-home .music-room-shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
