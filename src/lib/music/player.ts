@@ -123,7 +123,7 @@ function sourcesFor(
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error("music.source.none")), 12000);
   });
-  const promise = Promise.race([
+  const promise: Promise<MusicSourceCandidate[]> = Promise.race([
     invoke<MusicSourceCandidate[]>("music_source_candidates", { track }),
     timeout,
   ])
@@ -135,7 +135,9 @@ function sourcesFor(
       ),
     )
     .catch((error) => {
-      queuedSources.delete(key);
+      // A fresh lookup may have replaced this one while it was in flight.
+      // An older rejection must never evict the newer result.
+      if (queuedSources.get(key)?.promise === promise) queuedSources.delete(key);
       throw error;
     })
     .finally(() => clearTimeout(timer));

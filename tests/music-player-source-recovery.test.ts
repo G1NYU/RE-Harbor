@@ -14,7 +14,7 @@ const spotify: MusicTrack = {
 };
 const alternative: MusicTrack = { ...spotify, id: "soundcloud:one", connectorId: "soundcloud" };
 
-function fixture(failImmediately = false, exhaustedCache = false, failure = "Spotify unavailable") {
+function fixture(failImmediately = false, exhaustedCache = false, failure = "Spotify unavailable", lookupGate?: Promise<void>) {
   const source = readFileSync(new URL("../src/lib/music/player.ts", import.meta.url), "utf8");
   const tree = ts.createSourceFile("player.ts", source, ts.ScriptTarget.Latest, true);
   const functions = tree.statements.filter(node => ts.isFunctionDeclaration(node) &&
@@ -42,6 +42,7 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
     readMusicPreference: () => null, clampMusicVolume: (volume: number) => volume,
     sourcesFor: async (_track: MusicTrack, _ttl?: number, refresh?: boolean) => {
       lookups++;
+      if (lookupGate) await lookupGate;
       if (exhaustedCache && !refresh)
         return [{ connectorId: "spotify", health: "healthy", track: spotify }];
       return [{ connectorId: "soundcloud", health: "healthy", track: alternative }];
@@ -110,4 +111,53 @@ test("an unconfirmed stop never retries or switches an automatic playback source
   assert.deepEqual(h.state.queue, [spotify]);
   assert.equal(h.state.phase, "error");
   assert.equal(h.state.error, "STOP_UNCONFIRMED");
+});
+
+test("a delayed recovery lookup cannot replace a newer song", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const h = fixture(false, false, "Spotify unavailable", gate);
+  const newer = { ...alternative, id: "soundcloud:two", title: "Two" };
+  await h.play(spotify);
+  h.failLater("network stalled");
+  assert.equal(h.lookups(), 1);
+  await h.play(newer);
+  release();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.attempts, [spotify, newer]);
+  assert.equal(h.state.current?.id, newer.id);
+  assert.equal(h.state.error, null);
+});
+
+test("an obsolete source lookup rejection cannot evict a refreshed candidate cache", async () => {
+  const source = readFileSync(new URL("../src/lib/music/player.ts", import.meta.url), "utf8");
+  const tree = ts.createSourceFile("player.ts", source, ts.ScriptTarget.Latest, true);
+  const fn = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "sourcesFor");
+  assert.ok(fn);
+  const declarations = `const queuedSources = new Map();
+    const SOURCE_TTL_MS = 120000, SOURCE_CACHE_MAX = 16;
+    export { sourcesFor };`;
+  const { outputText } = ts.transpileModule(declarations + fn.getText(tree), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  });
+  let rejectOld!: (reason: Error) => void;
+  const old = new Promise<never>((_, reject) => { rejectOld = reject; });
+  const candidates = [{ connectorId: "soundcloud", health: "healthy", track: alternative }];
+  let calls = 0;
+  const exports: { sourcesFor?: (track: MusicTrack, ttl?: number, fresh?: boolean) => Promise<unknown> } = {};
+  new Function("invoke", "filterMusicSourceCandidates", "compatibleVocalVersion", "exports", outputText)(
+    () => ++calls === 1 ? old : Promise.resolve(candidates),
+    (items: unknown[]) => items,
+    () => true,
+    exports,
+  );
+  const lookup = exports.sourcesFor!;
+  const stale = lookup(spotify);
+  const rejected = assert.rejects(stale, /obsolete/);
+  const fresh = lookup(spotify, undefined, true);
+  assert.deepEqual(await fresh, candidates);
+  rejectOld(new Error("obsolete"));
+  await rejected;
+  assert.equal(lookup(spotify), fresh);
+  assert.equal(calls, 2);
 });
