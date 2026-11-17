@@ -354,6 +354,62 @@ const hi: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  "Refract sync": "Refract सिंक",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "देखने के इतिहास और Harbor की वॉचलिस्ट में किए गए बदलावों को Refract के साथ सिंक करें।",
+  "Refract personal API key": "Refract की निजी API कुंजी",
+  "Verifying...": "सत्यापित किया जा रहा है…",
+  "Connect Refract": "Refract कनेक्ट करें",
+  "Refract key saved in Harbor's secret store":
+    "Refract की कुंजी Harbor के सुरक्षित स्टोर में सहेजी गई है",
+  "Sync watched history and watchlist": "देखने का इतिहास और वॉचलिस्ट सिंक करें",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Harbor से देखने का इतिहास और वॉचलिस्ट में किए गए बदलाव Refract पर भेजें। केवल Harbor की मुख्य प्रोफ़ाइल सिंक होती है।",
+  "Retry pending watches": "लंबित देखने के रिकॉर्ड फिर से भेजें",
+  "Disconnect Refract": "Refract डिस्कनेक्ट करें",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Refract ({identity}) से कनेक्ट हो गया है। देखने के इतिहास का सिंक चालू है।",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Refract /v1/me के ज़रिए कुंजी सत्यापित नहीं हो सकी। अनुमतियाँ और कनेक्शन जाँचें।",
+  "Disconnected from Refract.": "Refract डिस्कनेक्ट हो गया है।",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Refract में profile:read, library:read, library:write और history:write अनुमतियों वाली निजी API कुंजी बनाएँ। कुंजी कभी साझा न करें या किसी कमिट में शामिल न करें।",
+  "Automatic watch threshold": "स्वचालित देखने के रिकॉर्ड की सीमा",
+  "After {count} minutes": "{count} मिनट बाद",
+  "{count}% (default)": "{count}% (डिफ़ॉल्ट)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "प्लेबैक चुने गए समय या प्रतिशत तक पहुँचने पर फ़िल्म या एपिसोड को Refract में दर्ज करें। सीमा से आगे स्किप करना भी मान्य है। जल्दी दर्ज करने पर सामग्री को देखा हुआ माना जाता है, आंशिक रूप से देखा हुआ नहीं। Harbor की अपनी देखने की पूर्णता सीमा नहीं बदलती।",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract: देखने की योजना",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "सिंक चालू होने पर वॉचलिस्ट में जोड़ी और हटाई गई सामग्री अपने आप भेजी जाती है। library:write अनुमति आवश्यक है; ज़रूरत पड़ने पर अपडेट की गई कुंजी से फिर कनेक्ट करें। Refract का मौजूदा इतिहास और लाइब्रेरी की अन्य स्थितियाँ सुरक्षित रहती हैं।",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "भेजे गए: {sent} · लंबित: {pending} · मेल नहीं मिला: {failed}",
+  "Unmatched items": "बिना मेल वाले आइटम",
+  "Refract queue full; unable to save another watch":
+    "Refract की कतार भर गई है; दूसरा देखने का रिकॉर्ड सहेजा नहीं जा सकता",
+  "No verified IMDb/TMDB/TVDB identity": "कोई सत्यापित IMDb/TMDB/TVDB पहचान उपलब्ध नहीं है",
+  "Movie not found in Refract": "Refract में फ़िल्म नहीं मिली",
+  "Episode not found; verify season numbering": "एपिसोड नहीं मिला; सीज़न की संख्या जाँचें",
+  "Last watched item sent successfully": "देखने का पिछला रिकॉर्ड सफलतापूर्वक भेजा गया",
+  "Unknown error": "अज्ञात त्रुटि",
+  "Some items could not be matched or sent":
+    "कुछ आइटम का मिलान नहीं हो सका या उन्हें भेजा नहीं जा सका",
+  "Refract denied access; check key and permissions":
+    "Refract ने पहुँच अस्वीकार कर दी; कुंजी और अनुमतियाँ जाँचें",
+  "Network error; retry scheduled": "नेटवर्क त्रुटि; फिर से कोशिश निर्धारित है",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "इस शीर्षक के लिए कोई सत्यापित IMDb/TMDB/TVDB पहचान उपलब्ध नहीं है।",
+  "Refract could not uniquely identify this title.":
+    "Refract इस शीर्षक की विशिष्ट पहचान नहीं कर सका।",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract ने मौजूदा लाइब्रेरी एंट्री या देखने का इतिहास सुरक्षित रखा।",
+  "Added to Refract Plan to Watch.": "Refract की देखने की योजना में जोड़ा गया।",
+  "Removed from Refract Plan to Watch.": "Refract की देखने की योजना से हटाया गया।",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "Refract वॉचलिस्ट के लिए library:write अनुमति आवश्यक है। इस अनुमति वाली कुंजी से फिर कनेक्ट करें।",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract वॉचलिस्ट में बदलाव की पुष्टि नहीं कर सका। फिर कोशिश करें।",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default hi;
