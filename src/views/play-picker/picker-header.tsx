@@ -67,6 +67,7 @@ export function PickerHeader({
     : null;
   return (
     <header className="flex flex-col gap-3">
+      <span data-void-stream-brand aria-hidden="true">VOID <small>PLAYBACK</small></span>
       {episode ? (
         <>
           <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-ink-subtle">
