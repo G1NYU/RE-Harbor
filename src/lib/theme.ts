@@ -1834,9 +1834,9 @@ export const FONT_PAIRS: Record<FontPairId, FontPair> = {
   "void-native": {
     id: "void-native",
     name: "VOID Native",
-    blurb: "Rebuild N's sharp, heavyweight Helvetica-style UI.",
-    display: '"Arial", "Helvetica Neue", "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif',
-    sans: '"Arial", "Helvetica Neue", "Segoe UI Variable", "Segoe UI", Tahoma, system-ui, sans-serif',
+    blurb: "Confident, modern lettering from the rebuilt Music room.",
+    display: '"Plus Jakarta Sans", "General Sans", "Inter", system-ui, sans-serif',
+    sans: '"Plus Jakarta Sans", "General Sans", "Inter", system-ui, sans-serif',
   },
   "sentient-switzer": {
     id: "sentient-switzer",
