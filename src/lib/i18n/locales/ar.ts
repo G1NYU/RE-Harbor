@@ -411,6 +411,61 @@ const ar: Record<string, string> = {
   ...gameNotes,
   ...playOrders,
   ...contextActions,
+  "Refract sync": "مزامنة Refract",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "زامن سجل المشاهدة والتغييرات في قائمة المشاهدة في Harbor مع Refract.",
+  "Refract personal API key": "مفتاح API شخصي لـ Refract",
+  "Verifying...": "جارٍ التحقق…",
+  "Connect Refract": "ربط Refract",
+  "Refract key saved in Harbor's secret store":
+    "تم حفظ مفتاح Refract في مخزن الأسرار في Harbor",
+  "Sync watched history and watchlist": "مزامنة سجل المشاهدة وقائمة المشاهدة",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "أرسل سجل المشاهدة والتغييرات في قائمة المشاهدة من Harbor إلى Refract. تتم مزامنة الملف الشخصي الأساسي في Harbor فقط.",
+  "Retry pending watches": "إعادة إرسال سجلات المشاهدة المعلقة",
+  "Disconnect Refract": "قطع اتصال Refract",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "تم الاتصال بـ Refract ({identity}). تم تفعيل مزامنة سجل المشاهدة.",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "تعذر التحقق من المفتاح عبر Refract /v1/me. تحقق من الأذونات والاتصال.",
+  "Disconnected from Refract.": "تم قطع الاتصال بـ Refract.",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "أنشئ مفتاح API شخصيًا في Refract بالأذونات profile:read وlibrary:read وlibrary:write وhistory:write. لا تشارك المفتاح ولا تحفظه في مستودع برمجي.",
+  "Automatic watch threshold": "عتبة تسجيل المشاهدة تلقائيًا",
+  "After {count} minutes": "بعد {count} دقائق",
+  "{count}% (default)": "{count}% (افتراضي)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "سجّل الفيلم أو الحلقة في Refract عندما يصل التشغيل إلى المدة أو النسبة المحددة. يُحتسب أيضًا تجاوز العتبة بالتقديم. يُسجّل المحتوى مبكرًا كمُشاهَد، وليس كمُشاهَد جزئيًا. تبقى عتبة إكمال المشاهدة في Harbor دون تغيير.",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract: مخطط للمشاهدة",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "تُرسل الإضافات والإزالات من قائمة المشاهدة تلقائيًا أثناء تفعيل المزامنة. يتطلب ذلك إذن library:write؛ أعد الاتصال بمفتاح محدّث عند الحاجة. يبقى سجل Refract الحالي وحالات المكتبة الأخرى محفوظة.",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "تم الإرسال: {sent} · معلق: {pending} · غير مطابق: {failed}",
+  "Unmatched items": "عناصر غير مطابقة",
+  "Refract queue full; unable to save another watch":
+    "قائمة انتظار Refract ممتلئة؛ تعذر حفظ مشاهدة أخرى",
+  "No verified IMDb/TMDB/TVDB identity": "لا يوجد معرّف IMDb/TMDB/TVDB موثّق",
+  "Movie not found in Refract": "لم يتم العثور على الفيلم في Refract",
+  "Episode not found; verify season numbering": "لم يتم العثور على الحلقة؛ تحقق من ترقيم المواسم",
+  "Last watched item sent successfully": "تم إرسال آخر سجل مشاهدة بنجاح",
+  "Unknown error": "خطأ غير معروف",
+  "Some items could not be matched or sent": "تعذرت مطابقة بعض العناصر أو إرسالها",
+  "Refract denied access; check key and permissions":
+    "رفض Refract الوصول؛ تحقق من المفتاح والأذونات",
+  "Network error; retry scheduled": "خطأ في الشبكة؛ تمت جدولة إعادة المحاولة",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "لا يوجد معرّف IMDb/TMDB/TVDB موثّق لهذا العنوان.",
+  "Refract could not uniquely identify this title.":
+    "تعذر على Refract تحديد هذا العنوان بشكل فريد.",
+  "Refract preserved an existing library entry or viewing history.":
+    "احتفظ Refract بعنصر موجود في المكتبة أو سجل المشاهدة.",
+  "Added to Refract Plan to Watch.": "تمت الإضافة إلى قائمة المشاهدة لاحقًا في Refract.",
+  "Removed from Refract Plan to Watch.": "تمت الإزالة من قائمة المشاهدة لاحقًا في Refract.",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "تتطلب قائمة المشاهدة في Refract إذن library:write. أعد الاتصال بمفتاح يملك هذا الإذن.",
+  "Refract could not confirm the watchlist change. Try again.":
+    "تعذر على Refract تأكيد تغيير قائمة المشاهدة. حاول مجددًا.",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default ar;
