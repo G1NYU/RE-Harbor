@@ -1,8 +1,8 @@
-name: VOID Native + Music UI
+name: VOID Native + Refract Validation
 
 on:
   push:
-    branches: [feature/void-native-rebuild-n]
+    branches: [feature/void-refract-preview]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   ui:
-    name: VOID Native and music UI typecheck
+    name: VOID/Refract application typecheck
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -37,4 +37,7 @@ jobs:
             tests/music-dock-clearance.test.ts \
             tests/music-now-playing-key.test.ts \
             tests/void-native.test.ts \
-            tests/void-native-cohesion.test.ts
+            tests/void-native-cohesion.test.ts \
+            tests/music-cover-art-url.test.ts
+      - name: Refract API, identity, and sync tests
+        run: node --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-identity.test.mjs tests/refract-bulk-account.test.mjs
