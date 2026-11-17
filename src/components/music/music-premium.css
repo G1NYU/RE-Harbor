@@ -8,16 +8,16 @@
  */
 
 [data-music-premium] {
-  --music-premium-base: #111019;
-  --music-premium-surface: #1b1925;
-  --music-premium-raised: #252231;
-  --music-premium-line: #393541;
-  --music-premium-text: #e1e3f3;
-  --music-premium-muted: #a5a9bd;
-  --music-premium-accent: #89b4fa;
-  --music-premium-accent-ink: #101522;
+  --music-premium-base: #11111b;
+  --music-premium-surface: #181825;
+  --music-premium-raised: #1e1e2e;
+  --music-premium-line: #313244;
+  --music-premium-text: #cdd6f4;
+  --music-premium-muted: #a6adc8;
+  --music-premium-accent: #6c7086;
+  --music-premium-accent-ink: #11111b;
   color: var(--music-premium-text);
-  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* Keep the integrated dock visually distinct from video, manga and books. */
@@ -28,7 +28,7 @@
   box-shadow: 0 -8px 24px rgb(0 0 0 / 0.20);
   --color-ink: var(--music-premium-text);
   --color-ink-muted: var(--music-premium-muted);
-  --color-ink-subtle: #82879e;
+  --color-ink-subtle: #6c7086;
   --color-canvas: var(--music-premium-base);
   --color-elevated: var(--music-premium-surface);
   --color-raised: var(--music-premium-raised);
@@ -61,7 +61,7 @@
   color: var(--music-premium-accent-ink);
 }
 [data-music-dock][data-music-premium] .music-dock-play:hover:not(:disabled) {
-  background: #a5c8ff;
+  background: #9399b2;
 }
 [data-music-dock][data-music-premium] .music-dock-play:focus-visible {
   outline: 2px solid var(--music-premium-text);
