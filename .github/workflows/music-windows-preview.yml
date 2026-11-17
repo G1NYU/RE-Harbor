@@ -1,8 +1,8 @@
-name: Music Listening Room Windows Preview
+name: VOID Native Windows Preview
 
 on:
   push:
-    branches: [feature/music-void-ui]
+    branches: [feature/void-native-rebuild-n]
     paths:
       - ".github/workflows/music-windows-preview.yml"
       - "src/**"
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: music-windows-preview-${{ github.ref }}
+  group: void-native-windows-preview-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
       HARBOR_CAPSTAN_OPTIONAL: "1"
       HARBOR_POKEMON_OPTIONAL: "1"
     steps:
-      - name: Checkout music branch
+      - name: Checkout VOID Native branch
         uses: actions/checkout@v6
 
       - name: Set up Rust
@@ -65,7 +65,7 @@ jobs:
           pnpm run setup
           if ($LASTEXITCODE -ne 0) { throw "Setup failed" }
 
-      - name: Build isolated music preview
+      - name: Build isolated VOID Native preview
         shell: pwsh
         run: |
           pnpm tauri build --no-bundle --config src-tauri/tauri.music-preview.conf.json
@@ -89,16 +89,16 @@ jobs:
           if (-not (Test-Path -LiteralPath music-preview/harbor.exe)) { throw "Missing portable Harbor executable" }
           Remove-Item -LiteralPath music-preview/uninstall.exe -Force -ErrorAction SilentlyContinue
           @'
-          HARBOR MUSIC PREVIEW (Windows x64)
+          HARBOR VOID NATIVE PREVIEW (Windows x64)
           ==================================
-          This is a portable test build from feature/music-void-ui, not a normal Harbor installer.
+          This is a portable test build from feature/void-native-rebuild-n, not a normal Harbor installer.
 
           1. Extract this artifact to a new folder.
           2. Run harbor.exe from that folder.
-          3. Open Music and test the Listening Room, dock, and expanded player.
+          3. Test VOID styling across Movies, Shows, Anime, Manga, Books, Games and Music.
           4. Do not use this preview as your everyday Harbor installation.
 
-          The preview uses its own Tauri application identifier, app.harbor.musicpreview.
+          The preview uses its own Tauri application identifier, app.harbor.voidnativepreview.
           It does not install or uninstall the normal Harbor app.
           This CI build deliberately omits Android extension support and the Pokemon engine.
           It is unsigned; Windows may display an unrecognized publisher warning.
@@ -108,7 +108,7 @@ jobs:
       - name: Upload portable Windows preview
         uses: actions/upload-artifact@v4
         with:
-          name: harbor-music-preview-windows-x64
+          name: harbor-void-native-windows-x64
           path: music-preview/
           if-no-files-found: error
           retention-days: 7
