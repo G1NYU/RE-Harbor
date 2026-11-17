@@ -27,7 +27,7 @@ function Invoke-OkMusic {
     }
     $url = "https://wmf.ok.ru/$Route;jsessionid=$Session?" + [string]::Join("&", $pairs)
     $method = if ($Post) { [System.Net.Http.HttpMethod]::Post } else { [System.Net.Http.HttpMethod]::Get }
-    $request = New-Object System.Net.Http.HttpRequestMessage($method, $url)
+    $request = [System.Net.Http.HttpRequestMessage]::new($method, $url)
     $response = $null
     try {
         $null = $request.Headers.TryAddWithoutValidation("Cookie", "jsessionid=$Session")
@@ -38,7 +38,7 @@ function Invoke-OkMusic {
         $null = $request.Headers.TryAddWithoutValidation("Referer", "https://ok.ru/")
         $null = $request.Headers.TryAddWithoutValidation("X-Requested-With", "XMLHttpRequest")
         if ($Post) {
-            $request.Content = New-Object System.Net.Http.StringContent(
+            $request.Content = [System.Net.Http.StringContent]::new(
                 "",
                 [System.Text.Encoding]::UTF8,
                 "application/x-www-form-urlencoded"
@@ -111,7 +111,7 @@ try {
     $handler = New-Object System.Net.Http.HttpClientHandler
     $handler.AllowAutoRedirect = $false
     $handler.UseCookies = $false
-    $client = New-Object System.Net.Http.HttpClient($handler)
+    $client = [System.Net.Http.HttpClient]::new($handler)
     $client.Timeout = [TimeSpan]::FromSeconds(18)
 
     if (-not $PlaybackOnly) {
