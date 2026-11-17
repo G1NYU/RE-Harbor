@@ -4,16 +4,29 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Net.Http
 
 function Get-OkResponse {
-    param([System.Net.Http.HttpClient]$Client, [string]$Session, [string]$Route, [hashtable]$Parameters)
+    param([System.Net.Http.HttpClient]$Client, [string]$Session, [string]$Route, [hashtable]$Parameters, [switch]$CookieAuth)
     if ($Route -notin @("tracks", "play")) { throw "Unexpected diagnostic route." }
     $parts = @()
     foreach ($key in $Parameters.Keys) {
         $parts += ([Uri]::EscapeDataString([string]$key) + "=" + [Uri]::EscapeDataString([string]$Parameters[$key]))
     }
-    $url = "https://wmf.ok.ru/$Route;jsessionid=$Session?" + [string]::Join("&", $parts)
+    # The legacy WMF API expects a URL session. Test a normal Cookie header as
+    # an alternative only after it explicitly rejects the URL session.
+    if ($CookieAuth) {
+        $url = "https://wmf.ok.ru/$Route?" + [string]::Join("&", $parts)
+    } else {
+        $url = "https://wmf.ok.ru/$Route;jsessionid=$Session?" + [string]::Join("&", $parts)
+    }
+    $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, $url)
+    if ($CookieAuth) {
+        $null = $request.Headers.TryAddWithoutValidation("Cookie", "JSESSIONID=$Session")
+    }
+    $null = $request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0")
     try {
-        $response = $Client.GetAsync($url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
-    } catch { throw "Cannot reach OK.ru (network/timeout)." }
+        try {
+            $response = $Client.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+        } catch { throw "Cannot reach OK.ru (network/timeout)." }
+    } finally { $request.Dispose() }
     try {
         if (-not $response.IsSuccessStatusCode) {
             throw "OK.ru $Route returned HTTP $([int]$response.StatusCode)."
@@ -46,12 +59,28 @@ try {
     if ($session -notmatch '^[A-Za-z0-9_.!-]{8,256}$') { throw "Unsupported session format." }
     $handler = [System.Net.Http.HttpClientHandler]::new()
     $handler.AllowAutoRedirect = $false
+    $handler.UseCookies = $false
     $client = [System.Net.Http.HttpClient]::new($handler)
     $client.Timeout = [TimeSpan]::FromSeconds(12)
 
     Write-Host "[1/3] Authenticated music search..."
-    $found = Get-OkResponse -Client $client -Session $session -Route "tracks" -Parameters @{
-        q = $Query; start = "0"; count = "5"; imgfmt = "base"
+    $searchParams = @{ q = $Query; start = "0"; count = "5"; imgfmt = "base" }
+    $cookieAuth = $false
+    try {
+        $found = Get-OkResponse -Client $client -Session $session -Route "tracks" -Parameters $searchParams
+    } catch {
+        if ($_.Exception.Message -notlike "*Session invalid or expired*") { throw }
+        Write-Host "Legacy URL-session rejected. Trying a standard browser cookie header..."
+        try {
+            $found = Get-OkResponse -Client $client -Session $session -Route "tracks" -Parameters $searchParams -CookieAuth
+            $cookieAuth = $true
+            Write-Host "Cookie-based session accepted by search."
+        } catch {
+            if ($_.Exception.Message -like "*Session invalid or expired*") {
+                throw "WMF rejected this session in both URL and Cookie modes. Do not keep copying the same website cookie. The music API may require separate authentication or a newer client."
+            }
+            throw
+        }
     }
     if ($null -eq $found.tracks) { throw "Search response schema changed (no tracks array)." }
     $tracks = @($found.tracks)
@@ -64,7 +93,7 @@ try {
         Write-Host "[2/3] Playback metadata..."
         $playback = Get-OkResponse -Client $client -Session $session -Route "play" -Parameters @{
             tid = $id; imgfmt = "base"
-        }
+        } -CookieAuth:$cookieAuth
         $media = $null
         if (-not [Uri]::TryCreate([string]$playback.play, [UriKind]::Absolute, [ref]$media)) {
             throw "No usable media link was provided."
