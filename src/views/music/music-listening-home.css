@@ -14,17 +14,53 @@
 }
 
 .music-room-home .music-room-feature {
+  position: relative;
+  isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 34%);
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 30%);
   align-items: center;
-  gap: clamp(24px, 5vw, 84px);
-  min-height: 350px;
-  padding: clamp(24px, 3.5vw, 54px);
+  gap: clamp(28px, 5vw, 84px);
+  min-height: clamp(440px, 51vh, 640px);
+  padding: clamp(38px, 5.1vw, 82px);
   overflow: hidden;
-  border: 1px solid var(--music-room-border);
-  border-radius: 20px;
+  border: none;
+  border-radius: 0;
   background: var(--music-room-bg);
   color: var(--music-room-text);
+}
+
+/* One native image bound to the current song. No autoplaying video, blur, filters,
+ * animation loop or remounting artwork as a separate theme layer. */
+.music-room-home .music-room-backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.music-room-home .music-room-backdrop img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 38%;
+  opacity: 0.68;
+}
+
+.music-room-home .music-room-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #11111b 0%, rgb(17 17 27 / 0.94) 26%, rgb(17 17 27 / 0.58) 56%, rgb(17 17 27 / 0.24) 100%),
+    linear-gradient(0deg, #11111b 0%, transparent 36%, rgb(17 17 27 / 0.15) 78%, #11111b 100%);
+}
+
+.music-room-home .music-room-feature-content,
+.music-room-home .music-room-cover-shell {
+  position: relative;
+  z-index: 1;
 }
 
 .music-room-home .music-room-feature-content {
@@ -43,12 +79,12 @@
 
 .music-room-home .music-room-feature h2 {
   width: 100%;
-  margin: 20px 0 12px;
+  margin: 24px 0 16px;
   color: var(--music-room-text);
-  font-size: clamp(32px, 3.65vw, 58px);
+  font-size: clamp(36px, 4.15vw, 72px);
   font-weight: 800;
-  line-height: 1.09;
-  letter-spacing: -0.045em;
+  line-height: 1.1;
+  letter-spacing: -0.043em;
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -276,4 +312,26 @@
   .music-room-home .music-room-shortcuts {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* The music stage reaches the available canvas edges; the shelves below
+ * retain comfortable reading gutters. Do not alter other category pages. */
+[data-music-view][data-music-tab="forYou"] [data-music-consolidated-back] {
+  max-width: none;
+}
+[data-music-view][data-music-tab="forYou"] [data-scroll-anchor="hero"] {
+  margin-inline: -3rem;
+}
+@media (max-width: 1023px) {
+  [data-music-view][data-music-tab="forYou"] [data-scroll-anchor="hero"] {
+    margin-inline: -2rem;
+  }
+}
+@media (max-width: 639px) {
+  [data-music-view][data-music-tab="forYou"] [data-scroll-anchor="hero"] {
+    margin-inline: -1.25rem;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .music-room-home .music-room-backdrop img { opacity: 0.4; }
 }
