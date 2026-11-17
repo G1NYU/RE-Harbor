@@ -36,4 +36,5 @@ jobs:
             tests/music-void-ui.test.ts \
             tests/music-dock-clearance.test.ts \
             tests/music-now-playing-key.test.ts \
-            tests/void-native.test.ts
+            tests/void-native.test.ts \
+            tests/void-native-cohesion.test.ts
