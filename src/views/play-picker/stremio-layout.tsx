@@ -120,7 +120,7 @@ export function StremioLayout({
     filter === "all" ? t("All") : (addonOptions.find((o) => o.id === filter)?.name ?? t("All"));
   const filterLogo = filter === "all" ? null : (addonLogoMap.get(filter) ?? null);
   return (
-    <div className="flex flex-col gap-3">
+    <div data-stream-layout className="flex flex-col gap-3">
       <div className="relative">
         <button
           onClick={() => setFilterOpen((v) => !v)}
