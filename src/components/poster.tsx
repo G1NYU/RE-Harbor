@@ -237,6 +237,8 @@ function PosterBody({
   onError,
   lazy = false,
   fallbacks,
+  retryOnError = true,
+  fallbackColor,
 }: {
   src?: string;
   seed: string;
@@ -247,6 +249,9 @@ function PosterBody({
   onError?: () => void;
   lazy?: boolean | "release";
   fallbacks?: Array<string | null | undefined>;
+  /** Suppress repeated failed image requests for static catalogs with missing cover art. */
+  retryOnError?: boolean;
+  fallbackColor?: string;
 }) {
   const { settings } = useSettings();
   const renderCauseRef = useRef<{
@@ -255,7 +260,7 @@ function PosterBody({
     onError: unknown;
     fallbacks: unknown;
   } | null>(null);
-  const propKey = `${src ?? ""}|${seed}|${ratio}|${className}|${String(lazy)}`;
+  const propKey = `${src ?? ""}|${seed}|${ratio}|${className}|${String(lazy)}|${retryOnError}|${fallbackColor ?? ""}`;
   const prevRender = renderCauseRef.current;
   recordRenderCause(
     "poster",
@@ -370,7 +375,7 @@ function PosterBody({
   }, [exhausted]);
 
   useEffect(() => {
-    if (!exhausted) return;
+    if (!exhausted || !retryOnError) return;
     const retryNow = () => {
       failedRef.current = new Set();
       firedRef.current = false;
@@ -386,7 +391,7 @@ function PosterBody({
       window.removeEventListener("online", retryNow);
       if (timer) window.clearTimeout(timer);
     };
-  }, [exhausted, retry]);
+  }, [exhausted, retry, retryOnError]);
 
   const fail = useCallback((url: string) => {
     const now = Date.now();
@@ -453,7 +458,7 @@ function PosterBody({
       ref={rootRef}
       data-poster-effect={effect}
       className={`harbor-poster your-card relative w-full overflow-hidden rounded-[var(--poster-radius,12px)] ${className}`}
-      style={showPlate ? { background: gradient(hue) } : undefined}
+      style={showPlate ? { background: fallbackColor ?? gradient(hue) } : undefined}
     >
       <div aria-hidden style={{ paddingTop: ASPECT_PAD[ratio] }} />
       {showShimmer && <span aria-hidden className="harbor-shimmer absolute inset-0" />}
