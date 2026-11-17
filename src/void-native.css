@@ -103,7 +103,7 @@ html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] butt
 }
 
 html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] [data-harbor-sidebar-footer] {
-  background: #0b0b12;
+  background: var(--void-rail);
   border-block-start-color: transparent;
 }
 
