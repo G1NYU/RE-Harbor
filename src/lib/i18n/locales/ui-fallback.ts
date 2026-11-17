@@ -1159,6 +1159,60 @@ const uiFallback: Record<string, string> = {
     "Ten-foot uses large controls built for a remote across the room. Desktop keeps the same player you use in the normal window, which is quicker with a mouse and keyboard.",
   "Ten-foot": "Ten-foot",
   Desktop: "Desktop",
+  "Refract sync": "Refract sync",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "Sync watched history and Harbor watchlist changes with Refract.",
+  "Refract personal API key": "Refract personal API key",
+  "Verifying...": "Verifying...",
+  "Connect Refract": "Connect Refract",
+  "Refract key saved in Harbor's secret store": "Refract key saved in Harbor's secret store",
+  "Sync watched history and watchlist": "Sync watched history and watchlist",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.",
+  "Retry pending watches": "Retry pending watches",
+  "Disconnect Refract": "Disconnect Refract",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Connected to Refract ({identity}). Watched history sync is enabled.",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Could not verify the key via Refract /v1/me. Check permissions and connectivity.",
+  "Disconnected from Refract.": "Disconnected from Refract.",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.",
+  "Automatic watch threshold": "Automatic watch threshold",
+  "After {count} minutes": "After {count} minutes",
+  "{count}% (default)": "{count}% (default)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract Plan to Watch",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "{sent} sent · {pending} pending · {failed} unmatched",
+  "Unmatched items": "Unmatched items",
+  "Refract queue full; unable to save another watch":
+    "Refract queue full; unable to save another watch",
+  "No verified IMDb/TMDB/TVDB identity": "No verified IMDb/TMDB/TVDB identity",
+  "Movie not found in Refract": "Movie not found in Refract",
+  "Episode not found; verify season numbering": "Episode not found; verify season numbering",
+  "Last watched item sent successfully": "Last watched item sent successfully",
+  "Unknown error": "Unknown error",
+  "Some items could not be matched or sent": "Some items could not be matched or sent",
+  "Refract denied access; check key and permissions":
+    "Refract denied access; check key and permissions",
+  "Network error; retry scheduled": "Network error; retry scheduled",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "No verified IMDb/TMDB/TVDB identity is available for this title.",
+  "Refract could not uniquely identify this title.":
+    "Refract could not uniquely identify this title.",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract preserved an existing library entry or viewing history.",
+  "Added to Refract Plan to Watch.": "Added to Refract Plan to Watch.",
+  "Removed from Refract Plan to Watch.": "Removed from Refract Plan to Watch.",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "Refract watchlist requires library:write. Reconnect with a key that has this scope.",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract could not confirm the watchlist change. Try again.",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default uiFallback;
