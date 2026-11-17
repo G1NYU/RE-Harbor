@@ -14,7 +14,7 @@ const spotify: MusicTrack = {
 };
 const alternative: MusicTrack = { ...spotify, id: "soundcloud:one", connectorId: "soundcloud" };
 
-function fixture(failImmediately = false, exhaustedCache = false) {
+function fixture(failImmediately = false, exhaustedCache = false, failure = "Spotify unavailable") {
   const source = readFileSync(new URL("../src/lib/music/player.ts", import.meta.url), "utf8");
   const tree = ts.createSourceFile("player.ts", source, ts.ScriptTarget.Latest, true);
   const functions = tree.statements.filter(node => ts.isFunctionDeclaration(node) &&
@@ -49,7 +49,7 @@ function fixture(failImmediately = false, exhaustedCache = false) {
     invoke: async (command: string, args: { track: MusicTrack }) => {
       if (command !== "music_play_track") return;
       attempts.push(args.track);
-      if (failImmediately && args.track.connectorId === "spotify") throw new Error("Spotify unavailable");
+      if (failImmediately && args.track.connectorId === "spotify") throw new Error(failure);
     },
     stopCastOwner: async () => {}, ensureNativeEvents: async () => {}, updateMediaSession: () => {},
     likedIdsFor: () => [], isMusicLiked: () => false, getMusicSpeakerState: () => ({ active: false }),
@@ -99,4 +99,15 @@ test("an exhausted cached source list is refreshed before automatic playback giv
   assert.equal(h.lookups(), 2);
   assert.equal(h.state.current?.connectorId, "soundcloud");
   assert.equal(h.state.error, null);
+});
+
+test("an unconfirmed stop never retries or switches an automatic playback source", async () => {
+  const h = fixture(true, false, "STOP_UNCONFIRMED");
+  await assert.rejects(h.play(spotify, [spotify]), /STOP_UNCONFIRMED/);
+  assert.deepEqual(h.attempts, [spotify]);
+  assert.equal(h.lookups(), 0);
+  assert.equal(h.state.current?.connectorId, "spotify");
+  assert.deepEqual(h.state.queue, [spotify]);
+  assert.equal(h.state.phase, "error");
+  assert.equal(h.state.error, "STOP_UNCONFIRMED");
 });

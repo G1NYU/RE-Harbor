@@ -1105,12 +1105,15 @@ export async function playMusic(
         : error instanceof Error
           ? error.message
           : String(error);
-    if (
-      skipUnavailable &&
-      !/STOP_UNCONFIRMED|stopUnconfirmed/i.test(message) &&
-      skipUnavailableTrack(track, queue)
-    )
-      return;
+    // The previous session may still own the audio engine. Do not retry, switch
+    // providers, or advance the queue until the listener can safely stop it.
+    const stopUnconfirmed = /STOP_UNCONFIRMED|stopUnconfirmed/i.test(message);
+    if (stopUnconfirmed) {
+      recoverPlayback = null;
+      publish({ phase: "error", error: message });
+      throw error instanceof Error ? error : new Error(message);
+    }
+    if (skipUnavailable && skipUnavailableTrack(track, queue)) return;
     const attemptKey = `${track.connectorId}:${track.id}`;
     if (!chosenByHand && !skipUnavailable && !failedAttempts.has(attemptKey)) {
       failedAttempts.add(attemptKey);
@@ -1119,12 +1122,14 @@ export async function playMusic(
         await playMusic(track, queue, failedAttempts, true, skipUnavailable);
         return;
       } catch {
-        /* the retry failed too; fall through to another source */
+        // The child request owns its own recovery and error state.
+        if (!ownsRequest()) throw error instanceof Error ? error : new Error(message);
       }
     }
     if (!chosenByHand && !skipUnavailable) {
       const next = await nextPlayableSource(track, failedAttempts);
-      if (next && ownsRequest()) {
+      if (!ownsRequest()) return;
+      if (next) {
         publish({ phase: "resolving", error: null });
         try {
           await playMusic(
@@ -1136,7 +1141,8 @@ export async function playMusic(
           );
           return;
         } catch {
-          /* exhausted; the picker below is the last resort */
+          // A superseding request (including the child attempt) owns the UI.
+          if (!ownsRequest()) throw error instanceof Error ? error : new Error(message);
         }
       }
     }
