@@ -101,7 +101,18 @@ impl OkRuConnector {
     ) -> Result<Response, String> {
         // The caller controls neither the host nor the route; redirects are disabled.
         let url = format!("https://wmf.ok.ru/{route};jsessionid={session}");
-        let response = self.http.get(url).query(params).send().await
+        let mut request = match route {
+            "play" => self.http.post(url),
+            "queryMixedSuggestions" => self.http.get(url),
+            _ => return Err("Unsupported OK.ru music API route".into()),
+        };
+        request = request.query(params)
+            .header(reqwest::header::ACCEPT, "application/json, text/javascript, */*; q=0.01")
+            .header(reqwest::header::ACCEPT_LANGUAGE, "ru-RU,ru;q=0.9,en;q=0.8")
+            .header(reqwest::header::ORIGIN, "https://ok.ru")
+            .header(reqwest::header::REFERER, "https://ok.ru/")
+            .header("X-Requested-With", "XMLHttpRequest");
+        let response = request.send().await
             .map_err(|_| "OK.ru request failed; check session or connection")?;
         if !response.status().is_success() {
             return Err(format!("OK.ru returned HTTP {}", response.status()));
@@ -117,11 +128,10 @@ impl OkRuConnector {
 
     async fn find(&self, query: &str, limit: usize) -> Result<Vec<MusicTrack>, String> {
         if query.trim().is_empty() { return Ok(Vec::new()); }
-        let response = self.request("tracks", &[
+        let response = self.request("queryMixedSuggestions", &[
             ("q", query.trim().to_owned()),
-            ("start", "0".into()),
-            ("count", limit.clamp(1, 50).to_string()),
-            ("imgfmt", "base".into()),
+            ("client", "web".into()),
+            ("locale", "ru".into()),
         ]).await?;
         Ok(response.tracks.iter()
             .filter_map(|item| map_track(item, &response.albums))
@@ -135,7 +145,11 @@ impl OkRuConnector {
             return Err("Invalid OK.ru track".into());
         }
         let response = self.request("play", &[
-            ("tid", id.to_owned()), ("imgfmt", "base".into()),
+            ("tid", id.to_owned()),
+            ("ctx", "my|1".into()),
+            ("client", "web".into()),
+            ("locale", "ru".into()),
+            ("imgfmt", "base".into()),
         ]).await?;
         let url = safe_media(response.play.as_deref().ok_or("OK.ru did not return a playable URL")?)?;
         Ok(MusicStream { url, mime_type: "audio/mpeg".into(), bitrate: 0, http_headers: Default::default() })
@@ -150,11 +164,50 @@ fn parse_response(route: &str, json: Value) -> Result<Response, String> {
             _ => "OK.ru rejected the request",
         }.into());
     }
-    if route == "tracks" && !json.get("tracks").is_some_and(Value::is_array) {
-        return Err("OK.ru search response format has changed".into());
+    if !json.is_object() {
+        return Err("OK.ru returned an unsupported response".into());
     }
-    serde_json::from_value(json)
-        .map_err(|_| "OK.ru returned an unsupported response".to_string())
+    let mut response: Response = serde_json::from_value(json.clone())
+        .map_err(|_| "OK.ru returned an unsupported response".to_string())?;
+    if route == "queryMixedSuggestions" && response.tracks.is_empty() {
+        let mut matching = Vec::new();
+        collect_suggested_tracks(&json, 0, &mut matching);
+        response.tracks = matching;
+    }
+    Ok(response)
+}
+
+fn collect_suggested_tracks(json: &Value, depth: usize, matches: &mut Vec<Track>) {
+    if depth > 6 || matches.len() >= 50 {
+        return;
+    }
+    match json {
+        Value::Array(items) => {
+            for item in items.iter().take(100) {
+                collect_suggested_tracks(item, depth + 1, matches);
+                if matches.len() >= 50 { break; }
+            }
+        }
+        Value::Object(object) => {
+            // Accept track-shaped objects only, never artist/album suggestions.
+            if json.get("duration").and_then(Value::as_u64).unwrap_or(0) > 0
+                && json.get("id").and_then(Value::as_i64).unwrap_or(0) > 0
+                && json.get("name").and_then(Value::as_str).is_some()
+            {
+                if let Ok(track) = serde_json::from_value::<Track>(json.clone()) {
+                    if !matches.iter().any(|known| known.id == track.id) {
+                        matches.push(track);
+                    }
+                }
+            }
+            for key in ["tracks", "track", "suggestions", "items", "results", "data", "result"] {
+                if let Some(value) = object.get(key) {
+                    collect_suggested_tracks(value, depth + 1, matches);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 fn safe_cdn(raw: &str) -> Option<Url> {
@@ -215,11 +268,10 @@ impl MusicConnector for OkRuConnector {
         // Verify that the new session can actually reach search BEFORE replacing
         // an already usable session. Empty results are acceptable; invalid
         // auth, redirects and changed response schemas are not.
-        self.request_with_session(&session, "tracks", &[
+        self.request_with_session(&session, "queryMixedSuggestions", &[
             ("q", "music".to_string()),
-            ("start", "0".to_string()),
-            ("count", "1".to_string()),
-            ("imgfmt", "base".to_string()),
+            ("client", "web".to_string()),
+            ("locale", "ru".to_string()),
         ]).await?;
         self.set_session(&session)?;
         self.health.set(ConnectorHealth::Healthy);
@@ -285,11 +337,11 @@ mod tests {
     #[test]
     fn connection_probe_detects_invalid_sessions_and_changed_search_schema() {
         let rejected = serde_json::json!({"error":"error.notloggedin"});
-        assert!(parse_response("tracks", rejected).unwrap_err().contains("expired"));
-        let malformed = serde_json::json!({"message":"unexpected response"});
-        assert!(parse_response("tracks", malformed).unwrap_err().contains("format"));
-        let empty = serde_json::json!({"tracks":[],"albums":[]});
-        assert_eq!(parse_response("tracks", empty).unwrap().tracks.len(), 0);
+        assert!(parse_response("queryMixedSuggestions", rejected).unwrap_err().contains("expired"));
+        let malformed = serde_json::json!(["unexpected", "response"]);
+        assert!(parse_response("queryMixedSuggestions", malformed).unwrap_err().contains("unsupported"));
+        let empty = serde_json::json!({"suggestions":[]});
+        assert_eq!(parse_response("queryMixedSuggestions", empty).unwrap().tracks.len(), 0);
     }
     #[test]
     fn a_playback_response_does_not_need_the_search_results_field() {
@@ -297,6 +349,31 @@ mod tests {
             "play":"https://musicd.mycdn.me/v0/stream?md5=example"
         });
         assert!(parse_response("play", playback).unwrap().play.is_some());
+    }
+    #[test]
+    fn modern_search_discovers_nested_tracks_without_taking_album_suggestions() {
+        let json = serde_json::json!({"suggestions": [
+            {"id":42, "name":"Artist only"},
+            {"track":{"id":125295703372099_i64,"name":"Demo Track","ensemble":"Demo Artist","duration":106}},
+            {"track":{"id":125295703372099_i64,"name":"Demo Track","duration":106}},
+            {"track":{"id":55,"name":"Another Track","duration":180}}
+        ]});
+        let parsed = parse_response("queryMixedSuggestions", json).unwrap();
+        assert_eq!(parsed.tracks.len(), 2);
+        assert_eq!(map_track(&parsed.tracks[0], &parsed.albums).unwrap().duration_seconds, 106);
+    }
+    #[test]
+    fn browser_play_response_preserves_the_track_metadata_shape() {
+        let json = serde_json::json!({
+            "play":"https://musicd.mycdn.me/v0/stream?md5=example",
+            "image":"https://i.mycdn.me/i?r=abc",
+            "subscribed":false, "albums":[{"id":1,"name":"Test"}],
+            "friend":{"name":"Example"}, "umaPayload":"{}",
+            "track":{"id":125295703372099_i64,"ensemble":"Demo","duration":106}
+        });
+        let response = parse_response("play", json).unwrap();
+        assert!(response.play.is_some());
+        assert_eq!(response.albums.len(), 1);
     }
     #[test]
     fn historic_okru_result_maps_to_harbor_music_track() {
