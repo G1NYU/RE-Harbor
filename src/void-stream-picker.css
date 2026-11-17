@@ -2,7 +2,7 @@
  * VOID Native / source selection.
  * A single lightweight visual language for initial stream picking and
  * in-player source switching. Structural hooks, no duplicate controls,
- * backdrop-filter, continuous effects or network assets.
+ * expensive GPU blurs, continuous effects or network assets.
  */
 [data-void-stream-brand] {
   display: none;
