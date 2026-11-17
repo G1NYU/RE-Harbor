@@ -371,6 +371,61 @@ const id: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  "Refract sync": "Sinkronisasi Refract",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "Sinkronkan riwayat tontonan dan perubahan daftar tontonan Harbor dengan Refract.",
+  "Refract personal API key": "Kunci API pribadi Refract",
+  "Verifying...": "Memverifikasi…",
+  "Connect Refract": "Hubungkan Refract",
+  "Refract key saved in Harbor's secret store":
+    "Kunci Refract tersimpan di penyimpanan rahasia Harbor",
+  "Sync watched history and watchlist": "Sinkronkan riwayat dan daftar tontonan",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Kirim riwayat dan perubahan daftar tontonan dari Harbor ke Refract. Hanya profil utama Harbor yang disinkronkan.",
+  "Retry pending watches": "Coba lagi tontonan yang tertunda",
+  "Disconnect Refract": "Putuskan koneksi Refract",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Terhubung ke Refract ({identity}). Sinkronisasi riwayat tontonan aktif.",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Kunci tidak dapat diverifikasi melalui Refract /v1/me. Periksa izin dan koneksi.",
+  "Disconnected from Refract.": "Koneksi Refract diputus.",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Buat kunci API pribadi di Refract dengan profile:read, library:read, library:write dan history:write. Jangan pernah bagikan atau masukkan kunci ke repositori.",
+  "Automatic watch threshold": "Ambang pencatatan tontonan otomatis",
+  "After {count} minutes": "Setelah {count} menit",
+  "{count}% (default)": "{count}% (bawaan)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "Catat film atau episode di Refract saat pemutaran mencapai waktu atau persentase pilihan. Melompat melewati ambang juga dihitung. Pencatatan awal menandai konten sebagai sudah ditonton, bukan sebagian ditonton. Ambang penyelesaian Harbor tidak berubah.",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract: rencana tontonan",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "Penambahan dan penghapusan dalam daftar tontonan dikirim otomatis saat sinkronisasi aktif. Memerlukan library:write; hubungkan kembali dengan kunci terbaru jika perlu. Riwayat Refract dan status pustaka lainnya tetap tersimpan.",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "{sent} terkirim · {pending} tertunda · {failed} tidak cocok",
+  "Unmatched items": "Item yang tidak cocok",
+  "Refract queue full; unable to save another watch":
+    "Antrean Refract penuh; tontonan tambahan tidak dapat disimpan",
+  "No verified IMDb/TMDB/TVDB identity": "Tidak ada ID IMDb/TMDB/TVDB yang terverifikasi",
+  "Movie not found in Refract": "Film tidak ditemukan di Refract",
+  "Episode not found; verify season numbering": "Episode tidak ditemukan; periksa penomoran musim",
+  "Last watched item sent successfully": "Tontonan terakhir berhasil dikirim",
+  "Unknown error": "Kesalahan tidak diketahui",
+  "Some items could not be matched or sent": "Beberapa item tidak dapat dicocokkan atau dikirim",
+  "Refract denied access; check key and permissions":
+    "Refract menolak akses; periksa kunci dan izin",
+  "Network error; retry scheduled": "Kesalahan jaringan; percobaan ulang dijadwalkan",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "Tidak ada ID IMDb/TMDB/TVDB terverifikasi untuk judul ini.",
+  "Refract could not uniquely identify this title.":
+    "Refract tidak dapat mengidentifikasi judul ini secara unik.",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract mempertahankan entri pustaka atau riwayat tontonan yang sudah ada.",
+  "Added to Refract Plan to Watch.": "Ditambahkan ke rencana tontonan Refract.",
+  "Removed from Refract Plan to Watch.": "Dihapus dari rencana tontonan Refract.",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "Daftar tontonan Refract memerlukan library:write. Hubungkan kembali dengan kunci yang memiliki izin ini.",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract tidak dapat mengonfirmasi perubahan daftar tontonan. Coba lagi.",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default id;
