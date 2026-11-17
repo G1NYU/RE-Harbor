@@ -840,6 +840,7 @@ export async function playMusic(
   skipUnavailable = false,
   explicit = false,
   automationOwner?: symbol,
+  refreshStream = false,
 ): Promise<void> {
   if (automationOwner && !ownsMusicQueueAutomation(automationOwner)) return;
   if (!continuing && !failedAttempts.size && !automationOwner) cancelMusicQueueAutomation();
@@ -993,9 +994,37 @@ export async function playMusic(
             ? state.currentTime
             : 0;
         const duration = state.duration;
-        failedAttempts.add(`${attemptTrack.connectorId}:${attemptTrack.id}`);
+        const attemptKey = `${attemptTrack.connectorId}:${attemptTrack.id}`;
+        const stopUnconfirmed = /STOP_UNCONFIRMED|stopUnconfirmed/i.test(message ?? "");
+        const canReconnect =
+          !stopUnconfirmed &&
+          !target &&
+          position > 0 &&
+          position < duration - 2 &&
+          !attemptTrack.playbackUrl &&
+          ["youtube", "youtube_music", "soundcloud", "plex", "jellyfin", "subsonic", "navidrome"].includes(
+            attemptTrack.connectorId ?? "",
+          ) &&
+          musicPlaybackSourceAllowed(attemptTrack) &&
+          !failedAttempts.has(attemptKey) &&
+          failedAttempts.size < SOURCE_ATTEMPT_CEILING;
+        failedAttempts.add(attemptKey);
+        if (stopUnconfirmed) {
+          enginePrimed = false;
+          resumeAt = null;
+          recoverPlayback = null;
+          publish({ phase: "error", error: message });
+          return;
+        }
         publish({ phase: "resolving", error: null });
         void (async () => {
+          if (canReconnect) {
+            // Renew a native source once per failed recording before trying another provider.
+            resumeAt = { key: queueTrackKey(attemptTrack), position };
+            await playMusic(attemptTrack, state.queue, failedAttempts, true, skipUnavailable, false, undefined, true)
+              .catch(() => {});
+            return;
+          }
           const candidates =
             chosenByHand || attemptTrack.mediaKind === "video"
               ? []
@@ -1046,7 +1075,11 @@ export async function playMusic(
       };
       try {
         if (target && !returningToComputer) await loadMusicOnSpeaker(track, target);
-        else await invoke("music_play_track", { track, volume: state.volume });
+        else await invoke("music_play_track", {
+          track,
+          volume: state.volume,
+          ...(refreshStream && attempt === 0 ? { refreshStream: true } : {}),
+        });
         break;
       } catch (error) {
         if (!ownsRequest()) return;

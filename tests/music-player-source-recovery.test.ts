@@ -33,6 +33,7 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
     currentTime: 0, duration: 0 };
   const attempts: MusicTrack[] = [];
   const seeks: number[] = [];
+  const refreshes: boolean[] = [];
   let lookups = 0;
   const scope = {
     state, queueTrackKey, shouldResolvePreferredSource, adoptRequestedIdentity, sameMusicTrack,
@@ -50,9 +51,10 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
         return [{ connectorId: "spotify", health: "healthy", track: spotify }];
       return [{ connectorId: "soundcloud", health: "healthy", track: replacement }];
     },
-    invoke: async (command: string, args: { track: MusicTrack }) => {
+    invoke: async (command: string, args: { track: MusicTrack; refreshStream?: boolean }) => {
       if (command !== "music_play_track") return;
       attempts.push(args.track);
+      refreshes.push(args.refreshStream === true);
       if (failImmediately && args.track.connectorId === "spotify") throw new Error(failure);
     },
     stopCastOwner: async () => {}, ensureNativeEvents: async () => {}, updateMediaSession: () => {},
@@ -62,7 +64,7 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
   };
   const exports: { playMusic?: typeof import("../src/lib/music/player").playMusic; failLater?: (message: string) => void; fileLoaded?: (track: MusicTrack) => void } = {};
   new Function(...Object.keys(scope), "exports", output)(...Object.values(scope), exports);
-  return { play: exports.playMusic!, failLater: exports.failLater!, fileLoaded: exports.fileLoaded!, state, attempts, seeks, lookups: () => lookups };
+  return { play: exports.playMusic!, failLater: exports.failLater!, fileLoaded: exports.fileLoaded!, state, attempts, seeks, refreshes, lookups: () => lookups };
 }
 
 test("an explicitly selected Spotify source reports immediate failure without switching providers", async () => {
@@ -205,4 +207,44 @@ test("a new song selection discards a pending recovery seek", async () => {
   await h.play(newer);
   h.fileLoaded(newer);
   assert.deepEqual(h.seeks, []);
+});
+
+test("interrupted native audio reconnects once to its original source before falling back", async () => {
+  const youtube: MusicTrack = { ...spotify, id: "youtube:one", connectorId: "youtube" };
+  const h = fixture();
+  await h.play(youtube);
+  h.fileLoaded(youtube);
+  h.state.currentTime = 64;
+  h.failLater("network interruption");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.refreshes, [false, true]);
+  assert.deepEqual(h.attempts, [youtube, youtube]);
+  assert.equal(h.lookups(), 0);
+  h.fileLoaded(youtube);
+  assert.deepEqual(h.seeks, [64]);
+  h.state.currentTime = 65;
+  h.failLater("network interruption");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.refreshes, [false, true, false]);
+  assert.equal(h.state.current?.connectorId, "soundcloud");
+  h.fileLoaded(alternative);
+  assert.deepEqual(h.seeks, [64, 65]);
+});
+
+test("reconnecting a manually chosen native source never changes providers", async () => {
+  const youtube: MusicTrack = { ...spotify, id: "youtube:one", connectorId: "youtube" };
+  const h = fixture();
+  await h.play(youtube, [youtube], undefined, false, false, true);
+  h.fileLoaded(youtube);
+  h.state.currentTime = 64;
+  h.failLater("network interruption");
+  await new Promise(resolve => setImmediate(resolve));
+  h.fileLoaded(youtube);
+  h.state.currentTime = 65;
+  h.failLater("network interruption");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.refreshes, [false, true]);
+  assert.equal(h.lookups(), 0);
+  assert.equal(h.state.current?.connectorId, "youtube");
+  assert.equal(h.state.phase, "error");
 });

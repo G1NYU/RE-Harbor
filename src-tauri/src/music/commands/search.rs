@@ -78,6 +78,7 @@ async fn probe_stream(stream: &MusicStream) -> StreamHealth {
 async fn cached_or_resolved<Probe, Probed, Resolve, Resolved>(
     db: &MusicDb,
     track_id: &str,
+    refresh: bool,
     probe: Probe,
     resolve: Resolve,
 ) -> Result<MusicStream, String>
@@ -87,7 +88,13 @@ where
     Resolve: FnOnce() -> Resolved,
     Resolved: Future<Output = Result<MusicStream, String>>,
 {
-    if let Some(cached) = db.cached_stream(track_id)? {
+    let cached = if refresh {
+        db.invalidate_stream(track_id)?;
+        None
+    } else {
+        db.cached_stream(track_id)?
+    };
+    if let Some(cached) = cached {
         let (cached, health) = probe(cached).await;
         if health == StreamHealth::Usable {
             return Ok(cached);
@@ -103,6 +110,15 @@ pub(super) async fn resolve_track(
     app: &tauri::AppHandle,
     state: &MusicState,
     track: &MusicTrack,
+) -> Result<MusicStream, String> {
+    resolve_track_with_refresh(app, state, track, false).await
+}
+
+pub(super) async fn resolve_track_with_refresh(
+    app: &tauri::AppHandle,
+    state: &MusicState,
+    track: &MusicTrack,
+    refresh: bool,
 ) -> Result<MusicStream, String> {
     state.db.upsert_track(track)?;
     if let Some(url) = track
@@ -122,6 +138,7 @@ pub(super) async fn resolve_track(
     cached_or_resolved(
         &state.db,
         &track.id,
+        refresh,
         |cached| async move {
             let health = probe_stream(&cached).await;
             (cached, health)
@@ -197,6 +214,7 @@ mod tests {
         let resolved = cached_or_resolved(
             &database,
             TRACK,
+            false,
             |cached| async move { (cached, StreamHealth::Usable) },
             || async move {
                 counter.fetch_add(1, Ordering::SeqCst);
@@ -218,6 +236,7 @@ mod tests {
         let resolved = cached_or_resolved(
             &database,
             TRACK,
+            false,
             |cached| async move { (cached, StreamHealth::Expired) },
             || async move {
                 counter.fetch_add(1, Ordering::SeqCst);
@@ -247,6 +266,7 @@ mod tests {
         let error = cached_or_resolved(
             &database,
             TRACK,
+            false,
             |cached| async move { (cached, StreamHealth::Expired) },
             || async move {
                 counter.fetch_add(1, Ordering::SeqCst);
@@ -269,6 +289,7 @@ mod tests {
         let resolved = cached_or_resolved(
             &database,
             TRACK,
+            false,
             |cached| async move { (cached, StreamHealth::Expired) },
             || async move {
                 counter.fetch_add(1, Ordering::SeqCst);
@@ -287,6 +308,27 @@ mod tests {
                 .expect("stored stream")
                 .url,
             "https://cf-media.sndcdn.com/first"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_explicit_refresh_resolves_without_probing_the_previous_url() {
+        let database = database_with_cached("https://example.test/old");
+        let resolved = cached_or_resolved(
+            &database,
+            TRACK,
+            true,
+            |_cached| async move {
+                panic!("refresh must not probe the previous stream")
+            },
+            || async { Ok(stream("https://example.test/renewed")) },
+        )
+        .await
+        .expect("fresh resolution");
+        assert_eq!(resolved.url, "https://example.test/renewed");
+        assert_eq!(
+            database.cached_stream(TRACK).unwrap().unwrap().url,
+            resolved.url
         );
     }
 

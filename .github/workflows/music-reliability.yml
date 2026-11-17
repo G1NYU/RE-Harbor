@@ -52,4 +52,6 @@ jobs:
       - name: Native music tests
         env:
           TAURI_CONFIG: '{"bundle":{"externalBin":[],"resources":[]}}'
-        run: cargo test --manifest-path src-tauri/Cargo.toml network_audio_cache_has_bounded_lookahead_and_rebuffer_threshold
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml network_audio_cache_has_bounded_lookahead_and_rebuffer_threshold
+          cargo test --manifest-path src-tauri/Cargo.toml music::commands::search::tests
