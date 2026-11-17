@@ -1,16 +1,16 @@
 /* VOID / Catppuccin personal music home; no rotating editorial hero. */
 .music-room-home[data-music-premium] {
-  --music-room-bg: #111019;
-  --music-room-surface: #1b1925;
-  --music-room-raised: #252231;
-  --music-room-border: #393541;
-  --music-room-accent: #89b4fa;
-  --music-room-text: #e1e3f3;
-  --music-room-muted: #a5a9bd;
+  --music-room-bg: #11111b;
+  --music-room-surface: #181825;
+  --music-room-raised: #1e1e2e;
+  --music-room-border: #313244;
+  --music-room-accent: #6c7086;
+  --music-room-text: #cdd6f4;
+  --music-room-muted: #a6adc8;
   display: flex;
   flex-direction: column;
   gap: 26px;
-  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .music-room-home .music-room-feature {
@@ -85,11 +85,11 @@
 
 .music-room-home .music-room-main-action {
   background: var(--music-room-accent);
-  color: #101522;
+  color: #11111b;
 }
 
 .music-room-home .music-room-main-action:hover {
-  background: #a5c8ff;
+  background: #9399b2;
 }
 
 .music-room-home .music-room-secondary-action {
