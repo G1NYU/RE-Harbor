@@ -18,7 +18,7 @@ const defaults = read("src/lib/settings/defaults.ts");
 test("recents shelf loads its own responsive styling rather than the legacy hero", () => {
   assert.match(musicBands, /import "\.\/music-recents\.css"/);
   assert.match(musicBands, /className="music-quick-grid"/);
-  assert.match(musicCards, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(musicCards, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(musicCards, /\.music-quick-art img\s*\{/);
   assert.match(musicCards, /object-fit: cover/);
   assert.match(musicCards, /max-width: 560px/);
