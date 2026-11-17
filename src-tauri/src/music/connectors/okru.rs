@@ -107,6 +107,10 @@ impl OkRuConnector {
             _ => return Err("Unsupported OK.ru music API route".into()),
         };
         request = request.query(params)
+            // Match the authenticated music service: session both in the fixed path
+            // and as a cookie, never sent to redirects or external media hosts.
+            .header(reqwest::header::COOKIE, format!("jsessionid={session}"))
+            .header(reqwest::header::USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
             .header(reqwest::header::ACCEPT, "application/json, text/javascript, */*; q=0.01")
             .header(reqwest::header::ACCEPT_LANGUAGE, "ru-RU,ru;q=0.9,en;q=0.8")
             .header(reqwest::header::ORIGIN, "https://ok.ru")
