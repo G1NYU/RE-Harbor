@@ -319,16 +319,16 @@
 [data-music-view][data-music-tab="forYou"] [data-music-consolidated-back] {
   max-width: none;
 }
-[data-music-view][data-music-tab="forYou"] [data-scroll-anchor="hero"] {
+[data-music-view][data-music-tab="forYou"] .music-room-feature {
   margin-inline: -3rem;
 }
 @media (max-width: 1023px) {
-  [data-music-view][data-music-tab="forYou"] [data-scroll-anchor="hero"] {
+  [data-music-view][data-music-tab="forYou"] .music-room-feature {
     margin-inline: -2rem;
   }
 }
 @media (max-width: 639px) {
-  [data-music-view][data-music-tab="forYou"] [data-scroll-anchor="hero"] {
+  [data-music-view][data-music-tab="forYou"] .music-room-feature {
     margin-inline: -1.25rem;
   }
 }
