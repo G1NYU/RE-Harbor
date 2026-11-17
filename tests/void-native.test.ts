@@ -29,6 +29,7 @@ test("native chrome keeps hero artwork static, rather than remounting it", () =>
   assert.match(nativeCss, /data-tv-hero-zone/);
   assert.match(nativeCss, /prefers-reduced-motion/);
   assert.doesNotMatch(nativeCss, /backdrop-filter\s*:/);
-  assert.doesNotMatch(nativeCss, /url\s*\(/);
+  assert.match(nativeCss, /--void-nav-icon:url\("data:image\/svg\+xml/);
+  assert.doesNotMatch(nativeCss, /url\s*\(["\']?https?:/i);
   assert.doesNotMatch(nativeCss, /@keyframes/);
 });
