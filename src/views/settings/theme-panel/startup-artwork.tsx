@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { LoaderCircle, RotateCcw, Upload } from 'lucide-react';
 import { CustomArtwork, useCustomArtwork } from '@/components/custom-artwork';
-import { HarborLoader } from '@/components/harbor-loader';
+import { HarborLoader, VoidDefaultArtwork } from '@/components/harbor-loader';
+import { useSettings } from '@/lib/settings';
 import { HarborMark } from '@/components/icons/harbor-mark';
 import { ARTWORK_ACCEPT, type ArtworkRole } from '@/lib/custom-artwork-data';
 import { importArtwork } from '@/lib/custom-artwork-import';
@@ -13,6 +14,8 @@ import './startup-artwork.css';
 
 function ArtworkSetting({role}: {role:ArtworkRole}) {
   const t = useT(), choice = useCustomArtwork(role);
+  const { settings } = useSettings();
+  const voidNative = settings.theme.preset === 'cool-grey';
   const file = useRef<HTMLInputElement>(null), alive = useRef(true), pending = useRef(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   useEffect(() => { alive.current = true; return () => {alive.current = false;}; }, []);
@@ -32,10 +35,10 @@ function ArtworkSetting({role}: {role:ArtworkRole}) {
   return <SettingRow wide label={t(`artwork.${role}`)} desc={t(`artwork.${role}Hint`)}>
     <div className="hset-artwork" aria-busy={busy}>
       <div className="hset-artwork-preview">
-        <CustomArtwork role={role} className="h-24 w-24" fallback={role === 'loading' ? <HarborLoader size="sm" original /> : <HarborMark className="h-16 w-16 text-ink" />} />
+        <CustomArtwork role={role} className="h-24 w-24" fallback={voidNative ? <VoidDefaultArtwork size="sm" /> : role === 'loading' ? <HarborLoader size="sm" original /> : <HarborMark className="h-16 w-16 text-ink" />} />
       </div>
       <div className="hset-artwork-controls">
-        <span className="hset-artwork-name" title={choice?.name}>{choice?.name ?? t('artwork.original')}</span>
+        <span className="hset-artwork-name" title={choice?.name}>{choice?.name ?? (voidNative ? 'VOID default' : t('artwork.original'))}</span>
         <div className="hset-artwork-actions">
           <button type="button" disabled={busy} onClick={()=>file.current?.click()} aria-label={t(role==='loading'?'artwork.chooseLoading':'artwork.chooseLaunch')}>
             {busy ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}{t(busy?'artwork.saving':'artwork.choose')}
