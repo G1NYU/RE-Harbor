@@ -14,22 +14,25 @@ const spotify: MusicTrack = {
 };
 const alternative: MusicTrack = { ...spotify, id: "soundcloud:one", connectorId: "soundcloud" };
 
-function fixture(failImmediately = false, exhaustedCache = false, failure = "Spotify unavailable", lookupGate?: Promise<void>) {
+function fixture(failImmediately = false, exhaustedCache = false, failure = "Spotify unavailable", lookupGate?: Promise<void>, replacement = alternative) {
   const source = readFileSync(new URL("../src/lib/music/player.ts", import.meta.url), "utf8");
   const tree = ts.createSourceFile("player.ts", source, ts.ScriptTarget.Latest, true);
   const functions = tree.statements.filter(node => ts.isFunctionDeclaration(node) &&
-    ["playMusic", "nextPlayableSource", "recoverySources"].includes(node.name?.text ?? ""));
+    ["playMusic", "nextPlayableSource", "recoverySources", "handlePlaybackEvent"].includes(node.name?.text ?? ""));
   const declarations = `let explicitSource=null, playRequest=0, observedPause=null, resumeAt=null,
     recoverPlayback=null, audioReady=null, enginePrimed=false, pendingSpeakerDevice=null,
     returningToComputer=false, speakerTransfer=false; const autoSkipped=new Set();
     const SOURCE_ATTEMPT_CEILING=6, SOURCE_TTL_MS=120000;
-    export const failLater=(message)=>recoverPlayback?.(message);`;
+    export const failLater=(message)=>recoverPlayback?.(message);
+    export const fileLoaded=(track)=>handlePlaybackEvent({event:"file-loaded",trackId:track.id,connectorId:track.connectorId});`;
   const output = ts.transpileModule(declarations + functions.map(node => node.getText(tree)).join("\n"), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
   }).outputText;
   const state = { phase: "idle", current: null as MusicTrack | null, queue: [] as MusicTrack[],
-    queueIndex: 0, volume: .5, recents: [], likedIds: [], likedTracks: [], error: null };
+    queueIndex: 0, volume: .5, recents: [], likedIds: [], likedTracks: [], error: null,
+    currentTime: 0, duration: 0 };
   const attempts: MusicTrack[] = [];
+  const seeks: number[] = [];
   let lookups = 0;
   const scope = {
     state, queueTrackKey, shouldResolvePreferredSource, adoptRequestedIdentity, sameMusicTrack,
@@ -45,7 +48,7 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
       if (lookupGate) await lookupGate;
       if (exhaustedCache && !refresh)
         return [{ connectorId: "spotify", health: "healthy", track: spotify }];
-      return [{ connectorId: "soundcloud", health: "healthy", track: alternative }];
+      return [{ connectorId: "soundcloud", health: "healthy", track: replacement }];
     },
     invoke: async (command: string, args: { track: MusicTrack }) => {
       if (command !== "music_play_track") return;
@@ -55,10 +58,11 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
     stopCastOwner: async () => {}, ensureNativeEvents: async () => {}, updateMediaSession: () => {},
     likedIdsFor: () => [], isMusicLiked: () => false, getMusicSpeakerState: () => ({ active: false }),
     deckAdoption: { deck: () => 0 }, require: () => ({ unhideMusicRecent: () => {} }),
+    seekMusic: (position: number) => seeks.push(position),
   };
-  const exports: { playMusic?: typeof import("../src/lib/music/player").playMusic; failLater?: (message: string) => void } = {};
+  const exports: { playMusic?: typeof import("../src/lib/music/player").playMusic; failLater?: (message: string) => void; fileLoaded?: (track: MusicTrack) => void } = {};
   new Function(...Object.keys(scope), "exports", output)(...Object.values(scope), exports);
-  return { play: exports.playMusic!, failLater: exports.failLater!, state, attempts, lookups: () => lookups };
+  return { play: exports.playMusic!, failLater: exports.failLater!, fileLoaded: exports.fileLoaded!, state, attempts, seeks, lookups: () => lookups };
 }
 
 test("an explicitly selected Spotify source reports immediate failure without switching providers", async () => {
@@ -160,4 +164,45 @@ test("an obsolete source lookup rejection cannot evict a refreshed candidate cac
   await rejected;
   assert.equal(lookup(spotify), fresh);
   assert.equal(calls, 2);
+});
+
+test("late playback recovery resumes a matching replacement exactly once after it loads", async () => {
+  const h = fixture();
+  await h.play(spotify);
+  h.fileLoaded(spotify);
+  h.state.currentTime = 64;
+  h.failLater("network interruption");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.current?.connectorId, "soundcloud");
+  assert.deepEqual(h.seeks, []);
+  h.fileLoaded(spotify);
+  assert.deepEqual(h.seeks, []);
+  h.fileLoaded(alternative);
+  h.fileLoaded(alternative);
+  assert.deepEqual(h.seeks, [64]);
+});
+
+test("late playback recovery does not seek across substantially different durations", async () => {
+  const replacement = { ...alternative, durationSeconds: 205 };
+  const h = fixture(false, false, undefined, undefined, replacement);
+  await h.play(spotify);
+  h.fileLoaded(spotify);
+  h.state.currentTime = 64;
+  h.failLater("network interruption");
+  await new Promise(resolve => setImmediate(resolve));
+  h.fileLoaded(replacement);
+  assert.deepEqual(h.seeks, []);
+});
+
+test("a new song selection discards a pending recovery seek", async () => {
+  const h = fixture();
+  await h.play(spotify);
+  h.fileLoaded(spotify);
+  h.state.currentTime = 64;
+  h.failLater("network interruption");
+  await new Promise(resolve => setImmediate(resolve));
+  const newer = { ...alternative, id: "soundcloud:two", title: "Two" };
+  await h.play(newer);
+  h.fileLoaded(newer);
+  assert.deepEqual(h.seeks, []);
 });
