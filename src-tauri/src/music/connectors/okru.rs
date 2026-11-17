@@ -3,6 +3,7 @@ use super::super::connector::{ConnectorHealth, HealthCell, MusicConnector};
 use super::super::{duration_label, MusicConnection, MusicConnectionField, MusicStream, MusicTrack};
 use async_trait::async_trait;
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::Duration;
@@ -86,26 +87,28 @@ impl OkRuConnector {
     }
 
     async fn request(&self, route: &str, params: &[(&str, String)]) -> Result<Response, String> {
-        // Fixed host, fixed routes, and no redirects keep account sessions private.
         let session = self.session.read()
             .map_err(|_| "OK.ru session storage unavailable")?
             .clone().ok_or("Connect OK.ru in Music Connections first")?;
+        self.request_with_session(&session, route, params).await
+    }
+
+    async fn request_with_session(
+        &self,
+        session: &str,
+        route: &str,
+        params: &[(&str, String)],
+    ) -> Result<Response, String> {
+        // The caller controls neither the host nor the route; redirects are disabled.
         let url = format!("https://wmf.ok.ru/{route};jsessionid={session}");
         let response = self.http.get(url).query(params).send().await
             .map_err(|_| "OK.ru request failed; check session or connection")?;
         if !response.status().is_success() {
             return Err(format!("OK.ru returned HTTP {}", response.status()));
         }
-        let body: Response = response.json().await
+        let json: Value = response.json().await
             .map_err(|_| "OK.ru returned an unsupported response")?;
-        if let Some(error) = body.error.as_deref() {
-            return Err(match error {
-                "error.notloggedin" => "OK.ru session expired",
-                "error.copyright.restriction" => "OK.ru restricts this recording",
-                _ => "OK.ru rejected the request",
-            }.into());
-        }
-        Ok(body)
+        parse_response(route, json)
     }
 
     fn record<T>(&self, outcome: &Result<T, String>) {
@@ -137,6 +140,21 @@ impl OkRuConnector {
         let url = safe_media(response.play.as_deref().ok_or("OK.ru did not return a playable URL")?)?;
         Ok(MusicStream { url, mime_type: "audio/mpeg".into(), bitrate: 0, http_headers: Default::default() })
     }
+}
+
+fn parse_response(route: &str, json: Value) -> Result<Response, String> {
+    if let Some(error) = json.get("error").and_then(Value::as_str) {
+        return Err(match error {
+            "error.notloggedin" => "OK.ru session expired",
+            "error.copyright.restriction" => "OK.ru restricts this recording",
+            _ => "OK.ru rejected the request",
+        }.into());
+    }
+    if route == "tracks" && !json.get("tracks").is_some_and(Value::is_array) {
+        return Err("OK.ru search response format has changed".into());
+    }
+    serde_json::from_value(json)
+        .map_err(|_| "OK.ru returned an unsupported response".to_string())
 }
 
 fn safe_cdn(raw: &str) -> Option<Url> {
@@ -191,8 +209,20 @@ impl MusicConnector for OkRuConnector {
         _app: &tauri::AppHandle,
         fields: &HashMap<String, String>,
     ) -> Result<MusicConnection, String> {
-        let session = fields.get("session").ok_or("Enter your OK.ru session ID")?;
-        self.set_session(session)?;
+        let session = Self::validate_session(
+            fields.get("session").ok_or("Enter your OK.ru session ID")?,
+        )?;
+        // Verify that the new session can actually reach search BEFORE replacing
+        // an already usable session. Empty results are acceptable; invalid
+        // auth, redirects and changed response schemas are not.
+        self.request_with_session(&session, "tracks", &[
+            ("q", "music".to_string()),
+            ("start", "0".to_string()),
+            ("count", "1".to_string()),
+            ("imgfmt", "base".to_string()),
+        ]).await?;
+        self.set_session(&session)?;
+        self.health.set(ConnectorHealth::Healthy);
         Ok(self.connection())
     }
 
@@ -252,6 +282,22 @@ mod tests {
         assert!(connector.configured());
     }
 
+    #[test]
+    fn connection_probe_detects_invalid_sessions_and_changed_search_schema() {
+        let rejected = serde_json::json!({"error":"error.notloggedin"});
+        assert!(parse_response("tracks", rejected).unwrap_err().contains("expired"));
+        let malformed = serde_json::json!({"message":"unexpected response"});
+        assert!(parse_response("tracks", malformed).unwrap_err().contains("format"));
+        let empty = serde_json::json!({"tracks":[],"albums":[]});
+        assert_eq!(parse_response("tracks", empty).unwrap().tracks.len(), 0);
+    }
+    #[test]
+    fn a_playback_response_does_not_need_the_search_results_field() {
+        let playback = serde_json::json!({
+            "play":"https://musicd.mycdn.me/v0/stream?md5=example"
+        });
+        assert!(parse_response("play", playback).unwrap().play.is_some());
+    }
     #[test]
     fn historic_okru_result_maps_to_harbor_music_track() {
         let response: Response = serde_json::from_str(r#"{
