@@ -1,4 +1,5 @@
 import { useRef, useState, type MouseEvent } from "react";
+import "./music-recents.css";
 import { Music2, Plus, X } from "@/components/icons/music-icons";
 import { hideMusicRecent, isMusicRecentHidden } from "@/lib/music/hidden-recents";
 import { MusicTrackMixChip, MusicTrackPlaylistChip } from "@/components/music/music-playlist-chip";
