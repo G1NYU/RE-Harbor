@@ -1,0 +1,215 @@
+/*
+ * VOID Native / source selection.
+ * A single lightweight visual language for initial stream picking and
+ * in-player source switching. Structural hooks, no duplicate controls,
+ * backdrop-filter, continuous effects or network assets.
+ */
+[data-void-stream-brand] {
+  display: none;
+}
+
+html[data-void-native="1"] [data-void-stream-brand] {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 840;
+  letter-spacing: 0.19em;
+  line-height: 1.25;
+  color: var(--color-ink);
+}
+
+html[data-void-native="1"] [data-void-stream-brand] small {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.2em;
+  color: var(--color-ink-subtle);
+}
+
+html[data-void-native="1"] main[data-stream-picker] {
+  background-color: #11111b;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+html[data-void-native="1"] [data-stream-picker-content] {
+  max-width: 1120px;
+  gap: clamp(24px, 3.5vw, 42px);
+  padding-inline: clamp(20px, 4vw, 48px);
+  padding-block-start: clamp(88px, 9vw, 120px);
+}
+
+html[data-void-native="1"] [data-stream-picker] header h1 {
+  font-family: var(--font-display);
+  font-weight: 790;
+  font-size: clamp(34px, 4.6vw, 62px);
+  line-height: 1.05;
+  letter-spacing: -0.043em;
+  text-wrap: balance;
+}
+
+html[data-void-native="1"] [data-stream-picker] header > p:first-of-type {
+  color: var(--color-ink-subtle);
+  font-size: 11px;
+  letter-spacing: 0.19em;
+}
+
+html[data-void-native="1"] [data-stream-picker] :is(button, [role="button"]):focus-visible,
+html[data-void-native="1"] [data-stream-switcher] :is(button, [role="button"]):focus-visible {
+  outline: 2px solid #9399b2;
+  outline-offset: 2px;
+}
+
+html[data-void-native="1"] [data-stream-primary] {
+  background-color: #181825;
+  border: 1px solid #313244;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+html[data-void-native="1"] [data-stream-primary] > .grid {
+  gap: clamp(18px, 3vw, 32px);
+  padding: clamp(18px, 3vw, 32px);
+}
+
+html[data-void-native="1"] [data-stream-drawer] > button:first-child {
+  min-height: 46px;
+  border: 1px solid #313244;
+  border-radius: 11px;
+  background: #181825;
+  color: #cdd6f4;
+  letter-spacing: 0.08em;
+}
+
+html[data-void-native="1"] [data-stream-drawer] > button:first-child:hover {
+  background: #1e1e2e;
+  border-color: #6c7086;
+}
+
+html[data-void-native="1"] [data-stream-drawer] > ul {
+  background-color: #181825;
+  border-color: #313244;
+  border-radius: 14px;
+}
+
+html[data-void-native="1"] [data-stream-row] > button {
+  min-height: 72px;
+  padding-block: 16px;
+  transition: background-color 140ms ease;
+}
+
+html[data-void-native="1"] [data-stream-row] > button:hover,
+html[data-void-native="1"] [data-stream-row] > button:focus-visible {
+  background: #1e1e2e;
+}
+
+html[data-void-native="1"] [data-stream-layout] {
+  gap: 18px;
+}
+
+html[data-void-native="1"] [data-stream-layout] > .relative > button:first-child {
+  min-height: 52px;
+  border-radius: 12px;
+  background-color: #181825;
+  border: 1px solid #313244;
+  box-shadow: none;
+}
+
+html[data-void-native="1"] [data-stream-layout] > .relative > button:first-child:hover {
+  background: #1e1e2e;
+  border-color: #6c7086;
+}
+
+html[data-void-native="1"] [data-stream-layout] > .flex.flex-col.gap-2 {
+  gap: 10px;
+}
+
+/* In-player source modal: no heavy transparent blur over moving video. */
+html[data-void-native="1"] [data-stream-switcher] {
+  background: rgb(9 9 14 / 0.92);
+  font-family: var(--font-sans);
+}
+
+html[data-void-native="1"] [data-stream-switcher-panel] {
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 18px;
+  box-shadow: 0 24px 56px -24px rgb(0 0 0 / 0.85);
+  max-width: 980px;
+  max-height: min(88vh, 880px);
+}
+
+html[data-void-native="1"] [data-stream-switcher-panel] > header {
+  min-height: 76px;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  padding: 18px 24px;
+}
+
+html[data-void-native="1"] [data-stream-switcher-panel] > header [data-void-stream-brand] {
+  margin-inline-end: 16px;
+}
+
+html[data-void-native="1"] [data-stream-switcher-panel] > header button {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+}
+
+html[data-void-native="1"] [data-stream-switcher-panel] li > [role="button"] {
+  min-height: 70px;
+  padding: 18px 22px;
+  gap: 16px;
+  border-bottom: 1px solid rgb(49 50 68 / 0.6);
+  transition: background-color 140ms ease;
+}
+
+html[data-void-native="1"] [data-stream-switcher-panel] li > [role="button"]:is(:hover, :focus-visible) {
+  background: #1e1e2e;
+}
+
+html[data-void-native="1"] [data-stream-switcher-panel] li > [role="button"] p:first-child {
+  font-family: var(--font-sans);
+  font-weight: 740;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 960px) {
+  html[data-void-native="1"] [data-stream-primary] > .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-void-native="1"] [data-stream-primary] > .grid > :first-child {
+    max-width: min(100%, 360px);
+  }
+  html[data-void-native="1"] [data-stream-switcher-panel] {
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  html[data-void-native="1"] [data-stream-picker-content] {
+    padding-inline: 18px;
+  }
+  html[data-void-native="1"] [data-stream-switcher-panel] > header {
+    padding-inline: 14px;
+    gap: 8px;
+  }
+  html[data-void-native="1"] [data-stream-switcher-panel] > header [data-void-stream-brand] small {
+    display: none;
+  }
+  html[data-void-native="1"] [data-stream-switcher-panel] li > [role="button"] {
+    flex-wrap: wrap;
+    padding-inline: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-void-native="1"] [data-stream-row] > button,
+  html[data-void-native="1"] [data-stream-switcher-panel] li > [role="button"] {
+    transition: none;
+  }
+}
