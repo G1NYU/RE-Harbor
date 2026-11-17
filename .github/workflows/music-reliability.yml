@@ -70,6 +70,33 @@ jobs:
             echo "### Full music suite: $SUITE_RESULT" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+
+  powershell-compat:
+    name: Windows PowerShell 5.1 script syntax
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Parse Windows smoke tests with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $files = @("scripts/music-okru-modern-probe.ps1", "scripts/music-okru-smoke.ps1")
+          foreach ($file in $files) {
+            $tokens = $null
+            $parseErrors = $null
+            $fullPath = (Resolve-Path $file).Path
+            [void][System.Management.Automation.Language.Parser]::ParseFile($fullPath, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count -gt 0) {
+              foreach ($failure in $parseErrors) {
+                Write-Host ("ERROR: {0}: line {1}: {2}" -f $file, $failure.Extent.StartLineNumber, $failure.Message)
+              }
+              exit 1
+            }
+            Write-Host ("PASS: {0} parses in Windows PowerShell 5.1" -f $file)
+          }
+
   native:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
