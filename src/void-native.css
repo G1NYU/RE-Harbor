@@ -1,0 +1,247 @@
+/*
+ * VOID Native — Rebuild N
+ * Compiled Harbor chrome styling, not a .harborstyle injection.
+ * Preserves the existing React views, all click handlers, original artwork
+ * elements, music playback subscriptions, and keyboard navigation.
+ * No CSS filters, JS DOM scans, poster duplication or animated gradients.
+ */
+
+html[data-void-native="1"] {
+  --void-rail: #11111b;
+  --void-panel: #181825;
+  --void-raised: #1e1e2e;
+  --void-ink: #cdd6f4;
+  --void-muted: #a6adc8;
+  --void-steel: #6c7086;
+  --void-steel-light: #9399b2;
+  --void-edge: #313244;
+  --void-focus: #9399b2;
+}
+
+html[data-void-native="1"] body {
+  color: var(--void-ink);
+  font-family: var(--font-sans);
+}
+
+html[data-void-native="1"] ::selection {
+  background: rgb(108 112 134 / 0.22);
+  color: #eef1ff;
+}
+
+/* React renders the wordmark; only the sidebar's existing structure is styled. */
+html[data-void-native="1"] aside[data-harbor-sidebar] {
+  background: var(--void-rail);
+  border-inline-end-color: transparent;
+  box-shadow: none;
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar] [data-harbor-sidebar-brand] {
+  border-block-end: 0;
+  gap: 0;
+}
+
+html[data-void-native="1"] [data-void-native-mark],
+html[data-void-native="1"] [data-void-native-wordmark] {
+  color: #bac2de;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.20em;
+}
+
+html[data-void-native="1"] [data-void-native-mark] {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  font-size: 29px;
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar][data-collapsed="false"] [data-void-native-mark] {
+  display: none;
+}
+
+html[data-void-native="1"] [data-void-native-wordmark] {
+  font-size: 30px;
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav] {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  min-height: 48px;
+  color: var(--void-muted);
+  font-family: var(--font-sans);
+  font-weight: 720;
+  letter-spacing: 0;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav]:not([data-active]):hover {
+  background-color: var(--void-panel);
+  color: var(--void-ink);
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav][data-active] {
+  background: var(--void-raised);
+  border-color: var(--void-edge);
+  color: var(--void-ink);
+  box-shadow: none;
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav][data-active]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 12px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--void-steel);
+  pointer-events: none;
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav][data-active] [data-harbor-sidebar-icon] {
+  color: var(--void-steel-light);
+}
+
+html[data-void-native="1"] aside[data-harbor-sidebar] [data-harbor-sidebar-footer] {
+  background: #0b0b12;
+  border-block-start-color: transparent;
+}
+
+/* A single static fade under the native topbar; nothing is blurred or cloned. */
+html[data-void-native="1"] [data-harbor-topbar-content] {
+  background: linear-gradient(
+    to bottom,
+    rgb(11 11 18 / 0.95) 0%,
+    rgb(11 11 18 / 0.80) 34%,
+    rgb(11 11 18 / 0.36) 70%,
+    rgb(11 11 18 / 0) 100%
+  );
+  border-block-end: 0;
+}
+
+html[data-void-native="1"] [data-harbor-topbar-content] [data-harbor-search] {
+  background: var(--void-panel);
+  color: var(--void-ink);
+  border: 1px solid var(--void-edge);
+  border-radius: 11px;
+  box-shadow: none;
+}
+
+/* Full cinematic artwork is still the same native image and slide carousel. */
+html[data-void-native="1"] main:not([data-kids="on"]) [data-tv-hero-zone]:not(.harbor-hero-full) {
+  margin-block-start: -112px;
+  margin-block-end: -48px;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) [data-tv-hero-zone]:not(.harbor-hero-full) > .flex.flex-col.gap-5 {
+  position: relative;
+  gap: 0;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) [data-tv-hero-zone]:not(.harbor-hero-full) .harbor-hero-stage {
+  height: 78vh;
+  min-height: 640px;
+  border-radius: 0;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) [data-tv-hero-zone] .harbor-hero-stage {
+  border-block-end: 0;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) [data-tv-hero-zone] .harbor-hero-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 175px;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    #0b0b12 0%,
+    rgb(11 11 18 / 0.78) 30%,
+    rgb(11 11 18 / 0.36) 62%,
+    transparent 100%
+  );
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) .harbor-hero-content :is(h1, h2) {
+  color: var(--void-ink);
+  font-family: var(--font-display);
+  font-size-adjust: none;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  line-height: 1.03;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) .harbor-hero-content p {
+  max-width: 56ch;
+  color: rgb(186 194 222 / 0.82);
+  line-height: 1.55;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) .harbor-hero-content .mt-9 > button {
+  min-height: 46px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) .harbor-hero-content .mt-9 > button:first-child {
+  background: var(--void-steel);
+  color: #11111b;
+  border: 1px solid var(--void-steel);
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) .harbor-hero-content .mt-9 > button:first-child:hover {
+  background: var(--void-steel-light);
+}
+
+/* The same neutral hierarchy is used for every library/category row. */
+html[data-void-native="1"] main:not([data-kids="on"]) .harbor-row-shell h3 {
+  color: var(--void-ink);
+  font-family: var(--font-display);
+  font-size: clamp(20px, 1.68vw, 26px);
+  font-weight: 760;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  border-inline-start: 2px solid var(--void-steel);
+  padding-inline-start: 10px;
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) .harbor-row-shell h3::after {
+  content: none;
+}
+
+html[data-void-native="1"] .modal-panel,
+html[data-void-native="1"] .harbor-profile-dropdown {
+  background-color: var(--void-panel);
+  border: 1px solid var(--void-edge);
+  border-radius: 16px;
+  box-shadow: 0 18px 52px -34px rgb(0 0 0 / 0.92);
+}
+
+html[data-void-native="1"] main:not([data-kids="on"]) input[type="search"] {
+  background: var(--void-panel);
+  border: 1px solid var(--void-edge);
+  border-radius: 11px;
+}
+
+html[data-void-native="1"] :is(button, a, input):focus-visible {
+  outline-color: var(--void-focus);
+}
+
+@media (max-width: 767px) {
+  html[data-void-native="1"] main:not([data-kids="on"]) [data-tv-hero-zone]:not(.harbor-hero-full) {
+    margin-block-start: -84px;
+  }
+  html[data-void-native="1"] main:not([data-kids="on"]) [data-tv-hero-zone]:not(.harbor-hero-full) .harbor-hero-stage {
+    min-height: 560px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-void-native="1"] aside[data-harbor-sidebar] button[data-harbor-nav] {
+    transition: none;
+  }
+}
