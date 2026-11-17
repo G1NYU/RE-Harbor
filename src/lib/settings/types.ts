@@ -105,7 +105,7 @@ export type MusicSpeedPreset = {
 };
 
 export type Settings = {
-  soundTheme: "none" | "glass" | "modern" | "retro" | "cinematic";
+  soundTheme: "none" | "glass" | "modern" | "retro" | "cinematic" | "void";
   sfxVolume: number;
   playerVolumeSfx: boolean;
   blurComments: boolean;
