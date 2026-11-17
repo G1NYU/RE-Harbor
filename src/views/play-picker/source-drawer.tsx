@@ -66,7 +66,7 @@ export function SourceDrawer({
       setAddonFilter("all");
   }, [addonOptions, addonFilter]);
   return (
-    <div className="flex flex-col gap-4">
+    <div data-stream-drawer className="flex flex-col gap-4">
       <button
         onClick={onToggle}
         aria-expanded={open}
@@ -202,7 +202,7 @@ function SourceRow({
           });
 
   return (
-    <li className={divider ? "border-t border-edge-soft/30" : ""}>
+    <li data-stream-row className={divider ? "border-t border-edge-soft/30" : ""}>
       <button
         onClick={onPlay}
         disabled={resolving}
