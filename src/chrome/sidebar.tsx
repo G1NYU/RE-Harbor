@@ -29,6 +29,7 @@ export function Sidebar() {
 
   const { mark: customMark, wordmark: customWordmark } = useHarborLogo();
   const collapsed = settings.sidebarCollapsed;
+  const voidNative = settings.theme.preset === "cool-grey" && !kid;
   const retainLabels = (settings.theme.preset as string) === "elegantfin" && !kid;
   const hybridBar =
     typeof window !== "undefined" &&
@@ -61,7 +62,9 @@ export function Sidebar() {
         >
           {!hybridBar && (
             <span data-harbor-sidebar-mark className="inline-flex shrink-0">
-              {customMark ? (
+              {voidNative ? (
+                <span data-void-native-mark aria-hidden="true">{collapsed ? "V" : ""}</span>
+              ) : customMark ? (
                 <img
                   src={customMark}
                   alt=""
@@ -75,7 +78,11 @@ export function Sidebar() {
           )}
           {!hybridBar &&
             (!collapsed || retainLabels) &&
-            (customWordmark ? (
+            (voidNative ? (
+              <span data-harbor-sidebar-label data-void-native-wordmark className="hidden whitespace-nowrap lg:inline">
+                VOID
+              </span>
+            ) : customWordmark ? (
               <img
                 src={customWordmark}
                 alt=""
