@@ -28,3 +28,10 @@ helps determine whether the connector needs a new authentication flow.
 A November 2026 experimental Python SDK reports using `curl_cffi` for a
 browser-like HTTP stack, so transport behavior may also differ from plain
 PowerShell. Do not install unverified packages or share credentials to test it.
+
+
+## Nov 2026 WMF request refresh
+
+A published Nov 2026 third-party SDK uses GET /queryMixedSuggestions with client=web&locale=ru and browser-style headers. The earlier local probe used legacy GET /tracks, which might not be a valid current endpoint. The fallback Cookie-only /tracks probe gave HTTP 404, so it was not a valid session test.
+
+Run scripts/music-okru-modern-probe.ps1 in Windows PowerShell 5.1. It only prints HTTP status and JSON field names, never the session, playback URL or track data. The optional -TrackId N argument makes a POST /play metadata request for a track your account is allowed to access. No download is attempted. Even if this passes, the Rust connector still uses the old endpoint, and must be updated after confirming the returned search shape.
