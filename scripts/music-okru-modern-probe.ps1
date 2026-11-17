@@ -3,7 +3,8 @@
 # Uses your own session. Never prints, stores, or uploads it.
 param(
     [string]$Query = "Kate Bush",
-    [string]$TrackId = ""
+    [string]$TrackId = "",
+    [switch]$PlaybackOnly
 )
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Net.Http
@@ -77,15 +78,20 @@ function Invoke-OkModern {
 $session = $null
 $client = $null
 try {
-    if ([string]::IsNullOrWhiteSpace($Query) -or $Query.Length -gt 200) {
+    if (-not $PlaybackOnly -and ([string]::IsNullOrWhiteSpace($Query) -or $Query.Length -gt 200)) {
         throw "Use a query between 1 and 200 characters."
+    }
+    if ($PlaybackOnly -and -not $TrackId) {
+        throw "PlaybackOnly requires a numeric TrackId."
     }
     if ($TrackId -and $TrackId -notmatch '^[0-9]{1,20}$') {
         throw "TrackId must be a numeric OK.ru music track ID."
     }
-    Write-Host "Harbor OK.ru 2026 API diagnostic (read-only)."
+    Write-Host "Harbor OK.ru 2026 API diagnostic (metadata only; no audio download)."
+    Write-Host "Use the jsessionid shown in YOUR successful wmf.ok.ru/play browser request,"
+    Write-Host "which may differ from the JSESSIONID cookie listed under ok.ru."
     Write-Host "Credentials, audio URLs, and song data are NOT printed or saved."
-    $secret = Read-Host "Your own OK.ru JSESSIONID (hidden)" -AsSecureString
+    $secret = Read-Host "Music-service jsessionid (hidden)" -AsSecureString
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
     try { $session = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
@@ -98,21 +104,44 @@ try {
     $client = [System.Net.Http.HttpClient]::new($handler)
     $client.Timeout = [TimeSpan]::FromSeconds(18)
 
-    Write-Host "[1/2] Testing current WMF mixed-suggestions search..."
-    $result = Invoke-OkModern -Client $client -Session $session -Route "queryMixedSuggestions" -Params @{
-        q = $Query
+    if (-not $PlaybackOnly) {
+        Write-Host "[1/2] Testing current WMF mixed-suggestions search..."
+        $result = Invoke-OkModern -Client $client -Session $session -Route "queryMixedSuggestions" -Params @{
+            q = $Query
+            client = "web"
+            locale = "ru"
+        }
+        $known = @($result.PSObject.Properties.Name |
+            Where-Object { $_ -match '^[a-zA-Z][a-zA-Z0-9_]{0,50}
+    Write-Host "[2/2] Testing own playable track metadata via POST /play..."
+    $play = Invoke-OkModern -Client $client -Session $session -Route "play" -Post $true -Params @{
+        tid = $TrackId
+        ctx = "my|1"
         client = "web"
         locale = "ru"
+        imgfmt = "base"
     }
-    $known = @($result.PSObject.Properties.Name |
-        Where-Object { $_ -match '^[a-zA-Z][a-zA-Z0-9_]{0,50}$' } |
-        Select-Object -First 12)
-    Write-Host ("Search JSON accepted. Top-level field names: {0}" -f ([string]::Join(", ", $known)))
-    Write-Host "Search endpoint responded. This does not yet prove playable audio."
+    if (-not $play.play) {
+        throw "Playback JSON has no direct play field (not currently resolved)."
+    }
+    Write-Host "PASS: WMF returned playback metadata. Signed media URL intentionally redacted."
+    Write-Host "Native audio delivery still needs separate testing."
+} catch {
+    Write-Host ("FAIL: " + $_.Exception.Message)
+    exit 1
+} finally {
+    $session = $null
+    if ($null -ne $client) { $client.Dispose() }
+}
+ } |
+            Select-Object -First 12)
+        Write-Host ("Search JSON accepted. Top-level field names: {0}" -f ([string]::Join(", ", $known)))
+        Write-Host "Search endpoint responded. This does not yet prove playable audio."
+    }
 
     if (-not $TrackId) {
         Write-Host "PARTIAL PASS: Search probe completed. Playback not requested (no TrackId supplied)."
-        Write-Host "If investigating further, only report HTTP status and field names, never URLs or cookies."
+        Write-Host "Report HTTP statuses and field names only, never URLs or cookies."
         exit 0
     }
     Write-Host "[2/2] Testing own playable track metadata via POST /play..."
