@@ -1,0 +1,173 @@
+/*
+ * Music / recently played — extracted from the retired home hero stylesheet.
+ * Scoped to the active Music page so the new Listening Room retains its own
+ * layout and none of the old full-screen hero animation/blur rules are revived.
+ */
+[data-music-view] .music-quick-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+[data-music-view] .music-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+[data-music-view] .music-quick-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 76px;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-edge-soft);
+  border-radius: 12px;
+  text-align: start;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+[data-music-view] .music-quick-item:is(:hover, :focus-within) {
+  background: var(--color-elevated);
+  border-color: var(--color-edge);
+}
+
+[data-music-view] .music-quick-art {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  min-width: 76px;
+  overflow: hidden;
+  flex: 0 0 76px;
+  background: var(--color-raised);
+  color: var(--color-ink-muted);
+}
+
+[data-music-view] .music-quick-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-music-view] .music-quick-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 10px 10px 0;
+}
+
+[data-music-view] .music-quick-copy > button {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  text-align: start;
+}
+
+[data-music-view] .music-quick-copy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 740;
+  line-height: 1.3;
+}
+
+[data-music-view] .music-quick-copy .music-quick-artist {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-music-view] .music-quick-indicators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 17px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--color-ink-subtle);
+}
+
+[data-music-view] .music-quick-indicators > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-music-view] .music-quick-remove {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--color-canvas);
+  color: var(--color-ink-muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, color 140ms ease;
+}
+
+[data-music-view] .music-quick-item:is(:hover, :focus-within) .music-quick-remove {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+[data-music-view] .music-quick-remove:is(:hover, :focus-visible) {
+  background: var(--color-raised);
+  color: var(--color-ink);
+}
+
+@media (max-width: 1240px) {
+  [data-music-view] .music-quick-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  [data-music-view] .music-quick-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  [data-music-view] .music-quick-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (hover: none) {
+  [data-music-view] .music-quick-remove {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-music-view] .music-quick-item,
+  [data-music-view] .music-quick-remove {
+    transition: none;
+  }
+}
