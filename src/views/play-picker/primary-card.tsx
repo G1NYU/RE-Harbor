@@ -103,7 +103,7 @@ export function PrimaryCard({
   const isLandscape = Boolean(landscapeImage);
 
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-canvas/70">
+    <section data-stream-primary className="relative overflow-hidden rounded-3xl bg-canvas/70">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-ink/12 to-transparent" />
 
       <div
