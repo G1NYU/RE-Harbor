@@ -29,3 +29,10 @@ large stable artwork, direct library/provider/settings navigation, and recent tr
 It does not start automatic video previews or rotate a random track. Uses
 `useMusicNowPlaying` for playback identity and phase to avoid re-rendering
 its artwork on every progress tick.
+
+### Color extraction performance
+
+The premium dock deliberately does not call the expensive artwork color extraction
+hook, even if a previous Harbor setting had it enabled by default. The old
+artwork-color toggle is hidden in this dedicated player because it has no effect
+on the fixed dark palette. Album images themselves remain visible and unchanged.

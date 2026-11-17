@@ -52,7 +52,7 @@ import { MusicDockTooltip } from "./music-dock-tooltip";
 import { getMusicPlaybackOrigin, musicTitleTarget } from "@/lib/music/playback-origin";
 import { requestMusicPlaylist } from "@/lib/music/navigation";
 import { MusicNowPlaying } from "./music-now-playing";
-import { useMusicAppearance, useMusicArtworkColor } from "@/lib/music/appearance";
+import { useMusicAppearance } from "@/lib/music/appearance";
 import { requestMusicExplore, requestMusicPanel } from "@/lib/music/navigation";
 import { musicSourceName } from "@/lib/music/recovery";
 import { musicVolumeCeiling, useMusicAudioSettings } from "@/lib/music/audio-settings";
@@ -208,7 +208,6 @@ export function MusicDock() {
   const appearance = useMusicAppearance();
   const dockParts = useMusicDockLayout();
   const { profile: recording, display } = useRecordingProfile(player.current);
-  const artworkColor = useMusicArtworkColor(display?.artwork, appearance.artworkColors);
   const [scrub, setScrub] = useState<number | null>(null);
   const [hoverFrac, setHoverFrac] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -460,7 +459,6 @@ export function MusicDock() {
         data-music-dock
         data-music-premium
         data-music-dock-tab
-        data-art-colors={artworkColor ? "on" : undefined}
         aria-label={t("music.player")}
         style={
           {
@@ -468,9 +466,6 @@ export function MusicDock() {
             insetInlineEnd: 0,
             height: TAB_HEIGHT,
             bottom: "var(--harbor-viewport-bottom, 0px)",
-            ...(artworkColor
-              ? { "--music-art-accent": artworkColor.color, "--music-art-ink": artworkColor.ink }
-              : {}),
           } as CSSProperties
         }
         className="pointer-events-none fixed bottom-0 z-[120] flex items-end"
@@ -548,7 +543,6 @@ export function MusicDock() {
       data-music-dock
       data-music-premium
       data-closing={collapseExit.closing || undefined}
-      data-art-colors={artworkColor ? "on" : undefined}
       role={expanded ? "dialog" : undefined}
 
       aria-label={t(expanded ? "music.now.title" : "music.player")}
@@ -558,9 +552,6 @@ export function MusicDock() {
           insetInlineEnd: 0,
           height: DOCK_HEIGHT,
           bottom: "var(--harbor-viewport-bottom, 0px)",
-          ...(artworkColor
-            ? { "--music-art-accent": artworkColor.color, "--music-art-ink": artworkColor.ink }
-            : {}),
         } as CSSProperties
       }
       className="@container fixed bottom-0 z-[120] border-t border-edge bg-canvas text-ink"

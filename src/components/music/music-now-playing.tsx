@@ -22,7 +22,6 @@ import {
   BarChart3,
   Heart,
   Maximize,
-  Palette,
   Search,
   SlidersHorizontal,
   Speaker,
@@ -381,15 +380,6 @@ export function MusicNowPlaying({
             <span>{t("music.now.title")}</span>
           </button>
           <div className="music-now-options">
-            <button
-              type="button"
-              aria-pressed={appearance.artworkColors}
-              onClick={() => setMusicAppearance({ artworkColors: !appearance.artworkColors })}
-              title={t("music.now.colors")}
-            >
-              <Palette size={17} aria-hidden="true" />
-              <span>{t("music.now.colors")}</span>
-            </button>
             <button
               type="button"
               aria-pressed={appearance.levels}
