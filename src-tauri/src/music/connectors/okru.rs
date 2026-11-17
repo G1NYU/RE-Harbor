@@ -1,8 +1,10 @@
 //! Personal-use OK.ru prototype, opt-in only. Never persist or log the session.
 use super::super::connector::{ConnectorHealth, HealthCell, MusicConnector};
-use super::super::{duration_label, MusicConnection, MusicStream, MusicTrack};
+use super::super::{duration_label, MusicConnection, MusicConnectionField, MusicStream, MusicTrack};
 use async_trait::async_trait;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::RwLock;
 use std::time::Duration;
 use url::Url;
 
@@ -35,7 +37,7 @@ struct Response {
 
 pub struct OkRuConnector {
     health: HealthCell,
-    session: String,
+    session: RwLock<Option<String>>,
     http: reqwest::Client,
 }
 
@@ -44,26 +46,51 @@ impl OkRuConnector {
         if std::env::var("HARBOR_EXPERIMENTAL_OKRU").ok().as_deref() != Some("1") {
             return None;
         }
-        Self::new(&std::env::var("HARBOR_OKRU_JSESSIONID").ok()?).ok()
+        Self::new(std::env::var("HARBOR_OKRU_JSESSIONID").ok().as_deref()).ok()
     }
 
-    fn new(session: &str) -> Result<Self, String> {
+    fn validate_session(session: &str) -> Result<String, String> {
         let session = session.trim();
         if session.len() < 8 || session.len() > 256
             || !session.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.' | b'!'))
         {
             return Err("Invalid OK.ru session".into());
         }
+        Ok(session.to_owned())
+    }
+
+    fn new(session: Option<&str>) -> Result<Self, String> {
+        let session = session.map(Self::validate_session).transpose()?;
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
             .redirect(reqwest::redirect::Policy::none())
             .build().map_err(|_| "OK.ru client unavailable")?;
-        Ok(Self { health: HealthCell::new(), session: session.to_owned(), http })
+        Ok(Self { health: HealthCell::new(), session: RwLock::new(session), http })
+    }
+
+    fn configured(&self) -> bool {
+        self.session.read().is_ok_and(|session| session.is_some())
+    }
+
+    fn set_session(&self, raw: &str) -> Result<(), String> {
+        let next = Self::validate_session(raw)?;
+        *self.session.write().map_err(|_| "OK.ru session storage unavailable")? = Some(next);
+        self.health.set(ConnectorHealth::Unknown);
+        Ok(())
+    }
+
+    fn forget_session(&self) -> Result<(), String> {
+        *self.session.write().map_err(|_| "OK.ru session storage unavailable")? = None;
+        self.health.set(ConnectorHealth::Unknown);
+        Ok(())
     }
 
     async fn request(&self, route: &str, params: &[(&str, String)]) -> Result<Response, String> {
         // Fixed host, fixed routes, and no redirects keep account sessions private.
-        let url = format!("https://wmf.ok.ru/{route};jsessionid={}", self.session);
+        let session = self.session.read()
+            .map_err(|_| "OK.ru session storage unavailable")?
+            .clone().ok_or("Connect OK.ru in Music Connections first")?;
+        let url = format!("https://wmf.ok.ru/{route};jsessionid={session}");
         let response = self.http.get(url).query(params).send().await
             .map_err(|_| "OK.ru request failed; check session or connection")?;
         if !response.status().is_success() {
@@ -156,9 +183,37 @@ impl MusicConnector for OkRuConnector {
     { let result = self.stream(track).await; self.record(&result); result }
     fn health(&self) -> ConnectorHealth { self.health.get() }
     fn set_health(&self, health: ConnectorHealth) { self.health.set(health); }
+    fn searchable(&self) -> bool { self.configured() }
+    fn playable(&self) -> bool { self.configured() }
+
+    async fn connect(
+        &self,
+        _app: &tauri::AppHandle,
+        fields: &HashMap<String, String>,
+    ) -> Result<MusicConnection, String> {
+        let session = fields.get("session").ok_or("Enter your OK.ru session ID")?;
+        self.set_session(session)?;
+        Ok(self.connection())
+    }
+
+    async fn disconnect(&self, _app: &tauri::AppHandle) -> Result<(), String> {
+        self.forget_session()
+    }
+
     fn connection(&self) -> MusicConnection {
-        let status = if self.health() == ConnectorHealth::Degraded { "error" } else { "connected" };
-        MusicConnection::new("okru", self.name(), "streaming", status, &["search", "play"])
+        let status = if self.configured() { "connected" } else { "disconnected" };
+        let mut connection = MusicConnection::new(
+            "okru", self.name(), "streaming", status, &["search", "play"],
+        ).needs(vec![
+            MusicConnectionField::new("session", "Own OK.ru session ID", "password", true),
+        ]);
+        connection.detail = Some(
+            "Experimental. Session stays in memory only and is forgotten on restart.".into(),
+        );
+        if self.configured() && self.health() == ConnectorHealth::Degraded {
+            connection.error = Some("Last OK.ru request failed; check the session or service.".into());
+        }
+        connection
     }
 }
 
@@ -167,11 +222,36 @@ mod tests {
     use super::*;
     #[test]
     fn session_validation_prevents_path_and_query_injection() {
-        assert!(OkRuConnector::new("abc12345.abc").is_ok());
+        assert!(OkRuConnector::new(Some("abc12345.abc")).is_ok());
         for bad in ["", "short", "abc/pathXX", "abc?queryXX", "abc#fragment", "abc\nheader"] {
-            assert!(OkRuConnector::new(bad).is_err());
+            assert!(OkRuConnector::new(Some(bad)).is_err());
         }
     }
+    #[test]
+    fn session_can_be_connected_and_disconnected_without_being_exposed() {
+        let connector = OkRuConnector::new(None).unwrap();
+        assert!(!connector.searchable());
+        assert!(!connector.playable());
+        assert_eq!(connector.connection().status, "disconnected");
+        assert_eq!(connector.connection().needs[0].kind, "password");
+        connector.set_session("abc12345.abc").unwrap();
+        assert!(connector.searchable());
+        assert!(connector.playable());
+        let details = serde_json::to_string(&connector.connection()).unwrap();
+        assert!(!details.contains("abc12345.abc"));
+        assert_eq!(connector.connection().status, "connected");
+        connector.forget_session().unwrap();
+        assert!(!connector.searchable());
+        assert_eq!(connector.connection().status, "disconnected");
+    }
+
+    #[test]
+    fn invalid_replacement_does_not_override_a_working_session() {
+        let connector = OkRuConnector::new(Some("sessionABC123")).unwrap();
+        assert!(connector.set_session("bad/session").is_err());
+        assert!(connector.configured());
+    }
+
     #[test]
     fn historic_okru_result_maps_to_harbor_music_track() {
         let response: Response = serde_json::from_str(r#"{

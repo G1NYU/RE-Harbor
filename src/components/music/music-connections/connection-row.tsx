@@ -125,6 +125,8 @@ export function MusicConnectionRow({
       .then(async (next) => {
         onChange(next);
         setOpen(false);
+        // A browser session is effectively an account password: never retain it in form state.
+        if (connection.id === "okru") setValues({});
         const folder = folderKey ? payload[folderKey] : undefined;
         if (next.status !== "connected") return;
         if (!folder) {
