@@ -26,18 +26,18 @@
 }
 
 @theme {
-  --color-canvas: oklch(0.18 0.004 260);
-  --color-surface: oklch(0.22 0.004 260);
-  --color-elevated: oklch(0.27 0.004 260);
-  --color-raised: oklch(0.32 0.004 260);
-  --color-ink: oklch(0.97 0.003 260);
-  --color-ink-muted: oklch(0.72 0.003 260);
-  --color-ink-subtle: oklch(0.65 0.003 260);
-  --color-edge: oklch(0.36 0.004 260 / 0.55);
-  --color-edge-soft: oklch(0.36 0.004 260 / 0.25);
-  --color-accent: oklch(0.78 0.13 60);
-  --color-accent-soft: oklch(0.78 0.13 60 / 0.18);
-  --color-danger: oklch(0.55 0.18 25);
+  --color-canvas: #11111b;
+  --color-surface: #181825;
+  --color-elevated: #181825;
+  --color-raised: #1e1e2e;
+  --color-ink: #cdd6f4;
+  --color-ink-muted: #a6adc8;
+  --color-ink-subtle: #6c7086;
+  --color-edge: #313244;
+  --color-edge-soft: #1e1e2e;
+  --color-accent: #6c7086;
+  --color-accent-soft: #6c708620;
+  --color-danger: #b77677;
   --color-success: oklch(0.68 0.15 150);
 
   --radius-sm: 6px;
@@ -46,8 +46,8 @@
   --radius-xl: 20px;
   --radius-2xl: 28px;
 
-  --font-display: "Sentient", "Iowan Old Style", "Georgia", serif;
-  --font-sans: "Switzer", "Inter", system-ui, sans-serif;
+  --font-display: "Arial", "Helvetica Neue", "Bahnschrift", "Segoe UI", sans-serif;
+  --font-sans: "Arial", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-channel: "General Sans", "Switzer", "Inter", system-ui, sans-serif;
   --font-anime: "WonderfulFontyCure", "Sentient", "Georgia", serif;
