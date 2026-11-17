@@ -45,6 +45,20 @@ function useTopAddonLogos(enabled: boolean): string[] {
   return logos;
 }
 
+export function VoidDefaultArtwork({ size = "md" }: { size?: Size }) {
+  const compact = size === "xs";
+  return (
+    <span
+      data-void-default-artwork
+      aria-label="VOID"
+      className={`inline-grid shrink-0 place-items-center rounded-xl border border-[#313244] bg-[#181825] font-display font-extrabold tracking-[0.08em] text-[#cdd6f4] ${SIZE_CLASS[size]}`}
+      style={{ fontSize: compact ? 20 : size === "sm" ? 15 : size === "md" ? 24 : size === "lg" ? 30 : 38 }}
+    >
+      {compact ? "V" : "VOID"}
+    </span>
+  );
+}
+
 export function HarborLoader({
   size = "md",
   caption,
@@ -60,9 +74,11 @@ export function HarborLoader({
   logos?: string[];
   original?: boolean;
 }) {
+  const voidNative = typeof document !== "undefined" && document.documentElement.dataset.voidNative === "1";
+  const fallback = voidNative ? <VoidDefaultArtwork size={size} /> : <Boat size={size} keyed={keyed} logos={logos} />;
   return (
     <div className={`flex flex-col items-center justify-center gap-2 ${className}`}>
-      {original ? <Boat size={size} keyed={keyed} logos={logos} /> : <CustomArtwork role="loading" className={`harbor-loader-art ${SIZE_CLASS[size]}`} fallback={<Boat size={size} keyed={keyed} logos={logos} />} />}
+      {original ? <Boat size={size} keyed={keyed} logos={logos} /> : <CustomArtwork role="loading" className={`harbor-loader-art ${SIZE_CLASS[size]}`} fallback={fallback} />}
       {caption && <p className="harbor-loader-cap mt-1 text-[12.5px] font-medium uppercase tracking-[0.18em] text-white/70">{caption}</p>}
     </div>
   );
