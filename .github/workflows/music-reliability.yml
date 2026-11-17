@@ -2,7 +2,7 @@ name: Music reliability
 
 on:
   push:
-    branches: [feature/music-reliability]
+    branches: [feature/music-reliability, feature/music-okru-experiment]
   workflow_dispatch:
 
 permissions:
@@ -93,3 +93,4 @@ jobs:
         run: |
           cargo test --manifest-path src-tauri/Cargo.toml network_audio_cache_has_bounded_lookahead_and_rebuffer_threshold
           cargo test --manifest-path src-tauri/Cargo.toml music::commands::search::tests
+          cargo test --manifest-path src-tauri/Cargo.toml music::connectors::okru::tests

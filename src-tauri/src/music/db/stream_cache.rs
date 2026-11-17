@@ -7,7 +7,7 @@ const DURABLE_PATH_TTL: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 pub(super) fn stream_ttl(connector: &str) -> Duration {
     match connector.trim() {
-        "soundcloud" => SOUNDCLOUD_SIGNATURE_TTL,
+        "soundcloud" | "okru" => SOUNDCLOUD_SIGNATURE_TTL,
         "youtube" => YOUTUBE_GOOGLEVIDEO_TTL,
         "local" | "direct" => DURABLE_PATH_TTL,
         _ => SERVER_TOKEN_TTL,
@@ -79,6 +79,7 @@ mod tests {
     #[test]
     fn every_connector_declares_its_own_lifetime() {
         assert_eq!(stream_ttl("soundcloud"), Duration::from_secs(60));
+        assert_eq!(stream_ttl("okru"), Duration::from_secs(60));
         assert_eq!(stream_ttl("youtube"), Duration::from_secs(1800));
         assert_eq!(stream_ttl("local"), Duration::from_secs(2_592_000));
         assert_eq!(stream_ttl("direct"), Duration::from_secs(2_592_000));

@@ -1,6 +1,7 @@
 pub mod catalog;
 pub mod jellyfin;
 pub mod local;
+pub mod okru;
 pub mod plex;
 pub mod soundcloud;
 pub mod subsonic;
@@ -13,6 +14,9 @@ pub fn register(registry: &ConnectorRegistry) -> Result<(), String> {
     registry.register(Box::new(soundcloud::SoundCloudConnector::new()))?;
     registry.register(Box::new(catalog::CatalogConnector::new()))?;
     registry.register(Box::new(local::LocalConnector::new()))?;
+    if let Some(connector) = okru::OkRuConnector::from_environment() {
+        registry.register(Box::new(connector))?;
+    }
     registry.register(Box::new(subsonic::SubsonicConnector::new()))?;
     registry.register(Box::new(jellyfin::JellyfinConnector::new()))?;
     registry.register(Box::new(plex::PlexConnector::new()))
