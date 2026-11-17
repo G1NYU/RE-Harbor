@@ -1,20 +1,20 @@
-name: Music Listening Room UI
+name: VOID Native + Music UI
 
 on:
   push:
-    branches: [feature/music-void-ui]
+    branches: [feature/void-native-rebuild-n]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: music-void-ui-${{ github.ref }}
+  group: void-native-ui-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   ui:
-    name: Music UI typecheck and scoped regressions
+    name: VOID Native and music UI typecheck
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -35,4 +35,5 @@ jobs:
           node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
             tests/music-void-ui.test.ts \
             tests/music-dock-clearance.test.ts \
-            tests/music-now-playing-key.test.ts
+            tests/music-now-playing-key.test.ts \
+            tests/void-native.test.ts
