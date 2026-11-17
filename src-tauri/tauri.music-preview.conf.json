@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Harbor Music Preview",
+  "identifier": "app.harbor.musicpreview",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["harbor-music-preview"]
+      }
+    },
+    "updater": {
+      "endpoints": []
+    }
+  }
+}
