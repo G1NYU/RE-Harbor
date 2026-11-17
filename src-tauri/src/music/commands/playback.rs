@@ -288,7 +288,7 @@ pub async fn music_deck_play(
     volume: Option<f64>,
 ) -> Result<(), String> {
     if deck == 0 {
-        return music_play_track(app, state, track, volume).await;
+        return music_play_track(app, state, track, volume, None).await;
     }
     if track.connector_id.as_deref() == Some("spotify") {
         return Err("Spotify plays on the main deck only".to_string());
