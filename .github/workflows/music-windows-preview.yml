@@ -1,0 +1,114 @@
+name: Music Listening Room Windows Preview
+
+on:
+  push:
+    branches: [feature/music-void-ui]
+    paths:
+      - ".github/workflows/music-windows-preview.yml"
+      - "src/**"
+      - "src-tauri/**"
+      - "installer/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: music-windows-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-preview:
+    name: Build portable Windows preview
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      HARBOR_CHANNEL: beta
+      HARBOR_CAPSTAN_OPTIONAL: "1"
+      HARBOR_POKEMON_OPTIONAL: "1"
+    steps:
+      - name: Checkout music branch
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+            installer/src-tauri
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare sidecars and fonts
+        shell: pwsh
+        run: |
+          $env:HARBOR_CAPSTAN_SRC = Join-Path $env:RUNNER_TEMP 'music-preview-no-compat-layer'
+          "HARBOR_CAPSTAN_SRC=$env:HARBOR_CAPSTAN_SRC" >> $env:GITHUB_ENV
+          pnpm run setup
+          if ($LASTEXITCODE -ne 0) { throw "Setup failed" }
+
+      - name: Build isolated music preview
+        shell: pwsh
+        run: |
+          pnpm tauri build --no-bundle --config src-tauri/tauri.music-preview.conf.json
+          if ($LASTEXITCODE -ne 0) { throw "Tauri preview build failed" }
+
+      - name: Build lightweight payload uninstaller
+        shell: pwsh
+        run: |
+          cargo build --manifest-path installer/src-tauri/Cargo.toml --release --no-default-features --features tauri/custom-protocol --bin harbor-uninstall --locked
+          if ($LASTEXITCODE -ne 0) { throw "Uninstaller build failed" }
+
+      - name: Stage and verify portable app
+        shell: pwsh
+        run: |
+          node installer/scripts/make-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Payload creation failed" }
+          node scripts/verify-managed-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Payload verification failed" }
+          New-Item -ItemType Directory -Force -Path music-preview | Out-Null
+          Expand-Archive -LiteralPath installer/src-tauri/payload/harbor-payload.zip -DestinationPath music-preview -Force
+          if (-not (Test-Path -LiteralPath music-preview/harbor.exe)) { throw "Missing portable Harbor executable" }
+          Remove-Item -LiteralPath music-preview/uninstall.exe -Force -ErrorAction SilentlyContinue
+          @'
+          HARBOR MUSIC PREVIEW (Windows x64)
+          ==================================
+          This is a portable test build from feature/music-void-ui, not a normal Harbor installer.
+
+          1. Extract this artifact to a new folder.
+          2. Run harbor.exe from that folder.
+          3. Open Music and test the Listening Room, dock, and expanded player.
+          4. Do not use this preview as your everyday Harbor installation.
+
+          The preview uses its own Tauri application identifier, app.harbor.musicpreview.
+          It does not install or uninstall the normal Harbor app.
+          This CI build deliberately omits Android extension support and the Pokemon engine.
+          It is unsigned; Windows may display an unrecognized publisher warning.
+          The main Harbor release is unchanged.
+          '@ | Set-Content -LiteralPath music-preview/README-MUSIC-PREVIEW.txt -Encoding UTF8
+
+      - name: Upload portable Windows preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-music-preview-windows-x64
+          path: music-preview/
+          if-no-files-found: error
+          retention-days: 7
