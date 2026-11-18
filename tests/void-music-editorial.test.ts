@@ -4,15 +4,14 @@ import { readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-test("VOID command bar is inside the shell's normal flex flow, not above media", () => {
+test("VOID 03 puts media navigation in its own structural row, not over the artwork", () => {
   const app = read("src/App.tsx");
-  const css = read("src/chrome/void/void-shell.css");
-  const body = app.indexOf('className={`relative flex min-h-0 min-w-0 flex-1 flex-col');
-  const command = app.indexOf("<VoidCommandBar />", body);
-  const home = app.indexOf("{homeAlive && (", body);
-  assert.ok(body >= 0 && command > body && command < home);
-  assert.match(css, /\.void-command-bar\s*\{[^}]*position:\s*relative/);
-  assert.doesNotMatch(css, /\.void-command-bar\s*\{[^}]*position:\s*fixed/);
+  const css = read("src/chrome/void/void-studio.css");
+  const spaces = app.indexOf("<VoidSpacesHeader />");
+  const media = app.indexOf("data-void-view-root");
+  assert.ok(spaces > 0 && media > spaces);
+  assert.match(css, /void03-header-height/);
+  assert.match(css, /flex-direction: column/);
 });
 
 test("album and artist detail are separately composed, not a reskinned generic header", () => {

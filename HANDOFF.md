@@ -37,3 +37,9 @@
 - No changes to ordinary Harbor installer, updater, defaults, secrets or deployment configuration.
 - Source handlers are retained; no removal of playback sources or Refract integration.
 - Existing branch `feature/void-02-native-shell` and working preview remain available for rollback.
+
+## VOID 03 new architecture branch (2026-11-18)
+- Branch `feature/void-03-workspaces`; preserves all previous branches for rollback.
+- Navigation and player have been replaced at the component level, but category content remains to be rewritten before distribution.
+- Full specification: `docs/VOID_03_ARCHITECTURE.md`.
+- No installer or releases should be produced from this branch until feature-parity/visual validation are satisfied.
