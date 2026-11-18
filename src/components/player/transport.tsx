@@ -1,9 +1,11 @@
 import { Settings2 } from "lucide-react";
 import { isLivePlaybackSrc } from "@/lib/player/live-src";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useContext, useEffect, useRef, useState } from "react";
 import type { PlayerCapabilities, PlayerSnapshot } from "@/lib/player/bridge";
 import type { SubtitleAddHandler } from "@/lib/player/subtitle-load";
 import type { Meta } from "@/lib/cinemeta";
+import { VoidPlayerContext } from "@/chrome/void/void-player-context";
+import "./transport/void-transport.css";
 import { CastModal } from "./cast-modal";
 import type { DownloadStatus } from "@/views/player/hooks/use-video-download";
 import { TransportStremio } from "./transport-stremio";
@@ -165,6 +167,8 @@ export function Transport({
 }) {
   const t = useT();
   const { settings } = useSettings();
+  const voidPlayer = useContext(VoidPlayerContext);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const kid = useActiveKid();
   const isStremioLayout =
     resolveChromeTheme(settings.theme, settings.playerChromeTheme) === "stremio";
@@ -190,7 +194,7 @@ export function Transport({
   const [tight, setTight] = useState(false);
   useEffect(() => {
     onMenuOpenChange?.(
-      audioMenuOpen ||
+      (voidPlayer && toolsOpen) || audioMenuOpen ||
         subtitleMenuOpen ||
         speedMenuOpen ||
         aspectMenuOpen ||
@@ -198,7 +202,7 @@ export function Transport({
         chapterMenuOpen,
     );
   }, [
-    audioMenuOpen,
+    voidPlayer, toolsOpen, audioMenuOpen,
     subtitleMenuOpen,
     speedMenuOpen,
     aspectMenuOpen,
@@ -232,7 +236,7 @@ export function Transport({
     const ro = new ResizeObserver(() => measure());
     ro.observe(el);
     return () => ro.disconnect();
-  }, [pipMode]);
+  }, [pipMode, voidPlayer]);
   if (isStremioLayout && !pipMode) {
     return (
       <TransportStremio
@@ -443,6 +447,34 @@ export function Transport({
   return (
     <>
       <SongIdToast />
+      {voidPlayer ? (
+        <section className="void-video-controls" aria-label={t("Playback controls")} hidden={!visible && !toolsOpen} ref={controlsRef}>
+          <div className="void-video-title">
+            {controlsInSlot(chromeConfig, "top-left").map((c) => <Fragment key={c.id}>{renderControl(c.id, ctx)}</Fragment>)}
+          </div>
+          <div className="void-video-window">
+            {controlsInSlot(chromeConfig, "top-right").map((c) => <Fragment key={c.id}>{renderControl(c.id, ctx)}</Fragment>)}
+          </div>
+          <div className="void-video-console">
+            <div className="void-video-timeline" dir="ltr">
+              {isLiveChannel ? <>
+                <LiveBadge /><LiveSeekBar durationSec={snap.durationSec} active={visible} onSeek={onSeek} /><GoToLive durationSec={snap.durationSec} onSeek={onSeek} />
+              </> : <>
+                {controlsInSlot(chromeConfig, "seek-leading").map((c) => <Fragment key={c.id}>{renderControl(c.id, ctx)}</Fragment>)}
+                <div className="min-w-0 flex-1"><SeekBar durationSec={snap.durationSec} onSeek={onSeek} active={visible} chapters={snap.chapters} /></div>
+                {controlsInSlot(chromeConfig, "seek-trailing").map((c) => <Fragment key={c.id}>{renderControl(c.id, ctx)}</Fragment>)}
+              </>}
+            </div>
+            <div className="void-video-transport">
+              {controlsInSlot(chromeConfig, "bottom-center").map((c) => <Fragment key={c.id}>{renderControl(c.id, ctx)}</Fragment>)}
+              <button type="button" aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}>{t("Controls")}</button>
+            </div>
+            {toolsOpen && <div className="void-video-tools">
+              {[...controlsInSlot(chromeConfig, "bottom-left"), ...controlsInSlot(chromeConfig, "bottom-right")].map((c) => <Fragment key={c.id}>{renderControl(c.id, ctx)}</Fragment>)}
+            </div>}
+          </div>
+        </section>
+      ) : <>
       <div
         data-tauri-drag-region={fullscreen ? undefined : ""}
         className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-7 pt-4 pb-8"
@@ -530,6 +562,8 @@ export function Transport({
           </div>
         </div>
       </div>
+
+      </>}
 
       {meta && !isLiveChannel && (
         <CastModal

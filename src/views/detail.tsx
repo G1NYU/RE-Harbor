@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Check, Plus } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
+import { VoidTitleWorkspace } from "./void-studio/title-workspace";
 import { animePlayEpisode } from "./detail/anime-play-episode";
 import {
   animeDetails,
@@ -226,10 +227,12 @@ function FadeInUp({ children }: { children: ReactNode }) {
 
 export function DetailView({
   meta,
+  voidWorkspace = false,
   liveContext = false,
   episodeHint,
 }: {
   meta: Meta;
+  voidWorkspace?: boolean;
   liveContext?: boolean;
   episodeHint?: { season: number; episode: number };
 }) {
@@ -318,6 +321,7 @@ export function DetailView({
   const [libraryItem, setLibraryItem] = useState<LibraryItem | null>(null);
   const { authKey } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [showTitleTools, setShowTitleTools] = useState(false);
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [scores, setScores] = useState<OmdbScores | null>(null);
   const [cinemetaRating, setCinemetaRating] = useState<string | null>(null);
@@ -1468,11 +1472,11 @@ export function DetailView({
   );
 
   const smartPlay = useCallback(
-    async (forcePicker = false) => {
+    async (forcePicker = false, selectedEpisode?: PlayEpisode, seasonEpisodes?: PlayEpisode[]) => {
       if (inSession) claimHost(true);
       const opts = { autoPlay: !forcePicker && settings.instantPlay, resume: !forcePicker };
       const launch = async (episode: PlayEpisode | undefined) => {
-        const stream = () => openPicker(playMeta, episode, opts);
+        const stream = () => openPicker(playMeta, episode, { ...opts, seasonEpisodes });
         if (forcePicker) {
           stream();
           return;
@@ -1534,6 +1538,7 @@ export function DetailView({
           return;
         }
       };
+      if (selectedEpisode) return launch(selectedEpisode);
       if (!isSeries) {
         if (meta.type === "other" && cinemetaFull?.videos?.length) {
           const first = cinemetaFull.videos[0];
@@ -1786,11 +1791,27 @@ export function DetailView({
     </>
   );
 
+  if (voidWorkspace && !isAnime && !showTitleTools) {
+    return (
+      <VoidTitleWorkspace
+        meta={playMeta}
+        resolved={cinemetaFull}
+        tmdb={detail}
+        loading={loading}
+        scrollRef={scrollRef}
+        playLabel={smartPlayLabel}
+        onPlay={(episode, seasonEpisodes) => void smartPlay(false, episode, seasonEpisodes)}
+        onTools={() => setShowTitleTools(true)}
+      />
+    );
+  }
+
   return (
     <main
       ref={scrollRef}
       className="harbor-detail-enter absolute inset-0 z-30 overflow-y-auto bg-canvas"
     >
+      {voidWorkspace && showTitleTools && <button className="absolute start-5 top-5 z-40 rounded bg-canvas px-4 py-2" onClick={() => setShowTitleTools(false)}>{t("Back")}</button>}
       <section className="relative">
         <div
           data-tauri-drag-region

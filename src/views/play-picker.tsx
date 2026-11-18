@@ -111,6 +111,7 @@ type PerEpisodeStatus =
   | { code: "failed" };
 
 export function PlayPicker({
+  voidWorkspace = false,
   meta,
   episode,
   autoPlay,
@@ -121,6 +122,7 @@ export function PlayPicker({
   continuation,
   playerActive,
 }: {
+  voidWorkspace?: boolean;
   meta: Meta;
   episode?: PlayEpisode;
   autoPlay?: boolean;
@@ -947,8 +949,15 @@ export function PlayPicker({
   }
 
   return (
-    <main ref={mainRef} data-stream-picker className="absolute inset-0 z-50 overflow-y-auto bg-canvas">
-      <BackdropLayer src={backdropSrc} />
+    <main ref={mainRef} data-stream-picker data-void-picker={voidWorkspace || undefined} className="absolute inset-0 z-50 overflow-y-auto bg-canvas">
+      {voidWorkspace ? (
+        <aside className="void-picker-title">
+          <button type="button" onClick={backToDetail}>{t("Back")}</button>
+          {metaForDisplay.poster && <img src={metaForDisplay.poster} alt="" />}
+          <h1>{metaForDisplay.name}</h1>
+          {episode && <p>{t("Season {n}", { n: episode.imdbSeason ?? episode.season })} · {t("Episode {n}", { n: animeAbsoluteEpisode ?? episode.imdbEpisode ?? episode.episode })}{episode.name && ` · ${episode.name}`}</p>}
+        </aside>
+      ) : <BackdropLayer src={backdropSrc} />}
 
       <div
         aria-hidden
@@ -957,12 +966,20 @@ export function PlayPicker({
       />
 
       <div data-stream-picker-content className="relative mx-auto flex min-h-full w-full max-w-5xl flex-col gap-12 px-12 pb-32 pt-32">
+        {voidWorkspace ? (
+          <header className="void-picker-heading">
+            <h2>{t("Sources")}</h2>
+            <button type="button" onClick={refresh} disabled={loading}>{t("Refresh sources")}</button>
+          </header>
+        ) : <>
         <PickerNav onBack={backToDetail} onRefresh={refresh} refreshing={loading} />
         <PickerHeader
           meta={metaForDisplay}
           episode={episode}
           absoluteEpisode={animeAbsoluteEpisode}
         />
+
+        </>}
 
         {!isDownload && (
           <LocalStreamList

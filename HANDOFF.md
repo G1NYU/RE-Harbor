@@ -56,3 +56,10 @@
 - `src/views/void-studio/void-watch.css`: full featured stage, filmstrip selections and in-workspace info drawer, no legacy Harbor Movie/Show components.
 - `src/App.tsx`: active VOID Movies and Shows are routed to `VoidWatchWorkspace`; other themes preserve their existing pages. `openMeta` preserves playback, watch history and Refract data flow.
 - **Parity gaps:** detailed episode/playback picker remains the original native route, Anime and other spaces await new layouts. Do not ship installer yet.
+
+## VOID 03 title, source selection and video controls
+
+- Branch `feature/void-03-workspaces`, based on `c807b7b`. Film and series title pages call the existing detail controller for resume, local/server choice, cloud history and group playback. More options opens the complete native title toolset.
+- The season browser combines TMDB descriptions with native episode IDs. Provider-only episodes and season zero remain selectable.
+- The manual picker has a separate title panel and source workspace. The default video transport has a compact playback console and expandable controls. Explicit player shell selections, PiP and kids modes retain their existing controllers.
+- Local VOID, music UI and Refract checks passed (70 tests). Production Windows playback, screenshots and installer testing remain outstanding. Chromium startup in the development container is blocked at its process-singleton socket.

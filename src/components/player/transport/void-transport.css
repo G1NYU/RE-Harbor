@@ -1,0 +1,72 @@
+.void-video-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  color: #eeeaf3;
+}
+.void-video-title,
+.void-video-window,
+.void-video-console,
+.void-video-tools {
+  position: absolute;
+  pointer-events: auto;
+  background: #16121cec;
+  border-radius: 8px;
+}
+.void-video-title,
+.void-video-window,
+.void-video-transport,
+.void-video-timeline,
+.void-video-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.void-video-title {
+  inset-block-start: 20px;
+  inset-inline-start: 20px;
+  max-width: 60%;
+  padding: 4px 12px;
+}
+.void-video-window {
+  inset-block-start: 20px;
+  inset-inline-end: 20px;
+}
+.void-video-console {
+  inset-block-end: 24px;
+  inset-inline-start: 24px;
+  width: min(620px, calc(100% - 48px));
+  padding: 14px 18px;
+}
+.void-video-timeline {
+  min-height: 24px;
+}
+.void-video-timeline > :only-child {
+  flex: 1;
+}
+.void-video-transport {
+  flex-wrap: wrap;
+}
+.void-video-transport > button:last-child {
+  margin-inline-start: auto;
+  font-weight: 700;
+  padding: 8px 14px;
+  background: #312b3c;
+  border-radius: 6px;
+}
+.void-video-tools {
+  bottom: calc(100% + 10px);
+  inset-inline-start: 0;
+  width: 100%;
+  flex-wrap: wrap;
+  padding: 12px;
+}
+@media (max-width: 600px) {
+  .void-video-console {
+    inset-inline-start: 8px;
+    inset-block-end: 8px;
+    width: calc(100% - 16px);
+    padding: 8px;
+  }
+}

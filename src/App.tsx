@@ -60,6 +60,7 @@ import { useOverlayPinned } from "@/lib/overlay-pin";
 import { isMobileWeb, isRemoteRoute } from "@/lib/platform";
 import { makeSafeTauriUnlisten } from "@/lib/tauri-unlisten";
 import { activeLayout } from "@/lib/theme";
+import { VoidPlayerContext } from "@/chrome/void/void-player-context";
 import { useThemePreview } from "@/lib/theme-preview";
 import { DevErrorTrigger } from "@/components/dev-error-trigger";
 import { ErrorView } from "@/components/error-view";
@@ -1986,6 +1987,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
                     />
                   ) : (
                     <DetailView
+                      voidWorkspace={voidShell && !metaLiveContext && !metaEpisodeHint && !meta.addonOrigin && !meta.animeFormat &&
+                        (meta.type === "movie" || meta.type === "series") &&
+                        /^(?:tt\d+|tmdb:(?:movie|tv):\d+)$/.test(meta.id)}
                       key={`meta-${meta.id}`}
                       meta={meta}
                       liveContext={metaLiveContext}
@@ -2181,6 +2185,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
               <div {...layerProps(pickerTop)}>
                 <Suspense fallback={null}>
                   <PlayPicker
+                    voidWorkspace={voidShell}
                     key={`picker-${picker.meta.id}-${picker.episode?.season ?? ""}-${picker.episode?.episode ?? ""}-${picker.attempt ?? 0}-${picker.intent ?? "play"}-${picker.seasonEpisodes?.length ?? 0}-${picker.contextRequestId ?? ""}-${picker.continuation?.id ?? ""}`}
                     meta={picker.meta}
                     episode={picker.episode}
@@ -2234,10 +2239,12 @@ function Shell({ onReady }: { onReady?: () => void }) {
         <GameLibraryDock visible={gameDockVisible && !gamesTop} />
         {player && (
           <Suspense fallback={null}>
+            <VoidPlayerContext.Provider value={voidShell}>
             <PlayerView
               key={player.meta.id.startsWith("iptv:") ? "player-live" : `player-${player.meta.id}`}
               src={player}
             />
+            </VoidPlayerContext.Provider>
           </Suspense>
         )}
         {bigPicture && (
