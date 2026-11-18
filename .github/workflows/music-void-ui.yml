@@ -2,7 +2,7 @@ name: VOID Native + Refract Validation
 
 on:
   push:
-    branches: [feature/void-refract-preview]
+    branches: ['feature/void-*']
   workflow_dispatch:
 
 permissions:
@@ -38,6 +38,7 @@ jobs:
             tests/music-now-playing-key.test.ts \
             tests/void-native.test.ts \
             tests/void-native-cohesion.test.ts \
-            tests/music-cover-art-url.test.ts
+            tests/music-cover-art-url.test.ts \
+            tests/void-shell.test.ts
       - name: Refract API, identity, and sync tests
         run: node --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-identity.test.mjs tests/refract-bulk-account.test.mjs
