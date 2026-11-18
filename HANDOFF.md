@@ -88,3 +88,9 @@
 - Windows rendering run `44294807005` failed because the native title dialog's Escape key was captured by Harbor's TV navigation before reaching its document keydown handler, incorrectly popping the title route.
 - Mark the dialog's existing close button with `data-tv-modal-close`. Harbor's `runBack` then dispatches Escape to the actual dialog closer instead of navigating away. Added an assertion that the title route remains active after closing.
 - Typecheck and Refract workflow `44294807032` passed on the preceding commit. Windows rendering needs re-run.
+
+## VOID 03 native stream browser (2026-11-18)
+- Added an independent `VoidSourceBoard` for VOID's manual picker and download-source selection. Original Harbor stream layout remains for every other theme.
+- The board uses the existing ranked/filtered stream data and `playManually` callbacks, with provider, quality, cache and codec/source/HDR/audio facets, a featured choice, paged alternatives, match hints and download state.
+- Maintains existing stream pipeline, debrid/P2P confirmation, saved filter management, and Refract playback entrypoints.
+- Feature parity still requires real-provider stream selection, native Windows video playback, and source-recovery testing. No installer or deploy configuration changed.

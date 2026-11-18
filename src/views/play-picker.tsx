@@ -74,6 +74,7 @@ import { PrimaryCard } from "./play-picker/primary-card";
 import { SourceDiagnostic } from "./play-picker/source-diagnostic";
 import { CachedTip } from "./play-picker/cached-tip";
 import { StremioLayout } from "./play-picker/stremio-layout";
+import { VoidSourceBoard } from "./void-studio/void-source-board";
 import { SourceDrawer } from "./play-picker/source-drawer";
 import { TierStrip } from "./play-picker/tier-strip";
 import { usePickHandler, type ResolvingSelection } from "./play-picker/use-pick-handler";
@@ -1140,7 +1141,25 @@ export function PlayPicker({
           </div>
         )}
 
-        {(settings.pickerLayout === "stremio" || isDownload) &&
+        {voidWorkspace && filteredPicker && filteredPicker.all.length > 0 ? (
+          <VoidSourceBoard
+            streams={displayStreams}
+            download={isDownload}
+            currentPick={currentPick}
+            failedStreams={failedStreams}
+            resolving={resolving?.stream ?? null}
+            matchFor={hostMatch ? matchFor : undefined}
+            downloadStateFor={(stream) =>
+              resolving?.stream === stream
+                ? "preparing"
+                : queuedDownloadKeys.has(streamIdentity(stream))
+                  ? "queued"
+                  : "idle"
+            }
+            onPlay={playManually}
+            onManageFilters={() => openSettings("streamFilters")}
+          />
+        ) : (settings.pickerLayout === "stremio" || isDownload) &&
         filteredPicker &&
         filteredPicker.all.length > 0 ? (
           <StremioLayout
@@ -1247,7 +1266,7 @@ export function PlayPicker({
           </div>
         )}
       </div>
-      {(settings.pickerLayout === "stremio" || isDownload) &&
+      {!voidWorkspace && (settings.pickerLayout === "stremio" || isDownload) &&
         filteredPicker &&
         filteredPicker.all.length > 0 && (
           <PickerScrollTop

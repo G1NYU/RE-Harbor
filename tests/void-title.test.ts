@@ -51,3 +51,19 @@ test("VOID title options stay in the new workspace until advanced compatibility 
   assert.match(detail, /onToggleWatched=\{markThisMovieWatched\}/);
   assert.match(detail, /onTools=\{\(\) => setShowTitleTools\(true\)\}/);
 });
+
+
+test("VOID source selection uses an independent stream board while other themes retain their picker", () => {
+  const picker = readFileSync("src/views/play-picker.tsx", "utf8");
+  const board = readFileSync("src/views/void-studio/void-source-board.tsx", "utf8");
+  const css = readFileSync("src/views/void-studio/void-source-board.css", "utf8");
+  assert.match(picker, /voidWorkspace && filteredPicker && filteredPicker\.all\.length > 0/);
+  assert.match(picker, /<VoidSourceBoard/);
+  assert.match(picker, /<StremioLayout/);
+  assert.match(picker, /onPlay=\{playManually\}/);
+  assert.match(picker, /downloadStateFor=\{\(stream\) =>/);
+  assert.match(board, /matchesFacets\(stream, facets\)/);
+  assert.match(board, /aria-label="Available sources"/);
+  assert.match(board, /onManageFilters/);
+  assert.doesNotMatch(css, /backdrop-filter\s*:|@keyframes|filter\s*:\s*blur\(/);
+});
