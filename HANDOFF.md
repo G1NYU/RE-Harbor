@@ -179,3 +179,8 @@
 - Added a one-time-on-introduction Windows CI workflow for `feature/void-03-workspaces` that builds a no-bundle Tauri executable using existing native dependencies, stages the verified payload, removes the installer helper, and uploads only an expiring Actions artifact.
 - Workflow is additionally manually dispatchable, but ordinary subsequent source-code commits do not automatically trigger another expensive native build.
 - This remains an unsigned developer preview, not a Harbor release; native GUI embedding, real addon streams and profile behavior require Windows device testing.
+
+## VOID 03 native source-failure recovery screen (2026-11-18)
+- The existing playback failure overlay was still Harbor's glass/rose modal. When VOID is active, show a separate flat, full-screen recovery view with explicit provider diagnostics, accessible alert-dialog semantics and focused source-selection action.
+- Both controls retain `onRetry` and `onChoose` from `useAutoRetry`; non-VOID themes preserve their original presentation. No resolver/stream ranking/debrid behavior changed.
+- Structural regressions check the native branch, unmodified legacy branch, action wiring and blur-free CSS. Real network failures require end-to-end Windows validation.

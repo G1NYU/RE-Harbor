@@ -185,3 +185,17 @@ test("VOID 03 portable preview keeps a separate Windows identity and no updater"
   assert.match(workflow, /paths:[\s\S]*?"\.github\/workflows\/void03-windows-preview\.yml"/);
   assert.doesNotMatch(workflow, /gh release|create-release|publish-release/);
 });
+
+test("VOID recovery uses native full-screen source failure actions without altering legacy UI", () => {
+  const card = readFileSync("src/views/player/source-error-card.tsx", "utf8");
+  const css = readFileSync("src/views/player/void-source-error.css", "utf8");
+  assert.match(card, /useVoidWorkspace\(\)/);
+  assert.match(card, /data-void-source-error/);
+  assert.match(card, /role="alertdialog"/);
+  assert.match(card, /ref=\{chooseRef\}/);
+  assert.match(card, /onClick=\{onRetry\}/);
+  assert.match(card, /onClick=\{onChoose\}/);
+  assert.match(card, /animate-modal-in/);
+  assert.match(css, /\.void-source-error-actions/);
+  assert.doesNotMatch(css, /(?:backdrop-filter|@keyframes|filter:\s*blur)/);
+});

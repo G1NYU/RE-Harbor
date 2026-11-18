@@ -1,5 +1,8 @@
 import { ListVideo, RotateCcw, ServerCrash, WifiOff } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
+import { useEffect, useRef } from "react";
+import "./void-source-error.css";
 import type { SourceError } from "./hooks/use-auto-retry";
 
 const STATUS_TEXT: Record<number, string> = {
@@ -62,6 +65,56 @@ export function SourceErrorCard({
   const info = describe(error);
   const codeLabel = error.status === 0 ? t("No response") : `HTTP ${error.status}`;
   const statusName = STATUS_TEXT[error.status];
+  const voidWorkspace = useVoidWorkspace();
+  const chooseRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (voidWorkspace) chooseRef.current?.focus();
+  }, [voidWorkspace]);
+
+  if (voidWorkspace) {
+    return (
+      <section
+        data-void-source-error
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="void-source-error-title"
+        className="void-source-error"
+      >
+        <div className="void-source-error-panel">
+          <header className="void-source-error-top">
+            <span>VOID / PLAYBACK</span>
+            <span>{error.exhausted ? t("Last source tried") : `${codeLabel}${statusName ? ` · ${statusName}` : ""}`}</span>
+          </header>
+          <div className="void-source-error-main">
+            <span className="void-source-error-symbol" aria-hidden="true">
+              {info.offline ? <WifiOff size={28} strokeWidth={1.8} /> : <ServerCrash size={28} strokeWidth={1.8} />}
+            </span>
+            <div className="void-source-error-message">
+              <span className="void-source-error-kicker">STREAM INTERRUPTED</span>
+              <h2 id="void-source-error-title">{t(info.title)}</h2>
+              <p>{t(info.detail)}</p>
+            </div>
+          </div>
+          {error.host && (
+            <div className="void-source-error-host">
+              <span>{error.exhausted ? t("Last source tried") : t("Source said")}</span>
+              <code>{error.host}</code>
+            </div>
+          )}
+          <footer className="void-source-error-actions">
+            <button type="button" onClick={onRetry}>
+              <RotateCcw size={17} />
+              {t("Retry")}
+            </button>
+            <button type="button" ref={chooseRef} onClick={onChoose}>
+              <ListVideo size={18} />
+              {t("Choose another source")}
+            </button>
+          </footer>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="animate-fade-in absolute inset-0 z-[90] flex items-center justify-center bg-canvas/85 p-6 backdrop-blur-md">
