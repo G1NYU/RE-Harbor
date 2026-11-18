@@ -50,7 +50,7 @@ await page.addInitScript(() => {
     installedAt: Date.now(),
     manifest: {
       id: "void-smoke-addon",
-      name: "VOID Preview Provider",
+      name: "VOID Fixture Source",
       version: "1.0.0",
       types: ["movie", "series"],
       idPrefixes: ["tt"],
@@ -66,9 +66,9 @@ await page.route("https://v3-cinemeta.strem.io/**", async (route) => {
 await page.route("https://void-preview.invalid/**", async (route) => {
   const pathname = new URL(route.request().url()).pathname;
   const payload = pathname.includes("/stream/") ? { streams: [
-    { name: "VOID Preview Provider", title: "Night Train.2024.1080p.WEB-DL", url: "https://video-preview.invalid/1080.mp4" },
-    { name: "VOID Preview Provider", title: "Night Train.2024.720p.WEBRip", url: "https://video-preview.invalid/720.mp4" },
-  ] } : { id: "void-smoke-addon", name: "VOID Preview Provider", version: "1.0.0", resources: ["stream"], types: ["movie", "series"], idPrefixes: ["tt"] };
+    { name: "VOID Fixture Source", title: "The.Night.Train.2024.1080p.WEB-DL", url: "https://video-fixture.invalid/1080.mp4", behaviorHints: { videoSize: 1_900_000_000 } },
+    { name: "VOID Fixture Source", title: "The.Night.Train.2024.720p.WEBRip", url: "https://video-fixture.invalid/720.mp4", behaviorHints: { videoSize: 950_000_000 } },
+  ] } : { id: "void-smoke-addon", name: "VOID Fixture Source", version: "1.0.0", resources: ["stream"], types: ["movie", "series"], idPrefixes: ["tt"] };
   await route.fulfill({ json: payload });
 });
 const errors = [];
@@ -144,7 +144,7 @@ try {
     .getByRole("button", { name: /Choose a source/ }).click();
   const board = page.locator("[data-void-source-board]:visible");
   await board.waitFor({ timeout: 20_000 });
-  assert.match(await board.innerText(), /VOID Preview Provider/);
+  assert.match(await board.innerText(), /VOID Fixture Source/);
   assert.equal(await board.locator(".void-source-row").count(), 1);
   await board.getByText("Advanced filters", { exact: true }).click();
   assert.ok(await board.locator(".void-source-advanced select").count() >= 3);

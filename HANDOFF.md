@@ -99,3 +99,7 @@
 - Added a deterministic mock Stremio addon to the isolated Edge rendering test. Its two synthetic playback URLs exercise source discovery and filtering, but are never played.
 - The test navigates to VOID Watch, opens a title, uses the native title-actions dialog, waits for the new source board and verifies source rows plus advanced facets. Its screenshot is stored as `void-sources.png`.
 - Real addons, streaming, downloads and Windows native playback are not yet verified by this synthetic integration test.
+
+## VOID 03 stream fixture correction
+- Windows run `44296915311` found two mock streams but no playable items because the fixture's source name included "Preview", which is intentionally treated as a trailer/extra marker by `applyTrust`. The new board was therefore correctly not rendered.
+- Renamed the synthetic source to `VOID Fixture Source`, gave streams full matching release filenames, and provided plausible file sizes. Production trust, ranking and filters are unchanged; repeat the integration run.
