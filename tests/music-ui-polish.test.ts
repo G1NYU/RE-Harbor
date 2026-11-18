@@ -39,8 +39,26 @@ test("bottom bar exposes explicit expansion and retains native transport", () =>
   }
 });
 
-test("artist portrait remains responsive without replacing Harbor detail view", () => {
+test("artist detail becomes full-width with a spacious editorial header and two-column tracks", () => {
+  const view = read("src/views/music.tsx");
+  const detail = read("src/views/music/music-detail.tsx");
   const css = read("src/views/music/music-detail.css");
-  assert.match(css, /music-detail-hero:has\(\.music-detail-art\.rounded-full\)/);
-  assert.match(css, /@container \(max-width: 620px\)/);
+  assert.match(view, /detail\?\.item\.kind === "artist" \? "max-w-none"/);
+  assert.match(detail, /data-music-artist=\{item\.kind === "artist"/);
+  assert.match(detail, /music-artist-eyebrow/);
+  assert.match(css, /grid-template-areas: "art identity" "art stats"/);
+  assert.match(css, /\.music-detail-track-list \{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /@container \(max-width: 850px\)/);
+});
+test("full-width music dock expands from its non-control area into the real player", () => {
+  const dock = read("src/components/music/music-dock.tsx");
+  const now = read("src/components/music/music-now-playing.tsx");
+  assert.ok(dock.includes('insetInlineStart: topKind === "games" ? inset : 0'));
+  assert.match(dock, /onClick=\{\(event\) => \{/);
+  assert.match(dock, /target\.closest\('button, a, input, select, textarea/);
+  assert.match(dock, /setQueueOpen\(false\);\s*setExpanded\(true\);/);
+  assert.match(dock, /<MusicNowPlaying/);
+  for (const region of ["music-now-artwork", "music-now-tabs", "music-now-panel"]) {
+    assert.ok(now.includes(region), "the expanded player lost " + region);
+  }
 });

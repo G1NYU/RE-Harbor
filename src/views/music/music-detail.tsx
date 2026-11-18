@@ -293,7 +293,7 @@ export function MusicDetail({
     </div>
   );
   return (
-    <section className="music-detail-page flex min-w-0 flex-col gap-6">
+    <section className="music-detail-page flex min-w-0 flex-col gap-6" data-music-artist={item.kind === "artist" || undefined}>
       <button
         type="button"
         data-music-inner-back
@@ -319,7 +319,7 @@ export function MusicDetail({
         {heroMenu.menu}
         <div
           onContextMenu={heroMenu.onContextMenu}
-          className={`music-detail-art grid size-48 shrink-0 place-items-center overflow-hidden bg-elevated ${item.kind === "artist" ? "rounded-full" : "rounded-lg"}`}
+          className={`music-detail-art grid size-48 shrink-0 place-items-center overflow-hidden bg-elevated ${item.kind === "artist" ? "rounded-[18px]" : "rounded-lg"}`}
         >
           {heroArt ? (
             <Poster
@@ -333,6 +333,7 @@ export function MusicDetail({
           )}
         </div>
         <div className="music-detail-title min-w-0">
+          {item.kind === "artist" && <span className="music-artist-eyebrow">{t("music.search.artists")}</span>}
           <h1
             ref={heading}
             tabIndex={-1}

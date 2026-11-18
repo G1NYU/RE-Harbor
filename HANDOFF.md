@@ -27,3 +27,9 @@ Do not redesign app navigation, replace the player engine, rework music sources,
 - Do not merge VOID 02/03 or affect core music sources, playback engine, Refract or other category pages.
 
 - Final review: the same transparent toolbar collision is visible above movie/poster rows. Enable opaque scroll backing for transparent topbar appearance globally; the content-density and sticky title changes remain Music-only.
+
+## Corrected interpretation of screenshot request
+- The bottom bar must be full-bleed across the application/window, not start after Harbor's sidebar. The user must be able to open the actual `MusicNowPlaying` environment by clicking unused dock surface, while play, seek, volume, menus, artist and track links retain their own actions. The visible expansion button remains as a keyboard-accessible alternative.
+- Artist detail (Masayoshi Takanaka reference) must be a true editorial redesign: full available content width, prominent rectangular artwork, balanced typography/actions/metadata, clear section controls and two desktop track columns that collapse responsively.
+- The old draft's small circular-portrait resizing was insufficient and has been replaced. The rest of Harbor remains on the stable baseline.
+- Exact implementation is staged as an **unpublished review commit**. Full test/build/render validation cannot be claimed before a branch push.

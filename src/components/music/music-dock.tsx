@@ -462,7 +462,7 @@ export function MusicDock() {
         aria-label={t("music.player")}
         style={
           {
-            insetInlineStart: inset,
+            insetInlineStart: topKind === "games" ? inset : 0,
             insetInlineEnd: 0,
             height: TAB_HEIGHT,
             bottom: "var(--harbor-viewport-bottom, 0px)",
@@ -548,13 +548,24 @@ export function MusicDock() {
       aria-label={t(expanded ? "music.now.title" : "music.player")}
       style={
         {
-          insetInlineStart: inset,
+          // Full width over Harbor's sidebar except within the Games workspace.
+          insetInlineStart: topKind === "games" ? inset : 0,
           insetInlineEnd: 0,
           height: DOCK_HEIGHT,
           bottom: "var(--harbor-viewport-bottom, 0px)",
         } as CSSProperties
       }
       className="@container fixed bottom-0 z-[120] border-t border-edge bg-canvas text-ink"
+      onClick={(event) => {
+        if (expanded) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        // Preserve seeking, playback controls, track/artist navigation and menus.
+        // The rest of the bar is one large shortcut to the full player.
+        if (target.closest('button, a, input, select, textarea, [role="button"], [role="slider"], [data-music-dock-seek], [data-music-dock-alert]')) return;
+        setQueueOpen(false);
+        setExpanded(true);
+      }}
     >
       {appearance.gifVisualizer && appearance.gifId ? (
         !expanded && <MusicGifVisualizer track={current} playing={player.phase === "playing"} />
@@ -563,7 +574,7 @@ export function MusicDock() {
       )}
       {expanded && (
         <MusicNowPlaying
-          inset={inset}
+          inset={topKind === "games" ? inset : 0}
           dockRef={dockRef}
           closing={nowExit.closing}
           onClose={nowExit.close}

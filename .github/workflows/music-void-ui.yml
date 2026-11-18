@@ -2,7 +2,7 @@ name: VOID Native + Refract Validation
 
 on:
   push:
-    branches: [feature/void-refract-preview]
+    branches: [feature/void-refract-preview, feature/harbor-music-polish]
   workflow_dispatch:
 
 permissions:
@@ -33,6 +33,7 @@ jobs:
       - name: Dock and now-playing regressions
         run: |
           node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
+            tests/music-ui-polish.test.ts \
             tests/music-void-ui.test.ts \
             tests/music-dock-clearance.test.ts \
             tests/music-now-playing-key.test.ts \

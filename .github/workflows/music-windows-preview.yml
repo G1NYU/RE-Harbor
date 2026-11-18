@@ -2,7 +2,7 @@ name: VOID + Refract Windows Preview
 
 on:
   push:
-    branches: [feature/void-refract-preview]
+    branches: [feature/void-refract-preview, feature/harbor-music-polish]
     paths:
       - ".github/workflows/music-windows-preview.yml"
       - "src/**"
@@ -91,7 +91,7 @@ jobs:
           @'
           VOID + REFRACT PREVIEW (Windows x64)
           ==================================
-          This is a portable test build from feature/void-refract-preview, not a normal Harbor installer.
+          This is a portable test build from the workflow branch, not a normal Harbor installer.
 
           1. Extract this artifact to a new folder.
           2. Run harbor.exe from that folder.
