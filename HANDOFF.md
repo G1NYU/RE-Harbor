@@ -60,3 +60,8 @@ Updated: 2026-11-18
 - Corrected the native Last.fm threshold: track updates now send when actually listened for >=50% or four minutes, not only on EOF, and <=30-second recordings are excluded. Skip/seek behavior remains protected by real listened-time accounting and one-send flag.
 - Added an optional Last.fm Now Playing event after mpv FileLoaded when the account is connected; no credentials transmitted without authorization. The optional presence failure must not affect audio.
 - This change needs a *new* Windows preview; the previous successful artifact predates it.
+
+## Windows archive extraction regression (2026-11-18)
+- CI run 44397942285 failed in `pnpm run setup` before native compilation: the Windows runner's `Expand-Archive` invoked an unavailable .NET `ExtractToDirectory` overload. FFmpeg and FFprobe were downloaded but could not be extracted.
+- `scripts/fetch-binaries.mjs` now uses Windows built-in bsdtar (`tar -xf`) for ZIP archives instead of PowerShell. Tarball extraction and non-Windows ZIP behavior are unchanged.
+- A dedicated test checks the Windows extraction path. The newer portable build must succeed before declaring Last.fm fixes native-tested.
