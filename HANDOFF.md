@@ -94,3 +94,8 @@
 - The board uses the existing ranked/filtered stream data and `playManually` callbacks, with provider, quality, cache and codec/source/HDR/audio facets, a featured choice, paged alternatives, match hints and download state.
 - Maintains existing stream pipeline, debrid/P2P confirmation, saved filter management, and Refract playback entrypoints.
 - Feature parity still requires real-provider stream selection, native Windows video playback, and source-recovery testing. No installer or deploy configuration changed.
+
+## VOID 03 stream-board Windows integration smoke
+- Added a deterministic mock Stremio addon to the isolated Edge rendering test. Its two synthetic playback URLs exercise source discovery and filtering, but are never played.
+- The test navigates to VOID Watch, opens a title, uses the native title-actions dialog, waits for the new source board and verifies source rows plus advanced facets. Its screenshot is stored as `void-sources.png`.
+- Real addons, streaming, downloads and Windows native playback are not yet verified by this synthetic integration test.

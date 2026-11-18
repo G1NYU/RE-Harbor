@@ -42,11 +42,34 @@ await page.addInitScript(() => {
       ],
     }),
   );
+  // A deterministic, browser-intercepted addon proves that VOID can display actual
+  // resolved streams without installing any provider or using user credentials.
+  localStorage.setItem("harbor.installed-addons.void-test", JSON.stringify([{
+    id: "void-smoke-addon",
+    transportUrl: "https://void-preview.invalid/manifest.json",
+    installedAt: Date.now(),
+    manifest: {
+      id: "void-smoke-addon",
+      name: "VOID Preview Provider",
+      version: "1.0.0",
+      types: ["movie", "series"],
+      idPrefixes: ["tt"],
+      resources: [{ name: "stream", types: ["movie", "series"], idPrefixes: ["tt"] }],
+    },
+  }]));
 });
 await page.route("https://v3-cinemeta.strem.io/**", async (route) => {
   const path = new URL(route.request().url()).pathname;
   const item = path.includes("/series/") ? series : film;
   await route.fulfill({ json: path.includes("/catalog/") ? { metas: [item] } : { meta: item } });
+});
+await page.route("https://void-preview.invalid/**", async (route) => {
+  const pathname = new URL(route.request().url()).pathname;
+  const payload = pathname.includes("/stream/") ? { streams: [
+    { name: "VOID Preview Provider", title: "Night Train.2024.1080p.WEB-DL", url: "https://video-preview.invalid/1080.mp4" },
+    { name: "VOID Preview Provider", title: "Night Train.2024.720p.WEBRip", url: "https://video-preview.invalid/720.mp4" },
+  ] } : { id: "void-smoke-addon", name: "VOID Preview Provider", version: "1.0.0", resources: ["stream"], types: ["movie", "series"], idPrefixes: ["tt"] };
+  await route.fulfill({ json: payload });
 });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -114,6 +137,18 @@ try {
   await nav.getByRole("button", { name: "Listen", exact: true }).click();
   await page.locator("[data-void-listening-deck]:visible").waitFor();
   await page.screenshot({ path: `${output}/listen.png` });
+  await nav.getByRole("button", { name: "Watch", exact: true }).click();
+  await watch.locator(".void-watch-primary").first().click();
+  await title.getByRole("button", { name: "More options" }).click();
+  await title.getByRole("dialog", { name: "Title actions" })
+    .getByRole("button", { name: /Choose a source/ }).click();
+  const board = page.locator("[data-void-source-board]:visible");
+  await board.waitFor({ timeout: 20_000 });
+  assert.match(await board.innerText(), /VOID Preview Provider/);
+  assert.equal(await board.locator(".void-source-row").count(), 1);
+  await board.getByText("Advanced filters", { exact: true }).click();
+  assert.ok(await board.locator(".void-source-advanced select").count() >= 3);
+  await page.screenshot({ path: `${output}/void-sources.png` });
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png` }).catch(() => {});
   console.error(
