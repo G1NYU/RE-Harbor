@@ -76,7 +76,19 @@ try {
   await page.screenshot({ path: folder + "/dock-1600.png" });
   // Clicking the unused left edge must open the existing full music player.
   await bar.click({ position: { x: 20, y: 25 } });
-  await page.locator(".music-now-playing").waitFor();
+  const now = page.locator(".music-now-playing");
+  await now.waitFor();
+  // Capture settled pixels, not the transparent halfway frame of the 280ms
+  // opening animation. Verify the full listening environment is opaque.
+  const fullPlayer = await now.evaluate(async (el) => {
+    await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
+    const style = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return { opacity: Number(style.opacity), background: style.backgroundColor, x: rect.x, right: rect.right };
+  });
+  assert.ok(fullPlayer.opacity >= 0.99, "Now Playing must finish fully opaque");
+  assert.notEqual(fullPlayer.background, "rgba(0, 0, 0, 0)", "Now Playing needs its own solid canvas");
+  assert.ok(fullPlayer.x < 2 && Math.abs(fullPlayer.right - 1600) < 3, "Now Playing must span the window");
   await page.screenshot({ path: folder + "/now-playing-1600.png" });
   await page.locator("[data-music-dock-close]").click();
   await page.locator(".music-now-playing").waitFor({ state: "hidden" });

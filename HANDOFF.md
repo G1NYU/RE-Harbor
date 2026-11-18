@@ -42,3 +42,7 @@ Updated: 2026-11-18
 ## Validation note (2026-11-18)
 - First branch CI run 44389549097 passed TypeScript but failed one new test that expected only artist pages to be full-width. The intended wide layout applies to both artist and album pages; corrected the test regex without changing production code.
 - The first portable Windows build was still compiling during this correction. Verification on the new test commit is pending.
+
+## Visual screenshot timing refinement
+- Edge rendering run 44393486339 passed geometry checks. The immediate screenshot of the 280ms Now Playing opening animation was captured while opacity was between 0 and 1, making underlying Music home visible.
+- Updated the test to await completion of all opening animations and assert a solid background, full opacity and full-window bounds before capturing Now Playing. No production change necessary unless this settled-state assertion fails.
