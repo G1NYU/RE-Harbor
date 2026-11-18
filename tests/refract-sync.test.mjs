@@ -35,7 +35,13 @@ function harness() {
       if (offline) throw new Error("offline");
       calls.push({ kind: "episode", args });
     },
-    RefractApiError: class RefractApiError extends Error {},
+    RefractApiError: class RefractApiError extends Error {
+      constructor(status) {
+        super(`HTTP ${status}`);
+        this.status = status;
+        this.retryAfterMs = 0;
+      }
+    },
   };
   const file = readFileSync(new URL("../src/lib/refract/sync.ts", import.meta.url), "utf8");
   const output = ts.transpileModule(file, {
@@ -54,6 +60,7 @@ function harness() {
   );
   return {
     sync: module.exports,
+    apiError: (status) => new client.RefractApiError(status),
     db,
     calls,
     setPrimary: (v) => {
@@ -272,20 +279,29 @@ test("a bulk history action exceeding remaining capacity is rejected without par
     }));
     h.db.set(storeKey, JSON.stringify({ pending, recent: {}, failed: [], synced: 0 }));
     h.sync.enqueueRefractWatch(episodeEvent(), {
-      episodes: [{ season: 2, episode: 4 }, { season: 2, episode: 5 }],
+      episodes: [
+        { season: 2, episode: 4 },
+        { season: 2, episode: 5 },
+      ],
     });
     await tick();
 
     // One independent queued movie succeeded, but the rejected batch remains visible.
     const stored = JSON.parse(h.db.get(storeKey));
     assert.equal(stored.pending.length, 2498);
-    assert.equal(stored.pending.some((job) => job.type === "episode"), false);
+    assert.equal(
+      stored.pending.some((job) => job.type === "episode"),
+      false,
+    );
     assert.equal(h.calls.length, 1);
     assert.equal(h.calls[0].kind, "movie");
     assert.equal(h.sync.refractStatus().failed, 1);
     assert.equal(h.sync.refractStatus().failureDetails[0].sourceId, episodeEvent().id);
     assert.match(h.sync.refractStatus().failureDetails[0].reason, /queue full/);
-    assert.equal(h.sync.refractStatus().message, "Refract queue full; unable to save another watch");
+    assert.equal(
+      h.sync.refractStatus().message,
+      "Refract queue full; unable to save another watch",
+    );
   } finally {
     h.cleanup();
   }
@@ -353,5 +369,148 @@ test("a same-key queue reset ignores late write completion without suppressing a
     assert.equal(h.sync.refractStatus().synced, 1);
   } finally {
     h.cleanup();
+  }
+});
+
+test("account replacement during an in-flight write cannot mark the new queue as synced", async () => {
+  const h = harness();
+  try {
+    let finish;
+    let started;
+    const writing = new Promise((resolve) => {
+      started = resolve;
+    });
+    h.setMovieWrite(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+          started();
+        }),
+    );
+    h.sync.enqueueRefractWatch(movieEvent());
+    await writing;
+
+    h.sync.resetRefractSync();
+    h.setKey("rfk_replacement_fixture");
+    finish();
+    await tick();
+    assert.equal(h.sync.refractStatus().pending, 0);
+    assert.equal(h.sync.refractStatus().synced, 0);
+
+    h.setMovieWrite(async (...args) => {
+      h.calls.push({ kind: "movie", args });
+    });
+    h.sync.enqueueRefractWatch(movieEvent("tmdb:movie:56"));
+    await tick();
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0].args[0], "rfk_replacement_fixture");
+    assert.equal(h.sync.refractStatus().synced, 1);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("queue-full warning returns after a failed attempt is successfully retried", async () => {
+  const h = harness();
+  try {
+    const storeKey = "harbor.refract.sync.v1";
+    const now = Date.now();
+    const pending = Array.from({ length: 2499 }, (_, i) => ({
+      id: `existing-${i}`,
+      requestId: `request-${i}`,
+      sourceId: `tmdb:movie:${i + 1}`,
+      type: "movie",
+      watchedAt: now,
+      attempts: 0,
+      nextAt: i === 0 ? now : now + 60_000,
+    }));
+    h.db.set(storeKey, JSON.stringify({ pending, recent: {}, failed: [], synced: 0 }));
+    h.setOffline(true);
+    h.sync.enqueueRefractWatch(episodeEvent(), {
+      episodes: [
+        { season: 2, episode: 4 },
+        { season: 2, episode: 5 },
+      ],
+    });
+    await tick();
+    assert.equal(h.sync.refractStatus().failed, 1);
+    assert.equal(h.sync.refractStatus().message, "Network error; retry scheduled");
+
+    h.setOffline(false);
+    h.sync.retryRefractSync();
+    await tick();
+    assert.equal(h.sync.refractStatus().synced, 16);
+    assert.equal(h.sync.refractStatus().failed, 1);
+    assert.equal(
+      h.sync.refractStatus().message,
+      "Refract queue full; unable to save another watch",
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("replacement watch queued during superseded lookup flushes without waiting for polling", async () => {
+  const h = harness();
+  try {
+    let finishOld;
+    h.setLookup(
+      () =>
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+    );
+    h.sync.enqueueRefractWatch(movieEvent());
+    h.sync.resetRefractSync();
+    h.setKey("rfk_replacement_fixture");
+    h.setLookup(async () => [{ ids: { refract: "replacement-movie" } }]);
+    h.sync.enqueueRefractWatch(movieEvent("tmdb:movie:56"));
+    assert.equal(h.calls.length, 0);
+    finishOld([{ ids: { refract: "old-movie" } }]);
+    await tick();
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0].args[0], "rfk_replacement_fixture");
+    assert.equal(h.calls[0].args[1], "replacement-movie");
+    assert.equal(h.sync.refractStatus().pending, 0);
+    assert.equal(h.sync.refractStatus().synced, 1);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("HTTP 409 remains retryable while 404 and 422 are terminal", async () => {
+  for (const status of [409, 404, 422]) {
+    const h = harness();
+    try {
+      let attempts = 0;
+      h.setMovieWrite(async (...args) => {
+        attempts += 1;
+        if (attempts === 1) throw h.apiError(status);
+        h.calls.push({ kind: "movie", args });
+      });
+      h.sync.enqueueRefractWatch(movieEvent());
+      await tick();
+      assert.equal(h.sync.refractStatus().pending, status === 409 ? 1 : 0);
+      assert.equal(h.sync.refractStatus().failed, status === 409 ? 0 : 1);
+      if (status === 409) {
+        const storeKey = "harbor.refract.sync.v1";
+        const stored = JSON.parse(h.db.get(storeKey));
+        stored.pending[0].nextAt = 0;
+        h.db.set(storeKey, JSON.stringify(stored));
+      }
+      if (status === 409) {
+        const storeKey = "harbor.refract.sync.v1";
+        const stored = JSON.parse(h.db.get(storeKey));
+        stored.pending[0].nextAt = 0;
+        h.db.set(storeKey, JSON.stringify(stored));
+      }
+      h.sync.retryRefractSync();
+      await tick();
+      assert.equal(h.calls.length, status === 409 ? 1 : 0);
+      assert.equal(h.sync.refractStatus().pending, 0);
+      assert.equal(h.sync.refractStatus().failed, status === 409 ? 0 : 1);
+    } finally {
+      h.cleanup();
+    }
   }
 });

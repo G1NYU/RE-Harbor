@@ -309,7 +309,12 @@ test("watchlist toggles preserve write order across TMDB to IMDb enrichment", as
     const title = { id: "tmdb:tv:100", type: "series" };
     const add = h.client.syncRefractWatchlist("rfk_fixture", title, true, () => {});
     await started;
-    const remove = h.client.syncRefractWatchlist("rfk_fixture", { ...title, imdbId: "tt100" }, false, () => {});
+    const remove = h.client.syncRefractWatchlist(
+      "rfk_fixture",
+      { ...title, imdbId: "tt100" },
+      false,
+      () => {},
+    );
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(
       h.calls.map(({ init }) => init.method),
@@ -321,6 +326,58 @@ test("watchlist toggles preserve write order across TMDB to IMDb enrichment", as
       h.calls.map(({ init }) => init.method),
       ["GET", "PUT", "GET", "DELETE"],
     );
+  } finally {
+    globalThis.window = original;
+  }
+});
+
+test("watchlist membership writes serialize across different titles on one account", async () => {
+  let finishFirst;
+  let markStarted;
+  const started = new Promise((resolve) => {
+    markStarted = resolve;
+  });
+  const h = harness((url, init) => {
+    if (init.method === "GET") {
+      const id = url.includes("/tt101") ? "second-show" : "first-show";
+      return new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: id } }] }));
+    }
+    if (init.method === "PUT" && url.endsWith("/first-show")) {
+      markStarted();
+      return new Promise((resolve) => {
+        finishFirst = resolve;
+      });
+    }
+    return new Response("{}", { status: 201 });
+  });
+  const original = globalThis.window;
+  globalThis.window = new EventTarget();
+  try {
+    const first = h.client.syncRefractWatchlist(
+      "rfk_fixture",
+      { id: "tt100", type: "series" },
+      true,
+      () => {},
+    );
+    await started;
+    const second = h.client.syncRefractWatchlist(
+      "rfk_fixture",
+      { id: "tt101", type: "series" },
+      true,
+      () => {},
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(
+      h.calls.map(({ init }) => init.method),
+      ["GET", "PUT"],
+    );
+    finishFirst(new Response("{}", { status: 201 }));
+    await Promise.all([first, second]);
+    assert.deepEqual(
+      h.calls.map(({ init }) => init.method),
+      ["GET", "PUT", "GET", "PUT"],
+    );
+    assert.ok(h.calls[3].url.endsWith("/second-show"));
   } finally {
     globalThis.window = original;
   }

@@ -43,6 +43,7 @@ const DEDUP_MS = 15 * 60 * 1000;
 const MAX_PENDING = 2500;
 const QUEUE_FULL = "Refract queue full; unable to save another watch";
 let running = false;
+let flushRequested = false;
 let started = false;
 
 const empty = (): Store => ({ pending: [], recent: {}, failed: [], synced: 0, message: "" });
@@ -215,7 +216,11 @@ async function push(key: string, job: Job): Promise<void> {
   );
 }
 export async function flushRefractSync(): Promise<void> {
-  if (running || !refractEnabled() || !activeProfileIsPrimary()) return;
+  if (running) {
+    flushRequested = true;
+    return;
+  }
+  if (!refractEnabled() || !activeProfileIsPrimary()) return;
   const key = getRefractKey();
   if (!key) return;
   running = true;
@@ -235,8 +240,9 @@ export async function flushRefractSync(): Promise<void> {
         current.recent[keyOf(job)] = Date.now();
         current.synced++;
         // Keep a rejected bulk action visible when an unrelated pending watch succeeds.
-        if (!current.failed.some((failure) => failure.reason === QUEUE_FULL))
-          current.message = "Last watched item sent successfully";
+        current.message = current.failed.some((failure) => failure.reason === QUEUE_FULL)
+          ? QUEUE_FULL
+          : "Last watched item sent successfully";
         save(current);
       } catch (error) {
         if (error instanceof Superseded || getRefractKey() !== key) break;
@@ -248,7 +254,7 @@ export async function flushRefractSync(): Promise<void> {
           (error instanceof RefractApiError &&
             error.status >= 400 &&
             error.status < 500 &&
-            ![401, 403, 429].includes(error.status))
+            ![401, 403, 409, 429].includes(error.status))
         ) {
           current.pending = current.pending.filter((x) => x.id !== job.id);
           current.failed.push({
@@ -279,6 +285,10 @@ export async function flushRefractSync(): Promise<void> {
     }
   } finally {
     running = false;
+    if (flushRequested) {
+      flushRequested = false;
+      void flushRefractSync();
+    }
   }
 }
 export function retryRefractSync(): void {

@@ -22,6 +22,11 @@
 - New structural regression tests added as `tests/void-music-editorial.test.ts` (verify in subsequent CI).
 - **Not verified yet:** Windows installer build from this branch; on-device visual/interaction test. Preview workflow was enabled for VOID 02 feature branches.
 
+## Latest Refract PR #103 synchronization patch
+- Imported the upstream replay-while-flushing and terminal HTTP 409 handling from `feature/refract-upstream` at `99366702f6cecda33ff335f05747d993dbcd9be1`.
+- Added upstream concurrency regression coverage from `tests/refract-sync.test.mjs` and `tests/refract-api.test.mjs`.
+- Existing API client and identity mapper remain unchanged (identical hashes).
+
 ## Next engineering stages
 1. Review the new editorial Music pages in a fresh isolated Windows preview and resolve layout issues based on screenshots at 1280x800, 1600x900 and smaller windows.
 2. Extend structural redesign to media detail pages, shared navigation, Settings, libraries, source picker and remaining categories. Do not simply theme old page layouts.
