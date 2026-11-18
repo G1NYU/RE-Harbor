@@ -293,7 +293,7 @@ export function MusicDetail({
     </div>
   );
   return (
-    <section className="music-detail-page flex min-w-0 flex-col gap-6">
+    <section className="music-detail-page flex min-w-0 flex-col gap-6" data-void-music-kind={item.kind}>
       <button
         type="button"
         data-music-inner-back
@@ -317,6 +317,12 @@ export function MusicDetail({
         }
       >
         {heroMenu.menu}
+        {/* The same artwork defines this page's atmosphere and primary cover.
+            A static backdrop avoids video, JS scrolling layers and costly blur effects. */}
+        <div className="void-music-detail-scenery" aria-hidden="true">
+          {heroArt && <img src={heroArt} alt="" loading="eager" decoding="async" />}
+        </div>
+        <div className="void-music-hero-body">
         <div
           onContextMenu={heroMenu.onContextMenu}
           className={`music-detail-art grid size-48 shrink-0 place-items-center overflow-hidden bg-elevated ${item.kind === "artist" ? "rounded-full" : "rounded-lg"}`}
@@ -333,6 +339,11 @@ export function MusicDetail({
           )}
         </div>
         <div className="music-detail-title min-w-0">
+          <span className="void-music-detail-overline" aria-hidden="true">
+            {item.kind === "artist" ? t("music.search.artists") : item.kind === "album"
+              ? t("music.search.albums") : item.kind === "playlist"
+                ? t("music.search.playlists") : t("music.search.tracks")}
+          </span>
           <h1
             ref={heading}
             tabIndex={-1}
@@ -455,6 +466,7 @@ export function MusicDetail({
             </div>
           )}
         </div>
+        </div>
         {item.kind === "artist" && <MusicReleaseMetadata item={item} />}
       </header>
       {item.kind === "track" && <MusicSoundtrackLink title={item.title} album={item.album} />}
@@ -478,7 +490,7 @@ export function MusicDetail({
                   type="button"
                   aria-pressed={section === id}
                   onClick={() => setSection(String(id))}
-                  className={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 text-sm ${section === id ? "bg-ink text-canvas" : "bg-elevated text-ink-muted hover:text-ink"}`}
+                  className={`music-detail-section-tab inline-flex items-center gap-2 rounded-md px-4 py-2.5 text-sm ${section === id ? "bg-ink text-canvas" : "bg-elevated text-ink-muted hover:text-ink"}`}
                 >
                   <Glyph size={16} />
                   {t(String(label))}
@@ -528,6 +540,7 @@ export function MusicDetail({
             <MusicTrackRow
               key={`${track.id}:${index}`}
               track={track}
+              editorial
               nowPlaying={isCurrent(track)}
               loading={isCurrent(track) && player.phase === "resolving"}
               paused={isCurrent(track) && player.phase === "paused"}
