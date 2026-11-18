@@ -24,10 +24,12 @@ These are conceptual references, not designs/assets copied from the authors.
 - `src/chrome/void/void-listening-deck.tsx`: new side-player and cross-category floating controller.
 - `src/chrome/void/void-studio.css`: separately compiled structural layout.
 - `src/App.tsx`: selects the new shell in VOID only and switches the old bottom dock off.
-- Original feature code remains available. This is **not yet feature-complete** and is **not a candidate installer**.
+- `src/views/void-studio/music-workspace.tsx`: new media-specific content and state flows with original React markup, not a wrapper around `MusicView`.
+- `src/views/void-studio/void-studio-music.css`: new Listening Room compositions.
+- The original Harbor feature code remains available. This is **not yet feature-complete** and is **not a candidate installer**.
 
 ## Blockers before shipping
-1. Replace legacy Music content and detail views with native VOID compositions; eliminate doubled search and old list/card geometry.
+1. Complete the new independent Music home, source management, detail views, search, and library feature parity (initial new components now live); eliminate any fallback to legacy controls.
 2. Replace legacy Home, Watch (Movies, Shows, Anime), Read (Manga/eBook), Play (Games), Live, Settings and Library views.
 3. Ensure new player offers source recovery, casting, lyrics and all existing music settings, not just transport.
 4. Add programmatic layout tests and inspect rendered UI at 960x600, 1280x800, 1600x900, ultrawide and RTL.

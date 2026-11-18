@@ -43,3 +43,10 @@
 - Navigation and player have been replaced at the component level, but category content remains to be rewritten before distribution.
 - Full specification: `docs/VOID_03_ARCHITECTURE.md`.
 - No installer or releases should be produced from this branch until feature-parity/visual validation are satisfied.
+
+## VOID 03 progress: independent Listen workspace
+- `src/views/void-studio/music-workspace.tsx` uses the native Harbor data provider and catalog APIs but owns its own navigation, full-artwork home, search, library, track list and album/artist/playlist views.
+- `src/views/void-studio/void-studio-music.css` controls the new layout, independent from Harbor's inherited templates.
+- `src/App.tsx` routes VOID into `VoidStudioMusic` and preserves `MusicView` only for other themes.
+- `tests/void-studio-music.test.ts` checks topology, engine interactions and static responsive CSS.
+- **Still WIP:** Refract remains under its separate tracking backend; search source management, full playback controls/lyrics/casting, Settings and every non-Music media space need real redesign and visual verification. No installer from VOID 03 yet.
