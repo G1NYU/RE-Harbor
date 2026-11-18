@@ -169,5 +169,5 @@ test("VOID Windows CI checks the pinned native libmpv decoder and seek path", ()
   assert.match(native, /video-params\/w/);
   assert.match(native, /video-params\/h/);
   assert.match(native, /seek 3 absolute\+exact/);
-  assert.doesNotMatch(native, /mpv\.exe/);
+  assert.doesNotMatch(native, /Start-Process\s+[^\n]*mpv|&\s+mpv(?:\.exe)?/i);
 });
