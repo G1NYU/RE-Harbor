@@ -15,11 +15,13 @@ export function TrailerOverlay({
   title,
   logo,
   onClose,
+  voidMode = false,
 }: {
   id: string;
   title: string;
   logo?: string;
   onClose: () => void;
+  voidMode?: boolean;
 }) {
   const t = useT();
   const { setChromeHidden } = useView();
@@ -83,22 +85,23 @@ export function TrailerOverlay({
     <div
       onClick={dismiss}
       role="dialog"
+      data-void-trailer={voidMode || undefined}
       aria-modal="true"
       aria-label={t("Trailer")}
       className="fixed inset-0 z-[170] flex cursor-zoom-out items-center justify-center"
       style={{
-        backgroundColor: open
+        backgroundColor: voidMode ? "rgba(8,8,15,0.96)" : open
           ? isMacDesktop()
             ? "rgba(0,0,0,1)"
             : "rgba(0,0,0,0.82)"
           : "rgba(0,0,0,0)",
-        backdropFilter: isMacDesktop() ? "none" : open ? "blur(32px) saturate(1.2)" : "blur(0px)",
-        WebkitBackdropFilter: isMacDesktop()
+        backdropFilter: voidMode || isMacDesktop() ? "none" : open ? "blur(32px) saturate(1.2)" : "blur(0px)",
+        WebkitBackdropFilter: voidMode || isMacDesktop()
           ? "none"
           : open
             ? "blur(32px) saturate(1.2)"
             : "blur(0px)",
-        transition:
+        transition: voidMode ? "none" :
           "background-color 360ms cubic-bezier(0.32,0.72,0.24,1), backdrop-filter 360ms cubic-bezier(0.32,0.72,0.24,1)",
       }}
     >
@@ -119,6 +122,7 @@ export function TrailerOverlay({
               e.stopPropagation();
               dismiss();
             }}
+            data-tv-modal-close
             aria-label={t("Close trailer")}
             className="relative flex h-11 w-11 items-center justify-center rounded-full bg-canvas/90 text-ink shadow-[0_8px_22px_rgba(0,0,0,0.4)] transition-colors duration-200 before:absolute before:-inset-3 before:content-[''] hover:bg-canvas active:scale-[0.94]"
           >
@@ -128,7 +132,9 @@ export function TrailerOverlay({
       </div>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative aspect-video w-[min(1280px,86vw)] cursor-default overflow-hidden rounded-[22px] bg-black shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+        className={voidMode
+          ? "relative aspect-video w-[min(1280px,92vw)] cursor-default overflow-hidden bg-black"
+          : "relative aspect-video w-[min(1280px,86vw)] cursor-default overflow-hidden rounded-[22px] bg-black shadow-[0_30px_80px_rgba(0,0,0,0.55)]"}
         style={{
           opacity: open ? 1 : 0,
           transform: open ? "scale(1)" : "scale(0.93)",

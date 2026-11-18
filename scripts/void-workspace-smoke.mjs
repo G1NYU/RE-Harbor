@@ -17,6 +17,7 @@ const film = {
   releaseInfo: "2024",
   genres: ["Drama"],
   description: "Two travelers cross paths on the last train home.",
+  trailers: [{ source: "fixture-trailer", type: "Trailer" }],
 };
 const series = {
   ...film,
@@ -107,6 +108,13 @@ try {
   await page.keyboard.press("Escape");
   assert.equal(await actions.count(), 0, "Title dialog should close on Escape");
   assert.equal(await title.locator("h1").innerText(), film.name, "Escape must not navigate back from title");
+  await title.getByRole("button", { name: "More options" }).click();
+  await actions.getByRole("button", { name: /Watch trailer/ }).click();
+  const trailer = page.locator("[data-void-trailer]:visible");
+  await trailer.waitFor();
+  await trailer.getByRole("button", { name: "Close trailer" }).click();
+  await trailer.waitFor({ state: "hidden" });
+  assert.equal(await title.locator("h1").innerText(), film.name, "Closing trailer must preserve the VOID title");
   for (const [width, height, dir] of [
     [960, 600, "ltr"],
     [1280, 800, "ltr"],

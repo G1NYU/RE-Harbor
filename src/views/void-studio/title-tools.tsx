@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { BookmarkCheck, Check, Download, Heart, ListPlus, ListVideo, Play, Plus, X } from "lucide-react";
+import { BookmarkCheck, Check, Clapperboard, Download, Heart, ListPlus, ListVideo, Play, Plus, X } from "lucide-react";
 import { MAX_LISTS, createListWithItem, setListMembership, useCustomLists, useListsContaining, type ListItemInput } from "@/lib/custom-lists";
 import { captureMembershipProfile } from "@/lib/membership-operations";
 import "./title-tools.css";
@@ -13,6 +13,8 @@ type VoidTitleToolsProps = {
   showWatched: boolean;
   onClose: () => void;
   onChooseSource: () => void;
+  hasTrailer: boolean;
+  onTrailer: () => void;
   onDownload: () => void;
   onToggleWatched: () => void;
   onToggleFavorite: () => void;
@@ -29,6 +31,8 @@ export function VoidTitleTools({
   showWatched,
   onClose,
   onChooseSource,
+  hasTrailer,
+  onTrailer,
   onDownload,
   onToggleWatched,
   onToggleFavorite,
@@ -126,6 +130,12 @@ export function VoidTitleTools({
             <Play size={20} />
             <span><strong>Choose a source</strong><small>Browse available playback options</small></span>
           </button>
+          {hasTrailer && (
+            <button type="button" onClick={() => run(onTrailer)}>
+              <Clapperboard size={20} />
+              <span><strong>Watch trailer</strong><small>Play the official video preview</small></span>
+            </button>
+          )}
           <button type="button" aria-pressed={isFavorite} onClick={onToggleFavorite}>
             <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
             <span><strong>{isFavorite ? "Remove favorite" : "Add to favorites"}</strong><small>Keep this title close</small></span>
@@ -176,7 +186,7 @@ export function VoidTitleTools({
           )}
         </section>
         <div className="void-title-tools-footer">
-          <p>Additional sync, trailer and provider tools remain accessible during the redesign.</p>
+          <p>Additional sync and provider tools remain accessible during the redesign.</p>
           <button type="button" onClick={() => run(onAdvanced)}>
             <ListVideo size={17} /> Open remaining tools
           </button>

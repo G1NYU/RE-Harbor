@@ -113,3 +113,9 @@
 - VOID's title actions now expand an original custom-list organizer without routing into the legacy Harbor detail page. Uses existing profile-aware membership and atomic list creation operations.
 - The Windows smoke fixture provides a list, toggles membership and checks persisted membership before closing the title dialog. New structural regression guards the native handlers.
 - Remaining legacy advanced tools include trailers, reminders, and integration-specific actions; keep compatibility until they are replaced and tested.
+
+## VOID 03 native trailer entry
+- Added direct "Watch trailer" action inside VOID's title controls and routed it to the existing trailer-resolution/playback engine, without opening Harbor's legacy detail page.
+- VOID's trailer overlay uses a flat no-blur full-screen treatment. The compatibility version retains its original presentation for other themes.
+- Marked the overlay closer for Harbor's global Back/Escape navigation and added browser coverage that the video modal closes back to the VOID title.
+- Real trailer extraction, network playback and casting are not verified by the mocked browser test.

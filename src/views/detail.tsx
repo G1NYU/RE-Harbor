@@ -1793,6 +1793,7 @@ export function DetailView({
 
   if (voidWorkspace && !isAnime && !showTitleTools) {
     return (
+      <>
       <VoidTitleWorkspace
         meta={playMeta}
         resolved={cinemetaFull}
@@ -1802,6 +1803,8 @@ export function DetailView({
         playLabel={smartPlayLabel}
         onPlay={(episode, seasonEpisodes) => void smartPlay(false, episode, seasonEpisodes)}
         onChooseSource={() => void smartPlay(true)}
+        hasTrailer={!!trailerCandidate}
+        onTrailer={() => setTrailerOpen(true)}
         onDownload={() => openPicker(playMeta, undefined, { intent: "download" })}
         onToggleFavorite={() => toggleFavorite({ id: meta.id, type: meta.type, name: title || meta.name, poster: meta.poster ?? detail?.poster })}
         isFavorite={isFav}
@@ -1810,6 +1813,16 @@ export function DetailView({
         onToggleWatched={markThisMovieWatched}
         onTools={() => setShowTitleTools(true)}
       />
+      {trailerOpen && trailerCandidate && (
+        <TrailerOverlay
+          id={trailerCandidate}
+          title={title}
+          logo={logo}
+          voidMode
+          onClose={() => setTrailerOpen(false)}
+        />
+      )}
+      </>
     );
   }
 

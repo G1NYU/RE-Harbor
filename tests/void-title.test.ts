@@ -79,3 +79,17 @@ test("VOID title actions handle custom-list membership with profile-aware operat
   assert.match(actions, /createListWithItem\(name, item, profile\)/);
   assert.match(title, /item=\{\{ id: meta\.id/);
 });
+
+
+test("VOID opens trailers directly without returning to the legacy title page", () => {
+  const actions = readFileSync("src/views/void-studio/title-tools.tsx", "utf8");
+  const page = readFileSync("src/views/detail.tsx", "utf8");
+  const overlay = readFileSync("src/views/detail/trailer-overlay.tsx", "utf8");
+  assert.match(actions, /hasTrailer &&/);
+  assert.match(actions, /run\(onTrailer\)/);
+  assert.match(page, /onTrailer=\{\(\) => setTrailerOpen\(true\)\}/);
+  assert.match(page, /<TrailerOverlay[\s\S]*?voidMode/);
+  assert.match(overlay, /data-void-trailer=\{voidMode \|\| undefined\}/);
+  assert.match(overlay, /data-tv-modal-close/);
+  assert.match(overlay, /backdropFilter: voidMode \|\| isMacDesktop\(\) \? "none"/);
+});

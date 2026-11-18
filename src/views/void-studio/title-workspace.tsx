@@ -31,6 +31,8 @@ export function VoidTitleWorkspace({
   onPlay,
   onTools,
   onChooseSource,
+  hasTrailer,
+  onTrailer,
   onDownload,
   onToggleFavorite,
   onToggleWatched,
@@ -47,6 +49,8 @@ export function VoidTitleWorkspace({
   onPlay: (episode?: PlayEpisode, seasonEpisodes?: PlayEpisode[]) => void;
   onTools: () => void;
   onChooseSource: () => void;
+  hasTrailer: boolean;
+  onTrailer: () => void;
   onDownload: () => void;
   onToggleFavorite: () => void;
   onToggleWatched: () => void;
@@ -312,6 +316,8 @@ export function VoidTitleWorkspace({
           showWatched={showWatched}
           onClose={closeTools}
           onChooseSource={onChooseSource}
+          hasTrailer={hasTrailer}
+          onTrailer={onTrailer}
           onDownload={onDownload}
           onToggleWatched={onToggleWatched}
           onToggleFavorite={onToggleFavorite}
