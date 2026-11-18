@@ -1,0 +1,47 @@
+name: VOID workspace rendering
+on:
+  push:
+    branches: [feature/void-03-workspaces]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: void-workspace-render-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  render:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+      - run: pnpm install --frozen-lockfile
+      - name: Inspect VOID layouts in Edge
+        shell: pwsh
+        run: |
+          $env:VOID_BROWSER_DEPS = Join-Path $env:RUNNER_TEMP 'void-browser'
+          npm install --prefix $env:VOID_BROWSER_DEPS --no-audit --no-fund playwright-core@1.56.1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $server = Start-Process node -ArgumentList 'node_modules/vite/bin/vite.js','--host','127.0.0.1' -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              try { $ready = (Invoke-WebRequest http://127.0.0.1:1420 -TimeoutSec 2).StatusCode -eq 200 } catch {}
+              if ($ready) { break }
+              Start-Sleep -Seconds 1
+            }
+            if (!$ready) { throw 'Vite did not start' }
+            node scripts/void-workspace-smoke.mjs
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          } finally { Stop-Process -Id $server.Id -ErrorAction SilentlyContinue }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: void-desktop-layouts
+          path: void-screenshots/
+          retention-days: 7

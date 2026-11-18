@@ -1,3 +1,8 @@
+import * as explicitPreference from "../src/lib/music/explicit-preference.ts";
+import * as queueSource from "../src/lib/music/queue-source.ts";
+import * as automation from "../src/lib/music/queue-automation.ts";
+import { nativePlaybackAdoption } from "../src/lib/music/deck-primary.ts";
+import * as version from "../src/lib/music/source-version.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -48,6 +53,21 @@ function fixture(respond?: (command: string, args?: any) => unknown, realCasting
     listener();
   };
   const mocks: Record<string, any> = {
+    "./source-version": version,
+    "./queue-automation": automation,
+    "./explicit-preference": explicitPreference,
+    "./queue-source": queueSource,
+    "@/lib/active-profile-id": { activeProfileId: () => "test", activeProfileIsPrimary: () => true },
+    "@/lib/platform": { isWindowsDesktop: () => false },
+    "./listening-affinity": { hydrateListeningAffinity: async () => {}, observeMusicListening: () => {} },
+    "./artist-blocks": { hydrateArtistBlockStore: async () => {}, filterBlockedTracks: (tracks: unknown[]) => tracks },
+    "./liked-artists": { hydrateLikedArtistStore: async () => {} },
+    "./recent-context": { hydrateMusicContextTracks: async () => {}, hydrateMusicRecentContexts: async () => {} },
+    "./recent-destinations": { hydrateMusicDestinations: async () => {} },
+    "./pinned-playlists": { hydratePinnedMusicPlaylists: async () => {} },
+    "./pinned-sources": { loadPinnedSources: async () => {}, peekPinnedSource: () => null },
+    "./decks": { engineSnapshot: async () => ({ live: false }) },
+    "./transport": { resetMusicOrder: () => {}, musicWarmTargets: () => [] },
     "@/lib/cast-ownership": castOwnershipFixture(),
     "@tauri-apps/api/core": {
       invoke: async (command: string, args?: any) => {
@@ -74,12 +94,13 @@ function fixture(respond?: (command: string, args?: any) => unknown, realCasting
     "./queue-order": { queueTrackKey },
     "./track-identity": { dedupeMusicTracks, sameMusicTrack },
     "./deck-sync": {
+      isDeckWindow: () => false,
       answerDeckRequests: () => () => {},
       broadcastDeckState: () => {},
       sendDeckAdopted: () => {},
       serveDeckCommands: () => () => {},
     },
-    "./deck-primary": { createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }) },
+    "./deck-primary": { nativePlaybackAdoption, createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }) },
     "./liked": {
       isMusicLiked: (ids: readonly string[], t: any) => !!t && ids.includes(t.id),
       likedIdsFor: (t: any) => (t ? [t.id] : []),
@@ -109,10 +130,11 @@ function fixture(respond?: (command: string, args?: any) => unknown, realCasting
       writeCheckpointToDb: () => {},
     },
     "./playback-origin": {
+      beginMusicQueue: () => {},
       getMusicPlaybackOrigin: () => null,
       restoreMusicPlaybackOrigin: () => {},
     },
-    "./preferences": { readMusicPreference: () => null, writeMusicPreference: () => {} },
+    "./preferences": { readStoredMusicPreference: () => null, readMusicPreference: () => null, writeMusicPreference: () => {} },
     "./hidden-recents": { unhideMusicRecent: () => {} },
     "./audio-settings": {
       initializeMusicAudioSettings: async () => {},

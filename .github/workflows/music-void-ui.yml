@@ -42,6 +42,11 @@ jobs:
             tests/void-shell.test.ts \
             tests/void-music-editorial.test.ts \
             tests/void-studio-music.test.ts \
-            tests/void-watch.test.ts
+            tests/void-watch.test.ts \
+            tests/void-title.test.ts \
+            tests/music-player-speaker.test.ts \
+            tests/music-audio-settings.test.ts \
+            tests/music-player-source-recovery.test.ts \
+            tests/music-lyrics.test.ts
       - name: Refract API, identity, and sync tests
         run: node --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-identity.test.mjs tests/refract-bulk-account.test.mjs
