@@ -146,9 +146,15 @@ try {
   await board.waitFor({ timeout: 20_000 });
   assert.match(await board.innerText(), /VOID Fixture Source/);
   assert.equal(await board.locator(".void-source-row").count(), 1);
+  const firstChoice = await board.locator(".void-source-feature").boundingBox();
+  assert.ok(
+    firstChoice && firstChoice.y + firstChoice.height <= 800,
+    `First source choice is clipped below the 1280x800 viewport: ${JSON.stringify(firstChoice)}`,
+  );
+  await page.screenshot({ path: `${output}/void-sources-first-screen.png` });
   await board.getByText("Advanced filters", { exact: true }).click();
   assert.ok(await board.locator(".void-source-advanced select").count() >= 3);
-  await page.screenshot({ path: `${output}/void-sources.png` });
+  await page.screenshot({ path: `${output}/void-sources-filters.png` });
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png` }).catch(() => {});
   console.error(

@@ -103,3 +103,8 @@
 ## VOID 03 stream fixture correction
 - Windows run `44296915311` found two mock streams but no playable items because the fixture's source name included "Preview", which is intentionally treated as a trailer/extra marker by `applyTrust`. The new board was therefore correctly not rendered.
 - Renamed the synthetic source to `VOID Fixture Source`, gave streams full matching release filenames, and provided plausible file sizes. Production trust, ranking and filters are unchanged; repeat the integration run.
+
+## VOID 03 source-room visual review
+- Inspected the successful mocked-addon Edge screenshot from `44297826046`; old picker headings and wide vertical gaps pushed the featured source below the 1280×800 first viewport.
+- Compact VOID-only source-room spacing and the featured-source composition. No functionality or safety diagnostics removed.
+- Added a first-viewport geometry assertion, plus separate screenshots for the compact default and expanded advanced-filter layouts.

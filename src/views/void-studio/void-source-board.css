@@ -40,3 +40,9 @@
 [data-void-shell] .void-source-board button:focus-visible, [data-void-shell] .void-source-board select:focus-visible { outline:2px solid #aab4d6; outline-offset:3px; }
 @media(max-width:760px) { [data-void-shell] .void-source-row { grid-template-columns:26px minmax(0,1fr) 28px; gap:10px; padding:13px 11px; } [data-void-shell] .void-source-row-detail { display:none; } [data-void-shell] .void-source-feature-bottom { align-items:start; } }
 @media(max-width:400px) { [data-void-shell] .void-source-feature { padding:19px; } [data-void-shell] .void-source-heading h3 { font-size:30px; } }
+
+/* Shorten the route into the featured source without hiding any safety diagnostics. */
+[data-void-shell] .void-source-heading { gap: 7px; padding-bottom: 12px; }
+[data-void-shell] .void-source-heading h3 { font-size: clamp(27px, 2.65vw, 41px); }
+[data-void-shell] .void-source-feature { gap: 13px; padding: clamp(17px, 2vw, 27px); }
+[data-void-shell] .void-source-list-head { padding-top: 23px; }
