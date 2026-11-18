@@ -1,0 +1,560 @@
+/*
+ * VOID 03 — actual new application architecture.
+ * Horizontal media spaces replace the permanent Harbor category rail.
+ * Listening controls own a right-side workspace instead of using the bottom bar.
+ * This sheet is compiled once, not runtime-injected; no blur, poster cloning,
+ * translucent chrome filters or scrolling animations.
+ */
+[data-void-shell] .void-studio-frame {
+  --void03-canvas: #11111b;
+  --void03-raised: #181825;
+  --void03-active: #cdd6f4;
+  --void03-subtle: #a6adc8;
+  --void03-quiet: #858ba4;
+  --void03-header-height: 94px;
+  --void03-deck-width: clamp(310px, 25vw, 396px);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  background: var(--void03-canvas);
+  color: var(--void03-active);
+}
+[data-void-shell] [data-void-view-root] {
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+[data-void-shell] .void-spaces-header {
+  position: relative;
+  z-index: 90;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: clamp(15px, 2.6vw, 46px);
+  width: 100%;
+  height: var(--void03-header-height);
+  flex: 0 0 var(--void03-header-height);
+  padding-inline: clamp(24px, 3.1vw, 58px);
+  background: #11111b;
+  color: var(--void03-active);
+  user-select: none;
+}
+[data-void-shell] .void-spaces-brand {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  justify-content: center;
+  min-width: 120px;
+}
+[data-void-shell] .void-spaces-wordmark {
+  display: block;
+  font-family: var(--font-display, var(--font-sans));
+  font-size: 27px;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: .21em;
+}
+[data-void-shell] .void-spaces-brand-dot {
+  margin-left: -4px;
+  font-weight: 800;
+  color: #9399b2;
+}
+[data-void-shell] .void-spaces-brand-note {
+  margin-top: 7px;
+  font-size: 9px;
+  font-weight: 760;
+  letter-spacing: .21em;
+  color: #777d98;
+}
+[data-void-shell] .void-spaces-nav {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-width: 0;
+  gap: clamp(2px, .55vw, 12px);
+}
+[data-void-shell] .void-spaces-tab {
+  position: relative;
+  display: flex;
+  min-width: 78px;
+  flex: 1 0 auto;
+  max-width: 154px;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-height: 48px;
+  padding-inline: 15px;
+  color: #8b91aa;
+  font-size: 14px;
+  font-weight: 680;
+  letter-spacing: -.005em;
+  transition: color 130ms ease;
+}
+[data-void-shell] .void-spaces-tab[data-active] {
+  color: #e1e3f4;
+}
+[data-void-shell] .void-spaces-tab[data-active]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 16px;
+  bottom: 12px;
+  height: 2px;
+  border-radius: 999px;
+  background: #9399b2;
+}
+[data-void-shell] .void-spaces-tab:hover {
+  color: #cdd6f4;
+}
+[data-void-shell] .void-spaces-tab:focus-visible,
+[data-void-shell] .void-spaces-utility:focus-visible {
+  outline: 2px solid #9399b2;
+  outline-offset: -4px;
+}
+[data-void-shell] .void-spaces-utilities {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+[data-void-shell] .void-spaces-utility {
+  display: grid;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 50%;
+  color: #9ba1b8;
+  transition: color 130ms ease, background-color 130ms ease;
+}
+[data-void-shell] .void-spaces-utility:hover {
+  background: #242436;
+  color: #cdd6f4;
+}
+[data-void-shell] .void-spaces-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  padding: 4px;
+  border-radius: 50%;
+}
+[data-void-shell] .void-spaces-all-wrap {
+  position: relative;
+}
+[data-void-shell] .void-spaces-destinations {
+  position: absolute;
+  z-index: 150;
+  top: 57px;
+  inset-inline-end: -90px;
+  display: grid;
+  grid-template-columns: minmax(174px, 1fr) minmax(174px, 1fr) minmax(174px, 1fr);
+  gap: 23px;
+  width: min(720px, calc(100vw - 90px));
+  max-height: min(620px, calc(100vh - 130px));
+  overflow-y: auto;
+  padding: 32px;
+  background: #181825;
+  border-radius: 16px;
+  box-shadow: 0 24px 68px rgb(0 0 0 / .42);
+}
+[data-void-shell] .void-spaces-destinations-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+[data-void-shell] .void-spaces-destinations-group h3 {
+  margin-bottom: 13px;
+  padding-inline: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #8d93ac;
+}
+[data-void-shell] .void-spaces-destinations-group > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 9px 8px;
+  text-align: start;
+  color: #adb3c8;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 7px;
+}
+[data-void-shell] .void-spaces-destinations-group > button:hover,
+[data-void-shell] .void-spaces-destinations-group > button[data-selected] {
+  color: #e2e4f4;
+  background: #242436;
+}
+[data-void-shell] .void-spaces-window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: 13px;
+}
+[data-void-shell] .void-spaces-window-controls button {
+  display: grid;
+  width: 33px;
+  height: 38px;
+  place-items: center;
+  color: #9da3b8;
+  font-size: 19px;
+}
+[data-void-shell] .void-spaces-window-controls button:hover { color: #e2e4f4; }
+[data-void-shell] .void-spaces-window-controls button:last-child:hover { background: #763647; color: white; }
+
+/* The player is never over the workspace: the editor reserves its width.
+ * Non-music categories keep their full content width. */
+[data-void-shell] .void-studio-frame[data-void-route="music"] > [data-void-view-root] {
+  width: calc(100% - var(--void03-deck-width));
+  flex: 1 1 auto;
+}
+[data-void-shell] .void-listening-deck {
+  position: absolute;
+  z-index: 68;
+  top: var(--void03-header-height);
+  bottom: 0;
+  inset-inline-end: 0;
+  display: flex;
+  flex-direction: column;
+  width: var(--void03-deck-width);
+  padding: clamp(18px, 2.6vw, 42px);
+  gap: 17px;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #39394b transparent;
+  background: #181825;
+}
+[data-void-shell] .void-listening-deck-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #a6adc8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+[data-void-shell] .void-listening-deck-head > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+[data-void-shell] .void-listening-signal {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a6adc8;
+}
+[data-void-shell] .void-listening-deck-head button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: #a6adc8;
+}
+[data-void-shell] .void-listening-deck-head button:hover { color: #e0e2f3; background: #252536; }
+[data-void-shell] .void-listening-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 340px;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #242436;
+}
+[data-void-shell] .void-listening-credit {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 7px;
+  margin-top: 5px;
+  text-align: left;
+}
+[data-void-shell] .void-listening-kicker {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .14em;
+  color: #9399b2;
+}
+[data-void-shell] .void-listening-credit h2 {
+  color: #e2e4f5;
+  font-size: clamp(23px, 2vw, 33px);
+  font-weight: 820;
+  letter-spacing: -.043em;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+[data-void-shell] .void-listening-credit p {
+  color: #b9bed1;
+  font-size: 16px;
+  font-weight: 620;
+}
+[data-void-shell] .void-listening-credit small {
+  color: #8189a3;
+  font-size: 12px;
+}
+[data-void-shell] .void-listening-timeline {
+  margin-top: 12px;
+}
+[data-void-shell] .void-listening-timeline > input[type="range"] {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+[data-void-shell] .void-listening-timeline input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #cdd6f4 var(--void-seek-progress, 0%), #39394b var(--void-seek-progress, 0%));
+}
+[data-void-shell] .void-listening-timeline input::-moz-range-track {
+  height: 4px;
+  background: #39394b;
+}
+[data-void-shell] .void-listening-timeline input::-moz-range-progress {
+  height: 4px;
+  background: #cdd6f4;
+}
+[data-void-shell] .void-listening-timeline input::-webkit-slider-thumb {
+  appearance: none;
+  margin-top: -5px;
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: #cdd6f4;
+}
+[data-void-shell] .void-listening-timeline input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: #cdd6f4;
+}
+[data-void-shell] .void-listening-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #8f95ad;
+}
+[data-void-shell] .void-listening-transport {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+[data-void-shell] .void-listening-transport > button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: clamp(38px, 3.2vw, 45px);
+  height: 50px;
+  color: #a6adc8;
+  border-radius: 12px;
+}
+[data-void-shell] .void-listening-transport > button:hover,
+[data-void-shell] .void-listening-transport > button[data-on] { color: #e1e3f4; }
+[data-void-shell] .void-listening-transport > .void-listening-primary {
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  background: #cdd6f4;
+  color: #11111b;
+}
+[data-void-shell] .void-listening-transport > .void-listening-primary:hover {
+  background: #e2e5fa;
+  color: #11111b;
+}
+[data-void-shell] .void-listening-extras {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+[data-void-shell] .void-listening-extras > button {
+  display: grid;
+  width: 40px;
+  height: 42px;
+  place-items: center;
+  color: #a6adc8;
+}
+[data-void-shell] .void-listening-extras > button[data-on] { color: #cdd6f4; }
+[data-void-shell] .void-listening-volume {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+[data-void-shell] .void-listening-volume button {
+  display: grid;
+  width: 31px;
+  height: 40px;
+  place-items: center;
+  color: #a6adc8;
+}
+[data-void-shell] .void-listening-volume input[type="range"] {
+  width: 83px;
+  accent-color: #cdd6f4;
+}
+[data-void-shell] .void-listening-up-next {
+  margin-top: 14px;
+}
+[data-void-shell] .void-listening-up-next header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+  color: #9399b2;
+}
+[data-void-shell] .void-listening-up-next h3 {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 780;
+  letter-spacing: .13em;
+}
+[data-void-shell] .void-listening-up-next header span {
+  font-size: 12px;
+  color: #7c839b;
+}
+[data-void-shell] .void-listening-up-next-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+[data-void-shell] .void-listening-next-item {
+  display: flex;
+  width: 100%;
+  min-height: 60px;
+  gap: 10px;
+  align-items: center;
+  padding: 6px;
+  border-radius: 8px;
+  text-align: start;
+  color: #d0d3e5;
+}
+[data-void-shell] .void-listening-next-item:hover { background: #242436; }
+[data-void-shell] .void-listening-next-art {
+  flex: 0 0 45px;
+  width: 45px;
+  height: 45px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #242436;
+}
+[data-void-shell] .void-listening-next-item > span:nth-child(2) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+}
+[data-void-shell] .void-listening-next-item strong,
+[data-void-shell] .void-listening-next-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-void-shell] .void-listening-next-item strong { font-size: 13px; font-weight: 700; }
+[data-void-shell] .void-listening-next-item small { font-size: 12px; color: #8c92aa; }
+[data-void-shell] .void-listening-next-duration { font-size: 12px; color: #9399b2; }
+[data-void-shell] .void-listening-empty-queue { color: #8c92aa; font-size: 13px; }
+[data-void-shell] .void-listening-error { color: #f4a9ba; font-size: 12px; line-height: 1.45; }
+[data-void-shell] .void-listening-start {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  color: #a6adc8;
+}
+[data-void-shell] .void-listening-start h2 {
+  font-size: clamp(28px, 2.7vw, 40px);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -.04em;
+  color: #cdd6f4;
+}
+[data-void-shell] .void-listening-start p { font-size: 15px; line-height: 1.6; max-width: 24ch; }
+
+/* A different controller outside Listen: a small, unobtrusive floating object
+ * rather than a persistent 100%-width bottom toolbar. */
+[data-void-shell] .void-listening-float {
+  position: fixed;
+  z-index: 110;
+  inset-inline-end: 30px;
+  bottom: 28px;
+  width: min(440px, calc(100vw - 60px));
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  color: #cdd6f4;
+  background: #242436;
+  box-shadow: 0 12px 40px rgb(0 0 0 / .3);
+}
+[data-void-shell] .void-listening-float-art { width: 48px; height: 48px; flex: 0 0 48px; overflow: hidden; border-radius: 8px; }
+[data-void-shell] .void-listening-float-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; text-align: start; }
+[data-void-shell] .void-listening-float-copy strong { font-size: 13px; font-weight: 780; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-void-shell] .void-listening-float-copy span { font-size: 12px; color: #9aa1b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-void-shell] .void-listening-float-ctl { width: 39px; height: 43px; flex: 0 0 39px; display: grid; place-items: center; border-radius: 10px; }
+[data-void-shell] .void-listening-float-ctl:hover { background: #313244; }
+[data-void-shell] .void-listening-deck-large {
+  position: fixed;
+  z-index: 180;
+  inset: 0;
+  width: min(640px, 100vw);
+  max-width: none;
+  margin-inline-start: auto;
+  padding: clamp(28px, 5vw, 60px);
+  background: #181825;
+  box-shadow: -20px 0 80px rgb(0 0 0 / .4);
+}
+@media (max-width: 1320px) {
+  [data-void-shell] .void-spaces-header { gap: 15px; padding-inline: 22px; }
+  [data-void-shell] .void-spaces-brand { min-width: 105px; }
+  [data-void-shell] .void-spaces-tab { min-width: 67px; padding-inline: 8px; font-size: 13px; gap: 7px; }
+  [data-void-shell] .void-spaces-nav { gap: 1px; }
+  [data-void-shell] .void-spaces-window-controls { margin-inline-start: 3px; }
+}
+@media (max-width: 1080px) {
+  [data-void-shell] .void-studio-frame { --void03-deck-width: 290px; --void03-header-height: 76px; }
+  [data-void-shell] .void-spaces-brand-note { display: none; }
+  [data-void-shell] .void-spaces-tab span { display: none; }
+  [data-void-shell] .void-spaces-tab { min-width: 42px; flex: 1 1 42px; max-width: 62px; }
+  [data-void-shell] .void-listening-deck { padding: 22px; }
+  [data-void-shell] .void-listening-transport > button { width: 35px; }
+  [data-void-shell] .void-listening-transport > .void-listening-primary { width: 58px; height: 58px; }
+}
+@media (max-width: 790px) {
+  [data-void-shell] .void-studio-frame { --void03-header-height: 70px; }
+  [data-void-shell] .void-spaces-header { padding-inline: 14px; gap: 4px; }
+  [data-void-shell] .void-spaces-brand { min-width: 79px; }
+  [data-void-shell] .void-spaces-wordmark { font-size: 21px; }
+  [data-void-shell] .void-spaces-utilities { gap: 1px; }
+  [data-void-shell] .void-spaces-window-controls { display: none; }
+  [data-void-shell] .void-studio-frame[data-void-route="music"] > [data-void-view-root] { width: 100%; }
+  [data-void-shell] .void-listening-deck { display: none; }
+  [data-void-shell] .void-listening-deck-large { display: flex; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-void-shell] :is(.void-spaces-tab, .void-spaces-utility) { transition: none; }
+}
