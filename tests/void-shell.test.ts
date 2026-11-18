@@ -19,7 +19,7 @@ test("VOID 03 replaces the Harbor rail with horizontal media spaces", () => {
 test("VOID 03 preserves route discovery and parental PIN checks", () => {
   const header = read("src/chrome/void/void-spaces-header.tsx");
   assert.match(header, /useSidebarNavigation/);
-  assert.match(header, /entry\.gated/);
+  assert.match(header, /entry\?\.gated/);
   assert.match(header, /locked/);
   assert.match(header, /ParentalPinModal/);
   assert.match(header, /AccountMenu/);

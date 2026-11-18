@@ -54,7 +54,7 @@ test("global navigation remains functional without permanent nav rail", () => {
   const header = read("src/chrome/void/void-spaces-header.tsx");
   const app = read("src/App.tsx");
   assert.match(header, /const GROUPS/);
-  assert.match(header, /\bid !== "settings"\b/);
+  assert.match(header, /id !== "settings"/);
   assert.match(header, /entry\?\.gated/);
   assert.match(header, /AccountMenu/);
   assert.match(app, /<VoidSpacesHeader/);
