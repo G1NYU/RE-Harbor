@@ -1,3 +1,4 @@
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import {
   lazy,
   startTransition,
@@ -369,7 +370,9 @@ export function Settings({ visible = true }: { visible?: boolean }) {
   const [pendingAnchor, setPendingAnchor] = useState<SettingsAnchorRequest | null>(null);
   const [pendingPage, setPendingPage] = useState<{ section: SectionId; tab?: string } | null>(null);
   const [query, setQuery] = useState("");
-  const compact = useMediaQuery("(max-width: 899px)");
+  const voidWorkspace = useVoidWorkspace();
+  const narrow = useMediaQuery("(max-width: 899px)");
+  const compact = voidWorkspace || narrow;
   const [browseOpen, setBrowseOpen] = useState(false);
   const browseRef = useRef<HTMLButtonElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);

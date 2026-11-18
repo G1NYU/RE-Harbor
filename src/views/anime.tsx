@@ -1,3 +1,5 @@
+import { EditorialPicks } from "./void-studio/editorial-picks";
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import {
   useCallback,
@@ -125,6 +127,7 @@ function cleanMeta(m: Meta): Meta {
 }
 
 export function AnimeView({ active = true }: { active?: boolean }) {
+  const voidWorkspace = useVoidWorkspace();
   const t = useT();
   const { settings, update } = useSettings();
   const { activeProfile, profiles } = useProfiles();
@@ -906,11 +909,11 @@ export function AnimeView({ active = true }: { active?: boolean }) {
             />
           ) : heroMetas.length > 0 ? (
             <div data-scroll-anchor="hero" className="relative harbor-anime-hero hero-reveal">
-              <AnimeHero
+              {voidWorkspace ? <EditorialPicks title={t("Anime")} items={heroSlides} compact /> : <AnimeHero
                 slides={heroSlides}
                 topPicks={topPicks}
                 trendingByMetaId={heroTrendingAll}
-              />
+              />}
               <button
                 type="button"
                 onClick={() => setShowPicker(true)}

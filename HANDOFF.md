@@ -63,3 +63,10 @@
 - The season browser combines TMDB descriptions with native episode IDs. Provider-only episodes and season zero remain selectable.
 - The manual picker has a separate title panel and source workspace. The default video transport has a compact playback console and expandable controls. Explicit player shell selections, PiP and kids modes retain their existing controllers.
 - Local VOID, music UI and Refract checks passed (70 tests). Production Windows playback, screenshots and installer testing remain outstanding. Chromium startup in the development container is blocked at its process-singleton socket.
+
+## VOID 03 browsing and listening
+
+- Watch checkpoint `01e5fb6` passed GitHub Actions run `44287862477`.
+- Start indexes configured catalogs. Anime and Library use the profile's existing picks. Read uses manga and eBook covers, Play has a game selection with save/open actions and Live displays the current and next programs from the guide.
+- Library exposes connected trackers through a section selector. Desktop Settings opens its page directory on demand. Listen adds speaker selection, audio settings, lyrics and the source recovery dialog.
+- Targeted local tests passed (90). Windows browser rendering and native playback validation are outstanding.

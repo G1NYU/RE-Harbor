@@ -1,3 +1,5 @@
+import { ReadingTable } from "./void-studio/editorial-picks";
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import { useLocalBackCapability } from "@/lib/use-local-back-capability";
 import {
   ArrowUp,
@@ -255,6 +257,7 @@ function scheduleEBookBackground(run: () => void, delay = 1_200): () => void {
 }
 
 export function EBookView() {
+  const voidWorkspace = useVoidWorkspace();
   const t = useT();
   const { ebookId, openEBook, topKind } = useView();
   const listScrollRef = useRef<HTMLElement | null>(null);
@@ -1002,6 +1005,10 @@ export function EBookView() {
   const bestsellerItems = nytRailItems(bestsellerList);
   const bestsellerHero = (bestsellerItems ?? []).filter((ebook) => ebook.cover).slice(0, 5);
   const heroBooks = bestsellerHero.length >= 3 ? bestsellerHero : featuredBooks.slice(0, 5);
+  function openFeaturedBook(id: string) {
+    if (isNytPlaceholder(id)) { emitListToast("Not available in your sources yet"); return; }
+    openEBook(id);
+  }
   const refreshing = query.trim().length >= 2 ? results === null : sourceItems === null;
   const rails: Rail[] =
     query.trim().length >= 2
@@ -1053,17 +1060,9 @@ export function EBookView() {
           data-ebook-page
           className="bg-canvas flex-1 overflow-y-auto overflow-x-hidden pb-20"
         >
-          <EBookLibraryHero
-            ebooks={heroBooks}
-            bestsellers={bestsellerList}
-            onOpen={(ebook) => {
-              if (isNytPlaceholder(String(ebook.id))) {
-                emitListToast("Not available in your sources yet");
-                return;
-              }
-              openEBook(String(ebook.id));
-            }}
-          />
+          {voidWorkspace ? <ReadingTable title={t("eBooks")} items={heroBooks.map(book => ({
+            id: book.id, title: ebookTitleForLanguage(book, titleLanguage), cover: book.cover, byline: book.authors.join(", ")
+          }))} onOpen={id => openFeaturedBook(id)} /> : <EBookLibraryHero ebooks={heroBooks} bestsellers={bestsellerList} onOpen={book => openFeaturedBook(book.id)} />}
 
           <div className="flex w-full flex-col gap-9 px-12 pt-8">
             {rails.map((rail) => (

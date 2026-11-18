@@ -1,3 +1,4 @@
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import { NavArrow } from "@/components/nav-arrow";
 import { GameAvailabilityBadge } from "./game-availability";
 import { GameHeroSkeleton } from "./game-loading";
@@ -23,6 +24,7 @@ export function GameShowcase({ active, open, save, isSaved, visit, browse }: {
   active: boolean; open: (game: GameSummary) => void; save: (game: GameSummary) => void; isSaved: (game: GameSummary) => boolean;
 }) {
   const t = useT();
+  const voidWorkspace = useVoidWorkspace();
   const [games, setGames] = useState<GameDetail[]>(() => [...visit.games]);
   const [selected, setSelected] = useState<number | undefined>(visit.selected);
   const [failed, setFailed] = useState(false);
@@ -44,7 +46,7 @@ export function GameShowcase({ active, open, save, isSaved, visit, browse }: {
   const [motion, setMotion] = useState(true);
   const [hovered, setHovered] = useState(false);
   const [artworkReady, setArtworkReady] = useState('');
-  const { root, playing, visible } = useHeroMotion(active, !!game, motion);
+  const { root, playing, visible } = useHeroMotion(active && !voidWorkspace, !!game, motion);
   useEffect(() => {
     if (active && visible && game && artworkReady === game.id) recordExploreVisit(visit, game.steamId);
   }, [active, visible, game?.id, artworkReady, visit]);
@@ -70,6 +72,15 @@ export function GameShowcase({ active, open, save, isSaved, visit, browse }: {
     return()=>{image.src='';};
   },[playing,game?.id,nextGame?.id,nextGame?.libraryHero,nextGame?.hero]);
   if (!game) return <GameHeroSkeleton failed={failed} retry={() => setAttempt(value => value + 1)}/>;
+  if (voidWorkspace) return <section className="void-game-selection" aria-label={t("games.featuredSelection")}>
+    <div>
+      {gameHeroSources(game)[0] && <img src={gameHeroSources(game)[0]} alt="" decoding="async" />}
+      <h2>{game.name}</h2><p>{game.description}</p>
+      <button type="button" onClick={() => open(game)}>{t("More info")}</button>
+      <button type="button" aria-pressed={isSaved(game)} onClick={() => save(game)}>{t(isSaved(game) ? "games.saved" : "games.save")}</button>
+    </div>
+    <nav aria-label={t("games.featuredSelection")}>{ordered.map(item => <button type="button" key={item.id} aria-current={item.id === game.id || undefined} onClick={() => setSelected(item.steamId)}>{item.name}</button>)}</nav>
+  </section>;
   return <section ref={root} className="games-showcase games-home-hero games-cycle-hero" aria-label={t("games.featuredSelection")}
     onPointerOver={event=>setHovered(!!(event.target as Element).closest("button,a"))} onPointerLeave={()=>setHovered(false)}
     onFocusCapture={event=>{if(event.target.matches(':focus-visible'))setMotion(false);}} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setMotion(true);}}>

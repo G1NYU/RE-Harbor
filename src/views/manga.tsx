@@ -1,3 +1,5 @@
+import { ReadingTable } from "./void-studio/editorial-picks";
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import { MediaStartPage } from "@/components/media-start-page";
 import { ArrowDownToLine, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import { CoverImg } from "@/components/cover-img";
@@ -74,6 +76,7 @@ type Mode =
     };
 
 export function MangaView() {
+  const voidWorkspace = useVoidWorkspace();
   const t = useT();
   const { settings, update } = useSettings();
   const { activeId } = useProfiles();
@@ -285,10 +288,10 @@ export function MangaView() {
           "flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-28" + (isBrowse ? "" : " hidden")
         }
       >
-        <MangaHero
+        {voidWorkspace ? <ReadingTable title={t("Manga")} items={featured.map(book => ({ ...book, byline: book.author }))} onOpen={id => setMode({ screen: "detail", mangaId: id })} /> : <MangaHero
           featured={featured}
           onOpen={(id) => setMode({ screen: "detail", mangaId: id })}
-        />
+        />}
         <div className="mt-8">
           <MangaContinue onResume={resume} />
         </div>

@@ -1,3 +1,5 @@
+import { EditorialPicks } from "./void-studio/editorial-picks";
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import {
   BarChart3,
   Bookmark,
@@ -190,12 +192,15 @@ export function LibraryView({ active }: { active: boolean }) {
  * a dead carousel.
  */
 function LibraryHero({ tabKey }: { tabKey: Tab }) {
+  const voidWorkspace = useVoidWorkspace();
   const metas = useLibraryFeatured();
   const slides = useMemo(
     () => pickFeatured(metas, tabKey).map((meta) => ({ meta })),
     [metas, tabKey],
   );
+  const t = useT();
   if (slides.length < 2) return null;
+  if (voidWorkspace) return <EditorialPicks title={t("My library")} items={slides.map(slide => slide.meta)} compact />;
   return <HeroCarousel slides={slides} />;
 }
 
@@ -221,6 +226,24 @@ function Header({
   const t = useT();
   const { setView } = useView();
   const { settings, update } = useSettings();
+  const voidWorkspace = useVoidWorkspace();
+  if (voidWorkspace) {
+    const sections: [Tab, string, boolean?][] = [
+      ["library", t("Library")], ["watchlist", t("Watchlist")], ["history", t("History")],
+      ["local", t("Local")], ["media-servers", t("Media servers")], ["torbox", "TorBox"],
+      ["lists", t("My Lists")], ["favorites", t("Favorites")], ["trakt", "Trakt", traktConnected],
+      ["anilist", "AniList", anilistConnected], ["mal", "MyAnimeList", malConnected], ["simkl", "Simkl", simklConnected],
+      ["publicmetadb", "PublicMetaDb", pmdbConnected], ["letterboxd", "Letterboxd", lbConnected],
+    ];
+    return <header className="void-library-index">
+      <h1>{sections.find(([id]) => id === tab)?.[1]}</h1>
+      <select value={tab} aria-label={t("My library")} onChange={event => onTab(event.target.value as Tab)}>
+        {sections.filter(([, , connected]) => connected !== false).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+      </select>
+      <button type="button" aria-pressed={settings.libraryHero} onClick={() => update({libraryHero: !settings.libraryHero})}>{t("Featured")}</button>
+      {settings.wrappedButton && <button type="button" onClick={() => setView("wrapped")}>{t("Stats")}</button>}
+    </header>;
+  }
   return (
     <header className="flex flex-col gap-5">
       <div className="flex items-end justify-between gap-6">

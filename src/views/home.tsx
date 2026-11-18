@@ -1,3 +1,5 @@
+import { EditorialPicks } from "./void-studio/editorial-picks";
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import {
   startTransition,
   useCallback,
@@ -105,7 +107,7 @@ import { useMediaFavorites, type MediaEntry } from "@/lib/media-favorites";
 import { useLocalWatchlist } from "@/lib/local-watchlist";
 import { useScrollMemory, useHomeResetTick } from "@/lib/view";
 import { recordRenderCause } from "@/lib/render-cause";
-import { CustomizableRows } from "./home/customizable-rows";
+import { CustomizableRows, displayRowTitle } from "./home/customizable-rows";
 import { CustomizeBar } from "./home/customize-bar";
 import { CWSection } from "./home/cw-section";
 import { NewEpisodesSection } from "./home/new-episodes-section";
@@ -135,6 +137,7 @@ export function Home({
   onReady?: () => void;
   seasonalInvitation?: ReactNode;
 }) {
+  const voidWorkspace = useVoidWorkspace();
   recordRenderCause("view.home");
   const { authKey, user } = useAuth();
   const { activeProfile, profiles } = useProfiles();
@@ -145,6 +148,7 @@ export function Home({
   const contentDrag = useContentDrag();
   const t = useT();
   const uiLang = useUiLanguage();
+  const [selectedCatalog, setSelectedCatalog] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [isAddSourceModalOpen, setAddSourceModalOpen] = useState(false);
   const [rows, setRows] = useState<HomeRow[]>([]);
@@ -1140,6 +1144,7 @@ export function Home({
     () => applyHomeRowCustomization(allCustomizableRows, homeRowsCustom, false),
     [allCustomizableRows, homeRowsCustom],
   );
+  const catalog = visibleRows.find(row => row.key === selectedCatalog) ?? visibleRows[0];
   const editRows = useMemo(
     () => applyHomeRowCustomization(allCustomizableRows, homeRowsCustom, true),
     [allCustomizableRows, homeRowsCustom],
@@ -1322,7 +1327,7 @@ export function Home({
               <div
                 data-scroll-anchor="hero"
                 data-tv-hero-zone
-                className={`relative ${heroFull ? `${cwTop ? "" : "-mt-24 lg:-mt-28"} -mb-12 harbor-hero-full` : ""}`}
+                className={`relative ${heroFull && !voidWorkspace ? `${cwTop ? "" : "-mt-24 lg:-mt-28"} -mb-12 harbor-hero-full` : ""}`}
               >
                 {editMode && (
                   <PinnedRowControls
@@ -1331,7 +1336,7 @@ export function Home({
                     onToggleHidden={() => handleToggleHidden("hero")}
                   />
                 )}
-                <HeroCarousel
+                {voidWorkspace ? <EditorialPicks title={t("Home")} items={shownHeroSlides.map(slide => slide.meta)} /> : <HeroCarousel
                   slides={shownHeroSlides}
                   full={heroFull}
                   fullQuality={settings.heroFullQuality}
@@ -1339,7 +1344,7 @@ export function Home({
                   bottomAlign
                   playSquare={!!homeRowsCustom.playButtonSquare}
                   moreInfo={!!homeRowsCustom.secondaryMoreInfo}
-                />
+                />}
                 {!editMode && (
                   <div className="pointer-events-none absolute -bottom-3 end-5 z-20 flex justify-end [&>*]:pointer-events-auto">
                     <CustomizeBar
@@ -1457,8 +1462,18 @@ export function Home({
           russianRows.length === 0 ? (
             Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={`skel-${i}`} />)
           ) : (
+            <div className={voidWorkspace && !editMode ? "void-home-catalog" : "contents"}>
+            {voidWorkspace && !editMode && catalog && (
+              <nav aria-label={t("Catalogs")}>
+                {visibleRows.map(row => <button type="button" key={row.key}
+                  aria-current={row.key === catalog.key ? "page" : undefined}
+                  onClick={() => setSelectedCatalog(row.key)}>
+                  {displayRowTitle(row, row.key in homeRowsCustom.renamed, t)}
+                </button>)}
+              </nav>
+            )}
             <CustomizableRows
-              rows={editMode ? editRows : visibleRows}
+              rows={editMode ? editRows : voidWorkspace && catalog ? [catalog] : visibleRows}
               editMode={editMode}
               customization={homeRowsCustom}
               orderKeys={orderKeys}
@@ -1476,6 +1491,7 @@ export function Home({
               stremioWatched={stremioWatchedIds}
               homeLanguages={settings.homeLanguages}
             />
+            </div>
           )}
         </div>
       </ScrollRootContext.Provider>

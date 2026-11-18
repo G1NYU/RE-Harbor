@@ -1,3 +1,4 @@
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Row } from "@/components/row";
@@ -42,6 +43,7 @@ export function LiveHome({
   onOpenCategory: (group: string) => void;
 }) {
   const t = useT();
+  const voidWorkspace = useVoidWorkspace();
   const { openMatchDetail } = useView();
   const { spotlight, guide, rails, categoryRails, countries } = useLiveHome({
     channels,
@@ -100,7 +102,15 @@ export function LiveHome({
           </h1>
           <span className="text-[16px] text-ink-subtle">{t("at {time}", { time: fmtClock(nowMs) })}</span>
         </div>
-        {spotlight.length > 0 && (
+        {voidWorkspace && spotlight.length > 0 ? (
+          <section className="void-airtime" aria-label={t("On now")}>
+            {spotlight.slice(0,8).map(({channel,current,next}) => <button key={channel.id} onClick={() => onPlay(channel)}>
+              <small>{channel.name}</small>
+              <strong>{current?.title || channel.name}</strong>
+              {next && <span>{fmtClock(next.startMs)} · {next.title}</span>}
+            </button>)}
+          </section>
+        ) : spotlight.length > 0 && (
           <div className="flex gap-5">
             <LiveHero items={spotlight} nowMs={nowMs} hydrations={heroHydrations} onPlay={onPlay} />
             <MoreOnNow items={spotlight} hydrations={heroHydrations} onPlay={onPlay} />

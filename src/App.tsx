@@ -60,7 +60,7 @@ import { useOverlayPinned } from "@/lib/overlay-pin";
 import { isMobileWeb, isRemoteRoute } from "@/lib/platform";
 import { makeSafeTauriUnlisten } from "@/lib/tauri-unlisten";
 import { activeLayout } from "@/lib/theme";
-import { VoidPlayerContext } from "@/chrome/void/void-player-context";
+import { VoidWorkspaceContext } from "@/chrome/void/workspace-context";
 import { useThemePreview } from "@/lib/theme-preview";
 import { DevErrorTrigger } from "@/components/dev-error-trigger";
 import { ErrorView } from "@/components/error-view";
@@ -1632,6 +1632,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
       onNavigate={openGames}
       onLeave={goBack}
     >
+      <VoidWorkspaceContext.Provider value={voidShell}>
       <div
         data-harbor-shell
         data-void-shell={voidShell ? "" : undefined}
@@ -2239,12 +2240,10 @@ function Shell({ onReady }: { onReady?: () => void }) {
         <GameLibraryDock visible={gameDockVisible && !gamesTop} />
         {player && (
           <Suspense fallback={null}>
-            <VoidPlayerContext.Provider value={voidShell}>
             <PlayerView
               key={player.meta.id.startsWith("iptv:") ? "player-live" : `player-${player.meta.id}`}
               src={player}
             />
-            </VoidPlayerContext.Provider>
           </Suspense>
         )}
         {bigPicture && (
@@ -2262,6 +2261,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
         <TabHotkeys />
         {!player && <OfflineBanner />}
       </div>
+      </VoidWorkspaceContext.Provider>
     </GameAccessProvider>
   );
 }

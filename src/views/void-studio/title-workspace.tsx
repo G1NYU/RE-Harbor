@@ -1,3 +1,4 @@
+import { CoverImg } from "@/components/cover-img";
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, BookmarkCheck, CalendarDays, Play, Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -43,7 +44,10 @@ export function VoidTitleWorkspace({
   const { goBack } = useView();
   const type = meta.type === "series" ? "series" : "movie";
   const [seasonChoice, setSeasonChoice] = useState<number | null>(null);
-  const [tmdbEpisodes, setTmdbEpisodes] = useState<VoidEpisode[]>([]);
+  const [seasonListing, setSeasonListing] = useState<{
+    season: number;
+    episodes: VoidEpisode[];
+  } | null>(null);
   const [episodesLoading, setEpisodesLoading] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
@@ -80,17 +84,18 @@ export function VoidTitleWorkspace({
 
   useEffect(() => {
     let cancelled = false;
-    setTmdbEpisodes([]);
+    setSeasonListing(null);
     setShowAll(false);
     setEpisodesLoading(false);
     if (type !== "series" || !settings.tmdbKey || tmdb?.kind !== "tv") return;
     setEpisodesLoading(true);
     void withTimeout(tmdbSeasonEpisodes(settings.tmdbKey, tmdb.id, activeSeason), DETAIL_TIMEOUT_MS)
       .then((episodes) => {
-        if (!cancelled) setTmdbEpisodes(episodesFromTmdb(episodes));
+        if (!cancelled)
+          setSeasonListing({ season: activeSeason, episodes: episodesFromTmdb(episodes) });
       })
       .catch(() => {
-        if (!cancelled) setTmdbEpisodes([]);
+        if (!cancelled) setSeasonListing(null);
       })
       .finally(() => {
         if (!cancelled) setEpisodesLoading(false);
@@ -105,8 +110,12 @@ export function VoidTitleWorkspace({
     [playMeta.videos, activeSeason],
   );
   const episodes = useMemo(
-    () => mergeEpisodes(cinemetaEpisodes, tmdbEpisodes),
-    [cinemetaEpisodes, tmdbEpisodes],
+    () =>
+      mergeEpisodes(
+        cinemetaEpisodes,
+        seasonListing?.season === activeSeason ? seasonListing.episodes : [],
+      ),
+    [cinemetaEpisodes, seasonListing, activeSeason],
   );
   const visibleEpisodes = showAll ? episodes : episodes.slice(0, EPISODES_PER_PAGE);
   const openEpisode = (entry: VoidEpisode) =>
@@ -136,12 +145,12 @@ export function VoidTitleWorkspace({
 
         <section className="void-title-feature" aria-label={title}>
           {backdrop && (
-            <img className="void-title-feature-image" src={backdrop} alt="" decoding="async" />
+            <CoverImg className="void-title-feature-image" src={backdrop} alt="" decoding="async" />
           )}
           <div className="void-title-feature-shade" aria-hidden="true" />
           <div className="void-title-feature-body">
             <div className="void-title-poster">
-              {poster && <img src={poster} alt={`${title} poster`} decoding="async" />}
+              {poster && <CoverImg src={poster} alt={`${title} poster`} decoding="async" />}
             </div>
             <div className="void-title-feature-copy">
               <h1>{title}</h1>
@@ -230,7 +239,7 @@ export function VoidTitleWorkspace({
                   </span>
                   <span className="void-title-episode-still">
                     {entry.image ? (
-                      <img src={entry.image} alt="" loading="lazy" />
+                      <CoverImg src={entry.image} alt="" loading="lazy" />
                     ) : (
                       <Play size={20} />
                     )}

@@ -1,10 +1,10 @@
 import { Settings2 } from "lucide-react";
 import { isLivePlaybackSrc } from "@/lib/player/live-src";
-import { Fragment, useContext, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { PlayerCapabilities, PlayerSnapshot } from "@/lib/player/bridge";
 import type { SubtitleAddHandler } from "@/lib/player/subtitle-load";
 import type { Meta } from "@/lib/cinemeta";
-import { VoidPlayerContext } from "@/chrome/void/void-player-context";
+import { useVoidWorkspace } from "@/chrome/void/workspace-context";
 import "./transport/void-transport.css";
 import { CastModal } from "./cast-modal";
 import type { DownloadStatus } from "@/views/player/hooks/use-video-download";
@@ -167,7 +167,7 @@ export function Transport({
 }) {
   const t = useT();
   const { settings } = useSettings();
-  const voidPlayer = useContext(VoidPlayerContext);
+  const voidPlayer = useVoidWorkspace();
   const [toolsOpen, setToolsOpen] = useState(false);
   const kid = useActiveKid();
   const isStremioLayout =

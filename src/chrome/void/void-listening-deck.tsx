@@ -1,4 +1,11 @@
-import { useState } from "react";
+import { MusicSourcePicker } from "@/components/music/music-source-picker";
+import { requestMusicConnection } from "@/components/music/music-connections";
+import { MusicSpeakers } from "@/components/music/music-speakers";
+import { MusicAudioSettings } from "@/components/music/music-audio-settings";
+import { musicVolumeCeiling, useMusicAudioSettings } from "@/lib/music/audio-settings";
+import { playMusicOnSpeaker, returnMusicToComputer, stopMusicCasting } from "@/lib/music/player";
+import { VoidLyrics } from "./void-lyrics";
+import { useEffect, useState } from "react";
 import {
   Heart, Headphones, ListMusic, Maximize2, Minimize2, Pause, Play,
   Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, VolumeX,
@@ -31,6 +38,14 @@ export function VoidListeningDeck() {
   const transport = useMusicTransport();
   const { topKind, setView } = useView();
   const [large, setLarge] = useState(false);
+  useMusicAudioSettings();
+  const [panel, setPanel] = useState<"queue" | "lyrics" | "speakers" | "audio">("queue");
+  const [sourceOpen, setSourceOpen] = useState(false);
+  useEffect(() => {
+    const recover = () => { setSourceOpen(true); setLarge(true); };
+    window.addEventListener("harbor:music-playback-source-required", recover);
+    return () => window.removeEventListener("harbor:music-playback-source-required", recover);
+  }, []);
   const [mutedVolume, setMutedVolume] = useState(0.8);
   const inMusic = topKind === "music";
   const track = state.current;
@@ -124,10 +139,22 @@ export function VoidListeningDeck() {
             ><Heart size={20} fill={liked ? "currentColor" : "none"} /></button>
             <div className="void-listening-volume">
               <button type="button" aria-label={state.volume === 0 ? "Unmute" : "Mute"} onClick={toggleMute}>{state.volume === 0 ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>
-              <input type="range" min={0} max={1} step={0.01} value={state.volume} aria-label="Volume" onChange={(event) => setMusicVolume(Number(event.currentTarget.value))} />
+              <input type="range" min={0} max={musicVolumeCeiling(track.connectorId)} step={0.01} value={state.volume} aria-label="Volume" onChange={(event) => setMusicVolume(Number(event.currentTarget.value))} />
             </div>
           </div>
-          <section className="void-listening-up-next" aria-label={t("music.transport.openQueue")}>
+          <div className="void-listening-tools">
+            {(["queue", "lyrics", "speakers", "audio"] as const).map((id) =>
+              <button key={id} type="button" aria-pressed={panel === id} onClick={() => setPanel(id)}>{t(({ queue: "Queue", lyrics: "Lyrics", speakers: "music.cast.title", audio: "Audio" })[id])}</button>
+            )}
+            <button type="button" onClick={() => setSourceOpen(true)}>{t("Sources")}</button>
+          </div>
+          {sourceOpen && <MusicSourcePicker key={imageSeed} request={{track, queue: state.queue, forceChoice: true, failure: state.error ?? undefined, failedTrack: state.error ? track : undefined}}
+            onClose={() => setSourceOpen(false)} onStarting={() => setSourceOpen(false)}
+            onConnect={() => { setSourceOpen(false); setView("music"); requestMusicConnection("spotify"); }} />}
+          {panel === "audio" && <MusicAudioSettings connectorId={track.connectorId} onBack={() => setPanel("queue")} />}
+          {panel === "lyrics" && <VoidLyrics track={track} key={imageSeed} seconds={position} />}
+          {panel === "speakers" && <MusicSpeakers track={track} positionSec={position} onLoad={playMusicOnSpeaker} onStop={stopMusicCasting} onReturn={returnMusicToComputer} onClose={() => setPanel("queue")} />}
+          {panel === "queue" && <section className="void-listening-up-next" aria-label={t("music.transport.openQueue")}>
             <header><ListMusic size={17} /><h3>UP NEXT</h3><span>{upcoming.length}</span></header>
             <div className="void-listening-up-next-items">
               {upcoming.length ? upcoming.map((next, index) => (
@@ -144,7 +171,7 @@ export function VoidListeningDeck() {
                 </button>
               )) : <p className="void-listening-empty-queue">Your queue will appear here.</p>}
             </div>
-          </section>
+          </section>}
           {state.error && <p className="void-listening-error" role="alert">{state.error}</p>}
         </>
       ) : (
