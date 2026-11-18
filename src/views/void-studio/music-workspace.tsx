@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  ArrowLeft, ArrowRight, Disc3, Heart, Headphones, LibraryBig, ListMusic,
+  ArrowLeft, ArrowRight, Heart, Headphones, LibraryBig, ListMusic,
   Music2, Pause, Play, Search, Settings2, Shuffle,
 } from "lucide-react";
 import { Poster } from "@/components/poster";
@@ -18,7 +18,6 @@ import { enqueueMusic, toggleMusicPlayback } from "@/lib/music/player";
 import { useMusicPlayback } from "@/lib/music/use-music-playback";
 import type { MusicCatalogItem, MusicCatalogRow, MusicSearchResults, MusicTrack } from "@/lib/music/types";
 import { useMusicData } from "@/views/music/use-music-data";
-import { useT } from "@/lib/i18n";
 import "./void-studio-music.css";
 
 type Room = "now" | "explore" | "library" | "search";
@@ -84,8 +83,7 @@ function StudioTrack({
   );
 }
 
-function MusicStudioBody({ active }: { active: boolean }) {
-  const t = useT();
+function MusicStudioBody() {
   const player = useMusicPlayback();
   const data = useMusicData(player.recents);
   const { openSourcePicker } = useMusicSourcePicker();
@@ -402,7 +400,7 @@ export function VoidStudioMusic({ active }: { active: boolean }) {
     <MusicConnectionsProvider active={active}>
       <MusicSourcePickerProvider active={active}>
         <MusicPlaylistPickerProvider active={active}>
-          <MusicStudioBody active={active} />
+          <MusicStudioBody />
         </MusicPlaylistPickerProvider>
       </MusicSourcePickerProvider>
     </MusicConnectionsProvider>

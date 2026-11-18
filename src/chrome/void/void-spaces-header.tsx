@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  BookOpenText, Clapperboard, Compass, Gamepad2, Headphones, Home,
+  BookOpenText, Clapperboard, Gamepad2, Headphones, Home,
   LayoutGrid, LockKeyhole, Radio, Search, Settings2, type LucideIcon,
 } from "lucide-react";
 import { AccountMenu } from "@/chrome/account-menu/account-menu";
