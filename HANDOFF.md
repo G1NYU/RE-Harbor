@@ -29,15 +29,15 @@ Updated: 2026-11-18
 
 ## Verification and next steps
 - 15 source-level consistency checks passed on the detached draft; these are not a substitute for TypeScript, runtime or visual checks.
-- The review patch remains unpushed pending the user's explicit approval; the branch HEAD remains its original documentation-only recovery commit.
-- After approval: fast-forward only if HEAD is unchanged, inspect CI logs, build portable artifact, review populated Music/artist pages against the screenshots on 1280px/1600px/2048px widths, and perform Windows playback/queue/artist-link/seek/volume testing.
+- The approved UI patch was pushed, and the source/visual/regression checks passed. Browser geometry is verified with synthetic fixtures rather than a signed production build.
+- The first portable build passed at GitHub Actions run 44389549093. The build with Last.fm improvements at run 44398691329 is compiling. Real source playback, scrobble account reporting and Windows device/OS integration still require manual application testing.
 - Do not claim the UI or playback is fixed before those checks pass.
 
 ## Album-detail screenshot clarification
 - The last attached photo is an album page ("There Will Be Blood"), not an artist profile.
 - Added a **separate album-only design** so its header artwork/title/actions use width normally occupied by empty filler. Tint/background fades and blurs toward both the right window edge and the section below; text/art remains sharp. The album track rows form two balanced desktop columns, returning to one column in narrow windows.
 - Artist pages remain their own editorial layout. Playback, album metadata, track ordering in the source array and source selection are unchanged.
-- This remains an unpushed prepared change and needs real screenshot checks after approval.
+- The approved album change is merged into the music-polish branch. Browser layout captures passed at 1600px.
 
 ## Validation note (2026-11-18)
 - First branch CI run 44389549097 passed TypeScript but failed one new test that expected only artist pages to be full-width. The intended wide layout applies to both artist and album pages; corrected the test regex without changing production code.
@@ -53,7 +53,7 @@ Updated: 2026-11-18
 ## Responsive artwork/header refinement
 - After inspecting 960x700 Edge screenshots, the 340px portrait stacked above the artist name and pushed the identity below the initial viewport. The 850px container breakpoint now keeps a smaller image alongside the name; stacking begins only under 620px.
 - Added a browser check that the artist name is visible at 960px while track columns collapse to one.
-- This is a prepared, unpushed fix pending completion of the earlier portable Windows build, so that build is not cancelled mid-packaging.
+- The responsive artist refinement was pushed and passed visual CI. Latest 2048px/960px captures are available from run 44401093207.
 
 ## Last.fm and FMHY implementation (2026-11-18)
 - Audited real FMHY-referenced open-source players and existing Harbor Last.fm/MusicBrainz/ListenBrainz support. See `docs/music-ecosystem-references.md`.
@@ -65,3 +65,9 @@ Updated: 2026-11-18
 - CI run 44397942285 failed in `pnpm run setup` before native compilation: the Windows runner's `Expand-Archive` invoked an unavailable .NET `ExtractToDirectory` overload. FFmpeg and FFprobe were downloaded but could not be extracted.
 - `scripts/fetch-binaries.mjs` now uses Windows built-in bsdtar (`tar -xf`) for ZIP archives instead of PowerShell. Tarball extraction and non-Windows ZIP behavior are unchanged.
 - A dedicated test checks the Windows extraction path. The newer portable build must succeed before declaring Last.fm fixes native-tested.
+
+## Browser UI and native validation snapshot (2026-11-18)
+- Edge visual run [44401093207](https://github.com/G1NYU/RE-Harbor/actions/runs/44401093207) passed after adding 2048x1124 coverage. Artist title/layout, two-column tracks, 960px responsive collapse, topbar opaque scroll, full-width dock and full-screen Now Playing were inspected. Synthetic artwork and a mocked-native startup warning are test-fixture limitations, not verified real-provider behavior.
+- Native typecheck/music/Refract/Windows sidecar regression run [44401093244](https://github.com/G1NYU/RE-Harbor/actions/runs/44401093244) passed.
+- The newer Windows artifact build [44398691329](https://github.com/G1NYU/RE-Harbor/actions/runs/44398691329) passed sidecar preparation and is compiling Tauri. Do not claim the Last.fm native build passed until its compiled artifact is actually uploaded and verified.
+- Source reference audit now includes LiMusic, Feishin, fooyin, muffon, Pear, Last.fm, MusicBrainz and ListenBrainz, with license boundaries. No code from copyleft clients copied.
