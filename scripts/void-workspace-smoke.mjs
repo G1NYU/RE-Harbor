@@ -15,6 +15,8 @@ const film = {
   type: "movie",
   name: "The Night Train",
   releaseInfo: "2024",
+  // This synthetic clip is intentionally short; do not classify it as a 2-hour movie stub.
+  runtime: "1",
   genres: ["Drama"],
   description: "Two travelers cross paths on the last train home.",
   trailers: [{ source: "fixture-trailer", type: "Trailer" }],
@@ -104,7 +106,7 @@ try {
         const timer = setInterval(() => {
           ctx.fillStyle = frame++ % 2 ? "#242436" : "#34364f";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          if (frame >= 14) {
+          if (frame >= 60) {
             clearInterval(timer);
             recorder.stop();
           }
@@ -296,6 +298,7 @@ try {
   assert.equal(decoded.width, 96, "The source should decode a fixture frame");
   assert.equal(decoded.height, 54);
   assert.match(decoded.source, /video-fixture\.invalid\/1080\.mp4/);
+  await player.locator(".void-video-controls").waitFor({ state: "attached", timeout: 12000 });
   assert.equal(await player.locator(".void-video-controls").count(), 1,
     "VOID player must render its native transport");
   await page.screenshot({ path: output + "/void-player-first-frame.png" });

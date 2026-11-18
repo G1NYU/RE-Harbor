@@ -154,3 +154,8 @@
 - The new Edge media test decoded a first frame but found no native VOID controls. Root cause: `Transport` returned `TransportStremio` first whenever the profile's inherited player chrome resolved to Stremio, even if VOID was active.
 - Give VOID's own transport precedence. Preserve the legacy Stremio branch for non-VOID themes and all native playback engine logic.
 - Adjust the structural smoke guard to check the atomic snapshot's rejection path. The test still verifies the real video frame and controls.
+
+## VOID 03 short-media playback fixture correction (2026-11-18)
+- Windows rendering run 44311841473 successfully decoded the VP8 video frame but the 1.4-second fixture was classified as a stub because the mock title had no runtime and advertised gigabyte-sized streams.
+- Give the synthetic title a 1-minute runtime (below Harbor's 90-second runtime floor) and record 6 seconds of actual video to keep the player alive long enough to mount its controls.
+- Keep production short-stream detection and stream trust policy unchanged; the native VOID transport precedence fix remains in place.

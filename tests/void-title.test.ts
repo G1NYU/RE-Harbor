@@ -141,6 +141,8 @@ test("VOID Windows smoke covers source-to-player decoded media handoff", () => {
   const smoke = readFileSync("scripts/void-workspace-smoke.mjs", "utf8");
   assert.ok(smoke.includes("canvas.captureStream(10)"));
   assert.ok(smoke.includes("MediaRecorder.isTypeSupported"));
+  assert.ok(smoke.includes('runtime: "1"'));
+  assert.ok(smoke.includes("frame >= 60"));
   assert.ok(smoke.includes('board.locator(".void-source-feature").click()'));
   assert.ok(smoke.includes("video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA"));
   assert.ok(smoke.includes("const decoded = await firstFrame.jsonValue()"));
