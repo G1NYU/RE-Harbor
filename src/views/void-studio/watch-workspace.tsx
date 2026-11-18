@@ -6,6 +6,7 @@ import { useSidebarNavigation } from "@/chrome/context-page-navigation";
 import { useParental } from "@/lib/parental";
 import { topMovies, topSeries, type Meta } from "@/lib/cinemeta";
 import { useSettings } from "@/lib/settings";
+import { CATALOG_REQUEST_TIMEOUT_MS, withTimeout } from "@/lib/progressive-rows";
 import { useView } from "@/lib/view";
 import { movieSpecs } from "@/views/movies/movie-specs";
 import { showSpecs } from "@/views/shows/show-specs";
@@ -89,7 +90,7 @@ export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; a
     setLoading(true);
     setError("");
     const fetchRows = async () => {
-      const outcomes = await Promise.allSettled(specs.map((spec) => spec.fetcher(1)));
+      const outcomes = await Promise.allSettled(specs.map((spec) => withTimeout(spec.fetcher(1), CATALOG_REQUEST_TIMEOUT_MS)));
       if (cancelled) return;
       const next: WatchRow[] = outcomes.flatMap((outcome, index) => {
         if (outcome.status !== "fulfilled") return [];
@@ -103,7 +104,7 @@ export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; a
       // Match the working Harbor catalog fallback when a configured TMDB source fails.
       if (!next.length && specs.some((spec) => spec.key !== "popular")) {
         try {
-          const fallback = unique(await (kind === "movies" ? topMovies() : topSeries()));
+          const fallback = unique(await withTimeout(kind === "movies" ? topMovies() : topSeries(), CATALOG_REQUEST_TIMEOUT_MS));
           if (cancelled) return;
           if (fallback.length) next.push({
             key: "popular",
@@ -143,7 +144,7 @@ export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; a
     if (loadingMore || !row.hasMore) return;
     setLoadingMore(row.key);
     try {
-      const extra = unique(await row.load(row.page + 1));
+      const extra = unique(await withTimeout(row.load(row.page + 1), CATALOG_REQUEST_TIMEOUT_MS));
       setRows((current) => current.map((entry) => entry.key !== row.key ? entry : ({
         ...entry,
         page: entry.page + 1,
