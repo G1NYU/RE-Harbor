@@ -322,10 +322,12 @@ export function MusicDetail({
         {heroMenu.menu}
         {/* The same artwork defines this page's atmosphere and primary cover.
             A static backdrop avoids video, JS scrolling layers and costly blur effects. */}
-        <div className="void-music-detail-scenery" aria-hidden="true">
-          {heroArt && <img src={heroArt} alt="" loading="eager" decoding="async" />}
-        </div>
-        <div className="void-music-hero-body">
+        {voidEdition && (
+          <div className="void-music-detail-scenery" aria-hidden="true">
+            {heroArt && <img src={heroArt} alt="" loading="eager" decoding="async" />}
+          </div>
+        )}
+        <div className={voidEdition ? "void-music-hero-body" : "contents"}>
         <div
           onContextMenu={heroMenu.onContextMenu}
           className={`music-detail-art grid size-48 shrink-0 place-items-center overflow-hidden bg-elevated ${item.kind === "artist" ? "rounded-full" : "rounded-lg"}`}
@@ -342,11 +344,13 @@ export function MusicDetail({
           )}
         </div>
         <div className="music-detail-title min-w-0">
-          <span className="void-music-detail-overline" aria-hidden="true">
-            {item.kind === "artist" ? t("music.search.artists") : item.kind === "album"
-              ? t("music.search.albums") : item.kind === "playlist"
-                ? t("music.search.playlists") : t("music.search.tracks")}
-          </span>
+          {voidEdition && (
+            <span className="void-music-detail-overline" aria-hidden="true">
+              {item.kind === "artist" ? t("music.search.artists") : item.kind === "album"
+                ? t("music.search.albums") : item.kind === "playlist"
+                  ? t("music.search.playlists") : t("music.search.tracks")}
+            </span>
+          )}
           <h1
             ref={heading}
             tabIndex={-1}
