@@ -55,6 +55,7 @@ import { enqueueMusic } from "@/lib/music/player";
 import { useMusicPlayback } from "@/lib/music/use-music-playback";
 import { useRecordingProfile } from "@/lib/music/use-recording-profile";
 import { useT, useUiLanguage } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
 import { loadArtistProfile } from "@/lib/music/artist-profile";
 import type {
   MusicCatalogItem,
@@ -112,6 +113,8 @@ export function MusicDetail({
   onViewChange: (view: MusicDetailViewState) => void;
 }) {
   const t = useT();
+  const { settings } = useSettings();
+  const voidEdition = settings.theme.preset === "cool-grey";
   const player = useMusicPlayback();
   const { profile: playingRecording } = useRecordingProfile(player.current);
   const isCurrent = (track: MusicTrack) =>
@@ -540,7 +543,7 @@ export function MusicDetail({
             <MusicTrackRow
               key={`${track.id}:${index}`}
               track={track}
-              editorial
+              editorial={voidEdition}
               nowPlaying={isCurrent(track)}
               loading={isCurrent(track) && player.phase === "resolving"}
               paused={isCurrent(track) && player.phase === "paused"}
