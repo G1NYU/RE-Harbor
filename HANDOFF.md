@@ -50,3 +50,9 @@
 - `src/App.tsx` routes VOID into `VoidStudioMusic` and preserves `MusicView` only for other themes.
 - `tests/void-studio-music.test.ts` checks topology, engine interactions and static responsive CSS.
 - **Still WIP:** Refract remains under its separate tracking backend; search source management, full playback controls/lyrics/casting, Settings and every non-Music media space need real redesign and visual verification. No installer from VOID 03 yet.
+
+## VOID 03 Watch workspace (2026-11-18)
+- `src/views/void-studio/watch-workspace.tsx`: original cinematic Films/Series workspace, TMDB catalog rows when configured and Cinemeta fallback without TMDB.
+- `src/views/void-studio/void-watch.css`: full featured stage, filmstrip selections and in-workspace info drawer, no legacy Harbor Movie/Show components.
+- `src/App.tsx`: active VOID Movies and Shows are routed to `VoidWatchWorkspace`; other themes preserve their existing pages. `openMeta` preserves playback, watch history and Refract data flow.
+- **Parity gaps:** detailed episode/playback picker remains the original native route, Anime and other spaces await new layouts. Do not ship installer yet.

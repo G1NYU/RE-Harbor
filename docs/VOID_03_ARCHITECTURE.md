@@ -30,7 +30,7 @@ These are conceptual references, not designs/assets copied from the authors.
 
 ## Blockers before shipping
 1. Complete the new independent Music home, source management, detail views, search, and library feature parity (initial new components now live); eliminate any fallback to legacy controls.
-2. Replace legacy Home, Watch (Movies, Shows, Anime), Read (Manga/eBook), Play (Games), Live, Settings and Library views.
+2. Complete Watch parity: the new Movies/Shows landing workspace is implemented; episodes, watchlist controls and Anime still need original VOID layouts. Then replace legacy Home, Read (Manga/eBook), Play (Games), Live, Settings and Library views.
 3. Ensure new player offers source recovery, casting, lyrics and all existing music settings, not just transport.
 4. Add programmatic layout tests and inspect rendered UI at 960x600, 1280x800, 1600x900, ultrawide and RTL.
 5. Verify TypeScript, playback, Refract PR #103 and installer behavior without releasing until real UI parity.
