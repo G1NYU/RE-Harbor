@@ -1,35 +1,34 @@
-# Harbor Music — focused recovery handoff
+# Harbor Music Polish — handoff
 
 Updated: 2026-11-18
 
-## Approved baseline
-- Repository: `G1NYU/RE-Harbor`
-- Branch: `feature/harbor-music-polish`
-- Exact starting commit: `9c89330eff5a08a208eaa4ac62017b8ac027cede` from `feature/void-refract-preview`.
-- This baseline passed Windows portable-preview workflow [44052102329](https://github.com/G1NYU/RE-Harbor/actions/runs/44052102329) and VOID/Refract validation [44052102318](https://github.com/G1NYU/RE-Harbor/actions/runs/44052102318).
-- Previous full-app redesign remains preserved on `feature/void-03-workspaces`. Do not merge, cherry-pick, reset or delete it as part of this recovery.
+## Baseline and branches
+- Repository: `G1NYU/RE-Harbor`.
+- Working branch: `feature/harbor-music-polish`, created from `feature/void-refract-preview` commit `9c89330eff5a08a208eaa4ac62017b8ac027cede`.
+- Original baseline passed Windows preview [44052102329](https://github.com/G1NYU/RE-Harbor/actions/runs/44052102329) and VOID/Refract [44052102318](https://github.com/G1NYU/RE-Harbor/actions/runs/44052102318) on 2026-11-17.
+- The abandoned full UI redesign remains preserved on `feature/void-03-workspaces`. Never merge, reset or delete it as part of music polish.
 
-## Scope — only two targeted corrections
-1. Bottom music player bar: fix the layout and interaction issues indicated in the user's earlier screenshots with red annotations. Keep the Harbor-based layout and existing playback/queue/source behavior.
-2. Artist / track page: correct the too-small artist hero, cramped track typography/rows and any overlapping toolbar elements, following those same red annotations.
+## Requirements grounded in seven red-annotated screenshots
+- Restore the original Harbor-based UI that the user liked. No more VOID 03 app-wide redesign.
+- The bottom music bar should reach both edges of the entire application. Clicking unused bar surface should open the complete Now Playing environment, not just enlarge album art. The bar's real transport/seek/volume, artist and song links, menu actions, and collapse behavior must continue to work.
+- Fix the fixed topbar colliding with scrolled poster rows, music results and breadcrumbs. Transparent topbar appearance needs an opaque backing after scroll.
+- Remove the long separator below For you / Explore / Library while keeping the active tab indication.
+- Fix long music search track titles, overpacked columns, row spacing and track action access.
+- Give the Masayoshi Takanaka-style artist view a genuine design pass: full available page width, large rectangular photograph, editorial typography/actions, fan metadata, balanced artist toolbar and readable track columns. Preserve real albums, queue, player, Refract and external sources.
+- Keep track sections and controls responsive and usable in narrower windows.
 
-Do not redesign app navigation, replace the player engine, rework music sources, change the interface architecture, or introduce VOID 03 into this branch. Preserve the working Refract integration, other media sections, and installed Harbor.
+## Prepared code review scope
+- `src/chrome/topbar.tsx`: scroll collision backing.
+- `src/components/music/music-sticky-title.css`: sticky title below fixed 80px header.
+- `src/components/music/music-tabs.tsx`: remove unwanted tab-wide border.
+- `src/components/music/music-track-grid.tsx` and `src/views/music/music-page-system.css`: two-column max search tracks, matching skeleton, larger rows, scrolling clearance.
+- `src/components/music/music-dock.tsx` and `.css`: true full-bleed bar except Games-specific sidebar reservation, explicit accessible expand button, click-to-expand from unused surface.
+- `src/views/music.tsx`, `src/views/music/music-detail.tsx` and `.css`: artist-specific full-width editorial hero and responsive two-column track listing.
+- `tests/music-ui-polish.test.ts`: regression checks for these invariants.
+- `.github/workflows/music-void-ui.yml` and `music-windows-preview.yml`: enable checks and isolated portable preview on this branch. No installer publishing, secrets or deployment changes.
 
-## Blocker and verification
-- The exact red-annotated screenshot pixels are not available in the current conversation context. Do not guess their precise measurements or element positions; request reattachment before pixel-matched UI edits.
-- Baseline code and branch were verified read-only; no corrective UI changes or new build have yet been validated on this recovery branch.
-- After targeted fixes: run frontend typecheck, relevant music/VOID/Refract regressions, desktop layout screenshots at narrow and normal widths, and a portable Windows preview. Inspect actual screenshots before accepting.
-
-## Harbor music screenshot corrections — staged (2026-11-18)
-- User supplied seven annotated 2048×1124 captures. Issues identified: transparent header clashing with scroll content/breadcrumbs; full-width tab separator; small, hard-to-find player expansion; three cramped search track columns; artist portrait/readability and fixed dock clearance.
-- Candidate changes preserve the original Harbor music architecture and behavior: solid on-scroll Music header even for transparent topbar appearance, title sticky below 80px chrome, active-tab underline only, two track columns/70px row spacing, responsive enlarged artist portrait, explicit accessible now-playing button and scroll clearance.
-- The review commit is **not attached to this branch yet**, pending explicit push approval. Verification: structural regression included; project typecheck and Windows screenshots must run after approval.
-- Do not merge VOID 02/03 or affect core music sources, playback engine, Refract or other category pages.
-
-- Final review: the same transparent toolbar collision is visible above movie/poster rows. Enable opaque scroll backing for transparent topbar appearance globally; the content-density and sticky title changes remain Music-only.
-
-## Corrected interpretation of screenshot request
-- The bottom bar must be full-bleed across the application/window, not start after Harbor's sidebar. The user must be able to open the actual `MusicNowPlaying` environment by clicking unused dock surface, while play, seek, volume, menus, artist and track links retain their own actions. The visible expansion button remains as a keyboard-accessible alternative.
-- Artist detail (Masayoshi Takanaka reference) must be a true editorial redesign: full available content width, prominent rectangular artwork, balanced typography/actions/metadata, clear section controls and two desktop track columns that collapse responsively.
-- The old draft's small circular-portrait resizing was insufficient and has been replaced. The rest of Harbor remains on the stable baseline.
-- Exact implementation is staged as an **unpublished review commit**. Full test/build/render validation cannot be claimed before a branch push.
+## Verification and next steps
+- 15 source-level consistency checks passed on the detached draft; these are not a substitute for TypeScript, runtime or visual checks.
+- The review patch remains unpushed pending the user's explicit approval; the branch HEAD remains its original documentation-only recovery commit.
+- After approval: fast-forward only if HEAD is unchanged, inspect CI logs, build portable artifact, review populated Music/artist pages against the screenshots on 1280px/1600px/2048px widths, and perform Windows playback/queue/artist-link/seek/volume testing.
+- Do not claim the UI or playback is fixed before those checks pass.

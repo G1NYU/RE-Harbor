@@ -1,4 +1,4 @@
-name: VOID + Refract Windows Preview
+name: Harbor Music Windows Preview
 
 on:
   push:
@@ -89,7 +89,7 @@ jobs:
           if (-not (Test-Path -LiteralPath music-preview/harbor.exe)) { throw "Missing portable Harbor executable" }
           Remove-Item -LiteralPath music-preview/uninstall.exe -Force -ErrorAction SilentlyContinue
           @'
-          VOID + REFRACT PREVIEW (Windows x64)
+          HARBOR MUSIC POLISH PREVIEW (Windows x64)
           ==================================
           This is a portable test build from the workflow branch, not a normal Harbor installer.
 
@@ -108,7 +108,7 @@ jobs:
       - name: Upload portable Windows preview
         uses: actions/upload-artifact@v4
         with:
-          name: harbor-void-refract-windows-x64
+          name: harbor-music-polish-windows-x64
           path: music-preview/
           if-no-files-found: error
           retention-days: 7
