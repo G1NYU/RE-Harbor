@@ -293,7 +293,7 @@ export function MusicDetail({
     </div>
   );
   return (
-    <section className="music-detail-page flex min-w-0 flex-col gap-6" data-music-artist={item.kind === "artist" || undefined}>
+    <section className="music-detail-page flex min-w-0 flex-col gap-6" data-music-artist={item.kind === "artist" || undefined} data-music-album={item.kind === "album" || undefined}>
       <button
         type="button"
         data-music-inner-back
@@ -334,6 +334,7 @@ export function MusicDetail({
         </div>
         <div className="music-detail-title min-w-0">
           {item.kind === "artist" && <span className="music-artist-eyebrow">{t("music.search.artists")}</span>}
+          {item.kind === "album" && <span className="music-album-eyebrow">{t("music.search.albums")}</span>}
           <h1
             ref={heading}
             tabIndex={-1}

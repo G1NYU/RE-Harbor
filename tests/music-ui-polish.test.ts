@@ -62,3 +62,17 @@ test("full-width music dock expands from its non-control area into the real play
     assert.ok(now.includes(region), "the expanded player lost " + region);
   }
 });
+
+test("album details use a wide image-and-metadata header with faded right/bottom edges", () => {
+  const view = read("src/views/music.tsx");
+  const detail = read("src/views/music/music-detail.tsx");
+  const css = read("src/views/music/music-detail.css");
+  assert.match(view, /detail\?\.item\.kind === "album" \? "max-w-none"/);
+  assert.match(detail, /data-music-album=\{item\.kind === "album"/);
+  assert.match(detail, /music-album-eyebrow/);
+  assert.match(css, /\.music-detail-page\[data-music-album\] \.music-detail-hero::before/);
+  assert.match(css, /mask-image: radial-gradient/);
+  assert.match(css, /filter: blur\(10px\)/);
+  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /@container \(max-width: 770px\)/);
+});

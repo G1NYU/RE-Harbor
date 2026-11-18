@@ -32,3 +32,9 @@ Updated: 2026-11-18
 - The review patch remains unpushed pending the user's explicit approval; the branch HEAD remains its original documentation-only recovery commit.
 - After approval: fast-forward only if HEAD is unchanged, inspect CI logs, build portable artifact, review populated Music/artist pages against the screenshots on 1280px/1600px/2048px widths, and perform Windows playback/queue/artist-link/seek/volume testing.
 - Do not claim the UI or playback is fixed before those checks pass.
+
+## Album-detail screenshot clarification
+- The last attached photo is an album page ("There Will Be Blood"), not an artist profile.
+- Added a **separate album-only design** so its header artwork/title/actions use width normally occupied by empty filler. Tint/background fades and blurs toward both the right window edge and the section below; text/art remains sharp. The album track rows form two balanced desktop columns, returning to one column in narrow windows.
+- Artist pages remain their own editorial layout. Playback, album metadata, track ordering in the source array and source selection are unchanged.
+- This remains an unpushed prepared change and needs real screenshot checks after approval.
