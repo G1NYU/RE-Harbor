@@ -56,7 +56,7 @@ try {
           nextCursor: null, scope: "catalog",
         };
         if (command === "music_artist_rows") return [];
-        if (command === "music_connections" || command === "music_home_rows") return [];
+        if (command === "music_connections" || command === "music_home_rows" || command === "music_audio_devices") return [];
         if (command === "music_get_checkpoint") return null;
         return null;
       },
