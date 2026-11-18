@@ -140,3 +140,8 @@
 - Actions dispatch through `setContextWatched` / `requireMediaActionSuccess`, retaining native Harbor and configured tracker writes, including Refract watch events, while surfacing partial provider failures.
 - Manual watched-state subscription refreshes visible status; the episode playback click target remains separate.
 - Added deterministic episode grouping regression tests and mocked Windows Edge watched/unwatched interaction smoke coverage. Real-provider writes and Windows media decoding still need direct validation.
+
+## VOID 03 direct-source playback smoke (2026-11-18)
+- Extended the Edge test past manual source discovery into the existing resolution pipeline and player stage. The browser must decode a video frame from the chosen source and render VOID's own player transport.
+- Generates a small VP8/WebM clip in the Windows Edge test using canvas and MediaRecorder. Intercepts the synthetic addon URL with CORS and byte-range support; no outside network dependency or checked-in media file.
+- Covers browser source handoff and first-frame decode, not native libmpv, real-world addon health, TV remotes or installer packaging.

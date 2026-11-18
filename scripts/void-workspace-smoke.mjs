@@ -80,6 +80,61 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 try {
   await page.goto("http://127.0.0.1:1420", { waitUntil: "domcontentloaded" });
+  // Produce a deterministic offline video in Edge without a third-party URL.
+  const clip = await page.evaluate(async () => {
+    const mime = ["video/webm;codecs=vp8", "video/webm"].find((value) => MediaRecorder.isTypeSupported(value));
+    if (!mime) throw new Error("Edge cannot encode the offline playback fixture");
+    const canvas = document.createElement("canvas");
+    canvas.width = 96;
+    canvas.height = 54;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2D is unavailable");
+    ctx.fillStyle = "#242436";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const stream = canvas.captureStream(10);
+    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 120000 });
+    try {
+      const blob = await new Promise((resolve, reject) => {
+        const chunks = [];
+        recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+        recorder.onerror = () => reject(new Error("Fixture encoding failed"));
+        recorder.onstop = () => resolve(new Blob(chunks, { type: mime }));
+        recorder.start(150);
+        let frame = 0;
+        const timer = setInterval(() => {
+          ctx.fillStyle = frame++ % 2 ? "#242436" : "#34364f";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          if (frame >= 14) {
+            clearInterval(timer);
+            recorder.stop();
+          }
+        }, 100);
+      });
+      return { mime, bytes: [...new Uint8Array(await blob.arrayBuffer())] };
+    } finally {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+  });
+  assert.ok(clip.bytes.length >= 100, "Browser generated no video bytes");
+  const playbackBytes = Buffer.from(clip.bytes);
+  await page.route("https://video-fixture.invalid/**", async (route) => {
+    const range = /^bytes=(\d+)-(\d*)$/.exec(route.request().headers()["range"] ?? "");
+    const start = range ? Number(range[1]) : 0;
+    const end = range && range[2] ? Math.min(Number(range[2]), playbackBytes.length - 1) : playbackBytes.length - 1;
+    const valid = start >= 0 && start <= end && end < playbackBytes.length;
+    await route.fulfill({
+      status: valid ? (range ? 206 : 200) : 416,
+      body: valid ? playbackBytes.subarray(start, end + 1) : Buffer.alloc(0),
+      headers: {
+        "content-type": clip.mime,
+        "access-control-allow-origin": "*",
+        "accept-ranges": "bytes",
+        ...(range ? { "content-range": valid
+          ? "bytes " + start + "-" + end + "/" + playbackBytes.length
+          : "bytes */" + playbackBytes.length } : {}),
+      },
+    });
+  });
   const nav = page.getByRole("navigation", { name: "Media spaces" });
   await nav.getByRole("button", { name: "Watch", exact: true }).click();
   const watch = page.locator("[data-void-watch]:visible");
@@ -218,6 +273,29 @@ try {
   await board.getByText("Advanced filters", { exact: true }).click();
   assert.ok(await board.locator(".void-source-advanced select").count() >= 3);
   await page.screenshot({ path: `${output}/void-sources-filters.png` });
+  // Real player handoff: assert the HTML5 decoder produced a first video frame.
+  await board.locator(".void-source-feature").click();
+  const player = page.locator("[data-harbor-player]:visible");
+  await player.waitFor({ timeout: 30000 });
+  await player.locator("[data-player-video-mount]").waitFor();
+  await page.waitForFunction(() => {
+    const video = document.querySelector("[data-harbor-player] [data-player-video-mount] video");
+    return video instanceof HTMLVideoElement &&
+      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+      video.videoWidth > 0 && video.videoHeight > 0 && video.error == null;
+  }, undefined, { timeout: 25000 });
+  const decoded = await player.locator("[data-player-video-mount] video").evaluate((video) => ({
+    width: video.videoWidth,
+    height: video.videoHeight,
+    source: video.currentSrc,
+    readyState: video.readyState,
+  }));
+  assert.equal(decoded.width, 96, "The source should decode a fixture frame");
+  assert.equal(decoded.height, 54);
+  assert.match(decoded.source, /video-fixture\.invalid\/1080\.mp4/);
+  assert.equal(await player.locator(".void-video-controls").count(), 1,
+    "VOID player must render its native transport");
+  await page.screenshot({ path: output + "/void-player-first-frame.png" });
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png` }).catch(() => {});
   console.error(
