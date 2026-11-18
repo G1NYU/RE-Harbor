@@ -205,6 +205,7 @@ export function MusicDock() {
     setExpanded(false);
   }, [topKind]);
   const { settings: dockSettings } = useSettings();
+  const voidDock = dockSettings.theme.preset === "cool-grey";
   const appearance = useMusicAppearance();
   const dockParts = useMusicDockLayout();
   const { profile: recording, display } = useRecordingProfile(player.current);
@@ -655,17 +656,23 @@ export function MusicDock() {
         <div className="flex items-center gap-2 @[900px]:pe-4">
           <button
             type="button"
-            data-music-dock-hide
+            data-music-dock-hide={!voidDock || undefined}
+            data-void-music-expand={voidDock || undefined}
             className={`music-dock-hide ${ICON_BUTTON}`}
-            aria-label={t("music.dock.hide")}
+            aria-expanded={voidDock ? expanded : undefined}
+            aria-label={t(voidDock ? (expanded ? "music.now.collapse" : "music.now.expand") : "music.dock.hide")}
             data-music-tooltip=""
             onClick={() => {
               setQueueOpen(false);
-              setExpanded(false);
-              collapseExit.close();
+              if (voidDock) {
+                setExpanded((open) => !open);
+              } else {
+                setExpanded(false);
+                collapseExit.close();
+              }
             }}
           >
-            <MusicGlyph name="collapse" size={19} aria-hidden="true" />
+            <MusicGlyph name={voidDock ? (expanded ? "collapse" : "expand") : "collapse"} size={voidDock ? 24 : 19} aria-hidden="true" />
           </button>
           <div className="music-dock-track flex min-w-0 flex-1 items-center gap-3 text-start">
             <button
