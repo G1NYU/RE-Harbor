@@ -99,6 +99,7 @@ try {
   await actions.getByRole("button", { name: /Save to a list/ }).click();
   const listButton = actions.getByRole("button", { name: /Weekend Cinema/ });
   const listInput = actions.getByRole("textbox", { name: "New list" });
+  await listInput.fill("Keyboard focus check");
   await listInput.focus();
   await page.keyboard.press("Tab");
   assert.equal(
