@@ -1,0 +1,460 @@
+/* VOID 02 / Music. First-class editorial layouts, scoped to the native shell.
+ * Layout is composed by MusicDetail, MusicSearchPanel and MusicMast; this sheet
+ * supplies responsive rhythm and colors without runtime injection or blur. */
+[data-void-shell] [data-music-view] {
+  --void-music-gutter: clamp(24px, 3.5vw, 64px);
+  padding: 0 !important;
+  background: #11111b;
+  color: #cdd6f4;
+  scroll-padding-top: 28px;
+}
+[data-void-shell] [data-music-consolidated-back].void-music-workspace {
+  max-width: none;
+  width: 100%;
+  padding-inline: var(--void-music-gutter);
+  gap: clamp(24px, 3vw, 40px);
+}
+[data-void-shell] [data-music-context="detail"] {
+  scroll-padding-top: 0;
+}
+[data-void-shell] [data-scroll-anchor="mast"] {
+  margin-top: clamp(22px, 3vw, 44px);
+}
+[data-void-shell] .void-music-mast {
+  align-items: end;
+  gap: clamp(24px, 3vw, 58px);
+  padding-block: 12px 4px;
+}
+[data-void-shell] .void-music-kicker,
+[data-void-shell] .void-music-detail-overline {
+  display: block;
+  margin-bottom: 12px;
+  color: #9399b2;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.3;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+[data-void-shell] .void-music-mast h1 {
+  font-size: clamp(42px, 4.5vw, 72px);
+  line-height: 1.05;
+  letter-spacing: -.045em;
+}
+[data-void-shell] .void-music-mast [role="search"] {
+  height: 50px;
+  border: none;
+  border-radius: 12px;
+  background: #181825;
+  box-shadow: none;
+  outline: none;
+}
+[data-void-shell] .void-music-mast [role="search"]:focus-within {
+  outline: 2px solid #9399b2;
+  outline-offset: 2px;
+}
+[data-void-shell] .void-music-mast input {
+  font-size: 15px;
+}
+[data-void-shell] [data-scroll-anchor="tabs"] {
+  border: 0;
+  box-shadow: none;
+  padding-bottom: 0;
+  margin-block: 4px -4px;
+}
+[data-void-shell] .music-navigation {
+  border: 0 !important;
+}
+[data-void-shell] .music-navigation [role="tab"] {
+  font-size: 15px;
+  padding: 11px 15px;
+  border-radius: 0;
+}
+[data-void-shell] .music-navigation [role="tab"][aria-selected="true"] {
+  border-radius: 0;
+}
+[data-void-shell] .music-room-home {
+  gap: clamp(28px, 3vw, 42px);
+}
+[data-void-shell] [data-scroll-anchor="hero"] {
+  margin-inline: calc(-1 * var(--void-music-gutter));
+}
+[data-void-shell] .music-room-home .music-room-feature {
+  min-height: clamp(440px, 53vh, 680px);
+  padding-inline: var(--void-music-gutter);
+  border: 0;
+  border-radius: 0;
+}
+[data-void-shell] .music-room-home .music-room-feature h2 {
+  max-width: 17ch;
+  font-size: clamp(42px, 4.4vw, 78px);
+  letter-spacing: -.05em;
+}
+[data-void-shell] .music-room-home .music-room-description {
+  font-size: 17px;
+  line-height: 1.6;
+}
+[data-void-shell] .music-room-home .music-room-main-action,
+[data-void-shell] .music-room-home .music-room-secondary-action {
+  min-height: 50px;
+  border-radius: 10px;
+}
+[data-void-shell] .music-room-home :is(.music-room-shortcut, .music-room-shortcut a) {
+  border: 0;
+}
+/* Detail pages no longer stack Harbor's Music mast and the secondary hero.
+ * Their own artwork, heading, actions, metadata, and track list form one page. */
+[data-void-shell] [data-void-music-context="detail"] .music-detail-page {
+  gap: clamp(24px, 3vw, 42px);
+  animation: none;
+  padding-bottom: 24px;
+}
+[data-void-shell] [data-music-inner-back].music-detail-back {
+  display: inline-flex !important;
+  position: relative;
+  width: fit-content;
+  min-height: 48px;
+  margin-top: 4px;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #a6adc8;
+}
+[data-void-shell] [data-music-inner-back].music-detail-back:hover {
+  color: #cdd6f4;
+}
+[data-void-shell] .music-detail-page .music-detail-hero {
+  position: relative;
+  display: block;
+  isolation: isolate;
+  width: calc(100% + 2 * var(--void-music-gutter));
+  min-height: clamp(370px, 45vh, 550px);
+  margin-inline: calc(-1 * var(--void-music-gutter));
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #11111b !important;
+}
+[data-void-shell] .void-music-detail-scenery {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #11111b;
+}
+[data-void-shell] .void-music-detail-scenery img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 60% 37%;
+  opacity: .48;
+}
+[data-void-shell] .void-music-detail-scenery::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #11111b 0%, rgb(17 17 27 / .91) 25%, rgb(17 17 27 / .55) 55%, rgb(17 17 27 / .24) 100%),
+    linear-gradient(0deg, #11111b 0%, transparent 38%, rgb(17 17 27 / .12) 75%, #11111b 100%);
+}
+[data-void-shell] .music-detail-page[data-void-music-kind="artist"] .void-music-detail-scenery img {
+  object-position: 70% 28%;
+  opacity: .58;
+}
+[data-void-shell] .void-music-hero-body {
+  display: grid;
+  grid-template-columns: minmax(170px, clamp(210px, 20vw, 290px)) minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 72px);
+  min-height: clamp(370px, 45vh, 550px);
+  align-items: center;
+  padding: 76px var(--void-music-gutter) 60px;
+}
+[data-void-shell] .music-detail-page .music-detail-art {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: #181825;
+  box-shadow: 0 16px 54px rgb(0 0 0 / .18);
+}
+[data-void-shell] .music-detail-page[data-void-music-kind="artist"] .music-detail-art {
+  border-radius: 50%;
+}
+[data-void-shell] .music-detail-page .music-detail-title {
+  min-width: 0;
+  max-width: 940px;
+  align-self: center;
+}
+[data-void-shell] .music-detail-page .music-detail-title h1 {
+  max-width: 19ch;
+  margin: 0;
+  font-size: clamp(44px, 5.4vw, 88px);
+  line-height: 1.03;
+  letter-spacing: -.053em;
+  font-weight: 850;
+  color: #e4e6f9;
+  overflow-wrap: anywhere;
+}
+[data-void-shell] .music-detail-page[data-void-music-kind="artist"] .music-detail-title h1 {
+  max-width: 17ch;
+}
+[data-void-shell] .music-detail-page .music-detail-meta {
+  font-size: 15px;
+  gap: 0;
+  margin-top: 22px;
+  color: #b1b6ce;
+}
+[data-void-shell] .music-detail-page .music-detail-hero-actions {
+  margin-top: 30px;
+}
+[data-void-shell] .music-detail-page .music-collection-controls {
+  gap: 10px;
+}
+[data-void-shell] .music-detail-page .music-collection-controls button {
+  min-width: 44px;
+  min-height: 48px;
+}
+[data-void-shell] .music-detail-page .music-detail-hero > .music-release-facts {
+  position: relative;
+  margin-inline: var(--void-music-gutter);
+}
+[data-void-shell] .music-detail-page .music-detail-sections {
+  justify-content: start;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+[data-void-shell] .music-detail-page .music-detail-chips {
+  display: flex;
+  width: 100%;
+  gap: clamp(12px, 2vw, 28px);
+  padding: 0;
+  margin: 0;
+}
+[data-void-shell] .music-detail-page .music-detail-section-tab {
+  min-height: 44px;
+  gap: 10px;
+  padding: 8px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent !important;
+  color: #9399b2 !important;
+  font-size: 15px;
+  font-weight: 650;
+  transition: color 120ms ease;
+}
+[data-void-shell] .music-detail-page .music-detail-section-tab:hover,
+[data-void-shell] .music-detail-page .music-detail-section-tab[aria-pressed="true"] {
+  color: #e4e6f9 !important;
+}
+[data-void-shell] .music-detail-page .music-detail-toolbar {
+  padding: 8px 0 0;
+  border: 0;
+  align-items: center;
+  gap: 28px;
+}
+[data-void-shell] .music-detail-page .music-detail-toolbar h2 {
+  font-size: clamp(22px, 2vw, 30px);
+  font-weight: 780;
+  letter-spacing: -.03em;
+}
+[data-void-shell] .music-detail-page .music-detail-track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 1340px;
+}
+[data-void-shell] [data-void-track-row] {
+  width: 100%;
+  gap: 8px;
+  min-height: 82px;
+  padding-inline: clamp(0px, .7vw, 10px);
+  border-radius: 10px;
+}
+[data-void-shell] [data-void-track-row]:hover,
+[data-void-shell] [data-void-track-row]:focus-within,
+[data-void-shell] [data-void-track-row][data-now-playing-track] {
+  background: #1e1e2e;
+}
+[data-void-shell] [data-void-track-row] .music-track-cover {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  border-radius: 8px;
+}
+[data-void-shell] [data-void-track-row] .music-track-title {
+  gap: 4px;
+  padding-inline-start: 18px;
+}
+[data-void-shell] [data-void-track-row] .music-track-title > span:first-child > button {
+  font-size: clamp(15px, 1.1vw, 18px);
+  line-height: 1.35;
+  font-weight: 700;
+}
+[data-void-shell] [data-void-track-row] .music-track-title .music-artist-link {
+  font-size: 14px;
+}
+[data-void-shell] [data-void-track-row] > span:first-child:not(.music-track-details) {
+  width: 34px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+[data-void-shell] [data-void-track-row] [data-music-duration] {
+  min-width: 74px;
+  justify-content: flex-end;
+  color: #a6adc8;
+  font-size: 13px;
+}
+[data-void-shell] .music-detail-page .music-detail-sort > button {
+  background: #181825;
+  border-radius: 10px;
+}
+[data-void-shell] .music-detail-page .music-detail-filter {
+  border-radius: 10px;
+}
+[data-void-shell] .music-detail-page .music-detail-track-controls {
+  flex: 0 1 auto;
+  gap: 14px;
+}
+[data-void-shell] .music-search-page > div:first-child {
+  border: 0;
+  padding-bottom: 10px;
+}
+[data-void-shell] .music-search-page > div:first-child h2 {
+  font-size: clamp(38px, 4.5vw, 70px);
+  font-weight: 800;
+  letter-spacing: -.05em;
+}
+[data-void-shell] .music-search-page > div[aria-label] button[aria-pressed] {
+  background: transparent !important;
+  color: #9399b2 !important;
+  padding: 10px 0;
+  margin-inline-end: 18px;
+  border-radius: 0;
+  font-size: 15px;
+}
+[data-void-shell] .music-search-page > div[aria-label] button[aria-pressed="true"] {
+  color: #cdd6f4 !important;
+}
+[data-void-shell] .void-music-search-tracks {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+[data-void-shell] .void-music-search-track-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+[data-void-shell] .void-music-search-track-heading h3 {
+  font-size: clamp(22px, 2.5vw, 30px);
+  font-weight: 780;
+  letter-spacing: -.03em;
+}
+[data-void-shell] .void-music-search-track-heading span {
+  color: #9399b2;
+  font-size: 13px;
+}
+[data-void-shell] .void-music-search-track-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  max-width: 1280px;
+}
+[data-void-shell] .music-search-page :is(.music-section-head, .music-section-title) {
+  border: 0 !important;
+}
+[data-void-shell] .music-search-page [data-row-variant="circles"] {
+  gap: 24px;
+}
+[data-void-shell] .music-search-page [data-row-variant="covers"] {
+  gap: 22px;
+}
+/* Persistent music player is part of the same visual system, not a secondary
+ * browser tab. The leftmost visible button actually expands Now Playing. */
+[data-void-shell] [data-music-dock] {
+  background: #11111b;
+}
+[data-void-shell] [data-music-dock] [data-void-music-expand] {
+  width: 60px;
+  height: 64px;
+  border-radius: 12px;
+  color: #cdd6f4;
+}
+[data-void-shell] [data-music-dock] [data-void-music-expand]:hover {
+  background: #242436;
+}
+[data-void-shell] [data-music-dock] [data-music-dock-art] {
+  width: 52px;
+  height: 52px;
+}
+@media (max-width: 1000px) {
+  [data-void-shell] .void-music-hero-body {
+    grid-template-columns: minmax(150px, 29%) minmax(0, 1fr);
+    gap: 26px;
+  }
+  [data-void-shell] .music-detail-page .music-detail-title h1 {
+    font-size: clamp(38px, 5vw, 64px);
+  }
+  [data-void-shell] .void-music-mast {
+    align-items: flex-start;
+  }
+  [data-void-shell] .void-music-mast [role="search"] {
+    width: 100%;
+    max-width: 560px;
+  }
+}
+@media (max-width: 670px) {
+  [data-void-shell] [data-music-view] { --void-music-gutter: 18px; }
+  [data-void-shell] .void-music-hero-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+    padding-block: 38px 34px;
+  }
+  [data-void-shell] .music-detail-page .music-detail-art {
+    width: min(44vw, 190px);
+    height: auto;
+  }
+  [data-void-shell] .music-detail-page .music-detail-title h1 {
+    font-size: clamp(35px, 8vw, 52px);
+  }
+  [data-void-shell] .music-detail-page .music-detail-meta {
+    font-size: 13px;
+  }
+  [data-void-shell] .music-detail-page .music-detail-chips {
+    gap: 16px;
+  }
+  [data-void-shell] [data-void-track-row] {
+    min-height: 76px;
+    padding-inline: 0;
+  }
+  [data-void-shell] [data-void-track-row] .music-track-cover {
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
+  }
+  [data-void-shell] [data-void-track-row] [data-music-duration] {
+    display: none;
+  }
+  [data-void-shell] .music-room-home .music-room-feature {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 25px;
+    padding-block: 40px 32px;
+  }
+  [data-void-shell] .music-room-home .music-room-feature h2 {
+    font-size: clamp(34px, 8vw, 56px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-void-shell] .music-detail-page,
+  [data-void-shell] [data-void-track-row],
+  [data-void-shell] .music-detail-page .music-detail-section-tab {
+    animation: none;
+    transition: none;
+  }
+}
