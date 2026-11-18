@@ -1732,6 +1732,10 @@ function Shell({ onReady }: { onReady?: () => void }) {
           <div
             className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${playerActive ? "invisible" : ""}`}
           >
+            {/* In normal layout flow: the command bar owns its height and never paints over media. */}
+            {voidShell && !immersive && !playerActive && !pickerTop && !standaloneLive && (
+              <VoidCommandBar />
+            )}
             {homeAlive && (
               <div {...parkLayerProps(homeTop)}>
                 <Profiled id="view.home">
@@ -2191,9 +2195,6 @@ function Shell({ onReady }: { onReady?: () => void }) {
               (themeHasTopbar || (settingsTop && layout !== "minui" && layout !== "custom")) && (
                 <Topbar />
               )}
-            {voidShell && !immersive && !playerActive && !pickerTop && !standaloneLive && (
-              <VoidCommandBar />
-            )}
             {!immersive && !playerActive && !pickerTop && layout === "custom" && (
               <div aria-hidden className="harbor-chrome-proxy fixed end-3 top-3 z-[40]">
                 <TogetherButton />
