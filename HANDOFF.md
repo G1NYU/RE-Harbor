@@ -49,3 +49,8 @@ Updated: 2026-11-18
 
 ## Scrolled chrome screenshot gate
 - Added an Edge viewport test that scrolls a populated artist track listing, asserts the topbar backing is opaque after its transition, captures a scrolled screenshot, and restores scroll position for narrow-window checks. This directly covers the original poster/toolbar overlap complaint.
+
+## Responsive artwork/header refinement
+- After inspecting 960x700 Edge screenshots, the 340px portrait stacked above the artist name and pushed the identity below the initial viewport. The 850px container breakpoint now keeps a smaller image alongside the name; stacking begins only under 620px.
+- Added a browser check that the artist name is visible at 960px while track columns collapse to one.
+- This is a prepared, unpushed fix pending completion of the earlier portable Windows build, so that build is not cancelled mid-packaging.

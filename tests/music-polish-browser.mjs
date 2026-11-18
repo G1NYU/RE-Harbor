@@ -156,6 +156,12 @@ try {
   await page.setViewportSize({ width: 960, height: 700 });
   const mobileColumns = await artistView.locator(".music-detail-track-list").evaluate(el => getComputedStyle(el).gridTemplateColumns);
   assert.equal(mobileColumns.trim().split(/\s+/).length, 1, "Narrow artist tracks must stack");
+  const compactArtist = await artistView.evaluate((el) => ({
+    image: el.querySelector(".music-detail-art").getBoundingClientRect().width,
+    headingTop: el.querySelector(".music-detail-title h1").getBoundingClientRect().top,
+  }));
+  assert.ok(compactArtist.image <= 240, "At 960px, the artist image must leave room for the name");
+  assert.ok(compactArtist.headingTop < 650, "The artist name must stay visible above the fold at 960px");
   await page.screenshot({ path: folder + "/artist-960.png" });
   console.log("Harbor Music geometry passed:", { dockRect, albumMetrics, artistMetrics, mobileColumns });
 } catch (error) {
