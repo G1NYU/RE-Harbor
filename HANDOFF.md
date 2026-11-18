@@ -129,3 +129,8 @@
 - Include list-name fields and reminder dropdowns in focus-trap sequencing rather than enumerating only buttons.
 - Windows browser smoke checks Tab movement into list creation and wraparound to the dialog closer.
 - No changes to playback providers, Refract, installer or deployment.
+
+## VOID 03 ultrawide composition audit (2026-11-18)
+- The Windows 2560×1080 screenshot showed the title content confined to the left side of a mostly empty feature stage when mock data lacks artwork.
+- At widths 1900px and above, center the poster/copy composition without changing tablet and ordinary desktop layouts.
+- Windows Edge smoke asserts ultrawide poster geometry; real title artwork and native playback still require device review.

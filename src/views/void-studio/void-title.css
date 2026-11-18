@@ -406,3 +406,12 @@
     gap: 8px;
   }
 }
+
+/* VOID 03 ultrawide title composition: balance artwork and copy across wide displays. */
+@media (min-width: 1900px) {
+  [data-void-shell] .void-title-feature-body {
+    grid-template-columns: minmax(180px, 260px) minmax(0, 900px);
+    justify-content: center;
+    gap: clamp(40px, 4vw, 88px);
+  }
+}

@@ -158,6 +158,13 @@ try {
           JSON.stringify(actionPosition),
       );
     }
+    if (width >= 1900) {
+      const posterBounds = await title.locator(".void-title-poster").boundingBox();
+      assert.ok(
+        posterBounds && posterBounds.x >= width * 0.18 && posterBounds.x < width * 0.5,
+        "Ultrawide title composition should be centered instead of anchored to the left edge",
+      );
+    }
     await page.screenshot({ path: `${output}/title-${width}-${height}-${dir}.png` });
   }
   await page.evaluate(() => {
