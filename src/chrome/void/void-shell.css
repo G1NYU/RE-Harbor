@@ -110,14 +110,15 @@
 }
 
 .void-command-bar {
-  pointer-events: none;
-  position: fixed;
+  pointer-events: auto;
+  position: relative;
   z-index: 85;
-  inset-inline-start: var(--void-rail-width);
-  inset-inline-end: 0;
-  inset-block-start: 0;
+  inset: auto;
   display: flex;
-  min-height: 78px;
+  width: 100%;
+  flex: 0 0 76px;
+  min-height: 76px;
+  background: #11111b;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
@@ -222,7 +223,7 @@
   .void-rail-link { min-height: 55px; }
   .void-rail-label { font-size: 9.5px; }
   .void-command-context { display: none; }
-  .void-command-bar { min-height: 66px; padding-inline: 12px; gap: 7px; }
+  .void-command-bar { min-height: 66px; flex-basis: 66px; padding-inline: 12px; gap: 7px; }
   .void-command-actions { gap: 4px; }
   .void-command-search { width: 42px; min-width: 42px; justify-content: center; }
   .void-command-search span { display: none; }
@@ -231,4 +232,25 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .void-rail-link, .void-command-icon, .void-window-controls button { transition: none; }
+}
+
+/* Feature chrome is layout-owned, not a fixed overlay. Existing page content
+ * scrolls beneath its own workspace header without occupying the same pixels. */
+[data-void-shell] [data-harbor-native-backdrop] > .relative.flex.min-h-0.flex-1.flex-col {
+  min-height: 0;
+}
+[data-void-shell] .void-command-context {
+  font-size: 13px;
+  gap: 14px;
+}
+[data-void-shell] .void-command-context-separator {
+  opacity: .55;
+}
+[data-void-shell] .void-command-search {
+  min-height: 42px;
+}
+@media (min-width: 1280px) {
+  [data-void-shell] .void-command-bar {
+    padding-inline: clamp(24px, 3vw, 56px);
+  }
 }
