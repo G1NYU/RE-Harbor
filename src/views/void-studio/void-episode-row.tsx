@@ -3,7 +3,6 @@ import { ArrowRight, CalendarDays, Check, Ellipsis, Play } from "lucide-react";
 import { manualEpisodeKeys, manualWatchedVersion, subscribeManualWatched } from "@/lib/manual-watched";
 import { requireMediaActionSuccess, setContextWatched } from "@/lib/media-context-actions";
 import type { Meta } from "@/lib/cinemeta";
-import type { PlayEpisode } from "@/lib/view";
 import { CoverImg } from "@/components/cover-img";
 import { episodesThroughInSeason, type VoidEpisode } from "./title-episodes";
 
