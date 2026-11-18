@@ -24,8 +24,8 @@ test("Watch retrieves real catalog data and sends title actions to existing play
   }
   assert.match(watch, /onClick=\{\(\) => play\(focused\)\}/);
   assert.match(watch, /onClick=\{\(\) => play\(primary\)\}/);
-  assert.match(watch, /setView\("movies"\)/);
-  assert.match(watch, /setView\("shows"\)/);
+  assert.match(watch, /onClick=\{\(\) => navigate\("movies"\)\}/);
+  assert.match(watch, /onClick=\{\(\) => navigate\("shows"\)\}/);
 });
 
 test("Watch is responsive, flat and does not use expensive glass or animated layers", () => {
@@ -42,4 +42,13 @@ test("Harbor Movies, Shows and Refract paths remain reachable outside VOID", () 
   assert.match(app, /<Movies active=\{moviesTop\}/);
   assert.match(app, /<Shows active=\{showsTop\}/);
   assert.match(app, /<PlayerView/);
+});
+
+test("Watch retains parental gates and a source fallback without bypassing native routes", () => {
+  const watch = read("src/views/void-studio/watch-workspace.tsx");
+  assert.match(watch, /useSidebarNavigation/);
+  assert.match(watch, /entry\.gated/);
+  assert.match(watch, /ParentalPinModal/);
+  assert.match(watch, /if \(!next\.length && specs\.some/);
+  assert.match(watch, /setView\(target\)/);
 });
