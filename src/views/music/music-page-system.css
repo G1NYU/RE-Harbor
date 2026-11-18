@@ -312,3 +312,32 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.025em;
 }
+
+/* Screenshot-grounded fix: scrolling under fixed window and player chrome. */
+[data-music-view] {
+  scroll-padding-block-start: 88px;
+  scroll-padding-block-end: calc(var(--harbor-dock-gap, 88px) + 16px);
+}
+[data-music-view] .music-track-grid-results > .group {
+  min-width: 0;
+  min-height: 70px;
+  height: auto;
+  padding: 7px 10px;
+  border-radius: 6px;
+}
+[data-music-view] .music-track-grid-results > .group:hover,
+[data-music-view] .music-track-grid-results > .group:focus-within {
+  background: var(--color-elevated);
+}
+[data-music-view] .music-track-grid-results .music-track-title > span:first-child button {
+  font-size: 14px;
+}
+[data-music-view] .music-track-grid-results > .group [data-music-duration] {
+  max-width: 35%;
+  min-width: 0;
+}
+@container (max-width: 780px) {
+  [data-music-view] .music-track-grid-results {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

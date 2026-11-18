@@ -19,3 +19,11 @@ Do not redesign app navigation, replace the player engine, rework music sources,
 - The exact red-annotated screenshot pixels are not available in the current conversation context. Do not guess their precise measurements or element positions; request reattachment before pixel-matched UI edits.
 - Baseline code and branch were verified read-only; no corrective UI changes or new build have yet been validated on this recovery branch.
 - After targeted fixes: run frontend typecheck, relevant music/VOID/Refract regressions, desktop layout screenshots at narrow and normal widths, and a portable Windows preview. Inspect actual screenshots before accepting.
+
+## Harbor music screenshot corrections — staged (2026-11-18)
+- User supplied seven annotated 2048×1124 captures. Issues identified: transparent header clashing with scroll content/breadcrumbs; full-width tab separator; small, hard-to-find player expansion; three cramped search track columns; artist portrait/readability and fixed dock clearance.
+- Candidate changes preserve the original Harbor music architecture and behavior: solid on-scroll Music header even for transparent topbar appearance, title sticky below 80px chrome, active-tab underline only, two track columns/70px row spacing, responsive enlarged artist portrait, explicit accessible now-playing button and scroll clearance.
+- The review commit is **not attached to this branch yet**, pending explicit push approval. Verification: structural regression included; project typecheck and Windows screenshots must run after approval.
+- Do not merge VOID 02/03 or affect core music sources, playback engine, Refract or other category pages.
+
+- Final review: the same transparent toolbar collision is visible above movie/poster rows. Enable opaque scroll backing for transparent topbar appearance globally; the content-density and sticky title changes remain Music-only.

@@ -348,3 +348,18 @@
 @media (prefers-reduced-motion: reduce) {
   .music-detail-filter, .music-detail-search-field { transition: none; }
 }
+
+/* Let artist portraits read as a real hero instead of a tiny avatar. */
+.music-detail-page .music-detail-hero:has(.music-detail-art.rounded-full) .music-detail-art {
+  width: clamp(192px, 19cqw, 248px);
+  height: clamp(192px, 19cqw, 248px);
+}
+.music-detail-page .music-detail-track-list .music-track-title > span:first-child button {
+  font-size: 14px;
+}
+@container (max-width: 620px) {
+  .music-detail-page .music-detail-hero:has(.music-detail-art.rounded-full) .music-detail-art {
+    width: 172px;
+    height: 172px;
+  }
+}

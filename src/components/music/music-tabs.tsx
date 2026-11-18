@@ -111,7 +111,7 @@ export function MusicTabs({
       ref={listRef}
       role="tablist"
       aria-label={t("music.sections")}
-      className={`relative flex h-[45px] items-end gap-[22px] border-b border-edge-soft ${className}`}
+      className={`relative flex h-[45px] items-end gap-[22px] ${className}`}
     >
       {MUSIC_TABS.map((tab, index) => {
         const selected = tab === value;

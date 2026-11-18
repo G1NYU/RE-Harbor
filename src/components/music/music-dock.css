@@ -512,3 +512,19 @@
   animation: dock-like-pop 0.7s ease-in-out both;
 }
 
+
+/* Dedicated keyboard-accessible expand affordance; the cover still opens the player. */
+[data-music-dock] .music-dock-expand {
+  flex: 0 0 44px;
+  border-radius: 7px;
+  color: var(--color-ink-muted);
+}
+[data-music-dock] .music-dock-expand:hover,
+[data-music-dock] .music-dock-expand:focus-visible {
+  color: var(--color-ink);
+  background: var(--color-elevated);
+}
+[data-music-dock] .music-dock-expand:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}

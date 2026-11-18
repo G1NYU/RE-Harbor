@@ -132,7 +132,7 @@ export function MusicSectionEmpty({ label }: { label?: string }) {
 
 export function MusicTrackGridSkeleton({ count = 9 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 gap-x-[46px] gap-y-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="music-track-grid-results grid grid-cols-1 gap-x-6 gap-y-3 xl:grid-cols-2">
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className="flex h-14 min-w-0 items-center">
           <div className="size-14 shrink-0 rounded-[4px] bg-elevated/40" />
@@ -254,7 +254,7 @@ export function MusicTrackGrid({
     body = <MusicSectionEmpty label={emptyLabel} />;
   } else {
     body = (
-      <div className="grid grid-cols-1 gap-x-[46px] gap-y-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="music-track-grid-results grid grid-cols-1 gap-x-6 gap-y-3 xl:grid-cols-2">
         {visible.map((track, index) => (
           <MusicTrackRow
             key={`${track.connectorId ?? ""}:${track.sourceId ?? track.id}:${index}`}

@@ -720,6 +720,20 @@ export function MusicDock() {
                 }}
               />
             </div>
+            <button
+              type="button"
+              data-music-dock-expand
+              aria-label={t("music.now.expand")}
+              title={t("music.now.expand")}
+              aria-expanded={expanded}
+              className={`${ICON_BUTTON} music-dock-expand`}
+              onClick={() => {
+                setQueueOpen(false);
+                setExpanded(true);
+              }}
+            >
+              <MusicGlyph name="expand" size={19} aria-hidden="true" />
+            </button>
             <MusicLikeButton
               key={`${current.connectorId}:${current.sourceId ?? current.id}`}
               dock

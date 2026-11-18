@@ -119,17 +119,20 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
       data-cleannav={settings.topbarAppearance === "transparent" ? "on" : undefined}
       className={`pointer-events-none fixed inset-x-0 top-0 ${topKind === "picker" || connecting ? "z-[130]" : "z-[55]"} h-20`}
     >
-      {!inSettings && settings.topbarScrollBlur && settings.topbarAppearance !== "transparent" && (
+      {!inSettings && (view === "music" || settings.topbarAppearance === "transparent" || settings.topbarScrollBlur) && (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 transition-opacity duration-[350ms] ease-out"
           style={{
             opacity: scrolled ? 1 : 0,
-            background: "color-mix(in oklch, var(--color-canvas), transparent 20%)",
-            backdropFilter: "blur(14px) saturate(115%)",
-            WebkitBackdropFilter: "blur(14px) saturate(115%)",
-            maskImage: "linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%)",
-            WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%)",
+            // Transparent chrome needs an opaque backing on scroll over posters, tracks and breadcrumbs.
+            background: view === "music" || settings.topbarAppearance === "transparent"
+              ? "var(--color-canvas)"
+              : "color-mix(in oklch, var(--color-canvas), transparent 20%)",
+            backdropFilter: view === "music" || settings.topbarAppearance === "transparent" ? "none" : "blur(14px) saturate(115%)",
+            WebkitBackdropFilter: view === "music" || settings.topbarAppearance === "transparent" ? "none" : "blur(14px) saturate(115%)",
+            maskImage: view === "music" || settings.topbarAppearance === "transparent" ? "none" : "linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%)",
+            WebkitMaskImage: view === "music" || settings.topbarAppearance === "transparent" ? "none" : "linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%)",
           }}
         />
       )}
