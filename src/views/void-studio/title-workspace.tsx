@@ -1,6 +1,7 @@
 import { CoverImg } from "@/components/cover-img";
+import { VoidEpisodeRow } from "./void-episode-row";
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
-import { ArrowLeft, ArrowRight, BookmarkCheck, CalendarDays, Play, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookmarkCheck, Play, Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import type { Meta } from "@/lib/cinemeta";
 import { tmdbSeasonEpisodes, type TmdbDetail } from "@/lib/providers/tmdb";
@@ -249,38 +250,14 @@ export function VoidTitleWorkspace({
             )}
             <div className="void-title-episode-list">
               {visibleEpisodes.map((entry) => (
-                <button
+                <VoidEpisodeRow
                   key={entry.key}
-                  type="button"
-                  className="void-title-episode"
-                  onClick={() => openEpisode(entry)}
-                >
-                  <span className="void-title-episode-index">
-                    {String(entry.number).padStart(2, "0")}
-                  </span>
-                  <span className="void-title-episode-still">
-                    {entry.image ? (
-                      <CoverImg src={entry.image} alt="" loading="lazy" />
-                    ) : (
-                      <Play size={20} />
-                    )}
-                  </span>
-                  <span className="void-title-episode-copy">
-                    <strong>{entry.title}</strong>
-                    {entry.description && <span>{entry.description}</span>}
-                  </span>
-                  <span className="void-title-episode-end">
-                    {entry.date ? (
-                      <>
-                        <CalendarDays size={14} />
-                        {entry.date.slice(0, 10)}
-                      </>
-                    ) : (
-                      ""
-                    )}
-                    <ArrowRight size={18} />
-                  </span>
-                </button>
+                  entry={entry}
+                  episodes={episodes}
+                  meta={playMeta}
+                  imdbId={imdbId}
+                  onPlay={openEpisode}
+                />
               ))}
             </div>
             {!showAll && episodes.length > EPISODES_PER_PAGE && (

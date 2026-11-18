@@ -79,3 +79,19 @@ export function mergeEpisodes(cinemetaEpisodes: VoidEpisode[], tmdbEpisodes: Voi
   });
   return [...enriched, ...sourceEpisodes.values()].sort((a, b) => a.number - b.number);
 }
+
+/** Only episodes in the selected season, through the chosen release and already aired. */
+export function episodesThroughInSeason(
+  episodes: VoidEpisode[],
+  selected: VoidEpisode,
+  now = Date.now(),
+): PlayEpisode[] {
+  const found = new Map<string, PlayEpisode>();
+  for (const entry of episodes) {
+    if (entry.play.season !== selected.play.season || entry.number > selected.number) continue;
+    const release = entry.date ? Date.parse(entry.date) : NaN;
+    if (Number.isFinite(release) && release > now) continue;
+    found.set(`${entry.play.season}:${entry.play.episode}`, entry.play);
+  }
+  return [...found.values()].sort((a, b) => a.episode - b.episode);
+}

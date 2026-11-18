@@ -134,3 +134,9 @@
 - The Windows 2560×1080 screenshot showed the title content confined to the left side of a mostly empty feature stage when mock data lacks artwork.
 - At widths 1900px and above, center the poster/copy composition without changing tablet and ordinary desktop layouts.
 - Windows Edge smoke asserts ultrawide poster geometry; real title artwork and native playback still require device review.
+
+## VOID 03 inline episode tracking (2026-11-18)
+- The independent series episode list now has an explicit native actions control per episode for mark watched / unwatched and marking released episodes through the selected episode in the current season.
+- Actions dispatch through `setContextWatched` / `requireMediaActionSuccess`, retaining native Harbor and configured tracker writes, including Refract watch events, while surfacing partial provider failures.
+- Manual watched-state subscription refreshes visible status; the episode playback click target remains separate.
+- Added deterministic episode grouping regression tests and mocked Windows Edge watched/unwatched interaction smoke coverage. Real-provider writes and Windows media decoding still need direct validation.

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { episodesFromCinemeta, mergeEpisodes } from "../src/views/void-studio/title-episodes.ts";
+import { episodesFromCinemeta, episodesThroughInSeason, mergeEpisodes } from "../src/views/void-studio/title-episodes.ts";
 
 test("merging listings keeps native-only episodes and source video IDs", () => {
   const native = episodesFromCinemeta(
@@ -111,4 +111,28 @@ test("VOID title modal traps keyboard focus across form controls", () => {
   assert.ok(actions.includes("select:not([disabled])"));
   assert.ok(actions.includes("panel.current?.contains(active)"));
   assert.ok(smoke.includes("custom-list text field must tab"));
+});
+
+test("VOID episode batch marking includes only earlier released episodes in this season", () => {
+  const seasonOne = episodesFromCinemeta([{ season: 1, episode: 9, id: "one" }], 1);
+  const seasonTwo = episodesFromCinemeta([
+    { season: 2, episode: 1, id: "video-a", released: "2024-01-01" },
+    { season: 2, episode: 2, id: "video-b", released: "2024-01-02" },
+    { season: 2, episode: 3, id: "video-c", released: "2035-01-01" },
+  ], 2);
+  const selected = seasonTwo[2];
+  const through = episodesThroughInSeason([...seasonOne, ...seasonTwo], selected, Date.parse("2026-01-01"));
+  assert.deepEqual(through.map((item) => item.episode), [1, 2]);
+  assert.equal(through[0].videoId, "video-a");
+});
+
+test("VOID episode actions use tracker-aware watched state without replacing playback", () => {
+  const title = readFileSync("src/views/void-studio/title-workspace.tsx", "utf8");
+  const row = readFileSync("src/views/void-studio/void-episode-row.tsx", "utf8");
+  assert.match(title, /<VoidEpisodeRow/);
+  assert.match(row, /setContextWatched\(/);
+  assert.match(row, /requireMediaActionSuccess\(result\)/);
+  assert.match(row, /useSyncExternalStore\(/);
+  assert.match(row, /onClick=\{\(\) => onPlay\(entry\)\}/);
+  assert.match(row, /aria-expanded=\{expanded\}/);
 });

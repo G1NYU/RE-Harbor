@@ -415,3 +415,75 @@
     gap: clamp(40px, 4vw, 88px);
   }
 }
+
+/* Native VOID episode tracking: playback is its own hit target, actions stay inline. */
+[data-void-shell] .void-title-episode-shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  min-width: 0;
+  border-top: 1px solid #282838;
+}
+[data-void-shell] .void-title-episode-shell > .void-title-episode {
+  flex: 1 1 0;
+  min-width: 0;
+  border-top: 0;
+}
+[data-void-shell] .void-title-episode-options {
+  flex: 0 0 48px;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  min-height: 48px;
+  color: #a3abc6;
+  border-radius: 7px;
+}
+[data-void-shell] .void-title-episode-options:hover,
+[data-void-shell] .void-title-episode-options[aria-expanded="true"] {
+  background: #29293d;
+  color: #e3e7f7;
+}
+[data-void-shell] .void-title-episode-actions {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 13px 18px 19px 54px;
+  background: #1c1c2b;
+  color: #abb2cc;
+}
+[data-void-shell] .void-title-episode-actions > span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  margin-inline-end: auto;
+}
+[data-void-shell] .void-title-episode-actions > button {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid #494b65;
+  border-radius: 5px;
+  color: #dde2f5;
+  font-size: 12px;
+  font-weight: 720;
+}
+[data-void-shell] .void-title-episode-actions > button:hover { background: #303149; }
+[data-void-shell] .void-title-episode-actions > button:disabled { opacity: .45; }
+[data-void-shell] .void-title-episode-actions > p {
+  flex: 0 0 100%;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+[data-void-shell] .void-title-episode-actions > p[role="alert"] { color: #ffb6b5; }
+[data-void-shell] .void-title-episode-options:focus-visible,
+[data-void-shell] .void-title-episode-actions > button:focus-visible {
+  outline: 2px solid #cdd6f4;
+  outline-offset: 2px;
+}
+@media (max-width: 740px) {
+  [data-void-shell] .void-title-episode-options { flex-basis: 40px; width: 40px; }
+  [data-void-shell] .void-title-episode-actions { padding: 15px; }
+  [data-void-shell] .void-title-episode-actions > span { flex-basis: 100%; }
+}

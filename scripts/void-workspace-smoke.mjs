@@ -175,6 +175,14 @@ try {
   await watch.locator(".void-watch-primary").first().click();
   await title.getByRole("button", { name: "Season 02" }).click();
   assert.match(await title.locator(".void-title-episode").innerText(), /Return/);
+  // The series row can update watched history without opening Harbor detail tools.
+  await title.getByRole("button", { name: "Episode actions: Return" }).click();
+  await title.getByRole("button", { name: "Mark as watched", exact: true }).click();
+  await title.locator('.void-title-episode-shell[data-watched="true"]').waitFor();
+  await title.getByRole("button", { name: "Episode actions: Return" }).click();
+  await title.getByRole("button", { name: "Mark as unwatched", exact: true }).click();
+  await title.locator('.void-title-episode-shell[data-watched="true"]').waitFor({ state: "hidden" });
+
   await title.getByRole("button", { name: "More options" }).click();
   const seriesActions = title.getByRole("dialog", { name: "Title actions" });
   await seriesActions.getByRole("button", { name: /Episode reminders/ }).click();
