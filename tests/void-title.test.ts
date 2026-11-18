@@ -93,3 +93,13 @@ test("VOID opens trailers directly without returning to the legacy title page", 
   assert.match(overlay, /data-tv-modal-close/);
   assert.match(overlay, /backdropFilter: voidMode \|\| isMacDesktop\(\) \? "none"/);
 });
+
+
+test("VOID series reminders use the existing notification store instead of Harbor detail markup", () => {
+  const tools = readFileSync("src/views/void-studio/title-tools.tsx", "utf8");
+  assert.match(tools, /<section className="void-title-tools-reminders"/);
+  assert.match(tools, /useReminder\(item\.id\)/);
+  assert.match(tools, /setReminder\(\{/);
+  assert.match(tools, /removeReminder\(item\.id\)/);
+  assert.match(tools, /void ensureNotifyPermission\(\)/);
+});

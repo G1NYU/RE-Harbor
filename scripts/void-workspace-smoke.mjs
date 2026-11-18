@@ -152,6 +152,17 @@ try {
   await watch.locator(".void-watch-primary").first().click();
   await title.getByRole("button", { name: "Season 02" }).click();
   assert.match(await title.locator(".void-title-episode").innerText(), /Return/);
+  await title.getByRole("button", { name: "More options" }).click();
+  const seriesActions = title.getByRole("dialog", { name: "Title actions" });
+  await seriesActions.getByRole("button", { name: /Episode reminders/ }).click();
+  await seriesActions.getByRole("button", { name: "Save reminder" }).click();
+  assert.equal(await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem("harbor.reminders.v1") ?? "{}");
+    return saved["tt0000002"]?.episodes === true &&
+      saved["tt0000002"]?.seasons === true;
+  }), true, "Episode reminders should be persisted by the existing notification store");
+  await page.keyboard.press("Escape");
+  assert.equal(await title.locator("h1").innerText(), series.name);
   await page.screenshot({ path: `${output}/series-episodes.png` });
   await title.evaluate((el) => { el.scrollTop = 0; });
   await page.screenshot({ path: `${output}/series-top.png` });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { BookmarkCheck, Check, Clapperboard, Download, Heart, ListPlus, ListVideo, Play, Plus, X } from "lucide-react";
+import { Bell, BookmarkCheck, Check, Clapperboard, Download, Heart, ListPlus, ListVideo, Play, Plus, X } from "lucide-react";
+import { ensureNotifyPermission, playTone, removeReminder, setReminder, useReminder, type ReminderTone } from "@/lib/reminders";
 import { MAX_LISTS, createListWithItem, setListMembership, useCustomLists, useListsContaining, type ListItemInput } from "@/lib/custom-lists";
 import { captureMembershipProfile } from "@/lib/membership-operations";
 import "./title-tools.css";
@@ -43,9 +44,43 @@ export function VoidTitleTools({
   const membershipProfile = useRef(captureMembershipProfile());
   const lists = useCustomLists();
   const memberships = useListsContaining(item.id);
+  const reminder = useReminder(item.id);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [remindEpisodes, setRemindEpisodes] = useState(reminder?.episodes ?? true);
+  const [remindSeasons, setRemindSeasons] = useState(reminder?.seasons ?? true);
+  const [reminderTone, setReminderTone] = useState<ReminderTone>(reminder?.tone ?? "chime");
   const [listPanelOpen, setListPanelOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [listError, setListError] = useState("");
+
+  useEffect(() => {
+    if (!reminderOpen) return;
+    setRemindEpisodes(reminder?.episodes ?? true);
+    setRemindSeasons(reminder?.seasons ?? true);
+    setReminderTone(reminder?.tone ?? "chime");
+  }, [reminderOpen, reminder]);
+
+  const saveReminder = () => {
+    const now = Date.now();
+    setReminder({
+      id: item.id,
+      name: item.name || name,
+      poster: item.poster,
+      type: "series",
+      episodes: remindEpisodes,
+      seasons: remindSeasons,
+      tone: reminderTone,
+      lastNotifiedAt: reminder?.lastNotifiedAt ?? now,
+      createdAt: reminder?.createdAt ?? now,
+      seenKeys: reminder?.seenKeys,
+    });
+    setReminderOpen(false);
+    void ensureNotifyPermission();
+  };
+  const clearReminder = () => {
+    removeReminder(item.id);
+    setReminderOpen(false);
+  };
 
   const changeMembership = (listId: string) => {
     const profile = membershipProfile.current;
@@ -155,6 +190,39 @@ export function VoidTitleTools({
             </button>
           )}
         </div>
+        {!isMovie && (
+          <section className="void-title-tools-reminders" aria-label="Episode reminders">
+            <button type="button" className="void-title-tools-reminders-trigger" aria-expanded={reminderOpen}
+              onClick={() => setReminderOpen((open) => !open)}>
+              <Bell size={20} />
+              <span><strong>Episode reminders</strong><small>New episodes and season notifications</small></span>
+              <span>{reminder ? "On" : "Off"}</span>
+            </button>
+            {reminderOpen && (
+              <div className="void-title-tools-reminders-form">
+                <label><input type="checkbox" checked={remindEpisodes}
+                  onChange={(event) => setRemindEpisodes(event.target.checked)} /> New episodes</label>
+                <label><input type="checkbox" checked={remindSeasons}
+                  onChange={(event) => setRemindSeasons(event.target.checked)} /> New seasons</label>
+                <label>Notification tone
+                  <select value={reminderTone} onChange={(event) => {
+                    const next = event.target.value as ReminderTone;
+                    setReminderTone(next);
+                    playTone(next);
+                  }}>
+                    <option value="chime">Chime</option>
+                    <option value="pulse">Pulse</option>
+                    <option value="silent">Silent</option>
+                  </select>
+                </label>
+                <div className="void-title-tools-reminders-buttons">
+                  <button type="button" disabled={!remindEpisodes && !remindSeasons} onClick={saveReminder}>Save reminder</button>
+                  {reminder && <button type="button" onClick={clearReminder}>Remove reminder</button>}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
         <section className="void-title-tools-lists" aria-label="Custom lists">
           <button type="button" className="void-title-tools-lists-trigger" aria-expanded={listPanelOpen}
             onClick={() => setListPanelOpen((open) => !open)}>

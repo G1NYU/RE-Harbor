@@ -157,3 +157,45 @@
 @media(max-width:400px) {
   [data-void-shell] .void-title-tools-lists-body form > div { flex-direction: column; }
 }
+
+/* VOID native series reminder controls, backed by Harbor's existing notification store. */
+[data-void-shell] .void-title-tools-reminders { margin-top: 12px; }
+[data-void-shell] .void-title-tools-reminders-trigger {
+  display: flex; align-items: center; gap: 16px; width: 100%; min-height: 76px;
+  padding: 16px 20px; border: 1px solid #343449; background: #202031;
+  color: #e3e6f3; text-align: start;
+}
+[data-void-shell] .void-title-tools-reminders-trigger:hover { background: #29293d; border-color: #767d9d; }
+[data-void-shell] .void-title-tools-reminders-trigger > span:nth-child(2) {
+  display: grid; flex: 1; min-width: 0; gap: 5px;
+}
+[data-void-shell] .void-title-tools-reminders-trigger strong { font-size: 15px; font-weight: 800; }
+[data-void-shell] .void-title-tools-reminders-trigger small { color: #a1a9c1; font-size: 12px; }
+[data-void-shell] .void-title-tools-reminders-form { display: grid; gap: 13px; padding: 15px 12px; background: #1a1a29; }
+[data-void-shell] .void-title-tools-reminders-form > label {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  min-height: 32px; color: #d5dbed; font-size: 13px;
+}
+[data-void-shell] .void-title-tools-reminders-form input[type="checkbox"] {
+  width: 17px; height: 17px; accent-color: #cdd6f4;
+}
+[data-void-shell] .void-title-tools-reminders-form select {
+  margin-inline-start: auto; padding: 8px 10px; color: #e4e7f6;
+  background: #242433; border: 1px solid #414159;
+}
+[data-void-shell] .void-title-tools-reminders-buttons {
+  display: flex; flex-wrap: wrap; gap: 9px; margin-top: 5px;
+}
+[data-void-shell] .void-title-tools-reminders-buttons > button {
+  padding: 11px 14px; border: 1px solid #414159; color: #dae0f2;
+  font-size: 12px; font-weight: 750;
+}
+[data-void-shell] .void-title-tools-reminders-buttons > button:first-child {
+  background: #cdd6f4; border-color: #cdd6f4; color: #11111b;
+}
+[data-void-shell] .void-title-tools-reminders-buttons > button:disabled { opacity: .45; }
+[data-void-shell] .void-title-tools-reminders button:focus-visible,
+[data-void-shell] .void-title-tools-reminders select:focus-visible,
+[data-void-shell] .void-title-tools-reminders input:focus-visible {
+  outline: 2px solid #aab4d6; outline-offset: 3px;
+}

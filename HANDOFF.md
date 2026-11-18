@@ -119,3 +119,8 @@
 - VOID's trailer overlay uses a flat no-blur full-screen treatment. The compatibility version retains its original presentation for other themes.
 - Marked the overlay closer for Harbor's global Back/Escape navigation and added browser coverage that the video modal closes back to the VOID title.
 - Real trailer extraction, network playback and casting are not verified by the mocked browser test.
+
+## VOID 03 series reminders
+- Native title tools for series now manage episode/season reminders and notification tone without opening the legacy detail interface.
+- Operations reuse the existing `setReminder`, `removeReminder`, `useReminder` and notification-permission workflow, preserving other themes.
+- Browser smoke now tests reminder persistence on an actual title route with mocked metadata; no real notification delivery or external source changes are claimed.
