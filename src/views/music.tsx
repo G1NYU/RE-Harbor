@@ -73,6 +73,7 @@ import {
 } from "@/components/music/music-tabs";
 import { ScrollRootContext } from "@/components/row";
 import { useT } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
 import { artistCatalog, localCollection, searchTyped } from "@/lib/music/catalog";
 import { loadMusicGenre } from "@/lib/music/genre-page";
 import { loadMusicLabel } from "@/lib/music/label-page";
@@ -147,6 +148,8 @@ export function MusicView({ active }: { active: boolean; shellBackAvailable?: bo
 
 function MusicViewContent({ active }: { active: boolean }) {
   const t = useT();
+  const { settings } = useSettings();
+  const voidEdition = settings.theme.preset === "cool-grey";
   const player = useMusicPlayback();
   const { openSourcePicker } = useMusicSourcePicker();
   const {
@@ -1185,6 +1188,7 @@ function MusicViewContent({ active }: { active: boolean }) {
         ref={scrollCb}
         data-music-view
         data-music-tab={tab}
+        data-void-music-context={voidEdition ? (detail ? "detail" : search ? "search" : "browse") : undefined}
         data-music-opening={openingDetail === resolveGeneration.current || undefined}
         aria-busy={openingDetail === resolveGeneration.current || undefined}
         // A WS_CHILD webview is not clipped by a scrolling ancestor, so while YouTube Music is
@@ -1196,8 +1200,9 @@ function MusicViewContent({ active }: { active: boolean }) {
         <ScrollRootContext.Provider value={scrollEl}>
           <div
             data-music-consolidated-back
-            className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 pb-24 [&_[data-music-inner-back]]:hidden"
+            className={`mx-auto flex w-full max-w-[1480px] flex-col gap-6 pb-24 ${voidEdition ? "void-music-workspace" : "[&_[data-music-inner-back]]:hidden"}`}
           >
+            {(!voidEdition || !detail) && (
             <section data-scroll-anchor="mast">
               <MusicMast
                 initialQuery={search && search.mode !== "genre" ? search.query : ""}
@@ -1205,8 +1210,10 @@ function MusicViewContent({ active }: { active: boolean }) {
                 onClear={clearSearch}
                 onPick={(item) => openItem(item, [item])}
                 searching={searching}
+                edition={voidEdition ? "void" : undefined}
               />
             </section>
+            )}
 
             {notice && <MusicNotice notice={notice} onDismiss={() => setNotice(null)} />}
 
