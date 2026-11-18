@@ -237,7 +237,8 @@ export function Transport({
     ro.observe(el);
     return () => ro.disconnect();
   }, [pipMode, voidPlayer]);
-  if (isStremioLayout && !pipMode) {
+  // VOID owns its transport even when a migrated profile selected Stremio chrome.
+  if (!voidPlayer && isStremioLayout && !pipMode) {
     return (
       <TransportStremio
         snap={snap}

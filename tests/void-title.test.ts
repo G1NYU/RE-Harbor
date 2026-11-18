@@ -142,6 +142,13 @@ test("VOID Windows smoke covers source-to-player decoded media handoff", () => {
   assert.ok(smoke.includes("canvas.captureStream(10)"));
   assert.ok(smoke.includes("MediaRecorder.isTypeSupported"));
   assert.ok(smoke.includes('board.locator(".void-source-feature").click()'));
-  assert.ok(smoke.includes("video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA"));
+  assert.ok(smoke.includes("video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA"));
+  assert.ok(smoke.includes("const decoded = await firstFrame.jsonValue()"));
   assert.ok(smoke.includes("void-player-first-frame.png"));
+});
+
+test("VOID playback transport takes precedence over inherited Stremio chrome", () => {
+  const transport = readFileSync("src/components/player/transport.tsx", "utf8");
+  assert.match(transport, /if \(!voidPlayer && isStremioLayout && !pipMode\)/);
+  assert.match(transport, /voidPlayer \? \(/);
 });

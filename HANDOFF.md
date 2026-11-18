@@ -149,3 +149,8 @@
 ## VOID 03 first-frame capture regression (2026-11-18)
 - Windows rendering run 44310675313 reached the player and decoded a video frame, but the prior smoke checked video dimensions in a second call after Harbor's short-stream guard had reset the 1.4-second synthetic clip. The second width was zero.
 - Capture decoded dimensions and source URL atomically in the same `waitForFunction` result. Keep short-stream detection enabled; this test is for the first decoded frame, not long-running stream validity.
+
+## VOID 03 player chrome precedence fix (2026-11-18)
+- The new Edge media test decoded a first frame but found no native VOID controls. Root cause: `Transport` returned `TransportStremio` first whenever the profile's inherited player chrome resolved to Stremio, even if VOID was active.
+- Give VOID's own transport precedence. Preserve the legacy Stremio branch for non-VOID themes and all native playback engine logic.
+- Adjust the structural smoke guard to check the atomic snapshot's rejection path. The test still verifies the real video frame and controls.
