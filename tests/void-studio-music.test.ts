@@ -14,7 +14,8 @@ test("VOID Listen is a new workspace, not a wrapped Harbor MusicView", () => {
   assert.match(screen, /void-studio-music-story/);
   assert.match(screen, /void-studio-music-detail/);
   assert.match(screen, /void-studio-track-list/);
-  assert.doesNotMatch(screen, /<MusicView\b|<MusicDetail\b|<MusicCatalogRow\b/);
+  // JSX-only assertion: a TypeScript generic like useState<MusicCatalogRow[]> is not a component.
+  assert.doesNotMatch(screen, /<(?:MusicView|MusicDetail|MusicCatalogRow)(?:\s|\/|>)/);
 });
 
 test("provider data and track interactions use the existing Harbor engine", () => {
