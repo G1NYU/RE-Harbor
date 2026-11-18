@@ -147,6 +147,8 @@ test("VOID Windows smoke covers source-to-player decoded media handoff", () => {
   assert.ok(smoke.includes("video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA"));
   assert.ok(smoke.includes("const decoded = await firstFrame.jsonValue()"));
   assert.ok(smoke.includes("void-player-first-frame.png"));
+  assert.ok(smoke.includes('player.locator(".harbor-connecting").waitFor({ state: "hidden"'));
+
 });
 
 test("VOID playback transport takes precedence over inherited Stremio chrome", () => {

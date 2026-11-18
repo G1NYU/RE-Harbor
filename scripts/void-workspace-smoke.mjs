@@ -301,6 +301,9 @@ try {
   await player.locator(".void-video-controls").waitFor({ state: "attached", timeout: 12000 });
   assert.equal(await player.locator(".void-video-controls").count(), 1,
     "VOID player must render its native transport");
+  // The first decoded frame is not enough if the connecting overlay never clears.
+  await player.locator(".harbor-connecting").waitFor({ state: "hidden", timeout: 12000 });
+  await page.mouse.move(640, 700);
   await page.screenshot({ path: output + "/void-player-first-frame.png" });
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png` }).catch(() => {});

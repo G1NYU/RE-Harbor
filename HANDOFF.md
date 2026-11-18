@@ -159,3 +159,8 @@
 - Windows rendering run 44311841473 successfully decoded the VP8 video frame but the 1.4-second fixture was classified as a stub because the mock title had no runtime and advertised gigabyte-sized streams.
 - Give the synthetic title a 1-minute runtime (below Harbor's 90-second runtime floor) and record 6 seconds of actual video to keep the player alive long enough to mount its controls.
 - Keep production short-stream detection and stream trust policy unchanged; the native VOID transport precedence fix remains in place.
+
+## VOID 03 connecting-overlay exit smoke (2026-11-18)
+- Edge browser run 44312797660 passed first-frame decode and native controls, but its screenshot was captured while the connecting overlay was still fading away.
+- Wait for `.harbor-connecting` to leave the visible player before the final screenshot, ensuring the handoff reaches a usable playback surface; wake the chrome to inspect the native controls.
+- The short-form local fixture is still separate from real-provider and libmpv playback validation.
