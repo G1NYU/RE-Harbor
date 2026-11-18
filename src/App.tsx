@@ -33,6 +33,7 @@ import { MinUIDock } from "@/chrome/minui-dock";
 import { Sidebar } from "@/chrome/sidebar";
 import { VoidSpacesHeader } from "@/chrome/void/void-spaces-header";
 import { VoidListeningDeck } from "@/chrome/void/void-listening-deck";
+import { VoidStudioMusic } from "@/views/void-studio/music-workspace";
 import { DraculaSidebar } from "@/chrome/dracula-sidebar";
 import { NordSidebar } from "@/chrome/nord-sidebar";
 import { ForestSidebar } from "@/chrome/forest-sidebar";
@@ -1830,15 +1831,19 @@ function Shell({ onReady }: { onReady?: () => void }) {
             {musicAlive && (
               <div className={layer(musicTop)}>
                 <Suspense fallback={null}>
-                  <MusicView
-                    active={musicTop}
-                    shellBackAvailable={
-                      canGoBack &&
-                      !chromeHidden &&
-                      !immersive &&
-                      (themeHasTopbar || layout === "minui")
-                    }
-                  />
+                  {voidShell ? (
+                    <VoidStudioMusic active={musicTop} />
+                  ) : (
+                    <MusicView
+                      active={musicTop}
+                      shellBackAvailable={
+                        canGoBack &&
+                        !chromeHidden &&
+                        !immersive &&
+                        (themeHasTopbar || layout === "minui")
+                      }
+                    />
+                  )}
                 </Suspense>
               </div>
             )}
