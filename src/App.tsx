@@ -33,7 +33,6 @@ import { MinUIDock } from "@/chrome/minui-dock";
 import { Sidebar } from "@/chrome/sidebar";
 import { VoidSpacesHeader } from "@/chrome/void/void-spaces-header";
 import { VoidListeningDeck } from "@/chrome/void/void-listening-deck";
-import { VoidStudioMusic } from "@/views/void-studio/music-workspace";
 import { DraculaSidebar } from "@/chrome/dracula-sidebar";
 import { NordSidebar } from "@/chrome/nord-sidebar";
 import { ForestSidebar } from "@/chrome/forest-sidebar";
@@ -295,6 +294,7 @@ const Settings = lazy(() => importSettings().then((m) => ({ default: m.Settings 
 const Shows = lazy(() => importShows().then((m) => ({ default: m.Shows })));
 const LibraryView = lazy(() => importLibrary().then((m) => ({ default: m.LibraryView })));
 const MusicView = lazy(() => importMusic().then((m) => ({ default: m.MusicView })));
+const VoidStudioMusic = lazy(() => import("@/views/void-studio/music-workspace").then((m) => ({ default: m.VoidStudioMusic })));
 const GamesView = lazy(() => importGames().then((m) => ({ default: m.GamesView })));
 const LiveView = lazy(() => importLive().then((m) => ({ default: m.LiveView })));
 const MatchDetailView = lazy(() =>
