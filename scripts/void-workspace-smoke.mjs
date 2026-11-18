@@ -98,6 +98,21 @@ try {
   await actions.getByRole("button", { name: /Choose a source/ }).waitFor();
   await actions.getByRole("button", { name: /Save to a list/ }).click();
   const listButton = actions.getByRole("button", { name: /Weekend Cinema/ });
+  const listInput = actions.getByRole("textbox", { name: "New list" });
+  await listInput.focus();
+  await page.keyboard.press("Tab");
+  assert.equal(
+    await actions.locator('button[type="submit"]').evaluate((el) => el === document.activeElement),
+    true,
+    "The custom-list text field must tab to its submit button",
+  );
+  await actions.getByRole("button", { name: "Open remaining tools" }).focus();
+  await page.keyboard.press("Tab");
+  assert.equal(
+    await actions.getByRole("button", { name: "Close title actions" }).evaluate((el) => el === document.activeElement),
+    true,
+    "Tab from the final title action must wrap to the modal close button",
+  );
   await listButton.click();
   assert.equal(await listButton.getAttribute("aria-pressed"), "true");
   assert.equal(await page.evaluate(() => {

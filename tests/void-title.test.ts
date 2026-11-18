@@ -103,3 +103,12 @@ test("VOID series reminders use the existing notification store instead of Harbo
   assert.match(tools, /removeReminder\(item\.id\)/);
   assert.match(tools, /void ensureNotifyPermission\(\)/);
 });
+
+test("VOID title modal traps keyboard focus across form controls", () => {
+  const actions = readFileSync("src/views/void-studio/title-tools.tsx", "utf8");
+  const smoke = readFileSync("scripts/void-workspace-smoke.mjs", "utf8");
+  assert.ok(actions.includes("input:not([disabled])"));
+  assert.ok(actions.includes("select:not([disabled])"));
+  assert.ok(actions.includes("panel.current?.contains(active)"));
+  assert.ok(smoke.includes("custom-list text field must tab"));
+});

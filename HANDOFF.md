@@ -124,3 +124,8 @@
 - Native title tools for series now manage episode/season reminders and notification tone without opening the legacy detail interface.
 - Operations reuse the existing `setReminder`, `removeReminder`, `useReminder` and notification-permission workflow, preserving other themes.
 - Browser smoke now tests reminder persistence on an actual title route with mocked metadata; no real notification delivery or external source changes are claimed.
+
+## VOID 03 title tools keyboard containment (2026-11-18)
+- Include list-name fields and reminder dropdowns in focus-trap sequencing rather than enumerating only buttons.
+- Windows browser smoke checks Tab movement into list creation and wraparound to the dialog closer.
+- No changes to playback providers, Refract, installer or deployment.
