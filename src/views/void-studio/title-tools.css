@@ -115,3 +115,45 @@
   [data-void-shell] .void-title-tools-head { margin-bottom: 26px; }
   [data-void-shell] .void-title-tools-actions > button { min-height: 72px; padding: 14px 16px; }
 }
+
+/* Original VOID list organizer within the title actions dialog. */
+[data-void-shell] .void-title-tools-lists { margin-top: 18px; }
+[data-void-shell] .void-title-tools-lists-trigger {
+  display: flex; align-items: center; gap: 16px; width: 100%; min-height: 76px;
+  padding: 16px 20px; text-align: start; border: 1px solid #343449;
+  background: #202031; color: #e3e6f3;
+}
+[data-void-shell] .void-title-tools-lists-trigger > span:nth-child(2) {
+  display: grid; flex: 1; min-width: 0; gap: 5px;
+}
+[data-void-shell] .void-title-tools-lists-trigger strong { font-size: 15px; font-weight: 800; }
+[data-void-shell] .void-title-tools-lists-trigger small { color: #a1a9c1; font-size: 12px; }
+[data-void-shell] .void-title-tools-lists-trigger:hover { border-color: #767d9d; background: #29293d; }
+[data-void-shell] .void-title-tools-lists-body { display: grid; gap: 9px; padding: 13px 0 0; }
+[data-void-shell] .void-title-tools-lists-body > button {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 12px 15px; border: 1px solid #323245;
+  background: #1c1c2b; color: #dce1f3; text-align: start;
+}
+[data-void-shell] .void-title-tools-lists-body > button[aria-pressed="true"] { border-color: #7982a2; background: #292a40; }
+[data-void-shell] .void-title-tools-lists-body > button > span { display: grid; gap: 5px; }
+[data-void-shell] .void-title-tools-lists-body > button strong { font-size: 13px; font-weight: 750; }
+[data-void-shell] .void-title-tools-lists-body > button small { font-size: 11px; color: #9ca4c0; }
+[data-void-shell] .void-title-tools-lists-body > p { margin-block: 4px; color: #b0b6cc; font-size: 12px; }
+[data-void-shell] .void-title-tools-lists-body form { display: grid; gap: 8px; margin-top: 9px; }
+[data-void-shell] .void-title-tools-lists-body form > label { color: #9ca4c0; font-size: 11px; font-weight: 750; }
+[data-void-shell] .void-title-tools-lists-body form > div { display: flex; gap: 8px; }
+[data-void-shell] .void-title-tools-lists-body input {
+  min-width: 0; flex: 1; padding: 11px 12px; border: 1px solid #414159;
+  background: #13131e; color: #eff1fc; font-size: 13px;
+}
+[data-void-shell] .void-title-tools-lists-body form button {
+  padding: 10px 13px; color: #10111b; background: #cdd6f4;
+  font-size: 12px; font-weight: 750;
+}
+[data-void-shell] .void-title-tools-lists-body form button:disabled { opacity: .45; }
+[data-void-shell] .void-title-tools-lists-body button:focus-visible,
+[data-void-shell] .void-title-tools-lists-body input:focus-visible { outline: 2px solid #aab4d6; outline-offset: 3px; }
+@media(max-width:400px) {
+  [data-void-shell] .void-title-tools-lists-body form > div { flex-direction: column; }
+}

@@ -67,3 +67,15 @@ test("VOID source selection uses an independent stream board while other themes 
   assert.match(board, /onManageFilters/);
   assert.doesNotMatch(css, /backdrop-filter\s*:|@keyframes|filter\s*:\s*blur\(/);
 });
+
+
+test("VOID title actions handle custom-list membership with profile-aware operations", () => {
+  const actions = readFileSync("src/views/void-studio/title-tools.tsx", "utf8");
+  const title = readFileSync("src/views/void-studio/title-workspace.tsx", "utf8");
+  assert.match(actions, /useCustomLists\(\)/);
+  assert.match(actions, /useListsContaining\(item\.id\)/);
+  assert.match(actions, /captureMembershipProfile\(\)/);
+  assert.match(actions, /setListMembership\(listId, item, present, profile\)/);
+  assert.match(actions, /createListWithItem\(name, item, profile\)/);
+  assert.match(title, /item=\{\{ id: meta\.id/);
+});

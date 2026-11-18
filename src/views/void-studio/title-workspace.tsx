@@ -305,6 +305,7 @@ export function VoidTitleWorkspace({
       {toolsOpen && (
         <VoidTitleTools
           name={title}
+          item={{ id: meta.id, type: meta.type, name: title, poster, addonOrigin: meta.addonOrigin, videos: playMeta.videos }}
           isMovie={type === "movie"}
           isWatched={isWatched}
           isFavorite={isFavorite}

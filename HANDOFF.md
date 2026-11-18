@@ -108,3 +108,8 @@
 - Inspected the successful mocked-addon Edge screenshot from `44297826046`; old picker headings and wide vertical gaps pushed the featured source below the 1280×800 first viewport.
 - Compact VOID-only source-room spacing and the featured-source composition. No functionality or safety diagnostics removed.
 - Added a first-viewport geometry assertion, plus separate screenshots for the compact default and expanded advanced-filter layouts.
+
+## VOID 03 native custom lists
+- VOID's title actions now expand an original custom-list organizer without routing into the legacy Harbor detail page. Uses existing profile-aware membership and atomic list creation operations.
+- The Windows smoke fixture provides a list, toggles membership and checks persisted membership before closing the title dialog. New structural regression guards the native handlers.
+- Remaining legacy advanced tools include trailers, reminders, and integration-specific actions; keep compatibility until they are replaced and tested.

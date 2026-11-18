@@ -44,6 +44,10 @@ await page.addInitScript(() => {
   );
   // A deterministic, browser-intercepted addon proves that VOID can display actual
   // resolved streams without installing any provider or using user credentials.
+  localStorage.setItem("harbor.customlists.v1", JSON.stringify([{
+    id: "void-test-list", name: "Weekend Cinema", createdAt: Date.now(),
+    updatedAt: Date.now(), items: [],
+  }]));
   localStorage.setItem("harbor.installed-addons.void-test", JSON.stringify([{
     id: "void-smoke-addon",
     transportUrl: "https://void-preview.invalid/manifest.json",
@@ -91,6 +95,15 @@ try {
   await title.getByRole("button", { name: "More options" }).click();
   const actions = title.getByRole("dialog", { name: "Title actions" });
   await actions.getByRole("button", { name: /Choose a source/ }).waitFor();
+  await actions.getByRole("button", { name: /Save to a list/ }).click();
+  const listButton = actions.getByRole("button", { name: /Weekend Cinema/ });
+  await listButton.click();
+  assert.equal(await listButton.getAttribute("aria-pressed"), "true");
+  assert.equal(await page.evaluate(() => {
+    const raw = localStorage.getItem("harbor.customlists.v1") ?? "[]";
+    const list = JSON.parse(raw).find((entry) => entry.id === "void-test-list");
+    return list?.items?.some((item) => item.id === "tt0000001") ?? false;
+  }), true, "List membership should persist through the existing list store");
   await page.keyboard.press("Escape");
   assert.equal(await actions.count(), 0, "Title dialog should close on Escape");
   assert.equal(await title.locator("h1").innerText(), film.name, "Escape must not navigate back from title");

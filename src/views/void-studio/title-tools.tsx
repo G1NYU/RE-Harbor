@@ -1,9 +1,12 @@
-import { useEffect, useRef } from "react";
-import { BookmarkCheck, Check, Download, Heart, ListVideo, Play, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { BookmarkCheck, Check, Download, Heart, ListPlus, ListVideo, Play, Plus, X } from "lucide-react";
+import { MAX_LISTS, createListWithItem, setListMembership, useCustomLists, useListsContaining, type ListItemInput } from "@/lib/custom-lists";
+import { captureMembershipProfile } from "@/lib/membership-operations";
 import "./title-tools.css";
 
 type VoidTitleToolsProps = {
   name: string;
+  item: ListItemInput;
   isMovie: boolean;
   isWatched: boolean;
   isFavorite: boolean;
@@ -19,6 +22,7 @@ type VoidTitleToolsProps = {
 /** VOID's own title actions. Existing Harbor controllers perform the actual mutations. */
 export function VoidTitleTools({
   name,
+  item,
   isMovie,
   isWatched,
   isFavorite,
@@ -32,6 +36,41 @@ export function VoidTitleTools({
 }: VoidTitleToolsProps) {
   const panel = useRef<HTMLElement>(null);
   const dismiss = useRef<HTMLButtonElement>(null);
+  const membershipProfile = useRef(captureMembershipProfile());
+  const lists = useCustomLists();
+  const memberships = useListsContaining(item.id);
+  const [listPanelOpen, setListPanelOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [listError, setListError] = useState("");
+
+  const changeMembership = (listId: string) => {
+    const profile = membershipProfile.current;
+    if (!profile) {
+      setListError("The active profile could not be verified.");
+      return;
+    }
+    const present = !memberships.has(listId);
+    const result = setListMembership(listId, item, present, profile);
+    setListError(result.status === (present ? "added" : "removed") ? "" :
+      "Could not update this list. Check your profile and available storage.");
+  };
+
+  const createAndAdd = (event: FormEvent) => {
+    event.preventDefault();
+    const name = newListName.trim();
+    const profile = membershipProfile.current;
+    if (!name || !profile || lists.length >= MAX_LISTS) {
+      setListError("The list name, active profile, or available list capacity is invalid.");
+      return;
+    }
+    const result = createListWithItem(name, item, profile);
+    if (result.result.status === "added") {
+      setNewListName("");
+      setListError("");
+    } else {
+      setListError("Could not create the list. Check your profile and available storage.");
+    }
+  };
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -106,8 +145,38 @@ export function VoidTitleTools({
             </button>
           )}
         </div>
+        <section className="void-title-tools-lists" aria-label="Custom lists">
+          <button type="button" className="void-title-tools-lists-trigger" aria-expanded={listPanelOpen}
+            onClick={() => setListPanelOpen((open) => !open)}>
+            <ListPlus size={20} />
+            <span><strong>Save to a list</strong><small>Organize this title without leaving VOID</small></span>
+            <span>{memberships.size > 0 ? memberships.size : "+"}</span>
+          </button>
+          {listPanelOpen && (
+            <div className="void-title-tools-lists-body">
+              {lists.length === 0 && <p>No lists yet. Create your first list below.</p>}
+              {lists.map((list) => (
+                <button key={list.id} type="button" aria-pressed={memberships.has(list.id)}
+                  onClick={() => changeMembership(list.id)}>
+                  <span><strong>{list.name}</strong><small>{list.items.length} titles</small></span>
+                  {memberships.has(list.id) ? <Check size={18} /> : <Plus size={18} />}
+                </button>
+              ))}
+              <form onSubmit={createAndAdd}>
+                <label htmlFor="void-title-new-list">New list</label>
+                <div>
+                  <input id="void-title-new-list" value={newListName} maxLength={60}
+                    onChange={(event) => { setNewListName(event.target.value); setListError(""); }}
+                    placeholder="List name" disabled={lists.length >= MAX_LISTS} />
+                  <button type="submit" disabled={!newListName.trim() || lists.length >= MAX_LISTS}>Create & add</button>
+                </div>
+              </form>
+              {listError && <p role="alert">{listError}</p>}
+            </div>
+          )}
+        </section>
         <div className="void-title-tools-footer">
-          <p>Additional sync, trailer, list and provider tools remain accessible during the redesign.</p>
+          <p>Additional sync, trailer and provider tools remain accessible during the redesign.</p>
           <button type="button" onClick={() => run(onAdvanced)}>
             <ListVideo size={17} /> Open remaining tools
           </button>
