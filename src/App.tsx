@@ -31,8 +31,8 @@ import { HybridTitleBar } from "@/chrome/hybrid-title-bar";
 import { WindowResizeEdges } from "@/chrome/window-resize-edges";
 import { MinUIDock } from "@/chrome/minui-dock";
 import { Sidebar } from "@/chrome/sidebar";
-import { VoidRail } from "@/chrome/void/void-rail";
-import { VoidCommandBar } from "@/chrome/void/void-command-bar";
+import { VoidSpacesHeader } from "@/chrome/void/void-spaces-header";
+import { VoidListeningDeck } from "@/chrome/void/void-listening-deck";
 import { DraculaSidebar } from "@/chrome/dracula-sidebar";
 import { NordSidebar } from "@/chrome/nord-sidebar";
 import { ForestSidebar } from "@/chrome/forest-sidebar";
@@ -1656,8 +1656,12 @@ function Shell({ onReady }: { onReady?: () => void }) {
         data-kids={kidsTop || kid ? "on" : undefined}
         className="relative flex h-full"
       >
-        <div data-harbor-native-backdrop className="relative flex h-full min-w-0 flex-1">
-          {voidShell && !playerActive && !standaloneLive && !pickerTop && !immersive && <VoidRail />}
+        <div
+          data-harbor-native-backdrop
+          data-void-route={voidShell ? topKind : undefined}
+          className={`relative flex h-full min-w-0 flex-1 ${voidShell ? "void-studio-frame" : ""}`}
+        >
+          {voidShell && !playerActive && !standaloneLive && !pickerTop && !immersive && <VoidSpacesHeader />}
           {!voidShell &&
             !settingsTop &&
             !playerActive &&
@@ -1725,17 +1729,14 @@ function Shell({ onReady }: { onReady?: () => void }) {
               <WindowControls />
             </div>
           )}
-          {installFeatures.music && <MusicDock />}
+          {installFeatures.music && !voidShell && <MusicDock />}
           <MusicSurprisePrompt />
           {!playerActive && <WindowResizeEdges />}
           <HybridTitleBar suppressed={playerActive || immersive || chromeHidden || voidShell} />
           <div
+            data-void-view-root={voidShell ? "" : undefined}
             className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${playerActive ? "invisible" : ""}`}
           >
-            {/* In normal layout flow: the command bar owns its height and never paints over media. */}
-            {voidShell && !immersive && !playerActive && !pickerTop && !standaloneLive && (
-              <VoidCommandBar />
-            )}
             {homeAlive && (
               <div {...parkLayerProps(homeTop)}>
                 <Profiled id="view.home">
@@ -2212,6 +2213,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
               />
             )}
           </div>
+          {voidShell && installFeatures.music && !playerActive && !pickerTop && !immersive && (
+            <VoidListeningDeck />
+          )}
         </div>
         <GameLibraryDock visible={gameDockVisible && !gamesTop} />
         {player && (
