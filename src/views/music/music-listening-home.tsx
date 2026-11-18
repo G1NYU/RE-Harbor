@@ -10,6 +10,7 @@ import {
 } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
 import { getMusicState, toggleMusicPlayback } from "@/lib/music/player";
 import { useMusicNowPlaying } from "@/lib/music/use-now-playing";
 import { useMusicSourcePicker } from "@/components/music/music-source-picker";
@@ -40,6 +41,8 @@ export function MusicListeningHome({
   onTastes: () => void;
 }) {
   const t = useT();
+  const { settings } = useSettings();
+  const voidEdition = settings.theme.preset === "cool-grey";
   const now = useMusicNowPlaying();
   const activeTrack = getMusicState().current;
   const { openSourcePicker } = useMusicSourcePicker();
@@ -122,7 +125,7 @@ export function MusicListeningHome({
             </div>
           )}
         </div>
-        {recents.some((track) => trackKey(track) !== subjectKey) && (
+        {voidEdition && recents.some((track) => trackKey(track) !== subjectKey) && (
           <aside className="void-music-feature-queue" aria-label={t("music.library.recent")}>
             <div className="void-music-feature-queue-heading">
               <span>{t("music.library.recent")}</span>
