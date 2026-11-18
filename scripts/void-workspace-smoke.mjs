@@ -64,6 +64,12 @@ try {
     await title.getByRole("button", { name: "In watchlist" }).getAttribute("aria-pressed"),
     "true",
   );
+  // Exercise the actual VOID actions dialog instead of only taking screenshots.
+  await title.getByRole("button", { name: "More options" }).click();
+  const actions = title.getByRole("dialog", { name: "Title actions" });
+  await actions.getByRole("button", { name: /Choose a source/ }).waitFor();
+  await page.keyboard.press("Escape");
+  assert.equal(await actions.count(), 0, "Title dialog should close on Escape");
   for (const [width, height, dir] of [
     [960, 600, "ltr"],
     [1280, 800, "ltr"],
@@ -79,6 +85,18 @@ try {
       await title.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
       "Title overflows horizontally",
     );
+    // Horizontal overflow alone misses controls falling below the first viewport.
+    if (height <= 700 && width > 740) {
+      const actionPosition = await title.locator(".void-title-action-primary").evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      });
+      assert.ok(
+        actionPosition.top >= 0 && actionPosition.bottom <= height - 4,
+        `Primary title action is not fully visible at ${width}x${height}: ` +
+          JSON.stringify(actionPosition),
+      );
+    }
     await page.screenshot({ path: `${output}/title-${width}-${height}-${dir}.png` });
   }
   await page.evaluate(() => {
@@ -89,7 +107,9 @@ try {
   await watch.locator(".void-watch-primary").first().click();
   await title.getByRole("button", { name: "Season 02" }).click();
   assert.match(await title.locator(".void-title-episode").innerText(), /Return/);
-  await page.screenshot({ path: `${output}/series.png` });
+  await page.screenshot({ path: `${output}/series-episodes.png` });
+  await title.evaluate((el) => { el.scrollTop = 0; });
+  await page.screenshot({ path: `${output}/series-top.png` });
   await nav.getByRole("button", { name: "Listen", exact: true }).click();
   await page.locator("[data-void-listening-deck]:visible").waitFor();
   await page.screenshot({ path: `${output}/listen.png` });

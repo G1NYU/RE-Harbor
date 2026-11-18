@@ -377,3 +377,32 @@
     margin-top: 55px;
   }
 }
+
+/* Keep the title's primary controls visible on short desktop windows.
+ * Content may still scroll when long titles or descriptions exceed the viewport. */
+@media (min-width: 741px) and (max-height: 700px) {
+  [data-void-shell] .void-title-topline {
+    padding-block: 16px;
+  }
+  [data-void-shell] .void-title-feature {
+    align-items: center;
+    min-height: clamp(320px, 48vh, 390px);
+    padding-block: 30px;
+  }
+  [data-void-shell] .void-title-feature-body {
+    align-items: center;
+  }
+  [data-void-shell] .void-title-feature h1 {
+    font-size: clamp(42px, 5.3vw, 70px);
+    margin: 0 0 12px;
+  }
+  [data-void-shell] .void-title-synopsis {
+    margin-block: 12px;
+    line-height: 1.5;
+    -webkit-line-clamp: 3;
+  }
+  [data-void-shell] .void-title-actions {
+    margin-top: 14px;
+    gap: 8px;
+  }
+}

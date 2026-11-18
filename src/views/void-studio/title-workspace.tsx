@@ -1,5 +1,5 @@
 import { CoverImg } from "@/components/cover-img";
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, BookmarkCheck, CalendarDays, Play, Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import type { Meta } from "@/lib/cinemeta";
@@ -14,6 +14,7 @@ import {
   mergeEpisodes,
   type VoidEpisode,
 } from "./title-episodes";
+import { VoidTitleTools } from "./title-tools";
 import "./void-title.css";
 
 const DETAIL_TIMEOUT_MS = 10_000;
@@ -29,6 +30,13 @@ export function VoidTitleWorkspace({
   playLabel,
   onPlay,
   onTools,
+  onChooseSource,
+  onDownload,
+  onToggleFavorite,
+  onToggleWatched,
+  isFavorite,
+  isWatched,
+  showWatched,
 }: {
   meta: Meta;
   resolved: Meta | null;
@@ -38,6 +46,13 @@ export function VoidTitleWorkspace({
   playLabel: string;
   onPlay: (episode?: PlayEpisode, seasonEpisodes?: PlayEpisode[]) => void;
   onTools: () => void;
+  onChooseSource: () => void;
+  onDownload: () => void;
+  onToggleFavorite: () => void;
+  onToggleWatched: () => void;
+  isFavorite: boolean;
+  isWatched: boolean;
+  showWatched: boolean;
 }) {
   const t = useT();
   const { settings } = useSettings();
@@ -50,6 +65,8 @@ export function VoidTitleWorkspace({
   } | null>(null);
   const [episodesLoading, setEpisodesLoading] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const closeTools = useCallback(() => setToolsOpen(false), []);
 
   const title = tmdb?.title || resolved?.name || meta.name;
   const poster = resolved?.poster || tmdb?.poster || meta.poster;
@@ -175,7 +192,7 @@ export function VoidTitleWorkspace({
                   <Play size={18} fill="currentColor" />
                   {playLabel}
                 </button>
-                <button type="button" className="void-title-action-secondary" onClick={onTools}>
+                <button type="button" className="void-title-action-secondary" aria-haspopup="dialog" aria-expanded={toolsOpen} onClick={() => setToolsOpen(true)}>
                   {t("More options")}
                 </button>
                 <button
@@ -285,6 +302,21 @@ export function VoidTitleWorkspace({
           </section>
         )}
       </div>
+      {toolsOpen && (
+        <VoidTitleTools
+          name={title}
+          isMovie={type === "movie"}
+          isWatched={isWatched}
+          isFavorite={isFavorite}
+          showWatched={showWatched}
+          onClose={closeTools}
+          onChooseSource={onChooseSource}
+          onDownload={onDownload}
+          onToggleWatched={onToggleWatched}
+          onToggleFavorite={onToggleFavorite}
+          onAdvanced={onTools}
+        />
+      )}
     </main>
   );
 }

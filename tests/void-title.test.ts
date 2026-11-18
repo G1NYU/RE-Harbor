@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { episodesFromCinemeta, mergeEpisodes } from "../src/views/void-studio/title-episodes.ts";
 
 test("merging listings keeps native-only episodes and source video IDs", () => {
@@ -33,4 +34,20 @@ test("specials remain in season zero", () => {
   const entries = episodesFromCinemeta([{ season: 0, number: 3, id: "extra" }], 0);
   assert.equal(entries[0].play.season, 0);
   assert.equal(entries[0].play.episode, 3);
+});
+
+
+test("VOID title options stay in the new workspace until advanced compatibility is requested", () => {
+  const title = readFileSync("src/views/void-studio/title-workspace.tsx", "utf8");
+  const actions = readFileSync("src/views/void-studio/title-tools.tsx", "utf8");
+  const detail = readFileSync("src/views/detail.tsx", "utf8");
+  assert.match(title, /<VoidTitleTools/);
+  assert.match(title, /onClick=\{\(\) => setToolsOpen\(true\)\}/);
+  assert.doesNotMatch(title, /onClick=\{onTools\}/);
+  assert.match(actions, /role="dialog" aria-modal="true"/);
+  assert.match(actions, /event\.key === "Escape"/);
+  assert.match(detail, /onChooseSource=\{\(\) => void smartPlay\(true\)\}/);
+  assert.match(detail, /onDownload=\{\(\) => openPicker\(playMeta, undefined, \{ intent: "download" \}\)\}/);
+  assert.match(detail, /onToggleWatched=\{markThisMovieWatched\}/);
+  assert.match(detail, /onTools=\{\(\) => setShowTitleTools\(true\)\}/);
 });

@@ -1801,6 +1801,13 @@ export function DetailView({
         scrollRef={scrollRef}
         playLabel={smartPlayLabel}
         onPlay={(episode, seasonEpisodes) => void smartPlay(false, episode, seasonEpisodes)}
+        onChooseSource={() => void smartPlay(true)}
+        onDownload={() => openPicker(playMeta, undefined, { intent: "download" })}
+        onToggleFavorite={() => toggleFavorite({ id: meta.id, type: meta.type, name: title || meta.name, poster: meta.poster ?? detail?.poster })}
+        isFavorite={isFav}
+        isWatched={watchedMark}
+        showWatched={settings.showWatchedButton && meta.type === "movie"}
+        onToggleWatched={markThisMovieWatched}
         onTools={() => setShowTitleTools(true)}
       />
     );

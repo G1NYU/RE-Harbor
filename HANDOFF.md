@@ -70,3 +70,16 @@
 - Start indexes configured catalogs. Anime and Library use the profile's existing picks. Read uses manga and eBook covers, Play has a game selection with save/open actions and Live displays the current and next programs from the guide.
 - Library exposes connected trackers through a section selector. Desktop Settings opens its page directory on demand. Listen adds speaker selection, audio settings, lyrics and the source recovery dialog.
 - Targeted local tests passed (90). Windows browser rendering and native playback validation are outstanding.
+
+## VOID 03 short-window visual audit (2026-11-18)
+
+- Reviewed the actual Edge screenshot artifact from `44289823045`: a 960×600 title view cuts off the primary button, despite passing horizontal-overflow checks.
+- Added a short-desktop-viewport (`741px+` wide, `700px-` high) compact title composition. Ordinary, mobile, and taller desktop layouts are unchanged.
+- The browser smoke suite now asserts that the primary title action is visible at 960×600 and saves separate `series-top`/`series-episodes` screenshots to avoid confusing auto-scroll with layout clipping.
+- Follow up by rerunning the Windows rendering workflow and inspecting its artifact. This alone does not verify real providers, native playback, or full release readiness.
+
+## VOID 03 title actions overlay (2026-11-18)
+- The primary "More options" title action opens the original VOID side panel, not the classic Harbor detail page.
+- Source choice, movie download, favorites and watched status dispatch through existing Harbor controllers, preserving Refract/watch history and local/online playback logic.
+- The remaining low-frequency features still have an explicit advanced compatibility route into the legacy detail tools. This remains a release blocker pending feature-parity replacement.
+- No installer, updater, deployment or other themes changed. Full Windows interaction checks are required after this patch is pushed and CI runs.
