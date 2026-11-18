@@ -19,6 +19,7 @@ export function MusicMast({
   initialQuery = "",
   searching = false,
   className = "",
+  edition,
 }: {
   onSubmit: (query: string, connector: string | null) => void;
   onClear?: () => void;
@@ -26,6 +27,7 @@ export function MusicMast({
   initialQuery?: string;
   searching?: boolean;
   className?: string;
+  edition?: "void";
 }) {
   const t = useT();
   const { connections, status, error, connected, reload } = useMusicConnections();
@@ -150,9 +152,12 @@ export function MusicMast({
 
   return (
     <header
-      className={`music-page-mast flex min-w-0 flex-wrap items-center justify-between gap-5 ${className}`}
+      className={`music-page-mast flex min-w-0 flex-wrap items-center justify-between gap-5 ${edition === "void" ? "void-music-mast" : ""} ${className}`}
     >
       <div className="min-w-0">
+        {edition === "void" && (
+          <span className="void-music-kicker" aria-hidden="true">VOID / MUSIC</span>
+        )}
         <h1 tabIndex={-1} className="text-[32px] font-bold leading-tight tracking-tight text-ink">
           {t("music.title")}
         </h1>
