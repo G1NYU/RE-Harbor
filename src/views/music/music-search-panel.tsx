@@ -12,6 +12,10 @@ import {
 import { ChevronLeft, Disc3, ListMusic, Music2, Search, UserRound, X } from "@/components/icons/music-icons";
 import { useEffect, useRef, useState } from "react";
 import { MusicCatalogRow } from "@/components/music/music-catalog-row";
+import { MusicTrackRow } from "@/components/music/music-track-row";
+import { useMusicPlaylistPicker } from "@/components/music/music-playlist-picker";
+import { enqueueMusic } from "@/lib/music/player";
+import { useSettings } from "@/lib/settings";
 import {
   MusicSectionEmpty,
   MusicSectionError,
@@ -54,6 +58,9 @@ export function MusicSearchPanel({
 }) {
   const t = useT();
   const language = useUiLanguage();
+  const { settings } = useSettings();
+  const voidEdition = settings.theme.preset === "cool-grey";
+  const { openPlaylistPicker } = useMusicPlaylistPicker();
   const [category, setCategory] = useState("all");
   const [resolvedArtists, setResolvedArtists] = useState<{
     source: MusicSearchResults;
@@ -145,6 +152,7 @@ export function MusicSearchPanel({
       data-scroll-anchor="search"
       aria-label={variant === "search" ? t("music.searchResults") : query}
       className="music-search-page flex flex-col gap-6"
+      data-void-music-search={voidEdition || undefined}
     >
       <div className="flex items-end justify-between gap-4 border-b border-edge-soft pb-4">
         <div className="min-w-0">
@@ -242,15 +250,38 @@ export function MusicSearchPanel({
               <MusicTrackGridSkeleton count={6} />
             ))}
           {tracks.length > 0 && (category === "all" || category === "tracks") && (
-            <MusicCatalogRow
-              row={localRow("search:tracks", t("music.search.tracks"), "", "trackGrid", tracks)}
-              count={tracks.length}
-              numbered
-              onPlay={(item) =>
-                item.kind === "track" ? onPlayTrack(item, results.tracks) : onOpenItem(item, tracks)
-              }
-              onOpen={(item) => onOpenItem(item, tracks)}
-            />
+            voidEdition ? (
+              <section className="void-music-search-tracks" aria-label={t("music.search.tracks")}>
+                <div className="void-music-search-track-heading">
+                  <h3>{t("music.search.tracks")}</h3>
+                  <span>{tracks.length}</span>
+                </div>
+                <div className="void-music-search-track-list">
+                  {results.tracks.map((track) => (
+                    <MusicTrackRow
+                      key={`${track.connectorId ?? "music"}:${track.sourceId ?? track.id}`}
+                      track={track}
+                      editorial
+                      showDuration
+                      onPlay={() => onPlayTrack(track, results.tracks)}
+                      onOpen={() => onOpenItem({ kind: "track", ...track }, tracks)}
+                      onAddToQueue={() => enqueueMusic(track)}
+                      onAddToPlaylist={() => openPlaylistPicker(track)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <MusicCatalogRow
+                row={localRow("search:tracks", t("music.search.tracks"), "", "trackGrid", tracks)}
+                count={tracks.length}
+                numbered
+                onPlay={(item) =>
+                  item.kind === "track" ? onPlayTrack(item, results.tracks) : onOpenItem(item, tracks)
+                }
+                onOpen={(item) => onOpenItem(item, tracks)}
+              />
+            )
           )}
           {albums.length > 0 && (category === "all" || category === "albums") && (
             <MusicCatalogRow
