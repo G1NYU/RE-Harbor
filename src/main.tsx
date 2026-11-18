@@ -22,6 +22,7 @@ import "@/void-native.css";
 import "@/void-stream-picker.css";
 import "@/chrome/void/void-shell.css";
 import "@/chrome/void/void-music-editorial.css";
+import "@/chrome/void/void-studio.css";
 import "flag-icons/css/flag-icons.min.css";
 import { startTaskbarProgress } from "@/lib/download/taskbar-progress";
 import { completeBetaReturnPreferences } from "@/lib/updater/beta-return";
