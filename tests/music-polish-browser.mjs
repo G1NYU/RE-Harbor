@@ -133,6 +133,26 @@ try {
   assert.ok(artistMetrics.columns.split(" ").length >= 2, "Artist tracks must be legible in two columns");
   await page.screenshot({ path: folder + "/artist-1600.png" });
 
+  // Scrolling the real Music content must activate the opaque fixed topbar so
+  // track rows and sticky breadcrumbs cannot bleed through its window controls.
+  await page.locator("[data-music-view]").evaluate((root) => {
+    root.scrollTop = 400;
+    root.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await page.waitForTimeout(500);
+  const topbar = await page.locator("[data-harbor-topbar-content]").evaluate((content) => {
+    const root = content.parentElement;
+    const backing = root?.querySelector('div[aria-hidden="true"]');
+    return backing ? {
+      opacity: Number(getComputedStyle(backing).opacity),
+      background: getComputedStyle(backing).backgroundColor,
+    } : null;
+  });
+  assert.ok(topbar && topbar.opacity >= 0.95, "Scrolled Music topbar must be opaque");
+  assert.notEqual(topbar.background, "rgba(0, 0, 0, 0)");
+  await page.screenshot({ path: folder + "/artist-scrolled-1600.png" });
+  await page.locator("[data-music-view]").evaluate((root) => { root.scrollTop = 0; });
+
   await page.setViewportSize({ width: 960, height: 700 });
   const mobileColumns = await artistView.locator(".music-detail-track-list").evaluate(el => getComputedStyle(el).gridTemplateColumns);
   assert.equal(mobileColumns.trim().split(/\s+/).length, 1, "Narrow artist tracks must stack");
