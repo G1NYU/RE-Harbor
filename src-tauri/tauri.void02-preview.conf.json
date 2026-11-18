@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "VOID Edition 02 Preview",
+  "identifier": "app.harbor.void02preview",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "VOID Edition 02 Preview",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "visible": false,
+        "decorations": false,
+        "transparent": false,
+        "backgroundColor": [
+          0,
+          0,
+          0,
+          255
+        ],
+        "shadow": true,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "center": true,
+        "browserExtensionsEnabled": true,
+        "additionalBrowserArgs": "--disk-cache-size=104857600 --media-cache-size=52428800 --autoplay-policy=no-user-gesture-required --disable-features=HardwareMediaKeyHandling"
+      }
+    ]
+  },
+  "bundle": {
+    "targets": [
+      "nsis"
+    ],
+    "fileAssociations": [],
+    "createUpdaterArtifacts": false,
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "void02-preview"
+        ]
+      }
+    },
+    "updater": {
+      "endpoints": []
+    }
+  }
+}
