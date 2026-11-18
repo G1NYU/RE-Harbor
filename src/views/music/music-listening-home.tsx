@@ -122,6 +122,34 @@ export function MusicListeningHome({
             </div>
           )}
         </div>
+        {recents.some((track) => trackKey(track) !== subjectKey) && (
+          <aside className="void-music-feature-queue" aria-label={t("music.library.recent")}>
+            <div className="void-music-feature-queue-heading">
+              <span>{t("music.library.recent")}</span>
+              <ListMusic size={18} aria-hidden="true" />
+            </div>
+            <div className="void-music-feature-queue-list">
+              {recents.filter((track) => trackKey(track) !== subjectKey).slice(0, 3).map((track) => (
+                <button
+                  type="button"
+                  className="void-music-feature-queue-track"
+                  key={trackKey(track)}
+                  onClick={() => play(track)}
+                  aria-label={t("music.playTrack", { title: track.title, artist: track.artist })}
+                >
+                  <span className="void-music-feature-queue-art" aria-hidden="true">
+                    <Poster src={track.artwork} seed={"music-room:" + trackKey(track)} ratio="square" className="w-full [--poster-radius:6px]" />
+                  </span>
+                  <span className="void-music-feature-queue-copy">
+                    <strong title={track.title}>{track.title}</strong>
+                    <small title={track.artist}>{track.artist}</small>
+                  </span>
+                  <Play size={16} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </aside>
+        )}
       </section>
 
       <nav className="music-room-shortcuts" aria-label={t("music.hero.startCta")}>
