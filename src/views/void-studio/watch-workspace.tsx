@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowRight, Clapperboard, Play, RefreshCw, Tv2, X } from "lucide-react";
 import { Poster } from "@/components/poster";
+import { ParentalPinModal } from "@/components/parental-pin-modal";
+import { useSidebarNavigation } from "@/chrome/context-page-navigation";
+import { useParental } from "@/lib/parental";
 import { topMovies, topSeries, type Meta } from "@/lib/cinemeta";
 import { useSettings } from "@/lib/settings";
 import { useView } from "@/lib/view";
@@ -54,6 +57,16 @@ function WatchPoster({ item, onOpen }: { item: Meta; onOpen: () => void }) {
 export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; active?: boolean }) {
   const { settings } = useSettings();
   const { setView, openMeta } = useView();
+  const { entries } = useSidebarNavigation();
+  const { unlock } = useParental();
+  const [pendingView, setPendingView] = useState<WatchKind | null>(null);
+  const destination = (target: WatchKind) => entries.find((entry) => entry.item.view === target);
+  const navigate = (target: WatchKind) => {
+    const entry = destination(target);
+    if (!entry) return; // Hidden/disabled categories must not be reachable through this workspace.
+    if (entry.gated) setPendingView(target);
+    else setView(target);
+  };
   const [rows, setRows] = useState<WatchRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -87,6 +100,21 @@ export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; a
           hasMore: items.length >= 15,
         }] : [];
       });
+      // Match the working Harbor catalog fallback when a configured TMDB source fails.
+      if (!next.length && specs.some((spec) => spec.key !== "popular")) {
+        try {
+          const fallback = unique(await (kind === "movies" ? topMovies() : topSeries()));
+          if (cancelled) return;
+          if (fallback.length) next.push({
+            key: "popular",
+            title: kind === "movies" ? "The essential films" : "Stories worth returning to",
+            items: fallback,
+            load: (page) => kind === "movies" ? topMovies(undefined, (page - 1) * 100) : topSeries(undefined, (page - 1) * 100),
+            page: 1,
+            hasMore: fallback.length >= 15,
+          });
+        } catch { /* The error state below is shown when both providers fail. */ }
+      }
       setRows(next);
       setFeatured(next.flatMap((row) => row.items).find((item) => !!item.background) ??
         next[0]?.items[0] ?? null);
@@ -102,6 +130,14 @@ export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; a
   }, [active, specs, retry]);
 
   useEffect(() => { setExpandedRow(null); }, [kind]);
+  useEffect(() => {
+    if (!focused) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFocused(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [focused]);
 
   const showMore = async (row: WatchRow) => {
     if (loadingMore || !row.hasMore) return;
@@ -135,12 +171,16 @@ export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; a
             <h1>Watch something <em>worth remembering.</em></h1>
           </div>
           <nav aria-label="Screening categories" className="void-watch-modes">
-            <button type="button" data-selected={kind === "movies" || undefined} aria-current={kind === "movies" ? "page" : undefined} onClick={() => setView("movies")}>
-              <Clapperboard size={19} /> Films
-            </button>
-            <button type="button" data-selected={kind === "shows" || undefined} aria-current={kind === "shows" ? "page" : undefined} onClick={() => setView("shows")}>
-              <Tv2 size={19} /> Series
-            </button>
+            {destination("movies") && (
+              <button type="button" data-selected={kind === "movies" || undefined} aria-current={kind === "movies" ? "page" : undefined} onClick={() => navigate("movies")}>
+                <Clapperboard size={19} /> Films
+              </button>
+            )}
+            {destination("shows") && (
+              <button type="button" data-selected={kind === "shows" || undefined} aria-current={kind === "shows" ? "page" : undefined} onClick={() => navigate("shows")}>
+                <Tv2 size={19} /> Series
+              </button>
+            )}
           </nav>
         </div>
         {primary && (
@@ -207,6 +247,20 @@ export function VoidWatchWorkspace({ kind, active = true }: { kind: WatchKind; a
           </>
         )}
       </div>
+      {pendingView && (
+        <ParentalPinModal
+          verify={unlock}
+          mode={{
+            kind: "unlock",
+            onUnlock: () => {
+              const target = pendingView;
+              setPendingView(null);
+              if (target) setView(target);
+            },
+            onCancel: () => setPendingView(null),
+          }}
+        />
+      )}
       {focused && (
         <section className="void-watch-focus" role="dialog" aria-modal="false" aria-label={focused.name}>
           <button className="void-watch-focus-close" type="button" onClick={() => setFocused(null)} aria-label="Close details"><X size={20} /></button>
