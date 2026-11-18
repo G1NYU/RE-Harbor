@@ -47,6 +47,7 @@ export function MusicTrackRow({
   nowPlaying = false,
   loading = false,
   paused = false,
+  editorial = false,
   className = "",
 }: {
   track: MusicTrack;
@@ -67,6 +68,8 @@ export function MusicTrackRow({
   nowPlaying?: boolean;
   loading?: boolean;
   paused?: boolean;
+  /** Opt-in VOID editorial rows: spacing, accessible artwork and readable labels. */
+  editorial?: boolean;
   className?: string;
 }) {
   const t = useT();
@@ -112,11 +115,12 @@ export function MusicTrackRow({
   return (
     <div
       data-now-playing-track={nowPlaying || undefined}
+      data-void-track-row={editorial || undefined}
       data-menu-open={open || undefined}
       aria-current={nowPlaying ? "true" : undefined}
       tabIndex={-1}
       onContextMenu={openMenu}
-      className={`group relative flex h-14 min-w-0 items-center ${nowPlaying ? "rounded-md bg-elevated" : open ? "bg-elevated" : ""} ${className}`}
+      className={`group relative flex ${editorial ? "min-h-[82px]" : "h-14"} min-w-0 items-center ${nowPlaying ? "rounded-md bg-elevated" : open ? "bg-elevated" : ""} ${className}`}
     >
       {leading ??
         (typeof index === "number" ? (
@@ -124,7 +128,7 @@ export function MusicTrackRow({
             {String(index).padStart(2, "0")}
           </span>
         ) : null)}
-      <div className="music-track-details flex h-14 min-w-0 flex-1 items-center text-start">
+      <div className={`music-track-details flex ${editorial ? "min-h-[82px]" : "h-14"} min-w-0 flex-1 items-center text-start`}>
         <button
           type="button"
           onClick={nowPlaying ? toggleMusicPlayback : onPlay}
@@ -133,7 +137,7 @@ export function MusicTrackRow({
               ? t(paused ? "music.play" : "music.pause")
               : t("music.playTrack", { title: track.title, artist: track.artist })
           }
-          className="music-track-cover relative block size-14 shrink-0 overflow-hidden rounded-[4px] bg-elevated"
+          className={`music-track-cover relative block ${editorial ? "size-[64px]" : "size-14"} shrink-0 overflow-hidden rounded-[4px] bg-elevated`}
         >
           <Poster
             src={track.artwork}
@@ -178,7 +182,7 @@ export function MusicTrackRow({
             <button
               type="button"
               onClick={onOpen ?? onPlay}
-              className="min-w-0 flex-1 truncate text-start text-[13px] font-semibold text-ink"
+              className={`min-w-0 flex-1 truncate text-start ${editorial ? "text-[16px]" : "text-[13px]"} font-semibold text-ink`}
               title={track.title}
             >
               {track.title}
@@ -189,7 +193,7 @@ export function MusicTrackRow({
             <MusicArtistLink
               name={track.artist}
               track={track}
-              className="text-[13px] text-ink-subtle"
+              className={editorial ? "text-[14px] text-ink-subtle" : "text-[13px] text-ink-subtle"}
             />
             <MusicTrackPlaylistChip track={track} />
           </span>
