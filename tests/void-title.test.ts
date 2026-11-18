@@ -171,3 +171,17 @@ test("VOID Windows CI checks the pinned native libmpv decoder and seek path", ()
   assert.match(native, /seek 3 absolute\+exact/);
   assert.doesNotMatch(native, /Start-Process\s+[^\n]*mpv|&\s+mpv(?:\.exe)?/i);
 });
+
+test("VOID 03 portable preview keeps a separate Windows identity and no updater", () => {
+  const config = JSON.parse(readFileSync("src-tauri/tauri.void03-preview.conf.json", "utf8"));
+  const workflow = readFileSync(".github/workflows/void03-windows-preview.yml", "utf8");
+  assert.equal(config.identifier, "app.harbor.void03preview");
+  assert.deepEqual(config.bundle.fileAssociations, []);
+  assert.deepEqual(config.plugins.updater.endpoints, []);
+  assert.deepEqual(config.plugins["deep-link"].desktop.schemes, ["void03-preview"]);
+  assert.match(workflow, /pnpm tauri build --no-bundle --config src-tauri\/tauri\.void03-preview\.conf\.json/);
+  assert.match(workflow, /Remove-Item -LiteralPath 'void03-preview\/uninstall\.exe'/);
+  assert.match(workflow, /workflow_dispatch/);
+  assert.match(workflow, /paths:[\s\S]*?"\.github\/workflows\/void03-windows-preview\.yml"/);
+  assert.doesNotMatch(workflow, /gh release|create-release|publish-release/);
+});

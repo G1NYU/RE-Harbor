@@ -173,3 +173,9 @@
 ## VOID 03 Windows libmpv option compatibility (2026-11-18)
 - Windows run 44316345021 downloaded the pinned 115.2 MB DLL and created its native context; smoke failed because libmpv rejected optional `script=no` (error -5).
 - Removed nonessential `script` and `ytdl` options from the isolated test. Required decoder options (`vo=null`, `ao=null`, `hwdec=no`) and actual first-frame/seek assertions remain.
+
+## VOID 03 isolated Windows portable preview (2026-11-18)
+- Added `src-tauri/tauri.void03-preview.conf.json` with distinct app identity `app.harbor.void03preview`, unique deep-link scheme, no file associations and no updater endpoints.
+- Added a one-time-on-introduction Windows CI workflow for `feature/void-03-workspaces` that builds a no-bundle Tauri executable using existing native dependencies, stages the verified payload, removes the installer helper, and uploads only an expiring Actions artifact.
+- Workflow is additionally manually dispatchable, but ordinary subsequent source-code commits do not automatically trigger another expensive native build.
+- This remains an unsigned developer preview, not a Harbor release; native GUI embedding, real addon streams and profile behavior require Windows device testing.

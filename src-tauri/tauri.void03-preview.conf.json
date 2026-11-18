@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "VOID 03 Native Preview",
+  "identifier": "app.harbor.void03preview",
+  "bundle": {
+    "fileAssociations": [],
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "void03-preview"
+        ]
+      }
+    },
+    "updater": {
+      "endpoints": []
+    }
+  }
+}

@@ -1,0 +1,101 @@
+name: VOID 03 isolated native Windows preview
+
+on:
+  push:
+    branches: [feature/void-03-workspaces]
+    paths:
+      - ".github/workflows/void03-windows-preview.yml"
+      - "src-tauri/tauri.void03-preview.conf.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: void03-native-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-preview:
+    name: Build isolated VOID 03 portable app (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      HARBOR_CAPSTAN_OPTIONAL: "1"
+      HARBOR_POKEMON_OPTIONAL: "1"
+    steps:
+      - name: Checkout VOID 03 branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+            installer/src-tauri
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Stage native dependencies and sidecars
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:HARBOR_CAPSTAN_SRC = Join-Path $env:RUNNER_TEMP 'void03-no-extension-compat-layer'
+          "HARBOR_CAPSTAN_SRC=$env:HARBOR_CAPSTAN_SRC" >> $env:GITHUB_ENV
+          pnpm run setup
+          if ($LASTEXITCODE -ne 0) { throw 'Native dependency setup failed' }
+      - name: Verify preview identity and updater isolation
+        shell: pwsh
+        run: |
+          $config = Get-Content -Raw 'src-tauri/tauri.void03-preview.conf.json' | ConvertFrom-Json
+          if ($config.identifier -ne 'app.harbor.void03preview') { throw 'Unsafe preview app identity' }
+          if ($config.plugins.'deep-link'.desktop.schemes -contains 'harbor') { throw 'Preview cannot register the normal Harbor protocol' }
+          if (@($config.plugins.updater.endpoints).Count -ne 0) { throw 'Preview updater endpoints must be empty' }
+      - name: Build isolated VOID 03 native executable
+        shell: pwsh
+        run: |
+          pnpm tauri build --no-bundle --config src-tauri/tauri.void03-preview.conf.json
+          if ($LASTEXITCODE -ne 0) { throw 'VOID 03 native build failed' }
+      - name: Build payload uninstaller for staging only
+        shell: pwsh
+        run: |
+          cargo build --manifest-path installer/src-tauri/Cargo.toml --release --no-default-features --features tauri/custom-protocol --bin harbor-uninstall --locked
+          if ($LASTEXITCODE -ne 0) { throw 'Staging helper build failed' }
+      - name: Create and verify self-contained portable payload
+        shell: pwsh
+        run: |
+          node installer/scripts/make-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Payload creation failed' }
+          node scripts/verify-managed-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Payload verification failed' }
+          New-Item -ItemType Directory -Force -Path void03-preview | Out-Null
+          Expand-Archive -LiteralPath 'installer/src-tauri/payload/harbor-payload.zip' -DestinationPath 'void03-preview' -Force
+          if (-not (Test-Path -LiteralPath 'void03-preview/harbor.exe')) { throw 'Portable executable missing' }
+          if (-not (Test-Path -LiteralPath 'void03-preview/libmpv-2.dll')) { throw 'Pinned libmpv missing from portable payload' }
+          Remove-Item -LiteralPath 'void03-preview/uninstall.exe' -Force -ErrorAction Stop
+          @'
+          VOID 03 NATIVE WINDOWS PORTABLE PREVIEW
+          =======================================
+          Development test build from feature/void-03-workspaces, not a release or installer.
+          Extract the entire folder to a new location and run harbor.exe.
+          It uses its own app identifier (app.harbor.void03preview).
+          It does not replace the installed Harbor application or register its normal URL scheme.
+          The updater has no endpoints. Do not use it as your daily Harbor installation.
+          The compatibility extension layer and Pokemon game engine are intentionally omitted.
+          Test VOID navigation, source selection, the actual libmpv player, subtitle seeking,
+          switching streams, playback recovery, Refract, and exiting/reopening the app.
+          '@ | Set-Content -LiteralPath 'void03-preview/README-VOID03.txt' -Encoding UTF8
+      - name: Upload temporary portable preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VOID-03-Windows-Native-Portable
+          path: void03-preview/
+          if-no-files-found: error
+          retention-days: 7
