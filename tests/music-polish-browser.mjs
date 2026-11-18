@@ -67,6 +67,17 @@ try {
     await mod.initializeMusic();
   }, { tracks });
 
+  // The browser fixture supplies Tauri after the app mounts; a first native
+  // connections request may already have failed. Retry against the now-installed
+  // shim so screenshots don't show a false provider failure.
+  const retry = page.getByRole("button", { name: "Try sources again" });
+  if (await retry.count()) {
+    await retry.click();
+    await retry.waitFor({ state: "hidden" });
+  }
+  assert.ok(!(await page.locator("[data-music-view]").innerText()).includes("Cannot read properties of undefined"),
+    "The mocked native connection error must be cleared before screenshots");
+
   const bar = page.locator('[data-music-dock]:not([data-music-dock-tab])');
   await bar.waitFor();
   const dockRect = await bar.boundingBox();
@@ -90,6 +101,12 @@ try {
   assert.notEqual(fullPlayer.background, "rgba(0, 0, 0, 0)", "Now Playing needs its own solid canvas");
   assert.ok(fullPlayer.x < 2 && Math.abs(fullPlayer.right - 1600) < 3, "Now Playing must span the window");
   await page.screenshot({ path: folder + "/now-playing-1600.png" });
+  await page.setViewportSize({ width: 2048, height: 1124 });
+  const widePlayer = await now.boundingBox();
+  assert.ok(widePlayer && widePlayer.x < 2 && Math.abs(widePlayer.x + widePlayer.width - 2048) < 3,
+    "Now Playing should span a 2048px-wide window");
+  await page.screenshot({ path: folder + "/now-playing-2048.png" });
+  await page.setViewportSize({ width: 1600, height: 900 });
   await page.locator("[data-music-dock-close]").click();
   await page.locator(".music-now-playing").waitFor({ state: "hidden" });
 
@@ -152,6 +169,11 @@ try {
   assert.notEqual(topbar.background, "rgba(0, 0, 0, 0)");
   await page.screenshot({ path: folder + "/artist-scrolled-1600.png" });
   await page.locator("[data-music-view]").evaluate((root) => { root.scrollTop = 0; });
+
+  await page.setViewportSize({ width: 2048, height: 1124 });
+  const wideArtist = await artistView.boundingBox();
+  assert.ok(wideArtist && wideArtist.width > 1600, "Artist page should fill the wide window");
+  await page.screenshot({ path: folder + "/artist-2048.png" });
 
   await page.setViewportSize({ width: 960, height: 700 });
   const mobileColumns = await artistView.locator(".music-detail-track-list").evaluate(el => getComputedStyle(el).gridTemplateColumns);
