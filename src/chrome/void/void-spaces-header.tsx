@@ -74,12 +74,15 @@ export function VoidSpacesHeader() {
   const available = (id: NavItemId) => entries.find(({ item }) => item.id === id);
   const navigate = (id: NavItemId) => {
     const entry = available(id);
-    if (!entry) return;
+    // Settings remains reachable even when hidden from customized navigation.
+    // Preserve the PIN restriction on the hidden destination as well.
+    if (!entry && id !== "settings") return;
+    const target = entry?.item.view ?? "settings";
     setOpen(false);
-    if (entry.gated || (id === "settings" && locked)) {
-      setPendingPinView(entry.item.view);
+    if (entry?.gated || (id === "settings" && locked)) {
+      setPendingPinView(target);
     } else {
-      setView(entry.item.view);
+      setView(target);
     }
   };
   const spaceOf = SPACES.find((space) =>
@@ -182,7 +185,7 @@ export function VoidSpacesHeader() {
             onOpenSettings={() => navigate("settings")}
             triggerClassName="void-spaces-avatar"
           />
-          {IS_TAURI && !settings.useNativeTitleBar && !settings.hybridTitleBar && (
+          {IS_TAURI && !settings.useNativeTitleBar && (
             <div className="void-spaces-window-controls" data-tauri-drag-region="false">
               <button type="button" aria-label={t("chrome.minimize")} onClick={minimize}>—</button>
               <button type="button" aria-label={maximized ? t("chrome.restore") : t("chrome.maximize")} onClick={() => void toggleMaximize()}>□</button>

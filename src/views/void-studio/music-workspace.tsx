@@ -204,6 +204,8 @@ function MusicStudioBody() {
           onPlaylist={() => openPlaylistPicker(track)}
           onArtist={() => {
             setRoom("search"); setQuery(track.artist);
+            setFilter("all");
+            setSearchError("");
             const run = ++searchRun.current;
             setSearching(true);
             void searchTyped(track.artist).then((result) => {
