@@ -278,18 +278,21 @@ try {
   const player = page.locator("[data-harbor-player]:visible");
   await player.waitFor({ timeout: 30000 });
   await player.locator("[data-player-video-mount]").waitFor();
-  await page.waitForFunction(() => {
+  // Store the frame details atomically: Harbor can reset a deliberately
+  // 1-second stub immediately after the first decode, before a second evaluate.
+  const firstFrame = await page.waitForFunction(() => {
     const video = document.querySelector("[data-harbor-player] [data-player-video-mount] video");
-    return video instanceof HTMLVideoElement &&
-      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-      video.videoWidth > 0 && video.videoHeight > 0 && video.error == null;
+    if (!(video instanceof HTMLVideoElement) ||
+        video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+        video.videoWidth <= 0 || video.videoHeight <= 0 || video.error != null) return null;
+    return {
+      width: video.videoWidth,
+      height: video.videoHeight,
+      source: video.currentSrc,
+      readyState: video.readyState,
+    };
   }, undefined, { timeout: 25000 });
-  const decoded = await player.locator("[data-player-video-mount] video").evaluate((video) => ({
-    width: video.videoWidth,
-    height: video.videoHeight,
-    source: video.currentSrc,
-    readyState: video.readyState,
-  }));
+  const decoded = await firstFrame.jsonValue();
   assert.equal(decoded.width, 96, "The source should decode a fixture frame");
   assert.equal(decoded.height, 54);
   assert.match(decoded.source, /video-fixture\.invalid\/1080\.mp4/);

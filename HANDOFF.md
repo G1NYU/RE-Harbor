@@ -145,3 +145,7 @@
 - Extended the Edge test past manual source discovery into the existing resolution pipeline and player stage. The browser must decode a video frame from the chosen source and render VOID's own player transport.
 - Generates a small VP8/WebM clip in the Windows Edge test using canvas and MediaRecorder. Intercepts the synthetic addon URL with CORS and byte-range support; no outside network dependency or checked-in media file.
 - Covers browser source handoff and first-frame decode, not native libmpv, real-world addon health, TV remotes or installer packaging.
+
+## VOID 03 first-frame capture regression (2026-11-18)
+- Windows rendering run 44310675313 reached the player and decoded a video frame, but the prior smoke checked video dimensions in a second call after Harbor's short-stream guard had reset the 1.4-second synthetic clip. The second width was zero.
+- Capture decoded dimensions and source URL atomically in the same `waitForFunction` result. Keep short-stream detection enabled; this test is for the first decoded frame, not long-running stream validity.
