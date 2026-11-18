@@ -63,6 +63,17 @@ pub(super) fn spawn_event_loop(loop_state: EventLoop) {
                     }
                     if matches!(event, Event::FileLoaded) && !quality_started {
                         quality_started = true;
+                        // A real file load is the earliest reliable Now Playing signal.
+                        // Last.fm is optional: failures must never interrupt audio.
+                        let now_app = app.clone();
+                        let now_track = track.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(error) =
+                                crate::music::lastfm::update_now_playing(&now_app, &now_track).await
+                            {
+                                eprintln!("[harbor::music] Last.fm Now Playing failed: {error}");
+                            }
+                        });
                         let quality_app = app.clone();
                         let quality_mpv = mpv.clone();
                         let quality_generation = active_generation.clone();
@@ -113,10 +124,9 @@ pub(super) fn spawn_event_loop(loop_state: EventLoop) {
                             }
                         }
                     }
-                    if (matches!(event, Event::EndFile(_)) || natural_eof)
-                        && !scrobble_started
-                        && should_scrobble(listened_seconds, duration_seconds)
-                    {
+                    // Send once as soon as the threshold is reached, not only
+                    // at EOF: quitting or switching tracks used to lose listens.
+                    if !scrobble_started && should_scrobble(listened_seconds, duration_seconds) {
                         scrobble_started = true;
                         let scrobble_app = app.clone();
                         let scrobble_track = track.clone();
@@ -303,6 +313,10 @@ pub(in crate::music) fn listened_increment(previous: Option<f64>, current: f64) 
 }
 
 pub(in crate::music) fn should_scrobble(listened_seconds: f64, duration_seconds: f64) -> bool {
+    // Last.fm excludes recordings of 30 seconds or less.
+    if duration_seconds.is_finite() && duration_seconds > 0.0 && duration_seconds <= 30.0 {
+        return false;
+    }
     let threshold = if duration_seconds.is_finite() && duration_seconds > 0.0 {
         (duration_seconds * 0.5).min(240.0)
     } else {

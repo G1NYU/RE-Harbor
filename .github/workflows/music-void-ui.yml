@@ -34,6 +34,7 @@ jobs:
         run: |
           node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
             tests/music-ui-polish.test.ts \
+            tests/music-lastfm-integration.test.ts \
             tests/music-void-ui.test.ts \
             tests/music-dock-clearance.test.ts \
             tests/music-now-playing-key.test.ts \

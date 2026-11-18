@@ -54,3 +54,9 @@ Updated: 2026-11-18
 - After inspecting 960x700 Edge screenshots, the 340px portrait stacked above the artist name and pushed the identity below the initial viewport. The 850px container breakpoint now keeps a smaller image alongside the name; stacking begins only under 620px.
 - Added a browser check that the artist name is visible at 960px while track columns collapse to one.
 - This is a prepared, unpushed fix pending completion of the earlier portable Windows build, so that build is not cancelled mid-packaging.
+
+## Last.fm and FMHY implementation (2026-11-18)
+- Audited real FMHY-referenced open-source players and existing Harbor Last.fm/MusicBrainz/ListenBrainz support. See `docs/music-ecosystem-references.md`.
+- Corrected the native Last.fm threshold: track updates now send when actually listened for >=50% or four minutes, not only on EOF, and <=30-second recordings are excluded. Skip/seek behavior remains protected by real listened-time accounting and one-send flag.
+- Added an optional Last.fm Now Playing event after mpv FileLoaded when the account is connected; no credentials transmitted without authorization. The optional presence failure must not affect audio.
+- This change needs a *new* Windows preview; the previous successful artifact predates it.

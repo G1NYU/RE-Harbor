@@ -404,6 +404,12 @@ fn scrobble_threshold_uses_half_or_four_minutes() {
     assert!(should_scrobble(150.0, 300.0));
     assert!(!should_scrobble(239.0, 900.0));
     assert!(should_scrobble(240.0, 900.0));
+    assert!(!should_scrobble(20.0, 20.0));
+    assert!(!should_scrobble(30.0, 30.0));
+    assert!(!should_scrobble(22.0, 45.0));
+    assert!(should_scrobble(22.5, 45.0));
+    assert!(!should_scrobble(239.0, 0.0));
+    assert!(should_scrobble(240.0, 0.0));
 }
 
 #[test]
