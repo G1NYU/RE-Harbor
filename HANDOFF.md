@@ -169,3 +169,7 @@
 - Windows Edge generates the exact six-second WebM clip used in the end-to-end VOID source-to-player test and saves it under `void-screenshots/native-fixture.webm`.
 - The Windows UI workflow now verifies the pinned, SHA-256-checked Harbor libmpv-2.dll by initializing libmpv through its C API, decoding 96x54 VP8 video to a null video output, advancing playback time, and seeking to 3 seconds.
 - This provides native Windows engine coverage without a published installer, remote media or extra packages. It does not yet exercise Tauri's WebView-to-libmpv window embedding, audio output devices, a real provider, or the eventual installer.
+
+## VOID 03 Windows libmpv option compatibility (2026-11-18)
+- Windows run 44316345021 downloaded the pinned 115.2 MB DLL and created its native context; smoke failed because libmpv rejected optional `script=no` (error -5).
+- Removed nonessential `script` and `ytdl` options from the isolated test. Required decoder options (`vo=null`, `ao=null`, `hwdec=no`) and actual first-frame/seek assertions remain.

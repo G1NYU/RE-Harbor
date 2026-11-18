@@ -78,8 +78,6 @@ try {
 
   foreach ($item in @(
     @('config', 'no'),
-    @('script', 'no'),
-    @('ytdl', 'no'),
     @('vo', 'null'),
     @('ao', 'null'),
     @('hwdec', 'no'),
