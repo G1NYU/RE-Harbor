@@ -1,6 +1,6 @@
 // Run with a fresh browser profile against Harbor's Vite entry point.
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 const require = createRequire(resolve(process.env.VOID_BROWSER_DEPS, "package.json"));
@@ -119,6 +119,8 @@ try {
   });
   assert.ok(clip.bytes.length >= 100, "Browser generated no video bytes");
   const playbackBytes = Buffer.from(clip.bytes);
+  // Reuse exactly the same offline video bytes for the pinned native libmpv decoder.
+  await writeFile(`${output}/native-fixture.webm`, playbackBytes);
   await page.route("https://video-fixture.invalid/**", async (route) => {
     const range = /^bytes=(\d+)-(\d*)$/.exec(route.request().headers()["range"] ?? "");
     const start = range ? Number(range[1]) : 0;

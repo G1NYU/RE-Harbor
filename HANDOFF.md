@@ -164,3 +164,8 @@
 - Edge browser run 44312797660 passed first-frame decode and native controls, but its screenshot was captured while the connecting overlay was still fading away.
 - Wait for `.harbor-connecting` to leave the visible player before the final screenshot, ensuring the handoff reaches a usable playback surface; wake the chrome to inspect the native controls.
 - The short-form local fixture is still separate from real-provider and libmpv playback validation.
+
+## VOID 03 pinned native Windows decode smoke (2026-11-18)
+- Windows Edge generates the exact six-second WebM clip used in the end-to-end VOID source-to-player test and saves it under `void-screenshots/native-fixture.webm`.
+- The Windows UI workflow now verifies the pinned, SHA-256-checked Harbor libmpv-2.dll by initializing libmpv through its C API, decoding 96x54 VP8 video to a null video output, advancing playback time, and seeking to 3 seconds.
+- This provides native Windows engine coverage without a published installer, remote media or extra packages. It does not yet exercise Tauri's WebView-to-libmpv window embedding, audio output devices, a real provider, or the eventual installer.

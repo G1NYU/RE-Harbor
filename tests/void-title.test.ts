@@ -156,3 +156,18 @@ test("VOID playback transport takes precedence over inherited Stremio chrome", (
   assert.match(transport, /if \(!voidPlayer && isStremioLayout && !pipMode\)/);
   assert.match(transport, /voidPlayer \? \(/);
 });
+
+test("VOID Windows CI checks the pinned native libmpv decoder and seek path", () => {
+  const smoke = readFileSync("scripts/void-workspace-smoke.mjs", "utf8");
+  const workflow = readFileSync(".github/workflows/void-workspace-render.yml", "utf8");
+  const native = readFileSync("scripts/void03-native-mpv-smoke.ps1", "utf8");
+  assert.match(smoke, /writeFile\(\x60\$\{output\}\/native-fixture\.webm\x60, playbackBytes\)/);
+  assert.match(workflow, /pnpm run setup:libmpv/);
+  assert.match(workflow, /void03-native-mpv-smoke\.ps1/);
+  assert.match(native, /mpv_create\(\)/);
+  assert.match(native, /mpv_initialize\(/);
+  assert.match(native, /video-params\/w/);
+  assert.match(native, /video-params\/h/);
+  assert.match(native, /seek 3 absolute\+exact/);
+  assert.doesNotMatch(native, /mpv\.exe/);
+});

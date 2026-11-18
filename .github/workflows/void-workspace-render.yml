@@ -39,6 +39,13 @@ jobs:
             node scripts/void-workspace-smoke.mjs
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           } finally { Stop-Process -Id $server.Id -ErrorAction SilentlyContinue }
+      - name: Decode offline fixture with pinned Windows libmpv
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm run setup:libmpv
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned libmpv setup failed' }
+          & ./scripts/void03-native-mpv-smoke.ps1 -VideoPath 'void-screenshots/native-fixture.webm'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
