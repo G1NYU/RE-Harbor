@@ -70,6 +70,7 @@ try {
   await actions.getByRole("button", { name: /Choose a source/ }).waitFor();
   await page.keyboard.press("Escape");
   assert.equal(await actions.count(), 0, "Title dialog should close on Escape");
+  assert.equal(await title.locator("h1").innerText(), film.name, "Escape must not navigate back from title");
   for (const [width, height, dir] of [
     [960, 600, "ltr"],
     [1280, 800, "ltr"],

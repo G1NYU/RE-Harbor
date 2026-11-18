@@ -78,7 +78,7 @@ export function VoidTitleTools({
             <h2>What next?</h2>
             <p>{name}</p>
           </div>
-          <button ref={dismiss} type="button" onClick={onClose} aria-label="Close title actions">
+          <button ref={dismiss} type="button" data-tv-modal-close onClick={onClose} aria-label="Close title actions">
             <X size={20} />
           </button>
         </header>

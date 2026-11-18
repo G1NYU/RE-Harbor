@@ -83,3 +83,8 @@
 - Source choice, movie download, favorites and watched status dispatch through existing Harbor controllers, preserving Refract/watch history and local/online playback logic.
 - The remaining low-frequency features still have an explicit advanced compatibility route into the legacy detail tools. This remains a release blocker pending feature-parity replacement.
 - No installer, updater, deployment or other themes changed. Full Windows interaction checks are required after this patch is pushed and CI runs.
+
+## VOID 03 Windows Escape regression fix (2026-11-18)
+- Windows rendering run `44294807005` failed because the native title dialog's Escape key was captured by Harbor's TV navigation before reaching its document keydown handler, incorrectly popping the title route.
+- Mark the dialog's existing close button with `data-tv-modal-close`. Harbor's `runBack` then dispatches Escape to the actual dialog closer instead of navigating away. Added an assertion that the title route remains active after closing.
+- Typecheck and Refract workflow `44294807032` passed on the preceding commit. Windows rendering needs re-run.
