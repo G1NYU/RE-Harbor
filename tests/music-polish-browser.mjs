@@ -75,7 +75,7 @@ try {
     await retry.click();
     await retry.waitFor({ state: "hidden" });
   }
-  assert.ok(!(await page.locator("[data-music-view]").innerText()).includes("Cannot read properties of undefined"),
+  assert.ok(!(await page.locator("body").innerText()).includes("Cannot read properties of undefined"),
     "The mocked native connection error must be cleared before screenshots");
 
   const bar = page.locator('[data-music-dock]:not([data-music-dock-tab])');
