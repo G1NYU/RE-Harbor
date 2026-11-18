@@ -284,6 +284,7 @@ const CommunityCollectionsView = lazy(() =>
 const PlayPicker = lazy(() => importPlayPicker().then((m) => ({ default: m.PlayPicker })));
 const PlayerView = lazy(() => importPlayer().then((m) => ({ default: m.PlayerView })));
 const Movies = memo(lazy(() => importMovies().then((m) => ({ default: m.Movies }))));
+const VoidWatchWorkspace = lazy(() => import("@/views/void-studio/watch-workspace").then((m) => ({ default: m.VoidWatchWorkspace })));
 const Kids = lazy(() => importKids().then((m) => ({ default: m.Kids })));
 const KidsDetailView = lazy(() =>
   import("@/views/kids-detail").then((m) => ({ default: m.KidsDetailView })),
@@ -1809,7 +1810,11 @@ function Shell({ onReady }: { onReady?: () => void }) {
               <div {...layerProps(moviesTop)}>
                 <Suspense fallback={null}>
                   <Profiled id="view.movies">
-                    <Movies active={moviesTop} />
+                    {voidShell ? (
+                      <VoidWatchWorkspace kind="movies" active={moviesTop} />
+                    ) : (
+                      <Movies active={moviesTop} />
+                    )}
                   </Profiled>
                 </Suspense>
               </div>
@@ -1824,7 +1829,11 @@ function Shell({ onReady }: { onReady?: () => void }) {
             {showsAlive && (
               <div {...layerProps(showsTop)}>
                 <Suspense fallback={null}>
-                  <Shows active={showsTop} />
+                  {voidShell ? (
+                    <VoidWatchWorkspace kind="shows" active={showsTop} />
+                  ) : (
+                    <Shows active={showsTop} />
+                  )}
                 </Suspense>
               </div>
             )}
