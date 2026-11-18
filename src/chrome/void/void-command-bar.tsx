@@ -52,15 +52,19 @@ export function VoidCommandBar() {
           </span>
         </div>
         <div className="void-command-actions" data-tauri-drag-region="false">
-          <button
-            type="button"
-            className="void-command-search"
-            onClick={() => openSearch(true)}
-            aria-label={t("search.placeholder")}
-          >
-            <Search size={17} strokeWidth={1.8} aria-hidden="true" />
-            <span>{t("search.placeholder")}</span>
-          </button>
+          {/* Music provides a source-aware search field in its workspace; keep
+              global search for every other category without doubling controls. */}
+          {topKind !== "music" && (
+            <button
+              type="button"
+              className="void-command-search"
+              onClick={() => openSearch(true)}
+              aria-label={t("search.placeholder")}
+            >
+              <Search size={17} strokeWidth={1.8} aria-hidden="true" />
+              <span>{t("search.placeholder")}</span>
+            </button>
+          )}
           <div className="void-command-extra">
             <DownloadsButton />
             <NotificationCenter />
