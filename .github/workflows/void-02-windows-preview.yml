@@ -1,0 +1,111 @@
+name: VOID 02 Native Windows Installer Preview
+
+on:
+  push:
+    branches: [feature/void-02-native-shell]
+    paths:
+      - ".github/workflows/void-02-windows-preview.yml"
+      - "src/**"
+      - "src-tauri/**"
+      - "installer/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: void-02-windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: Build isolated VOID 02 NSIS installer (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      HARBOR_CHANNEL: beta
+      HARBOR_CAPSTAN_OPTIONAL: "1"
+      HARBOR_POKEMON_OPTIONAL: "1"
+    steps:
+      - name: Checkout VOID 02 preview branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare native sidecars and fonts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:HARBOR_CAPSTAN_SRC = Join-Path $env:RUNNER_TEMP 'void02-no-compat-layer'
+          "HARBOR_CAPSTAN_SRC=$env:HARBOR_CAPSTAN_SRC" >> $env:GITHUB_ENV
+          pnpm run setup
+          if ($LASTEXITCODE -ne 0) { throw "Native setup failed" }
+
+      - name: Build isolated VOID 02 NSIS installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm tauri build --bundles nsis --config src-tauri/tauri.void02-preview.conf.json
+          if ($LASTEXITCODE -ne 0) { throw "VOID NSIS build failed" }
+
+      - name: Verify installer and prepare artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundles = @(Get-ChildItem -LiteralPath 'src-tauri/target/release/bundle/nsis' -File -Filter '*-setup.exe' -ErrorAction Stop)
+          if ($bundles.Count -ne 1) { throw "Expected exactly one NSIS setup executable; found $($bundles.Count)" }
+          New-Item -ItemType Directory -Force -Path 'void02-installer' | Out-Null
+          Copy-Item -LiteralPath $bundles[0].FullName -Destination 'void02-installer/VOID-02-Windows-x64-Setup.exe'
+          $digest = (Get-FileHash -LiteralPath 'void02-installer/VOID-02-Windows-x64-Setup.exe' -Algorithm SHA256).Hash
+          "SHA256: $digest" | Set-Content -LiteralPath 'void02-installer/SHA256.txt' -Encoding utf8
+          @'
+          VOID EDITION 02 — WINDOWS INSTALLER PREVIEW
+          ===========================================
+          This is a genuine NSIS installer for the feature/void-02-native-shell branch.
+          It is an unsigned preview, not a Harbor release.
+          
+          1. Run VOID-02-Windows-x64-Setup.exe to install for the current user.
+          2. Launch VOID Edition 02 Preview from the Start menu.
+          3. Test navigation, Music, stream selection, account/profile menus,
+             Settings and Refract while comparing against the last working preview.
+          4. Uninstall VOID Edition 02 Preview using Windows Installed Apps.
+          
+          Separate installer identity: app.harbor.void02preview
+          No normal Harbor file-association takeover or automatic updater.
+          Extension compatibility layer and Pokemon engine are omitted.
+          Do not replace or uninstall your working Harbor installation.
+          '@ | Set-Content -LiteralPath 'void02-installer/README.txt' -Encoding utf8
+
+      - name: Upload VOID 02 Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: VOID-02-Windows-x64-Installer
+          path: void02-installer/
+          if-no-files-found: error
+          retention-days: 7
