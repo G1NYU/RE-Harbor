@@ -55,3 +55,14 @@ test("editorial visuals are scoped to VOID and do not rely on costly runtime eff
   assert.match(css, /@media \(max-width: 670px\)/);
   assert.doesNotMatch(css, /backdrop-filter:\s*blur\(|filter:\s*blur\(|@keyframes/);
 });
+
+test("Music home composes a current-track hero with a playable recent queue", () => {
+  const home = read("src/views/music/music-listening-home.tsx");
+  const css = read("src/chrome/void/void-music-editorial.css");
+  assert.match(home, /className="void-music-feature-queue"/);
+  assert.match(home, /className="void-music-feature-queue-list"/);
+  assert.match(home, /onClick=\{\(\) => play\(track\)\}/);
+  assert.match(home, /music-room-shortcuts/);
+  assert.match(css, /\.void-music-feature-queue-track/);
+  assert.match(css, /\.music-room-shortcuts > button/);
+});

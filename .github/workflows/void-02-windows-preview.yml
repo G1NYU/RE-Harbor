@@ -2,7 +2,7 @@ name: VOID 02 Native Windows Installer Preview
 
 on:
   push:
-    branches: [feature/void-02-native-shell]
+    branches: ['feature/void-02-*']
     paths:
       - ".github/workflows/void-02-windows-preview.yml"
       - "src/**"
@@ -87,7 +87,7 @@ jobs:
           @'
           VOID EDITION 02 — WINDOWS INSTALLER PREVIEW
           ===========================================
-          This is a genuine NSIS installer for the feature/void-02-native-shell branch.
+          This is a genuine NSIS installer for the feature/void-02-editorial-pages branch.
           It is an unsigned preview, not a Harbor release.
           
           1. Run VOID-02-Windows-x64-Setup.exe to install for the current user.
