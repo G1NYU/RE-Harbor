@@ -38,3 +38,7 @@ Updated: 2026-11-18
 - Added a **separate album-only design** so its header artwork/title/actions use width normally occupied by empty filler. Tint/background fades and blurs toward both the right window edge and the section below; text/art remains sharp. The album track rows form two balanced desktop columns, returning to one column in narrow windows.
 - Artist pages remain their own editorial layout. Playback, album metadata, track ordering in the source array and source selection are unchanged.
 - This remains an unpushed prepared change and needs real screenshot checks after approval.
+
+## Validation note (2026-11-18)
+- First branch CI run 44389549097 passed TypeScript but failed one new test that expected only artist pages to be full-width. The intended wide layout applies to both artist and album pages; corrected the test regex without changing production code.
+- The first portable Windows build was still compiling during this correction. Verification on the new test commit is pending.
