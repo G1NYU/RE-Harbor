@@ -31,6 +31,8 @@ import { HybridTitleBar } from "@/chrome/hybrid-title-bar";
 import { WindowResizeEdges } from "@/chrome/window-resize-edges";
 import { MinUIDock } from "@/chrome/minui-dock";
 import { Sidebar } from "@/chrome/sidebar";
+import { VoidRail } from "@/chrome/void/void-rail";
+import { VoidCommandBar } from "@/chrome/void/void-command-bar";
 import { DraculaSidebar } from "@/chrome/dracula-sidebar";
 import { NordSidebar } from "@/chrome/nord-sidebar";
 import { ForestSidebar } from "@/chrome/forest-sidebar";
@@ -913,6 +915,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
     [preview, settings.theme],
   );
   const layout = kid ? "sidebar" : baseLayout;
+  // VOID uses its own React application shell, not Harbor chrome with new CSS.
+  // Other themes, theme previews, kids, and Big Picture retain existing layouts.
+  const voidShell = !kid && !preview && !bigPicture && settings.theme.preset === "cool-grey" && layout === "sidebar";
   const themeHasTopbar =
     layout === "sidebar" ||
     layout === "dracula" ||
@@ -1626,6 +1631,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
     >
       <div
         data-harbor-shell
+        data-void-shell={voidShell ? "" : undefined}
         data-games-library={gamesTop ? "" : undefined}
         data-games-layout={gamesTop ? layout : undefined}
         data-games-navigation={gamesTop && gamesNavigationOpen ? "" : undefined}
@@ -1651,7 +1657,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
         className="relative flex h-full"
       >
         <div data-harbor-native-backdrop className="relative flex h-full min-w-0 flex-1">
-          {!settingsTop &&
+          {voidShell && !playerActive && !standaloneLive && !pickerTop && !immersive && <VoidRail />}
+          {!voidShell &&
+            !settingsTop &&
             !playerActive &&
             !standaloneLive &&
             !pickerTop &&
@@ -1720,7 +1728,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
           {installFeatures.music && <MusicDock />}
           <MusicSurprisePrompt />
           {!playerActive && <WindowResizeEdges />}
-          <HybridTitleBar suppressed={playerActive || immersive || chromeHidden} />
+          <HybridTitleBar suppressed={playerActive || immersive || chromeHidden || voidShell} />
           <div
             className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${playerActive ? "invisible" : ""}`}
           >
@@ -2173,16 +2181,19 @@ function Shell({ onReady }: { onReady?: () => void }) {
                 <WindowControls />
               </div>
             )}
-            {!immersive && !settingsTop && (
+            {!immersive && !settingsTop && !voidShell && (
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-0 z-30 h-24 bg-gradient-to-b from-canvas/85 via-canvas/40 to-transparent"
               />
             )}
-            {!immersive &&
+            {!immersive && !voidShell &&
               (themeHasTopbar || (settingsTop && layout !== "minui" && layout !== "custom")) && (
                 <Topbar />
               )}
+            {voidShell && !immersive && !playerActive && !pickerTop && !standaloneLive && (
+              <VoidCommandBar />
+            )}
             {!immersive && !playerActive && !pickerTop && layout === "custom" && (
               <div aria-hidden className="harbor-chrome-proxy fixed end-3 top-3 z-[40]">
                 <TogetherButton />

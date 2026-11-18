@@ -1,0 +1,234 @@
+/* VOID 02: a distinct compiled application shell for every media category.
+ * This is loaded by the app once. No injected themes, scroll JS, blur filters,
+ * poster cloning or continuous animations. Child view components stay mounted. */
+
+[data-void-shell] {
+  --void-rail-width: 104px;
+  --void-shell-bg: #11111b;
+  --void-shell-elevated: #181825;
+  --void-shell-hover: #242436;
+  --void-shell-active: #cdd6f4;
+  --void-shell-muted: #9095ac;
+  --void-shell-focus: #9399b2;
+  background: var(--void-shell-bg);
+  color: #cdd6f4;
+}
+
+[data-void-shell] [data-harbor-native-backdrop] {
+  background: transparent;
+}
+
+.void-rail {
+  position: relative;
+  z-index: 70;
+  display: flex;
+  width: var(--void-rail-width);
+  flex: 0 0 var(--void-rail-width);
+  min-height: 0;
+  flex-direction: column;
+  background: transparent;
+}
+
+.void-rail-brand {
+  display: flex;
+  height: 84px;
+  flex: 0 0 84px;
+  justify-content: center;
+  align-items: center;
+}
+
+.void-rail-v {
+  font-family: var(--font-display);
+  font-size: 31px;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: -.04em;
+  color: #cdd6f4;
+}
+
+.void-rail-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 10px 22px;
+  scrollbar-width: none;
+}
+.void-rail-scroll::-webkit-scrollbar { display: none; }
+
+.void-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.void-rail-group-secondary { margin-top: 26px; }
+
+.void-rail-link {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 68px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 10px;
+  color: var(--void-shell-muted);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.void-rail-link:hover, .void-rail-link:focus-visible {
+  background: var(--void-shell-elevated);
+  color: #cdd6f4;
+}
+.void-rail-link[data-active] {
+  color: var(--void-shell-active);
+}
+.void-rail-link[data-active]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 2px;
+  inset-block-start: calc(50% - 13px);
+  width: 2px;
+  height: 26px;
+  border-radius: 2px;
+  background: #9399b2;
+}
+.void-rail-icon { position: relative; display: grid; place-items: center; width: 26px; height: 27px; }
+.void-rail-lock { position: absolute; inset-inline-end: -5px; inset-block-end: -2px; }
+.void-rail-label {
+  width: 100%;
+  overflow: hidden;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: .005em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.void-command-bar {
+  pointer-events: none;
+  position: fixed;
+  z-index: 85;
+  inset-inline-start: var(--void-rail-width);
+  inset-inline-end: 0;
+  inset-block-start: 0;
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 12px clamp(22px, 3.4vw, 62px);
+  color: #cdd6f4;
+}
+.void-command-start, .void-command-actions {
+  pointer-events: auto;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: clamp(10px, 1.35vw, 20px);
+}
+.void-command-context {
+  display: inline-flex;
+  max-width: 32ch;
+  gap: 12px;
+  align-items: center;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 750;
+  color: #cdd6f4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.void-command-context-parent, .void-command-context-separator { color: #6c7086; }
+.void-command-search {
+  display: flex;
+  width: clamp(180px, 18vw, 360px);
+  min-width: 0;
+  height: 40px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: #9ca1b6;
+  background: rgb(24 24 37 / .8);
+  text-align: start;
+}
+.void-command-search span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.void-command-search:hover { background: #242436; color: #cdd6f4; }
+.void-command-extra { display: flex; align-items: center; gap: 7px; }
+.void-command-icon, .void-window-controls button {
+  display: grid;
+  width: 37px;
+  height: 37px;
+  flex: 0 0 37px;
+  place-items: center;
+  border-radius: 9px;
+  color: #a6adc8;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+.void-command-icon:hover, .void-window-controls button:hover {
+  color: #cdd6f4;
+  background: #242436;
+}
+.void-command-avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; min-width: 38px; min-height: 38px; }
+.void-command-avatar:focus-visible { outline: 2px solid #9399b2; outline-offset: 3px; }
+.void-command-overflow-wrap { position: relative; }
+.void-command-overflow {
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #181825;
+  box-shadow: 0 22px 45px -22px rgb(0 0 0 / .75);
+}
+.void-window-controls { display: flex; align-items: center; gap: 1px; }
+.void-window-controls button:last-child:hover { color: #f2a9ac; background: #34222b; }
+
+/* Generic Harbor popovers are reused for behavior, but belong visually to VOID. */
+[data-void-shell] .harbor-profile-dropdown {
+  border-radius: 12px;
+  background: #181825;
+  border: 0;
+  box-shadow: 0 22px 48px -20px rgb(0 0 0 / .75);
+}
+[data-void-shell] .harbor-profile-dropdown button { min-height: 42px; }
+[data-void-shell] button:focus-visible, [data-void-shell] a:focus-visible {
+  outline: 2px solid var(--void-shell-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1150px) {
+  .void-command-extra { display: none; }
+  .void-command-bar { padding-inline: 22px; }
+}
+@media (max-width: 760px) {
+  [data-void-shell] { --void-rail-width: 74px; }
+  .void-rail-scroll { padding-inline: 5px; }
+  .void-rail-link { min-height: 55px; }
+  .void-rail-label { font-size: 9.5px; }
+  .void-command-context { display: none; }
+  .void-command-bar { min-height: 66px; padding-inline: 12px; gap: 7px; }
+  .void-command-actions { gap: 4px; }
+  .void-command-search { width: 42px; min-width: 42px; justify-content: center; }
+  .void-command-search span { display: none; }
+  .void-window-controls { gap: 0; }
+  .void-window-controls button { width: 28px; flex-basis: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .void-rail-link, .void-command-icon, .void-window-controls button { transition: none; }
+}
