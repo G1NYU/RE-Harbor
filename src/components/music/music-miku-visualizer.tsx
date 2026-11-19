@@ -31,6 +31,18 @@ export function MikuArtwork({ className = "" }: { className?: string }) {
   return <img className={`music-miku-art ${className}`} src={MIKU_ARTWORK[mikuModel].portrait} alt="" aria-hidden="true" draggable={false} />;
 }
 
+/** Animated authored idle sheet for settings; playback choreography stays native-signal driven. */
+export function MikuIdlePreview() {
+  const { mikuModel } = useMusicAppearance();
+  return (
+    <div
+      aria-hidden="true"
+      className="music-miku-art music-miku-idle-preview"
+      style={{ backgroundImage: `url(${MIKU_ARTWORK[mikuModel].idle})` }}
+    />
+  );
+}
+
 export function MusicMikuVisualizer({ track, playing, concealed = false, stream = acquireMusicMeter }: {
   track: MusicTrack;
   playing: boolean;

@@ -70,7 +70,7 @@ import type { MusicExploreRequest } from "@/lib/music/navigation";
 import { MusicServiceLogo } from "./music-service-logo";
 import { MusicQualityBadge } from "./music-quality-badge";
 import { MusicSignalDetails, MusicLevelMeter } from "./music-signal-details";
-import { useMusicAudioMeter } from "@/lib/music/audio-meter";
+import { musicVisualizerStatus, useMusicAudioMeter } from "@/lib/music/audio-meter";
 import { getMusicSpeakerState } from "@/lib/music/casting";
 import { musicTrackQuality } from "@/lib/music/quality";
 import "./music-now-playing.css";
@@ -80,6 +80,24 @@ const NOW_LIKE_SPOKES = [0, 45, 90, 135, 180, 225, 270, 315];
 function ArtworkLevels({ track, enabled }: { track: MusicTrack; enabled: boolean }) {
   const meter = useMusicAudioMeter(track, enabled);
   return <MusicLevelMeter meter={meter} />;
+}
+
+/** Keep 20Hz meter re-renders scoped to the tiny caption, not the player shell. */
+function MusicVisualizerCaption({ track, playing }: { track: MusicTrack; playing: boolean }) {
+  const t = useT();
+  const [reducedMotion, setReducedMotion] = useState(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const meter = useMusicAudioMeter(track, playing && !reducedMotion);
+  const status = musicVisualizerStatus(meter, track, playing, reducedMotion);
+  const label = status === "loading" ? "common.loading" : `music.quality.${status}`;
+  return <small data-music-visualizer-status={status} aria-live="polite">{t(label)}</small>;
 }
 
 export function MusicNowPlaying({
@@ -453,7 +471,7 @@ export function MusicNowPlaying({
                 <div className="music-now-spectrum">
                   <span>{t("music.now.visualizer")}</span>
                   <MusicDockVisualizer enabled track={current} playing={player.phase === "playing"} />
-                  <small>{t("music.quality.inactive")}</small>
+                  <MusicVisualizerCaption track={current} playing={player.phase === "playing"} />
                 </div>
               )}
             </div>

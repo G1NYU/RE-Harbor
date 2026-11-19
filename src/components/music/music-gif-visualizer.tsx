@@ -38,6 +38,8 @@ export function MusicGifCanvas({ animation, playing = true, track, timing = "aut
       const key = track ? JSON.stringify([track.connectorId, track.id]) : "";
       if (key !== trackKey) { trackKey = key; groove.reset(); clock.retime(); }
       const animate = playing && inView && !document.hidden && !motion.matches && !!surface.offsetWidth;
+      surface.dataset.motion = motion.matches ? "reduced" : animate ? "running" : "paused";
+      surface.dataset.frames = String(animation.frames.length);
       const analyze = animate && track && track.mediaKind !== "video";
       if (!analyze) { release?.(); release = null; }
       else if (!release) release = acquireMusicMeter(state => {

@@ -1,5 +1,6 @@
 .music-audio-settings {
-  max-width: 920px;
+  width: 100%;
+  max-width: 1180px;
   min-width: 0;
   padding: 28px 24px 110px;
   margin-inline: auto;

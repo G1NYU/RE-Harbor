@@ -19,7 +19,8 @@ test("VOID routes account and sidebar shortcuts to the upper-right away from doc
 test("VOID selection fades instead of drawing a bordered rectangle", () => {
   const css = read("src/void-native.css");
   assert.match(css, /button\[data-harbor-nav\]\[data-active\] \{/);
-  assert.match(css, /background: linear-gradient\(to right, color-mix/);
+  assert.match(css, /background: color-mix\(in srgb, var\(--void-raised\)/);
+  assert.match(css, /content: none;/);
   assert.match(css, /border-color: transparent/);
 });
 
@@ -56,4 +57,16 @@ test("VOID connecting mark is flat and has no enclosing panel", () => {
   assert.match(source, /data-void-default-artwork/);
   assert.match(source, /border-0 bg-transparent/);
   assert.doesNotMatch(source, /rounded-xl border border-\[#313244\]/);
+});
+
+test("original VOID grouped right-aligned sidebar preserves arbitrary tab moves", () => {
+  const side = read("src/chrome/sidebar.tsx");
+  const css = read("src/void-native.css");
+  assert.match(side, /data-void-sidebar-groups=\{grouped \|\| undefined\}/);
+  assert.match(side, /VOID_NAV_SECTIONS/);
+  assert.match(side, /data-void-nav-section/);
+  assert.match(side, /visibleOrder=\{visibleOrder\}/);
+  assert.match(side, /SidebarPositionEditor/);
+  assert.match(css, /flex-direction: row-reverse/);
+  assert.match(css, /content: none/);
 });

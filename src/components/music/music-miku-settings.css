@@ -12,3 +12,7 @@
 .music-miku-model { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
 .music-miku-model > span { color: var(--color-ink-muted); font-size: 13px; }
 .music-miku-model > div { width: 220px; max-width: 100%; }
+.music-miku-copy .music-motion-reduced { display: none; color: var(--color-ink-muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .music-miku-copy .music-motion-reduced { display: block; }
+}

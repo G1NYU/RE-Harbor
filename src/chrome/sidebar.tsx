@@ -1,6 +1,6 @@
 import { useContextMenu } from "@/lib/context-menu";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { HarborMark } from "@/components/icons/harbor-mark";
 import { ProfileChip } from "@/chrome/sidebar/profile-chip";
 import { useT } from "@/lib/i18n";
@@ -142,6 +142,7 @@ export function Sidebar() {
           setView={setView}
           collapsed={collapsed}
           retainLabels={retainLabels}
+          voidNative={voidNative}
           onPinNav={(v) => setPendingPinView(v)}
         />
         {/* VOID's full-width music dock must never cover account or rail utilities.
@@ -205,17 +206,29 @@ export function Sidebar() {
   );
 }
 
+// Section labels follow the saved order; they never constrain arbitrary tab moves.
+const VOID_NAV_SECTIONS: Partial<Record<NavItemId, string>> = {
+  movies: "Watch", shows: "Watch", anime: "Watch", kids: "Watch",
+  live: "Watch", sports: "Watch", vod: "Watch",
+  manga: "Read", ebook: "Read",
+  music: "Listen & Play", games: "Listen & Play",
+  library: "Yours", downloads: "Yours", calendar: "Yours", collections: "Yours",
+  addons: "More", plugins: "More", settings: "More",
+};
+
 function ScrollableNav({
   view,
   setView,
   collapsed,
   retainLabels,
+  voidNative,
   onPinNav,
 }: {
   view: View;
   setView: (v: View) => void;
   collapsed: boolean;
   retainLabels: boolean;
+  voidNative: boolean;
   onPinNav: (v: View) => void;
 }) {
   const kid = useActiveKid();
@@ -228,6 +241,7 @@ function ScrollableNav({
   const { entries } = useSidebarNavigation();
   const editing = useNavEditMode();
   const visibleOrder = entries.map(({ item }) => item.id);
+  const grouped = voidNative && !collapsed && !editing;
   const ref = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState<{ top: boolean; bottom: boolean }>({
     top: false,
@@ -280,20 +294,28 @@ function ScrollableNav({
         onContextMenu={openEmptyMenu}
         className="flex flex-1 flex-col overflow-y-auto px-4 pt-3 pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="flex flex-col gap-1.5">
-          {entries.map(({ item, gated }) => (
-            <NavItem
-              key={item.id}
-              {...item}
-              collapsed={collapsed}
-              retainLabels={retainLabels}
-              big={!!kid}
-              gated={gated}
-              visibleOrder={visibleOrder}
-              active={view === item.view}
-              onClick={() => (gated ? onPinNav(item.view) : setView(item.view))}
-            />
-          ))}
+        <div className="flex flex-col gap-1.5" data-void-sidebar-groups={grouped || undefined}>
+          {entries.map(({ item, gated }, index) => {
+            const section = grouped ? VOID_NAV_SECTIONS[item.id] : undefined;
+            const previous = index > 0 ? VOID_NAV_SECTIONS[entries[index - 1].item.id] : undefined;
+            return (
+              <Fragment key={item.id}>
+                {section && section !== previous && (
+                  <div data-void-nav-section aria-hidden="true">{t(section)}</div>
+                )}
+                <NavItem
+                  {...item}
+                  collapsed={collapsed}
+                  retainLabels={retainLabels}
+                  big={!!kid}
+                  gated={gated}
+                  visibleOrder={visibleOrder}
+                  active={view === item.view}
+                  onClick={() => (gated ? onPinNav(item.view) : setView(item.view))}
+                />
+              </Fragment>
+            );
+          })}
           {kid && (
             <NavItem
               render={(active) => <KidsPlayIcon active={active} />}

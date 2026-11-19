@@ -14,6 +14,14 @@
   transition: visibility 0s;
 }
 .music-miku-art { display: block; width: 100%; height: 100%; object-fit: contain; }
+.music-miku-preview .music-miku-idle-preview {
+  background-repeat: no-repeat;
+  background-size: 1200% 800%;
+  animation: music-miku-idle 8s step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .music-miku-preview .music-miku-idle-preview { animation: none; }
+}
 /* Only the reveal moves; her mounted pose and beat clock keep running. CSS
    transitions reverse from their current position during rapid toggles. */
 .music-miku-reveal {

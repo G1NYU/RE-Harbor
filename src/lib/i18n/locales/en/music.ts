@@ -14,6 +14,9 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
+  "music.motion.reduced": "Animation is paused because reduced motion is enabled in your system accessibility settings.",
+  "music.gif.frameCount": "{count} frames",
+  "music.gif.static": "This GIF contains only one frame and cannot move.",
   "music.xxl.newer": "Newer class",
   "music.xxl.older": "Older class",
   ...musicMiku,
