@@ -177,7 +177,7 @@ html[data-void-native="1"] main:not([data-kids="on"]) .harbor-hero-content :is(h
 
 html[data-void-native="1"] main:not([data-kids="on"]) .harbor-hero-content p {
   max-width: 56ch;
-  color: rgb(186 194 222 / 0.82);
+  color: var(--color-ink);
   line-height: 1.55;
 }
 
@@ -358,4 +358,48 @@ html[data-void-native="1"] main[data-music-view] [data-music-mast-form] input[da
 html[data-void-native="1"] main[data-music-view] [data-music-mast-form]:focus-within {
   outline: 2px solid var(--void-focus);
   outline-offset: 2px;
+}
+
+html[data-void-native="1"] [data-void-topbar-utilities] {
+  gap: clamp(4px, .5vw, 10px);
+  padding-inline: clamp(4px, .65vw, 12px);
+}
+.void-topbar-tool {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 38px;
+  block-size: 38px;
+  border-radius: 9px;
+}
+button.void-topbar-tool:is(:hover, :focus-visible) {
+  background: var(--color-elevated);
+  color: var(--color-ink);
+}
+html[data-void-native="1"] .harbor-anime-scrim,
+html[data-void-native="1"] .harbor-manga-scrim {
+  --hero-direction: to right;
+  background: linear-gradient(var(--hero-direction), var(--color-canvas), color-mix(in srgb, var(--color-canvas) 94%, transparent) 30%, color-mix(in srgb, var(--color-canvas) 78%, transparent) 54%, transparent 84%);
+}
+html[dir="rtl"][data-void-native="1"] :is(.harbor-anime-scrim, .harbor-manga-scrim) {
+  --hero-direction: to left;
+}
+html[data-void-native="1"] aside[data-harbor-sidebar][data-tv-focus-scope] {
+  padding-block-end: var(--harbor-dock-gap, 0px);
+}
+
+@media (min-width: 1024px) {
+  aside[data-harbor-sidebar][data-collapsed="false"] [data-nav-edit-wrapper]:has([role="group"]) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  aside[data-harbor-sidebar] [data-nav-edit-wrapper] [data-harbor-nav] {
+    gap: 8px;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+  aside[data-harbor-sidebar] [data-nav-edit-wrapper] [data-harbor-sidebar-label] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

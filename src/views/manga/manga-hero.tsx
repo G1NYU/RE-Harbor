@@ -94,7 +94,7 @@ export function MangaHero({
           style={{ objectPosition: "center 20%" }}
         />
         <div className="absolute inset-0 bg-canvas/45" />
-        <div className="absolute inset-0 bg-gradient-to-r rtl:bg-gradient-to-l from-[var(--color-canvas)] from-5% via-[color-mix(in_oklch,var(--color-canvas),transparent_45%)] via-55% to-[color-mix(in_oklch,var(--color-canvas),transparent_88%)]" />
+        <div className="harbor-manga-scrim absolute inset-0 bg-gradient-to-r rtl:bg-gradient-to-l from-[var(--color-canvas)] from-5% via-[color-mix(in_oklch,var(--color-canvas),transparent_45%)] via-55% to-[color-mix(in_oklch,var(--color-canvas),transparent_88%)]" />
         <div
           className="absolute inset-x-0 bottom-0 h-[55%]"
           style={{
@@ -203,14 +203,14 @@ export function MangaHero({
             onClick={() => setActive((i) => (i - 1 + featured.length) % featured.length)}
             label={t("Previous")}
             size={38}
-            className="absolute start-2 top-1/2 z-20 h-14 w-14 -translate-y-1/2 opacity-25 group-hover:opacity-100"
+            className="absolute start-2 top-1/2 z-20 h-14 w-14 -translate-y-1/2 opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
           />
           <NavArrow
             dir="right"
             onClick={() => setActive((i) => (i + 1) % featured.length)}
             label={t("Next")}
             size={38}
-            className="absolute end-2 top-1/2 z-20 h-14 w-14 -translate-y-1/2 opacity-25 group-hover:opacity-100"
+            className="absolute end-2 top-1/2 z-20 h-14 w-14 -translate-y-1/2 opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
           />
           <div className="absolute bottom-6 start-20 z-10 flex gap-1.5">
             {featured.map((_, i) => (

@@ -32,6 +32,7 @@ import { MusicGlyph } from "@/components/icons/music-glyph";
 import { Poster } from "@/components/poster";
 import { useMusicTrackContextMenu } from "./music-track-menu";
 import { MusicQueueContinuation } from "./music-queue-continuation";
+import { MusicDockVisualizer } from "./music-dock-visualizer";
 import { MusicNowTitle } from "./music-now-title";
 import { MusicUpNextRow } from "./music-up-next-row";
 import { MusicVideoSurface } from "./music-video-surface";
@@ -75,6 +76,11 @@ import { musicTrackQuality } from "@/lib/music/quality";
 import "./music-now-playing.css";
 
 const NOW_LIKE_SPOKES = [0, 45, 90, 135, 180, 225, 270, 315];
+
+function ArtworkLevels({ track, enabled }: { track: MusicTrack; enabled: boolean }) {
+  const meter = useMusicAudioMeter(track, enabled);
+  return <MusicLevelMeter meter={meter} />;
+}
 
 export function MusicNowPlaying({
   inset,
@@ -144,7 +150,7 @@ export function MusicNowPlaying({
     Boolean(
       current &&
       player.phase !== "resolving" &&
-      (appearance.levels || panel === "signal") &&
+      panel === "signal" &&
       !isMusicVideoActive() &&
       !speaker.active,
     ),
@@ -382,7 +388,8 @@ export function MusicNowPlaying({
           <div className="music-now-options">
             <button
               type="button"
-              aria-pressed={appearance.levels}
+              disabled={video || speaker.active}
+              aria-pressed={!video && !speaker.active && appearance.levels}
               onClick={() => setMusicAppearance({ levels: !appearance.levels })}
               title={t("music.quality.levels")}
             >
@@ -391,9 +398,10 @@ export function MusicNowPlaying({
             </button>
             <button
               type="button"
-              aria-pressed={appearance.dockVisualizer}
+              disabled={video || speaker.active}
+              aria-pressed={!video && !speaker.active && appearance.dockVisualizer}
               onClick={() => setMusicAppearance({ dockVisualizer: !appearance.dockVisualizer })}
-              title={t("music.now.visualizer")}
+              title={t(video || speaker.active ? "music.quality.unavailable" : "music.now.visualizer")}
             >
               <BarChart3 size={17} aria-hidden="true" />
               <span>{t("music.now.visualizer")}</span>
@@ -441,11 +449,18 @@ export function MusicNowPlaying({
                   className="w-full [--poster-radius:0px]"
                 />
               )}
+              {appearance.dockVisualizer && !video && !speaker.active && (
+                <div className="music-now-spectrum">
+                  <span>{t("music.now.visualizer")}</span>
+                  <MusicDockVisualizer enabled track={current} playing={player.phase === "playing"} />
+                  <small>{t("music.quality.inactive")}</small>
+                </div>
+              )}
             </div>
             {video && <MusicVideoFullscreen track={current} />}
-            {appearance.levels && current.mediaKind !== "video" && (
+            {appearance.levels && !speaker.active && current.mediaKind !== "video" && (
               <div className="music-now-levels" data-now-levels>
-                <MusicLevelMeter meter={meter} />
+                <ArtworkLevels track={current} enabled={player.phase !== "resolving" && !isMusicVideoActive()} />
               </div>
             )}
           </div>

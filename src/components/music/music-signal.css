@@ -204,3 +204,27 @@
 [data-art-colors] .music-level-peak {
   background: color-mix(in srgb, var(--music-art-accent) 75%, var(--color-ink));
 }
+
+.music-level-meter {
+  border-inline-start: 2px solid var(--color-edge-soft);
+  padding-inline-start: 12px;
+}
+.music-level-track {
+  height: 5px;
+  border-radius: 20px;
+  background: var(--color-elevated);
+}
+.music-level-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(5% - 2px), var(--color-surface) calc(5% - 2px) 5%);
+}
+.music-level-fill {
+  background: color-mix(in srgb, var(--color-accent) 62%, var(--color-ink-muted));
+  transition: transform 160ms ease-out;
+}
+.music-level-peak { z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .music-level-fill { transition: none; }
+}

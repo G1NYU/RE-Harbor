@@ -212,6 +212,14 @@ try {
   await bar.click({ position: { x: 20, y: 25 } });
   const now = page.locator(".music-now-playing");
   await now.waitFor();
+  const visualizer = now.getByRole("button", { name: "Visualizer", exact: true });
+  const spectrum = now.locator(".music-now-artwork .music-now-spectrum");
+  if ((await visualizer.getAttribute("aria-pressed")) === "true") await visualizer.click();
+  await visualizer.click();
+  await spectrum.waitFor();
+  assert.ok((await spectrum.locator(".music-dock-viz-bar").count()) > 0);
+  await visualizer.click();
+  await spectrum.waitFor({ state: "detached" });
   // Capture settled pixels, not the transparent halfway frame of the 280ms
   // opening animation. Verify the full listening environment is opaque.
   const fullPlayer = await now.evaluate(async (el) => {
@@ -348,6 +356,27 @@ try {
     "The artist name must stay visible above the fold at 960px",
   );
   await page.screenshot({ path: folder + "/artist-960.png" });
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const musicTab = page.locator('aside [data-harbor-nav="music"]');
+  await musicTab.click({ button: "right" });
+  await page.getByText("Edit sidebar", { exact: true }).last().click();
+  await page.locator("[data-harbor-context-layer]").waitFor({ state: "hidden" });
+  const sidebarOrder = () =>
+    page
+      .locator("aside [data-harbor-nav]")
+      .evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute("data-harbor-nav")));
+  const original = await sidebarOrder();
+  const liveIndex = original.indexOf("live");
+  assert.ok(liveIndex >= 0 && liveIndex < original.indexOf("music"));
+  const moveUp = musicTab.locator("..").getByRole("button", { name: "Move up" });
+  for (let index = original.indexOf("music"); index > liveIndex; index--) {
+    await moveUp.click();
+    assert.equal((await sidebarOrder()).indexOf("music"), index - 1);
+  }
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await musicTab.waitFor();
+  assert.equal((await sidebarOrder()).indexOf("music"), liveIndex);
   console.log("Harbor Music geometry passed:", {
     dockRect,
     albumMetrics,

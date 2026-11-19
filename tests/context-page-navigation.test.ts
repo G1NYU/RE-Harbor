@@ -27,12 +27,12 @@ test("shared sidebar policy preserves customization while enforcing hidden pages
   assert.deepEqual(
     result.map((entry: { item: { id: string }; gated: boolean }) => [entry.item.id, entry.gated]),
     [
-      ["home", false],
       ["library", false],
+      ["home", false],
       ["settings", true],
     ],
   );
-  assert.equal(result[0].item.label, "Harbor");
+  assert.equal(result[1].item.label, "Harbor");
   const kid = resolveSidebarNavigation(items, config, {
     kid: true,
     showPlaylistsTab: true,

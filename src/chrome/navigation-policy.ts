@@ -71,7 +71,7 @@ export function resolveSidebarNavigation<T extends NavigationItem>(
   const grouped = visible
     .filter((item) => PRIMARY_NAV_IDS.has(item.id))
     .concat(visible.filter((item) => !PRIMARY_NAV_IDS.has(item.id)));
-  return grouped.map((item) => ({
+  return (config.order.length ? visible : grouped).map((item) => ({
     item,
     primary: PRIMARY_NAV_IDS.has(item.id),
     gated: !!item.pinGated && policy.locked,

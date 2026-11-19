@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Eye, Plus, RotateCcw, X } from "lucide-react";
+import { ArrowUp, ArrowDown, Eye, Plus, RotateCcw, X } from "lucide-react";
 import { TvModalClose } from "@/components/tv-modal-close";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
@@ -42,12 +42,66 @@ export function NavHideBadge({ itemId }: { itemId: NavItemId }) {
   );
 }
 
-export function NavEditableItem({ itemId, children }: { itemId?: NavItemId; children: ReactNode }) {
+export function NavEditableItem({
+  itemId,
+  visibleOrder,
+  children,
+}: {
+  itemId?: NavItemId;
+  visibleOrder?: NavItemId[];
+  children: ReactNode;
+}) {
   const editing = useNavEditMode();
   if (!editing || !itemId) return children;
   return (
+    <EditingNavItem itemId={itemId} visibleOrder={visibleOrder}>
+      {children}
+    </EditingNavItem>
+  );
+}
+
+function EditingNavItem({
+  itemId,
+  visibleOrder,
+  children,
+}: {
+  itemId: NavItemId;
+  visibleOrder?: NavItemId[];
+  children: ReactNode;
+}) {
+  const { cfg, commit } = useNavCfg();
+  const t = useT();
+  const index = visibleOrder?.indexOf(itemId) ?? -1;
+  return (
     <div data-nav-edit-wrapper className="relative grid">
       {children}
+      {visibleOrder && index >= 0 && (
+        <div
+          className="flex flex-wrap justify-center gap-1"
+          aria-label={t("Edit sidebar")}
+          role="group"
+        >
+          {([-1, 1] as const).map((step) => {
+            const anchor = visibleOrder[index + step];
+            const label = t(step < 0 ? "Move up" : "Move down");
+            return (
+              <button
+                key={step}
+                type="button"
+                disabled={!anchor}
+                title={label}
+                aria-label={label}
+                className="grid size-8 place-items-center rounded-md hover:bg-elevated disabled:opacity-30"
+                onClick={() =>
+                  anchor && commit(moveNavItem(cfg, itemId, anchor, step < 0 ? "before" : "after"))
+                }
+              >
+                {step < 0 ? <ArrowUp size={15} /> : <ArrowDown size={15} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <NavHideBadge itemId={itemId} />
     </div>
   );
@@ -160,7 +214,10 @@ export function useNavDrag(
       drag.moved = true;
       document.body.style.userSelect = "none";
       if (draggedEl) {
-        const scope = draggedEl.closest("nav") ?? draggedEl.parentElement ?? document.body;
+        const scope =
+          draggedEl.closest<HTMLElement>("[data-nav-sort-scope], nav") ??
+          draggedEl.parentElement ??
+          document.body;
         const before = new Map<HTMLElement, number>();
         for (const k of scope.querySelectorAll<HTMLElement>("[data-nav-drop-id]")) {
           const rect = k.getBoundingClientRect();
@@ -218,7 +275,9 @@ export function useNavDrag(
     const cell = el?.closest?.("[data-nav-drop-id]") as HTMLElement | null;
     const vertical = orientation === "vertical";
     let container: HTMLElement | null =
-      cell?.closest("nav") ?? (draggedEl?.parentElement as HTMLElement | null) ?? null;
+      cell?.closest<HTMLElement>("[data-nav-sort-scope], nav") ??
+      (draggedEl?.parentElement as HTMLElement | null) ??
+      null;
     const relevant = (scope: HTMLElement | null) =>
       scope
         ? [...scope.querySelectorAll<HTMLElement>("[data-nav-drop-id]")].filter(

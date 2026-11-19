@@ -207,7 +207,7 @@ export function MangaAdaptationCard({
               <AnimeCoverage
                 coverage={coverage}
                 onReadChapter={onReadChapter}
-                className="sm:max-w-[48%] sm:shrink-0"
+                className="rounded-xl bg-canvas px-5 py-4 sm:max-w-[44%] sm:shrink-0"
               />
             )}
           </div>

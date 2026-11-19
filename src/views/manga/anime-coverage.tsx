@@ -79,7 +79,7 @@ export function AnimeCoverage({
       </p>
       {resumeLabel && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-[13px] text-ink-subtle">
+          <span className="text-[13px] text-ink-muted">
             {jumpIndex == null
               ? t("Pick up the manga at {label}.", { label: resumeLabel })
               : t("Pick up the manga where the anime ends.")}

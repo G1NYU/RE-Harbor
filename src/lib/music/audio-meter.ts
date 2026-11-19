@@ -181,12 +181,15 @@ export function acquireMusicMeter(listener: (state: MusicAudioMeterState) => voi
     release();
   };
 }
+const offSnapshot = () => OFF;
+
 export function useMusicAudioMeter(
   track: MusicTrack | null | undefined,
   enabled = false,
 ): MusicAudioMeterState {
-  const state = useSyncExternalStore(monitor.subscribe, monitor.getSnapshot, monitor.getSnapshot);
   const allowed = enabled && !!track;
+  const snapshot = allowed ? monitor.getSnapshot : offSnapshot;
+  const state = useSyncExternalStore(monitor.subscribe, snapshot, snapshot);
   useEffect(() => {
     if (!allowed) return;
     let release: (() => void) | undefined;

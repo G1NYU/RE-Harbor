@@ -1,3 +1,4 @@
+import { PRIMARY_NAV_IDS } from "./navigation-policy";
 import type { ReactNode } from "react";
 import { useSportsEnabled } from "@/lib/sports/enabled";
 import { usePluginCataloguesAvailable } from "@/lib/streams/plugins/available";
@@ -329,7 +330,10 @@ export function applyNavCustomization(items: NavItem[], cfg: NavCustomization): 
 }
 
 export function effectiveNavOrder(cfg: NavCustomization): NavItemId[] {
-  const all = NAV_ITEMS.map((it) => it.id);
+  const all = [
+    ...NAV_ITEMS.filter((item) => PRIMARY_NAV_IDS.has(item.id)),
+    ...NAV_ITEMS.filter((item) => !PRIMARY_NAV_IDS.has(item.id)),
+  ].map((item) => item.id);
   const known = new Set<string>(all);
   const out: NavItemId[] = [];
   for (const id of cfg.order) {

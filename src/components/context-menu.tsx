@@ -937,7 +937,11 @@ export function ContextMenu() {
     const target = state.target;
     const navItem = target.itemId ? NAV_ITEMS.find((it) => it.id === target.itemId) : undefined;
     if (navItem && target.itemId) {
-      const order = effectiveNavOrder(appSettings.navCustomization);
+      const order =
+        target.visibleOrder ??
+        effectiveNavOrder(appSettings.navCustomization).filter(
+          (id) => !appSettings.navCustomization.hidden.includes(id),
+        );
       const at = order.indexOf(target.itemId);
       const prevId = at > 0 ? order[at - 1] : null;
       const nextId = at >= 0 && at < order.length - 1 ? order[at + 1] : null;

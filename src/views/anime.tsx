@@ -1,4 +1,4 @@
-import { RotateCcw, SlidersHorizontal } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -910,29 +910,9 @@ export function AnimeView({ active = true }: { active?: boolean }) {
                 slides={heroSlides}
                 topPicks={topPicks}
                 trendingByMetaId={heroTrendingAll}
+                onTune={() => setShowPicker(true)}
+                favoriteGenreCount={favoriteGenres.length}
               />
-              <button
-                type="button"
-                onClick={() => setShowPicker(true)}
-                title={t("Tune anime")}
-                aria-label={t("Tune anime")}
-                style={{ top: "min(22%, 200px)" }}
-                className="group absolute end-[-3rem] z-20 flex flex-col items-center gap-2.5 rounded-s-xl border border-e-0 border-edge-soft/40 bg-canvas/55 py-4 pe-2 ps-2 text-ink-subtle opacity-45 backdrop-blur-md transition-all duration-300 hover:bg-canvas/85 hover:text-ink hover:opacity-100 hover:ps-3"
-              >
-                <SlidersHorizontal
-                  size={15}
-                  strokeWidth={2}
-                  className="text-ink-muted transition-colors group-hover:text-accent"
-                />
-                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] [writing-mode:vertical-rl]">
-                  {t("Tune")}
-                </span>
-                {favoriteGenres.length > 0 && (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent/20 text-[9px] font-bold leading-none text-accent">
-                    {favoriteGenres.length}
-                  </span>
-                )}
-              </button>
             </div>
           ) : (
             <div className="harbor-anime-hero">

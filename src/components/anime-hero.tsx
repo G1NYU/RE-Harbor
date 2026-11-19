@@ -1,4 +1,4 @@
-import { Check, Plus, TrendingUp } from "lucide-react";
+import { Check, Plus, SlidersHorizontal, TrendingUp } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import { useEffect, useMemo, useState } from "react";
 import { useArtFallback } from "./anime-hero-art-fallback";
@@ -12,6 +12,7 @@ import { useAwardMasterVersion } from "@/lib/anime-awards-source";
 import { useAwardIcon } from "@/lib/award-icons";
 import type { Meta } from "@/lib/cinemeta";
 import { isSaved, toggleSaved } from "@/lib/feed";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { useT } from "@/lib/i18n";
 import { useMalRating } from "@/lib/mal-rating";
 import { useSettings } from "@/lib/settings";
@@ -32,11 +33,15 @@ export function AnimeHero({
   topPicks,
   trendingByMetaId,
   topBleed = true,
+  onTune,
+  favoriteGenreCount = 0,
 }: {
   slides: Meta[];
   topPicks: Meta[];
   trendingByMetaId?: Record<string, string>;
   topBleed?: boolean;
+  onTune?: () => void;
+  favoriteGenreCount?: number;
 }) {
   const { openMeta } = useView();
   const { settings } = useSettings();
@@ -46,6 +51,8 @@ export function AnimeHero({
   const [paused, setPaused] = useState(false);
   const [inView, setInView] = useState(true);
   const visible = usePageVisible();
+  const reducedMotion = useReducedMotion();
+  const [focused, setFocused] = useState(false);
   const [savedTick, setSavedTick] = useState(0);
   const n = slides.length;
   const windowIdx = useMemo(() => {
@@ -69,10 +76,10 @@ export function AnimeHero({
   }, [slides.length]);
 
   useEffect(() => {
-    if (paused || !inView || !visible || slides.length < 2) return;
+    if (paused || focused || reducedMotion || !inView || !visible || slides.length < 2) return;
     const id = setInterval(() => setActive((i) => (i + 1) % slides.length), ROTATE_MS);
     return () => clearInterval(id);
-  }, [paused, inView, visible, slides.length]);
+  }, [paused, focused, reducedMotion, inView, visible, slides.length]);
 
   useEffect(() => {
     if (active >= slides.length && slides.length > 0) setActive(0);
@@ -96,125 +103,145 @@ export function AnimeHero({
     <section
       id="anime-hero-section"
       onContextMenu={onContextMenu}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => setFocused(event.currentTarget.contains(event.relatedTarget))}
       className={`group relative harbor-hero-bleed ${topBleed ? "harbor-hero-bleed-top" : ""}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        {slides.map((m, i) => {
-          if (!windowIdx.has(i)) return null;
-          if (!m.background && !m.poster) return null;
-          return (
-            <div
-              key={m.id}
-              aria-hidden={i !== active}
-              className="absolute inset-0"
-              style={{
-                opacity: i === active ? 1 : 0,
-                transition: `opacity ${FADE_MS}ms cubic-bezier(0.32, 0.72, 0.24, 1)`,
-              }}
-            >
-              <HeroBackdrop meta={m} />
-            </div>
-          );
-        })}
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-gradient-to-r rtl:bg-gradient-to-l from-[var(--color-canvas)] from-0% via-[color-mix(in_oklch,var(--color-canvas),transparent_50%)] via-55% to-[color-mix(in_oklch,var(--color-canvas),transparent_92%)] to-100%"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-x-0 bottom-0 h-[60%]"
-          style={{
-            background:
-              "linear-gradient(to top, var(--color-canvas), color-mix(in oklch, var(--color-canvas), transparent 60%) 50%, transparent)",
-          }}
-        />
-      </div>
-
-      <div className="relative z-10 flex min-h-[520px] items-end px-20 pt-24 pb-10">
-        <div
-          className="flex max-w-[520px] flex-col gap-5"
-          style={{ transition: `opacity ${FADE_MS}ms ease-out` }}
-        >
-          <CrunchyrollBadge
-            name={current.name}
-            year={parseAwardYear(current.releaseInfo)}
-            id={current.id}
+      <div className="relative isolate">
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          {slides.map((m, i) => {
+            if (!windowIdx.has(i)) return null;
+            if (!m.background && !m.poster) return null;
+            return (
+              <div
+                key={m.id}
+                aria-hidden={i !== active}
+                className="absolute inset-0"
+                style={{
+                  opacity: i === active ? 1 : 0,
+                  transition: reducedMotion
+                    ? "none"
+                    : `opacity ${FADE_MS}ms cubic-bezier(0.32, 0.72, 0.24, 1)`,
+                }}
+              >
+                <HeroBackdrop meta={m} />
+              </div>
+            );
+          })}
+          <div
+            aria-hidden
+            className="harbor-anime-scrim absolute inset-0 bg-gradient-to-r rtl:bg-gradient-to-l from-[var(--color-canvas)] from-0% via-[color-mix(in_oklch,var(--color-canvas),transparent_50%)] via-55% to-[color-mix(in_oklch,var(--color-canvas),transparent_92%)] to-100%"
           />
-          {!findTopAward(current.name, parseAwardYear(current.releaseInfo), current.id) &&
-            trendingByMetaId?.[current.id] && (
-              <TrendingBadge source={trendingByMetaId[current.id]} />
-            )}
-          <HeroLogo title={current.name} logo={logo} />
-          <HeroTags meta={current} />
-          {current.description && (
-            <p className="line-clamp-3 text-[14.5px] leading-relaxed text-ink-muted">
-              {current.description}
-            </p>
-          )}
-          <div className="mt-1 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => openMeta(current)}
-              className="flex h-12 items-center gap-2.5 rounded-full bg-ink px-7 text-[15px] font-semibold text-canvas transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
-            >
-              <Play size={18} fill="currentColor" />
-              {t("Start Watching")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                toggleSaved(current.id);
-                setSavedTick((t) => t + 1);
-              }}
-              aria-label={saved ? t("Remove from saved") : t("Save for later")}
-              aria-pressed={saved}
-              className={`flex h-12 w-12 items-center justify-center rounded-full transition-[transform,background-color] duration-200 active:scale-[0.98] ${
-                saved
-                  ? "bg-ink/15 text-ink hover:bg-ink/20"
-                  : "bg-canvas/80 text-ink hover:bg-canvas/95"
-              }`}
-            >
-              <PopIcon
-                active={saved}
-                activeIcon={<Check size={18} strokeWidth={2.4} />}
-                inactiveIcon={<Plus size={18} strokeWidth={2} />}
-              />
-            </button>
-            <span className="ms-1 hidden items-center gap-1.5 text-[13px] text-ink-muted sm:inline-flex">
-              {malRating && (
-                <>
-                  <MalLogo className="h-[12px] w-auto text-ink-muted" />
-                  <span className="font-semibold text-ink">{malRating}</span>
-                </>
+          <div
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-[60%]"
+            style={{
+              background:
+                "linear-gradient(to top, var(--color-canvas), color-mix(in oklch, var(--color-canvas), transparent 60%) 50%, transparent)",
+            }}
+          />
+        </div>
+
+        <div className="relative z-10 flex min-h-[clamp(360px,52vh,600px)] items-end px-[clamp(3.5rem,5vw,5rem)] pt-24 pb-10">
+          <div
+            className="flex min-w-0 w-full max-w-[540px] flex-col gap-5"
+            style={{ transition: `opacity ${FADE_MS}ms ease-out` }}
+          >
+            <CrunchyrollBadge
+              name={current.name}
+              year={parseAwardYear(current.releaseInfo)}
+              id={current.id}
+            />
+            {!findTopAward(current.name, parseAwardYear(current.releaseInfo), current.id) &&
+              trendingByMetaId?.[current.id] && (
+                <TrendingBadge source={trendingByMetaId[current.id]} />
               )}
-            </span>
+            <HeroLogo title={current.name} logo={logo} />
+            <HeroTags meta={current} />
+            {current.description && (
+              <p className="line-clamp-3 text-[14.5px] leading-relaxed text-ink-muted">
+                {current.description}
+              </p>
+            )}
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => openMeta(current)}
+                className="flex h-12 items-center gap-2.5 rounded-full bg-ink px-7 text-[15px] font-semibold text-canvas transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
+              >
+                <Play size={18} fill="currentColor" />
+                {t("Start Watching")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleSaved(current.id);
+                  setSavedTick((t) => t + 1);
+                }}
+                aria-label={saved ? t("Remove from saved") : t("Save for later")}
+                aria-pressed={saved}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition-[transform,background-color] duration-200 active:scale-[0.98] ${
+                  saved
+                    ? "bg-ink/15 text-ink hover:bg-ink/20"
+                    : "bg-canvas/80 text-ink hover:bg-canvas/95"
+                }`}
+              >
+                <PopIcon
+                  active={saved}
+                  activeIcon={<Check size={18} strokeWidth={2.4} />}
+                  inactiveIcon={<Plus size={18} strokeWidth={2} />}
+                />
+              </button>
+              {onTune && (
+                <button
+                  type="button"
+                  onClick={onTune}
+                  aria-label={t("Tune anime")}
+                  className="inline-flex h-12 items-center gap-2 rounded-full border border-edge-soft bg-canvas/95 px-4 text-sm font-medium text-ink hover:bg-elevated"
+                >
+                  <SlidersHorizontal size={16} aria-hidden />
+                  {t("Tune")}
+                  {favoriteGenreCount > 0 && <span>{favoriteGenreCount}</span>}
+                </button>
+              )}
+              <span className="ms-1 hidden items-center gap-1.5 text-[13px] text-ink-muted sm:inline-flex">
+                {malRating && (
+                  <>
+                    <MalLogo className="h-[12px] w-auto text-ink-muted" />
+                    <span className="font-semibold text-ink">{malRating}</span>
+                  </>
+                )}
+              </span>
+            </div>
           </div>
         </div>
+
+        {slides.length > 1 && (
+          <>
+            <NavArrow
+              dir="left"
+              onClick={prev}
+              label={t("Previous")}
+              size={38}
+              className="absolute start-2 top-1/2 z-30 h-14 w-14 -translate-y-1/2 opacity-70 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            />
+            <NavArrow
+              dir="right"
+              onClick={next}
+              label={t("Next")}
+              size={38}
+              className="absolute end-2 top-1/2 z-30 h-14 w-14 -translate-y-1/2 opacity-70 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            />
+          </>
+        )}
       </div>
-
-      {slides.length > 1 && (
-        <>
-          <NavArrow
-            dir="left"
-            onClick={prev}
-            label={t("Previous")}
-            size={38}
-            className="absolute start-2 top-1/2 z-30 h-14 w-14 -translate-y-1/2 opacity-25 transition-opacity group-hover:opacity-100"
-          />
-          <NavArrow
-            dir="right"
-            onClick={next}
-            label={t("Next")}
-            size={38}
-            className="absolute end-2 top-1/2 z-30 h-14 w-14 -translate-y-1/2 opacity-25 transition-opacity group-hover:opacity-100"
-          />
-        </>
-      )}
-
-      <div className="relative z-10 flex flex-col gap-5 px-12 pb-12" data-saved={savedTick}>
-        <div className="flex items-end justify-between gap-4">
+      <div
+        className="relative z-10 flex flex-col gap-5 bg-canvas px-[clamp(1rem,4vw,3rem)] pb-12"
+        data-saved={savedTick}
+      >
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <h2 className="text-[20px] font-medium tracking-tight text-ink">
             {t("Top Picks for You")}
           </h2>
@@ -251,7 +278,7 @@ export function AnimeHero({
 
 export function AnimeHeroSkeleton() {
   return (
-    <section className="relative -mx-12 -mt-28" aria-hidden>
+    <section className="relative harbor-hero-bleed harbor-hero-bleed-top" aria-hidden>
       <div className="absolute inset-0 z-0 overflow-hidden">
         <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-elevated/45 via-surface/30 to-canvas" />
         <div className="absolute inset-0 bg-gradient-to-r rtl:bg-gradient-to-l from-[var(--color-canvas)] from-0% via-[color-mix(in_oklch,var(--color-canvas),transparent_50%)] via-55% to-[color-mix(in_oklch,var(--color-canvas),transparent_92%)] to-100%" />
@@ -263,8 +290,8 @@ export function AnimeHeroSkeleton() {
           }}
         />
       </div>
-      <div className="relative z-10 flex min-h-[520px] items-end px-12 pt-24 pb-10">
-        <div className="flex max-w-[520px] flex-col gap-5">
+      <div className="relative z-10 flex min-h-[clamp(360px,52vh,600px)] items-end px-[clamp(3.5rem,5vw,5rem)] pt-24 pb-10">
+        <div className="flex min-w-0 w-full max-w-[540px] flex-col gap-5">
           <div className="h-4 w-40 animate-pulse rounded-full bg-elevated/50" />
           <div className="h-16 w-[360px] max-w-full animate-pulse rounded-2xl bg-elevated/50" />
           <div className="h-4 w-56 animate-pulse rounded-full bg-elevated/40" />
@@ -303,7 +330,7 @@ function HeroLogo({ title, logo }: { title: string; logo?: string }) {
     return <HeroLogoImage logo={logo} title={title} onFail={() => setFailed(true)} />;
   }
   return (
-    <h1 className="font-display text-[56px] font-medium leading-[0.98] tracking-tight text-ink drop-shadow-[0_2px_22px_rgba(0,0,0,0.6)]">
+    <h1 className="font-display text-[clamp(28px,4vw,56px)] break-words font-medium leading-[0.98] tracking-tight text-ink drop-shadow-[0_2px_22px_rgba(0,0,0,0.6)]">
       {title}
     </h1>
   );
@@ -408,7 +435,11 @@ function HeroBackdrop({ meta }: { meta: Meta }) {
       onLoad={art.onLoad}
       onError={art.onError}
       className="absolute inset-0 h-full w-full object-cover"
-      style={{ objectPosition: "75% center" }}
+      style={
+        art.src === meta.poster
+          ? { objectFit: "contain", objectPosition: "82% center" }
+          : { objectPosition: "75% center" }
+      }
     />
   );
 }
@@ -438,7 +469,7 @@ function HeroLogoImage({
         setShown(true);
       }}
       onError={art.onError}
-      className="max-h-[120px] w-auto max-w-[420px] object-contain object-left rtl:object-right drop-shadow-[0_6px_24px_rgba(0,0,0,0.55)]"
+      className="max-h-[120px] w-auto max-w-[min(100%,420px)] object-contain object-left rtl:object-right drop-shadow-[0_6px_24px_rgba(0,0,0,0.55)]"
       style={{
         opacity: shown ? 1 : 0,
         transition: "opacity 420ms cubic-bezier(0.32, 0.72, 0.24, 1)",

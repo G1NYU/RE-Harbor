@@ -226,8 +226,7 @@ function ScrollableNav({
     openContextMenu(e, { kind: "nav" });
   };
   const { entries } = useSidebarNavigation();
-  const primary = entries.filter((entry) => entry.primary);
-  const collections = entries.filter((entry) => !entry.primary);
+  const visibleOrder = entries.map(({ item }) => item.id);
   const ref = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState<{ top: boolean; bottom: boolean }>({
     top: false,
@@ -270,19 +269,22 @@ function ScrollableNav({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={ref}
+        data-nav-sort-scope
         onContextMenu={openEmptyMenu}
         className="flex flex-1 flex-col overflow-y-auto px-4 pt-3 pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div className="flex flex-col gap-1.5">
-          {primary.map(({ item }) => (
+          {entries.map(({ item, gated }) => (
             <NavItem
               key={item.id}
               {...item}
               collapsed={collapsed}
               retainLabels={retainLabels}
               big={!!kid}
+              gated={gated}
+              visibleOrder={visibleOrder}
               active={view === item.view}
-              onClick={() => setView(item.view)}
+              onClick={() => (gated ? onPinNav(item.view) : setView(item.view))}
             />
           ))}
           {kid && (
@@ -299,27 +301,6 @@ function ScrollableNav({
               }}
             />
           )}
-        </div>
-        <div
-          data-tauri-drag-region
-          aria-hidden
-          className="h-5 shrink-0"
-          onContextMenu={openEmptyMenu}
-        />
-        <div className="flex flex-col gap-1.5">
-          {collections.map(({ item, gated }) => {
-            return (
-              <NavItem
-                key={item.id}
-                {...item}
-                gated={gated}
-                collapsed={collapsed}
-                retainLabels={retainLabels}
-                active={view === item.view}
-                onClick={() => (gated ? onPinNav(item.view) : setView(item.view))}
-              />
-            );
-          })}
         </div>
         <div data-tauri-drag-region className="flex-1 min-h-2" onContextMenu={openEmptyMenu} />
       </div>
@@ -379,6 +360,7 @@ function KidsPlayIcon({ active }: { active: boolean }) {
 
 function NavItem({
   id,
+  visibleOrder,
   render,
   label,
   active,
@@ -390,6 +372,7 @@ function NavItem({
   view,
 }: {
   id?: NavItemId;
+  visibleOrder?: NavItemId[];
   render: (active: boolean, hovered?: boolean) => ReactNode;
   label: string;
   active?: boolean;
@@ -407,14 +390,14 @@ function NavItem({
   const editing = useNavEditMode();
   const drag = useNavDrag(id, "vertical");
   return (
-    <NavEditableItem itemId={id}>
+    <NavEditableItem itemId={id} visibleOrder={visibleOrder}>
       <button
         onClick={onClick}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onContextMenu={(e) => {
           if (!id) return;
-          openContextMenu(e, { kind: "nav", itemId: id, view, label: text, onOpen: onClick });
+          openContextMenu(e, { kind: "nav", itemId: id, visibleOrder, view, label: text, onOpen: onClick });
         }}
         data-harbor-nav={view}
         data-active={active ? "" : undefined}

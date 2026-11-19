@@ -26,7 +26,30 @@ function player() {
   });
   const callbacks = new Map<string, (event: { payload: Record<string, unknown> }) => void>();
   const module = { exports: {} };
+  const noop = () => {};
+  const hydrate = async () => {};
   const mocks: Record<string, unknown> = {
+    "@/lib/active-profile-id": {
+      activeProfileId: () => "test",
+      activeProfileIsPrimary: () => true,
+    },
+    "@/lib/platform": { isWindowsDesktop: () => false },
+    "./listening-affinity": { observeMusicListening: noop, hydrateListeningAffinity: hydrate },
+    "./artist-blocks": {
+      filterBlockedTracks: (tracks: MusicTrack[]) => tracks,
+      hydrateArtistBlockStore: hydrate,
+    },
+    "./liked-artists": { hydrateLikedArtistStore: hydrate },
+    "./recent-context": { hydrateMusicContextTracks: hydrate, hydrateMusicRecentContexts: hydrate },
+    "./recent-destinations": { hydrateMusicDestinations: hydrate },
+    "./pinned-playlists": { hydratePinnedMusicPlaylists: hydrate },
+    "./pinned-sources": { loadPinnedSources: hydrate, peekPinnedSource: () => null },
+    "./queue-automation": { cancelMusicQueueAutomation: noop },
+    "./source-version": { shouldResolvePreferredSource: () => false },
+    "./queue-source": {},
+    "./explicit-preference": {},
+    "./decks": { engineSnapshot: async () => null },
+    "./transport": { resetMusicOrder: noop, musicWarmTargets: () => [] },
     "@/lib/cast-ownership": { stopCastOwner: async () => {} },
     "@tauri-apps/api/core": {
       invoke: async (command: string) =>
@@ -48,12 +71,16 @@ function player() {
     "./queue-order": { queueTrackKey },
     "./track-identity": { dedupeMusicTracks, sameMusicTrack },
     "./deck-sync": {
+      isDeckWindow: () => false,
       answerDeckRequests: () => () => {},
       broadcastDeckState: () => {},
       sendDeckAdopted: () => {},
       serveDeckCommands: () => () => {},
     },
-    "./deck-primary": { createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }) },
+    "./deck-primary": {
+      nativePlaybackAdoption: () => null,
+      createDeckAdoption: () => ({ deck: () => 0, adopt: () => false }),
+    },
     "./liked": {
       isMusicLiked: (ids: readonly string[], t: any) => !!t && ids.includes(t.id),
       likedIdsFor: (t: any) => (t ? [t.id] : []),
@@ -83,10 +110,15 @@ function player() {
       writeCheckpointToDb: () => {},
     },
     "./playback-origin": {
+      beginMusicQueue: noop,
       getMusicPlaybackOrigin: () => null,
       restoreMusicPlaybackOrigin: () => {},
     },
-    "./preferences": { readMusicPreference: () => null, writeMusicPreference: () => {} },
+    "./preferences": {
+      readStoredMusicPreference: () => null,
+      readMusicPreference: () => null,
+      writeMusicPreference: () => {},
+    },
     "./hidden-recents": { unhideMusicRecent: () => {} },
     "./audio-settings": {
       initializeMusicAudioSettings: async () => {},

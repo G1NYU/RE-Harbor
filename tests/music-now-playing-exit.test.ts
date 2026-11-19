@@ -45,6 +45,8 @@ test("the css exit matches the unmount delay, so it is never cut off", () => {
 });
 
 test("reduced motion suppresses the exit too", () => {
-  const at = css.indexOf("prefers-reduced-motion");
-  assert.match(css.slice(at, at + 160), /\[data-closing="1"\]/);
+  assert.match(
+    css,
+    /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.music-now-playing,\s*\.music-now-playing\[data-closing="1"\]\s*\{\s*animation: none/,
+  );
 });

@@ -78,7 +78,7 @@ function MangaDetailSkeleton({ onBack }: { onBack: () => void }) {
       <div className="relative -mx-12 -mt-24 min-h-[360px] overflow-hidden">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-elevated/45 via-surface/30 to-canvas" />
-          <div aria-hidden className={`absolute inset-0 ${GRADIENT_SIDE}`} />
+          <div aria-hidden className={`harbor-manga-scrim absolute inset-0 ${GRADIENT_SIDE}`} />
           <div
             aria-hidden
             className="absolute inset-x-0 bottom-0 h-[70%]"
@@ -414,7 +414,7 @@ export function MangaDetail({
               }
             />
           )}
-          <div aria-hidden className={`absolute inset-0 ${GRADIENT_SIDE}`} />
+          <div aria-hidden className={`harbor-manga-scrim absolute inset-0 ${GRADIENT_SIDE}`} />
           <div
             aria-hidden
             className="absolute inset-x-0 bottom-0 h-[70%]"

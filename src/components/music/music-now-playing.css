@@ -146,6 +146,8 @@
   min-height: 0;
 }
 .music-now-source {
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   gap: 9px;
   align-items: center;
@@ -1064,4 +1066,30 @@
     animation: none;
     opacity: 0;
   }
+}
+
+.music-now-artwork { position: relative; }
+.music-now-artwork > .music-now-spectrum {
+  position: absolute;
+  inset: auto 12px 12px;
+  height: auto;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: #edf1ff;
+  background: rgb(17 17 30 / .94);
+  font-size: 12px;
+  pointer-events: none;
+}
+.music-now-spectrum .music-dock-viz {
+  display: block;
+  width: 100%;
+  height: 38px;
+  margin: 4px 0 0;
+  color: #a9bee2;
+}
+.music-now-spectrum small { display: none; position: absolute; inset-block-start: 9px; inset-inline-end: 12px; }
+.music-now-spectrum:has([data-resting="true"]) small { display: inline; }
+
+.music-now-options button[aria-pressed="true"] {
+  box-shadow: inset 0 -2px currentColor;
 }
