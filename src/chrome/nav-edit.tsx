@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowUp, ArrowDown, Eye, Plus, RotateCcw, X } from "lucide-react";
 import { TvModalClose } from "@/components/tv-modal-close";
 import { useT } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
+import { useActiveKid } from "@/lib/profiles";
+import { withVoidDefaultNavOrder } from "./void-sidebar-order";
 import {
   NAV_ITEMS,
   effectiveNavOrder,
@@ -15,8 +17,15 @@ import { setNavEditMode, useNavEditMode } from "./nav-edit-mode";
 
 function useNavCfg() {
   const { settings, update } = useSettings();
+  const kid = useActiveKid();
+  const cfg = useMemo(
+    () => settings.theme.preset === "cool-grey" && !kid
+      ? withVoidDefaultNavOrder(settings.navCustomization)
+      : settings.navCustomization,
+    [settings.navCustomization, settings.theme.preset, kid],
+  );
   return {
-    cfg: settings.navCustomization,
+    cfg,
     commit: (next: typeof settings.navCustomization) => update({ navCustomization: next }),
   };
 }

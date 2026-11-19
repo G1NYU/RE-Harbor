@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type MouseEvent } from "react";
 import { ArrowLeft, Lock, RefreshCw, Share2, UserRound } from "lucide-react";
 import { UiIcon } from "@/components/ui-icon";
 import { ParentalPinModal } from "@/components/parental-pin-modal";
@@ -29,6 +29,7 @@ import {
 } from "@/lib/app-back";
 import { ContextNavigationIcon } from "./context-navigation-icon";
 import { useAvailableNavItems } from "./nav-items";
+import { withVoidDefaultNavOrder } from "./void-sidebar-order";
 import { resolveContextNavigation, resolveSidebarNavigation } from "./navigation-policy";
 
 const navigationListeners = new Set<() => void>();
@@ -46,7 +47,13 @@ export function useSidebarNavigation() {
   const { settings } = useSettings();
   const { locked, hiddenTabs } = useParental();
   const kid = useActiveKid();
-  const customization = usePreviewNavCustomization(settings.navCustomization);
+  const previewCustomization = usePreviewNavCustomization(settings.navCustomization);
+  const customization = useMemo(
+    () => settings.theme.preset === "cool-grey" && !kid
+      ? withVoidDefaultNavOrder(previewCustomization)
+      : previewCustomization,
+    [previewCustomization, settings.theme.preset, kid],
+  );
   const items = useAvailableNavItems();
   const policy = {
     kid: !!kid,
