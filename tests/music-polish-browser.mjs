@@ -74,6 +74,7 @@ const artist = {
 };
 try {
   await page.goto("http://127.0.0.1:1420", { waitUntil: "domcontentloaded" });
+  await page.locator("[data-harbor-sidebar]").waitFor();
   const sidebarSections = page.locator("[data-void-nav-section]");
   const sectionLabels = async () => (await sidebarSections.allTextContents())
     .map((value) => value.trim().toUpperCase());

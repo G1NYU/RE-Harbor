@@ -233,7 +233,7 @@ function ScrollableNav({
   const editing = useNavEditMode();
   const visibleOrder = entries.map(({ item }) => item.id);
   const grouped = voidNative && !collapsed && !editing;
-  const sectionAt = new Map(voidNavSectionBoundaries(visibleOrder).map(({ index, label }) => [index, label]));
+  const sectionAt = new Map<number, string>(voidNavSectionBoundaries(visibleOrder).map(({ index, label }) => [index, label]));
   const ref = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState<{ top: boolean; bottom: boolean }>({
     top: false,

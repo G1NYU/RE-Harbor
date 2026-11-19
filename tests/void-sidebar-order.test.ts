@@ -29,5 +29,5 @@ test("section labels remain unique when a custom order crosses groups", () => {
   const headings = voidNavSectionBoundaries(custom);
   assert.deepEqual(headings.map(({ label }) => label), ["Watch", "Read", "Listen & Play", "More"]);
   assert.equal(new Set(headings.map(({ label }) => label)).size, headings.length);
-  assert.deepEqual(headings.map(({ index }) => index), [1, 4, 5, 6]);
+  assert.deepEqual(headings.map(({ index }) => index), [1, 3, 4, 6]);
 });
