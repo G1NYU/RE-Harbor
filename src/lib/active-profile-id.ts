@@ -18,6 +18,11 @@ export function activeProfileId(): string {
   return s?.activeId || "default";
 }
 
+/** Refract must use the currently selected Harbor profile; this fork has no separate Nuvio slots. */
+export function activeScopedProfileId(): string {
+  return activeProfileId();
+}
+
 export function activeProfileIsPrimary(): boolean {
   const s = readState();
   if (!s || !Array.isArray(s.profiles) || s.profiles.length === 0) return true;
