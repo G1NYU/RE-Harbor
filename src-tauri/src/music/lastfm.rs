@@ -190,7 +190,6 @@ pub async fn scrobble(
     let mut params = BTreeMap::from([
         ("api_key".to_string(), api_key),
         ("artist".to_string(), track.artist.clone()),
-        ("chosenByUser".to_string(), "1".to_string()),
         ("duration".to_string(), track.duration_seconds.to_string()),
         ("method".to_string(), "track.scrobble".to_string()),
         ("sk".to_string(), session_key),
@@ -206,6 +205,28 @@ pub async fn scrobble(
         params.insert("album".to_string(), album.to_string());
     }
     post(params, &api_secret).await?;
+    Ok(true)
+}
+
+/// Optional Last.fm presence update; it never creates a scrobble.
+pub async fn update_now_playing(app: &tauri::AppHandle, track: &MusicTrack) -> Result<bool, String> {
+    let Some(api_key) = crate::settings_store::secret_value(app, API_KEY_SECRET)? else { return Ok(false); };
+    let Some(secret) = crate::settings_store::secret_value(app, API_SECRET_SECRET)? else { return Ok(false); };
+    let Some(session_key) = crate::settings_store::secret_value(app, SESSION_KEY_SECRET)? else { return Ok(false); };
+    let mut params = BTreeMap::from([
+        ("api_key".to_string(), api_key),
+        ("artist".to_string(), track.artist.clone()),
+        ("method".to_string(), "track.updateNowPlaying".to_string()),
+        ("sk".to_string(), session_key),
+        ("track".to_string(), track.title.clone()),
+    ]);
+    if track.duration_seconds > 0 {
+        params.insert("duration".to_string(), track.duration_seconds.to_string());
+    }
+    if let Some(album) = track.album.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+        params.insert("album".to_string(), album.to_string());
+    }
+    post(params, &secret).await?;
     Ok(true)
 }
 

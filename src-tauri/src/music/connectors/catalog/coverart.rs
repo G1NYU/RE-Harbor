@@ -11,9 +11,9 @@ pub fn safe_mbid(raw: &str) -> Option<String> {
 }
 
 pub fn release_artwork(release_mbid: &str, caa_id: u64) -> String {
-    format!(
-        "https://archive.org/download/mbid-{release_mbid}/mbid-{release_mbid}-{caa_id}_thumb500.jpg"
-    )
+    // Use the CAA-supported thumbnail endpoint instead of guessing archive.org filenames.
+    // Its resolver handles the current thumbnail naming and redirects to the real asset.
+    format!("https://coverartarchive.org/release/{release_mbid}/{caa_id}-500")
 }
 
 #[cfg(test)]
@@ -35,7 +35,7 @@ mod tests {
     fn artwork_points_straight_at_the_archive_item() {
         assert_eq!(
             release_artwork("cd21d4e9-af51-4e7c-bd9f-a5f31d5cfe1a", 34059386237),
-            "https://archive.org/download/mbid-cd21d4e9-af51-4e7c-bd9f-a5f31d5cfe1a/mbid-cd21d4e9-af51-4e7c-bd9f-a5f31d5cfe1a-34059386237_thumb500.jpg"
+            "https://coverartarchive.org/release/cd21d4e9-af51-4e7c-bd9f-a5f31d5cfe1a/34059386237-500"
         );
     }
 }

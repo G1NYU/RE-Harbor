@@ -29,13 +29,25 @@ impl Spectrum {
     // Only our named metadata filters are accepted. No unrelated decoder logs
     // or media paths are retained or forwarded to the frontend.
     pub fn ingest(&mut self, text: &str) {
-        let Some(rest) = text.strip_prefix("ametadata@harbor_band_") else {
+        // FFmpeg prints "[ametadata@harbor_band_0 @ 0x...] frame:0 ..."
+        // while older mpv logs can omit the bracketed filter context.
+        let line = text.trim_start();
+        let Some(rest) = line
+            .strip_prefix("[ametadata@harbor_band_")
+            .or_else(|| line.strip_prefix("ametadata@harbor_band_"))
+        else {
             return;
         };
-        let Some((index, value)) = rest.split_once(": ") else {
-            return;
-        };
+        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+        let (index, suffix) = rest.split_at(digits);
         let Some(index) = index.parse::<usize>().ok().filter(|index| *index < 8) else {
+            return;
+        };
+        let value = suffix.strip_prefix(": ").or_else(|| {
+            suffix.strip_prefix(" @ ")
+                .and_then(|rest| rest.split_once("] ").map(|(_, value)| value))
+        });
+        let Some(value) = value else {
             return;
         };
         if let Some((_, time)) = value.split_once("pts_time:") {
@@ -95,6 +107,21 @@ mod tests {
             "ametadata@harbor_band_0: lavfi.astats.Overall.RMS_level={db}"
         ));
     }
+    #[test]
+    fn ffmpeg_log_prefixes_feed_bands_without_inventing_audio() {
+        let mut spectrum = Spectrum::default();
+        spectrum.ingest("[ametadata@harbor_band_0 @ 0x7fc9fc009dc0] frame:0    pts:0       pts_time:0");
+        spectrum.ingest("[ametadata@harbor_band_0 @ 0x7fc9fc009dc0] lavfi.astats.Overall.RMS_level=-40.982769");
+        spectrum.ingest("[ametadata@harbor_band_1 @ 0x7fc9fc00bdc0] frame:0    pts:0       pts_time:0");
+        spectrum.ingest("[ametadata@harbor_band_1 @ 0x7fc9fc00bdc0] lavfi.astats.Overall.RMS_level=-34.748311");
+        assert!((spectrum.at(0.0)[0] + 40.982769).abs() < 0.00001);
+        assert!((spectrum.at(0.0)[1] + 34.748311).abs() < 0.00001);
+        spectrum.ingest("[other_filter @ 0x1234] lavfi.astats.Overall.RMS_level=-1");
+        spectrum.ingest("[ametadata@harbor_band_8 @ 0x1234] lavfi.astats.Overall.RMS_level=-1");
+        assert_eq!(spectrum.at(0.0)[2], -120.0);
+        assert_eq!(spectrum.at(1.0)[0], -120.0);
+    }
+
     #[test]
     fn playback_clock_does_not_show_future_or_stale_audio() {
         let mut spectrum = Spectrum::default();
