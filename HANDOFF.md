@@ -1,6 +1,6 @@
 # Harbor Music Polish — handoff
 
-Updated: 2026-11-18
+Updated: 2026-11-19
 
 ## Baseline and branches
 - Repository: `G1NYU/RE-Harbor`.
@@ -30,7 +30,7 @@ Updated: 2026-11-18
 ## Verification and next steps
 - 15 source-level consistency checks passed on the detached draft; these are not a substitute for TypeScript, runtime or visual checks.
 - The approved UI patch was pushed, and the source/visual/regression checks passed. Browser geometry is verified with synthetic fixtures rather than a signed production build.
-- The first portable build passed at GitHub Actions run 44389549093. The build with Last.fm improvements at run 44398691329 is compiling. Real source playback, scrobble account reporting and Windows device/OS integration still require manual application testing.
+- The first portable build passed at GitHub Actions run 44389549093. The build with Last.fm improvements passed at run 44398691329 and uploaded a complete portable Windows x64 artifact. Real source playback, scrobble account reporting and Windows device/OS integration still require manual application testing.
 - Do not claim the UI or playback is fixed before those checks pass.
 
 ## Album-detail screenshot clarification
@@ -59,15 +59,27 @@ Updated: 2026-11-18
 - Audited real FMHY-referenced open-source players and existing Harbor Last.fm/MusicBrainz/ListenBrainz support. See `docs/music-ecosystem-references.md`.
 - Corrected the native Last.fm threshold: track updates now send when actually listened for >=50% or four minutes, not only on EOF, and <=30-second recordings are excluded. Skip/seek behavior remains protected by real listened-time accounting and one-send flag.
 - Added an optional Last.fm Now Playing event after mpv FileLoaded when the account is connected; no credentials transmitted without authorization. The optional presence failure must not affect audio.
-- This change needs a *new* Windows preview; the previous successful artifact predates it.
+- The newer portable artifact containing this change was built successfully in run 44398691329. Live Last.fm account and real-stream verification still require Windows user testing.
 
 ## Windows archive extraction regression (2026-11-18)
 - CI run 44397942285 failed in `pnpm run setup` before native compilation: the Windows runner's `Expand-Archive` invoked an unavailable .NET `ExtractToDirectory` overload. FFmpeg and FFprobe were downloaded but could not be extracted.
 - `scripts/fetch-binaries.mjs` now uses Windows built-in bsdtar (`tar -xf`) for ZIP archives instead of PowerShell. Tarball extraction and non-Windows ZIP behavior are unchanged.
-- A dedicated test checks the Windows extraction path. The newer portable build must succeed before declaring Last.fm fixes native-tested.
+- A dedicated test checks the Windows extraction path. The newer portable build passed; this verifies compilation and packaging, not authenticated Last.fm calls.
 
 ## Browser UI and native validation snapshot (2026-11-18)
 - Edge visual run [44401093207](https://github.com/G1NYU/RE-Harbor/actions/runs/44401093207) passed after adding 2048x1124 coverage. Artist title/layout, two-column tracks, 960px responsive collapse, topbar opaque scroll, full-width dock and full-screen Now Playing were inspected. Synthetic artwork and a mocked-native startup warning are test-fixture limitations, not verified real-provider behavior.
 - Native typecheck/music/Refract/Windows sidecar regression run [44401093244](https://github.com/G1NYU/RE-Harbor/actions/runs/44401093244) passed.
-- The newer Windows artifact build [44398691329](https://github.com/G1NYU/RE-Harbor/actions/runs/44398691329) passed sidecar preparation and is compiling Tauri. Do not claim the Last.fm native build passed until its compiled artifact is actually uploaded and verified.
+- The newer Windows artifact build [44398691329](https://github.com/G1NYU/RE-Harbor/actions/runs/44398691329) completed successfully. The bundled artifact is named `harbor-music-polish-windows-x64`; it was downloaded, structurally inspected and CRC-tested. Last.fm still needs live account testing.
 - Source reference audit now includes LiMusic, Feishin, fooyin, muffon, Pear, Last.fm, MusicBrainz and ListenBrainz, with license boundaries. No code from copyleft clients copied.
+
+## Build delivery verified (2026-11-19)
+- Source commit compiled: `235d2528f2a46f4f0d8fa621d60df1bd9da6f188`. Later commits through `a228ccc0e8f5eff8787a08cc08f3ba0ebe4a478d` affect only browser tests and documentation, not compiled source.
+- Windows workflow [44398691329](https://github.com/G1NYU/RE-Harbor/actions/runs/44398691329): **success** including native Tauri build, uninstaller compilation, payload verification and artifact upload.
+- GitHub Actions artifact: [harbor-music-polish-windows-x64](https://github.com/G1NYU/RE-Harbor/actions/runs/44398691329/artifacts/14472536747), artifact ID `14472536747`, compressed size 378,331,355 bytes.
+- Direct artifact inspection: 17 ZIP entries totaling 714,533,432 uncompressed bytes; `harbor.exe` has Windows MZ executable signature, `ffmpeg.exe`, `ffprobe.exe`, `yt-dlp.exe`, `mpv.exe` and `libmpv-2.dll` are present; ZIP CRC test passed.
+- SHA-256 of the downloaded ZIP: `3f81a50743e7878dc7d2da2549548caa31039eb2ce6aba22b06136b904c58441`.
+- Portable README says app identifier `app.harbor.voidnativepreview`; normal Harbor installation is not overwritten. Preview is unsigned and intentionally omits Android extension support and the Pokemon engine.
+- Latest Edge browser visual test [44401093207](https://github.com/G1NYU/RE-Harbor/actions/runs/44401093207): **success** for dock, Now Playing, album/artist, scrolled chrome and 960/1600/2048 layouts, on synthetic providers. Latest native/UI/Refract checks [44401968855](https://github.com/G1NYU/RE-Harbor/actions/runs/44401968855): **success**.
+- **Remaining manual acceptance checks:** On Windows extract ZIP to fresh folder and run `harbor.exe`; verify initial launch, source connection, actual song playback, pause/resume, seek, queue controls, docking/undocking, OS media controls, album/artist metadata/artwork, source switching, and Last.fm account authorization, Now Playing, thresholded scrobble without repeats. Test Refract and Movies unchanged.
+- The app cannot be declared fully user-accepted without these actual Windows interactions; no production release, automatic deployment, branch overwrite, or installation was performed.
+
