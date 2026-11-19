@@ -345,3 +345,17 @@ html[data-void-native="1"] [data-void-rank-card] [data-void-rank-number] {
   font-weight: 800;
   line-height: 1;
 }
+
+/* The global VOID input style was still drawing a second outline inside
+   the Music search form. Keep just one quiet surface and a clear focus state. */
+html[data-void-native="1"] main[data-music-view] [data-music-mast-form] input[data-music-mast-search] {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  outline: none;
+}
+html[data-void-native="1"] main[data-music-view] [data-music-mast-form]:focus-within {
+  outline: 2px solid var(--void-focus);
+  outline-offset: 2px;
+}

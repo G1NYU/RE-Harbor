@@ -48,6 +48,11 @@ try {
   }));
   assert.ok(mastForm.width >= 300, "Music search must have readable width");
   assert.equal(mastForm.border, "0px", "Music search must not add an outer border");
+  const innerSearch = await page.locator("[data-music-mast-search]").evaluate(el => ({
+    border: getComputedStyle(el).borderTopWidth,
+    background: getComputedStyle(el).backgroundColor,
+  }));
+  assert.equal(innerSearch.border, "0px", "Music search input must not draw a nested inner outline");
   await page.screenshot({ path: folder + "/music-search-1600.png" });
   const voidTools = page.locator("[data-void-topbar-utilities]");
   if (await voidTools.count()) {

@@ -93,3 +93,8 @@ Updated: 2026-11-19
 - Move Top 10 rank numbers onto posters; avoid giant outline numbers in VOID, keep other themes intact.
 - Make VOID media connecting logo transparent and flat instead of a rounded bordered tile. Other loader themes unchanged.
 - Run `tests/void-final-ui.test.ts`, TypeScript, music/VOID/Refract suite, Edge screenshots, and Windows portable build. Inspect all results; do not claim user-acceptance for real services without on-device tests.
+
+## Final visual sweep — nested Music search border
+- Reviewed the passing 1600/2048px Edge screenshots from run 44438992588. The faded sidebar selection and top-right account controls render correctly.
+- Found one remaining nested search input outline caused by the high-specificity VOID global `input[type="search"]` style. Add an equally scoped reset for the Music mast input, leaving focus indication on the outer search form.
+- Edge smoke now asserts the **input** border width is zero, not only the outer form's border. This is visual only and does not affect music search requests.
