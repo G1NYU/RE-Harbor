@@ -159,7 +159,8 @@
   background: color-mix(in srgb, var(--color-canvas) 65%, transparent);
   opacity: 0;
 }
-.music-queue-play:is(:hover, :focus-visible) .music-queue-cover-play {
+.music-queue-play:hover .music-queue-cover-play,
+.music-queue-cover:focus-visible .music-queue-cover-play {
   opacity: 1;
 }
 .music-queue-track-copy {
@@ -195,14 +196,17 @@
 }
 .music-queue-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
-  padding: 4px 8px 8px 28px;
+  padding-block: 4px 8px;
+  padding-inline: 28px 8px;
 }
 .music-queue-sources {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 0 8px 8px 28px;
+  padding-block: 0 8px;
+  padding-inline: 28px 8px;
 }
 .music-queue-sources button {
   display: flex;

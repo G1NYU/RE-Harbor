@@ -199,7 +199,14 @@ function setPointerModality() {
   // TV marker is removed. Drop that stale focus so pointer movement does not
   // replace the inset TV ring with the regular outer keyboard outline.
   const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  if (active && !isEditable(active) && !isLocallyManaged(active)) active.blur();
+  if (
+    active &&
+    !isEditable(active) &&
+    !isLocallyManaged(active) &&
+    !active.closest("[data-music-queue]")
+  ) {
+    active.blur();
+  }
 }
 
 export function advanceFocus(el: HTMLElement, dir?: Dir) {
@@ -1255,6 +1262,14 @@ export function useKeyboardNavigation(options: TVNavigationOptions = {}) {
       const modal = getActiveModal(
         document.activeElement instanceof HTMLElement ? document.activeElement : null,
       );
+      if (modal?.matches("[data-music-queue]")) {
+        const active = document.activeElement;
+        const sink = active && modal.contains(active) ? active : modal;
+        sink.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+        );
+        return true;
+      }
       if (modal) {
         const closer = modal.querySelector<HTMLElement>(MODAL_CLOSE_SELECTOR);
         if (closer) {
@@ -1356,6 +1371,7 @@ export function useKeyboardNavigation(options: TVNavigationOptions = {}) {
         return;
       }
 
+      if (e.key === "Escape" && target?.closest("[data-music-queue]")) return;
       if (isBackKey(e)) {
         // Always swallow Back/Escape so WebView/OS never treat it as close-app.
         e.preventDefault();
@@ -1519,7 +1535,14 @@ export function useKeyboardNavigation(options: TVNavigationOptions = {}) {
 
         // Menus and embedded surfaces own focus; blurring their host can close
         // a menu before the pointer's click reaches the selected item.
-        if (focused && !isEditable(focused) && !isLocallyManaged(focused)) focused.blur();
+        if (
+          focused &&
+          !isEditable(focused) &&
+          !isLocallyManaged(focused) &&
+          !focused.closest("[data-music-queue]")
+        ) {
+          focused.blur();
+        }
       });
     };
 

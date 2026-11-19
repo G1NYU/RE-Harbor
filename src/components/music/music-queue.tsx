@@ -1,7 +1,7 @@
 import { getMusicSourceCandidates, musicPlaybackSource } from "@/lib/music/sources";
 import { replaceQueueTrack, selectableSources } from "@/lib/music/queue-source";
 import { MusicTrackLabels } from "./music-track-labels";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronDown,
@@ -19,7 +19,7 @@ import { Poster } from "@/components/poster";
 import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
 import { MusicServiceLogo } from "./music-service-logo";
 import "./music-queue.css";
-import { useT } from "@/lib/i18n";
+import { useT, useUiLanguage } from "@/lib/i18n";
 import {
   playMusic,
   setMusicQueue,
@@ -76,15 +76,19 @@ function QueueTrack({
   dragging: boolean;
 }) {
   const t = useT();
-  const [actions, setActions] = useState(false);
+  const [disclosure, setDisclosure] = useState<"closed" | "actions" | "sources">("closed");
+  const sourceButton = useRef<HTMLButtonElement>(null);
   const [sources, setSources] = useState<MusicSourceCandidate[] | null>(null);
   const [loadingSources, setLoadingSources] = useState(false);
   const more = useRef<HTMLButtonElement>(null);
   const showSources = () => {
-    if (sources || loadingSources) {
-      setSources((value) => (value ? null : value));
+    if (disclosure === "sources") {
+      setDisclosure("actions");
       return;
     }
+    setDisclosure("sources");
+    if (loadingSources) return;
+    setSources(null);
     setLoadingSources(true);
     void getMusicSourceCandidates(track)
       .then((found) => setSources(selectableSources(found, track)))
@@ -93,7 +97,7 @@ function QueueTrack({
   };
   const run = (action: () => void) => {
     action();
-    setActions(false);
+    setDisclosure("closed");
     requestAnimationFrame(() =>
       (more.current ?? document.getElementById("music-queue-title"))?.focus({
         preventScroll: true,
@@ -112,6 +116,17 @@ function QueueTrack({
         if (draggable) {
           event.preventDefault();
           event.dataTransfer.dropEffect = "move";
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || disclosure === "closed") return;
+        event.stopPropagation();
+        if (disclosure === "sources") {
+          setDisclosure("actions");
+          sourceButton.current?.focus();
+        } else {
+          setDisclosure("closed");
+          more.current?.focus();
         }
       }}
       onDrop={onDrop}
@@ -180,26 +195,19 @@ function QueueTrack({
             ref={more}
             type="button"
             className="music-queue-icon"
-            aria-expanded={actions}
+            aria-expanded={disclosure !== "closed"}
             aria-label={t("music.card.moreActions", { title: track.title })}
-            onClick={() => setActions((value) => !value)}
+            onClick={() => setDisclosure(disclosure === "closed" ? "actions" : "closed")}
           >
             <MoreHorizontal size={19} aria-hidden />
           </button>
         )}
       </div>
-      {actions && (
+      {disclosure !== "closed" && (
         <div
           className="music-queue-actions"
           role="group"
           aria-label={t("music.card.moreActions", { title: track.title })}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.stopPropagation();
-              setActions(false);
-              more.current?.focus();
-            }
-          }}
         >
           <button type="button" onClick={() => run(onNext)}>
             <ListStart size={17} aria-hidden />
@@ -233,7 +241,8 @@ function QueueTrack({
           </button>
           <button
             type="button"
-            aria-expanded={!!sources}
+            ref={sourceButton}
+            aria-expanded={disclosure === "sources"}
             onClick={showSources}
             aria-label={t("music.source.another")}
             title={t("music.source.another")}
@@ -242,9 +251,13 @@ function QueueTrack({
           </button>
         </div>
       )}
-      {actions && (loadingSources || sources) && (
+      {disclosure === "sources" && (
         <div className="music-queue-sources" role="group" aria-label={t("music.source.another")}>
-          {loadingSources && <span className="music-queue-sources-note">{t("music.loading")}</span>}
+          {loadingSources && (
+            <span role="status" className="music-queue-sources-note">
+              {t("music.loading")}
+            </span>
+          )}
           {!loadingSources && sources?.length === 0 && (
             <span className="music-queue-sources-note">{t("music.source.none")}</span>
           )}
@@ -280,6 +293,20 @@ export function MusicQueue({
 }) {
   const t = useT();
   const player = useMusicPlayer();
+  const language = useUiLanguage();
+  const firstUpcoming = Math.max(0, player.queueIndex + 1);
+  const upcomingDuration = useMemo(() => {
+    if (!open || firstUpcoming >= player.queue.length) return null;
+    let seconds = 0;
+    for (let index = firstUpcoming; index < player.queue.length; index++) {
+      const duration = player.queue[index].durationSeconds;
+      if (!Number.isFinite(duration) || duration <= 0) return null;
+      seconds += duration;
+    }
+    return new Intl.NumberFormat(language, { style: "unit", unit: "minute" }).format(
+      Math.ceil(seconds / 60),
+    );
+  }, [open, player.queue, firstUpcoming, language]);
   const { shuffle } = useMusicTransport();
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -323,7 +350,6 @@ export function MusicQueue({
   if (!open) return null;
   const queue = player.queue;
   const playingAt = player.queueIndex;
-  const firstUpcoming = Math.max(0, playingAt + 1);
   const upcoming = queue.slice(firstUpcoming);
   const history = playingAt > 0 ? queue.slice(0, playingAt) : [];
   const move = (from: number, to: number) => {
@@ -399,7 +425,10 @@ export function MusicQueue({
           <h2 ref={heading} tabIndex={-1} id="music-queue-title">
             {t("music.transport.queue")}
           </h2>
-          <p>{t("music.queue.count", { count: upcoming.length })}</p>
+          <p>
+            {t("music.queue.count", { count: upcoming.length })}
+            {upcomingDuration && <> · {upcomingDuration}</>}
+          </p>
         </div>
         <button
           type="button"

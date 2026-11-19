@@ -78,7 +78,11 @@ try {
     window.__TAURI_INTERNALS__ = {
       invoke: async (command, args) => {
         if (command === "music_db_init")
-          return { likedIds: [], likedTracks: [], queue: [payload.tracks[0]], recents: [payload.tracks[0]] };
+          return { likedIds: [], likedTracks: [], queue: payload.tracks, recents: [payload.tracks[0]] };
+        if (command === "music_source_candidates")
+          return new Promise((resolve) => {
+            window.finishQueueSourceLookup = () => resolve([]);
+          });
         if (command === "music_album_tracks") return payload.tracks;
         if (command === "music_local_collection") return { items: payload.tracks.map(t => ({ ...t, kind: "track" })), nextOffset: null };
         if (command === "music_artist_catalog") return {
@@ -107,6 +111,41 @@ try {
   assert.ok(dockRect.x < 2, "Dock must begin at the left window edge");
   assert.ok(Math.abs(dockRect.x + dockRect.width - 1600) < 3, "Dock must reach the right window edge");
   await page.screenshot({ path: folder + "/dock-1600.png" });
+  const openQueue = bar.getByRole("button", { name: "Open queue", exact: true });
+  await openQueue.click();
+  const queue = page.locator("[data-music-queue]");
+  assert.match(await queue.locator("header p").innerText(), /11 up next · 45 min/);
+  const row = queue.locator(".music-queue-upcoming li").first();
+  const more = row.locator("button[aria-expanded]").first();
+  await more.click();
+  const sources = row.getByRole("button", { name: "Try another source" });
+  await page.setViewportSize({ width: 320, height: 720 });
+  const actionBounds = await row.locator(".music-queue-actions").evaluate((el) => {
+    const panel = el.closest("[data-music-queue]").getBoundingClientRect();
+    return [...el.querySelectorAll("button")].every((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.left >= panel.left && rect.right <= panel.right;
+    });
+  });
+  assert.ok(actionBounds, "Every queue action must fit within the narrow panel");
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await queue.locator(".music-queue-scroll").evaluate((el) => el.scrollTo(0, 0));
+  await queue.screenshot({ path: folder + "/queue-actions.png" });
+  await sources.click();
+  await row.getByRole("status").waitFor();
+  assert.equal(await sources.getAttribute("aria-expanded"), "true");
+  await page.keyboard.press("Escape");
+  assert.equal(await sources.evaluate((el) => el === document.activeElement), true);
+  await page.evaluate(() => window.finishQueueSourceLookup());
+  assert.equal(await row.locator(".music-queue-sources").count(), 0);
+  await page.evaluate(async () => {
+    const { dispatchTvNav } = await import("/src/lib/keyboard-navigation.ts");
+    dispatchTvNav("back");
+  });
+  assert.equal(await more.evaluate((el) => el === document.activeElement), true);
+  await page.keyboard.press("Escape");
+  await queue.waitFor({ state: "hidden" });
+  assert.equal(await openQueue.evaluate((el) => el === document.activeElement), true);
   // Clicking the unused left edge must open the existing full music player.
   await bar.click({ position: { x: 20, y: 25 } });
   const now = page.locator(".music-now-playing");

@@ -98,3 +98,11 @@ Updated: 2026-11-19
 - Reviewed the passing 1600/2048px Edge screenshots from run 44438992588. The faded sidebar selection and top-right account controls render correctly.
 - Found one remaining nested search input outline caused by the high-specificity VOID global `input[type="search"]` style. Add an equally scoped reset for the Music mast input, leaving focus indication on the outer search form.
 - Edge smoke now asserts the **input** border width is zero, not only the outer form's border. This is visual only and does not affect music search requests.
+
+## Music queue polish (2026-11-19)
+
+Prepared on `feature/harbor-music-polish` from `9afecca`. The queue header pairs the upcoming track count with localized minutes when every upcoming duration is known. The source picker can be dismissed during a lookup. Escape and remote Back dismiss one layer and restore focus. Keyboard focus reveals the cover transport, and row actions wrap with direction-aware indentation.
+
+The implementation touches the queue component, its CSS and the shared keyboard handler. The browser fixture exercises the running UI with synthetic tracks and an explicitly delayed source response. Local Chromium passed the queue checks at 320 and 1600 pixels and the existing dock, Now Playing, album and artist layout suite. TypeScript passed with a 4 GB Node heap. The focused Node run passed 61 tests, including keyboard and queue regressions. Additional browser checks confirmed keyboard cover visibility and suppression of the duration for empty queues and unknown durations.
+
+The formatter reports existing issues in the queue TSX and the browser smoke script, also reproduced on the base revision. The Linux system build requires Cargo, which is unavailable on this host. The next push triggers the branch's visual smoke, VOID/Refract validation and Windows portable preview workflows. Check their results and the preview on Windows after approval.
