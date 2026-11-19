@@ -59,7 +59,7 @@ test("VOID connecting mark is flat and has no enclosing panel", () => {
   assert.doesNotMatch(source, /rounded-xl border border-\[#313244\]/);
 });
 
-test("original VOID grouped right-aligned sidebar preserves arbitrary tab moves", () => {
+test("original VOID grouped left-aligned sidebar preserves arbitrary tab moves", () => {
   const side = read("src/chrome/sidebar.tsx");
   const css = read("src/void-native.css");
   assert.match(side, /data-void-sidebar-groups=\{grouped \|\| undefined\}/);
@@ -67,6 +67,7 @@ test("original VOID grouped right-aligned sidebar preserves arbitrary tab moves"
   assert.match(side, /data-void-nav-section/);
   assert.match(side, /visibleOrder=\{visibleOrder\}/);
   assert.match(side, /SidebarPositionEditor/);
-  assert.match(css, /flex-direction: row-reverse/);
+  assert.match(css, /flex-direction: row;/);
+  assert.match(css, /text-align: start/);
   assert.match(css, /content: none/);
 });
