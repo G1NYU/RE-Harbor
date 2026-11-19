@@ -341,3 +341,47 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Final pass: search is a single quiet surface, not a double-bordered capsule. */
+[data-music-view] [data-music-mast-form] {
+  border: 0;
+  box-shadow: none;
+  outline: none;
+  min-width: 0;
+}
+[data-music-view] [data-music-mast-form]:focus-within {
+  background: var(--color-raised);
+  outline: 1px solid var(--color-ink-muted);
+  outline-offset: 1px;
+}
+[data-music-view] [data-music-mast-search] {
+  min-width: 0;
+  padding-inline: 6px;
+}
+[data-music-view] [data-music-mast-scope] {
+  margin-inline-start: 8px;
+}
+[data-music-view][data-music-tab="explore"] [data-music-consolidated-back] {
+  max-width: none;
+}
+[data-music-view][data-music-tab="explore"] .music-discovery {
+  width: 100%;
+}
+[data-music-view][data-music-tab="explore"] .music-explore-heading {
+  min-height: 54px;
+}
+[data-music-view][data-music-tab="explore"] .music-explore-tastes {
+  min-width: 44px;
+  min-height: 44px;
+}
+@container (max-width: 650px) {
+  [data-music-view] .music-page-mast {
+    align-items: stretch;
+  }
+  [data-music-view] [data-music-mast-form] {
+    width: 100%;
+  }
+  [data-music-view] [data-music-mast-scope] {
+    max-width: 115px;
+  }
+}

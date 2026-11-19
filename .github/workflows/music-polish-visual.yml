@@ -5,6 +5,14 @@ on:
     paths:
       - ".github/workflows/music-polish-visual.yml"
       - "tests/music-polish-browser.mjs"
+      - "src/chrome/**"
+      - "src/void-native.css"
+      - "src/views/music.tsx"
+      - "src/views/music/**"
+      - "src/components/music/**"
+      - "src/components/top-rank-card.tsx"
+      - "src/components/row.tsx"
+      - "src/components/harbor-loader.tsx"
   workflow_dispatch:
 permissions:
   contents: read

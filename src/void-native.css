@@ -293,3 +293,55 @@ html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] butt
 html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="addons"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27black%27%3E%3Cpath%20d%3D%27M12%202%203.5%206.5v11L12%2022l8.5-4.5v-11L12%202zm0%202.2%206%203.1-6%203.2-6-3.2%206-3.1zm-6.5%204.6%205.5%202.9v7.7l-5.5-2.9V8.8zm13%200v7.7l-5.5%202.9v-7.7l5.5-2.9z%27%2F%3E%3C%2Fsvg%3E");}
 html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="plugins"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20d%3D%22M8%202h2v4h4V2h2v4h1a1%201%200%20011%201v4a6%206%200%2001-5%205.9V22h-2v-5.1A6%206%200%20016%2011V7a1%201%200%20011-1h1V2z%22%2F%3E%3C%2Fsvg%3E");}
 html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav="settings"] {--void-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22black%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M12.000%203.900L13.951%202.192L15.827%202.761L16.500%205.265L17.728%206.272L20.315%206.444L21.239%208.173L19.944%2010.420L20.100%2012.000L21.808%2013.951L21.239%2015.827L18.735%2016.500L17.728%2017.728L17.556%2020.315L15.827%2021.239L13.580%2019.944L12.000%2020.100L10.049%2021.808L8.173%2021.239L7.500%2018.735L6.272%2017.728L3.685%2017.556L2.761%2015.827L4.056%2013.580L3.900%2012.000L2.192%2010.049L2.761%208.173L5.265%207.500L6.272%206.272L6.444%203.685L8.173%202.761L10.420%204.056Z%20M15.5%2012a3.5%203.5%200%201%201-7%200%203.5%203.5%200%200%201%207%200Z%22%2F%3E%3C%2Fsvg%3E");}
+
+/* Top 10: ranks belong inside the cover, never as huge outlined numbers. */
+html[data-void-native="1"] [data-void-rank-card] {
+  aspect-ratio: 2 / 3 !important;
+}
+html[data-void-native="1"] [data-void-rank-card] > span[aria-hidden] {
+  display: none !important;
+}
+html[data-void-native="1"] [data-void-rank-card] [data-preview-anchor] {
+  inset-inline: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+}
+html[data-void-native="1"] [data-void-rank-card] [data-preview-anchor] img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+html[data-void-native="1"] [data-void-rank-card] > p {
+  position: absolute;
+  z-index: 12;
+  inset-inline: 0;
+  top: auto;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  padding: 38px 45px 10px 12px;
+  color: #eef1fb;
+  font-size: 12px;
+  text-align: start;
+  white-space: nowrap;
+  background: linear-gradient(0deg, rgb(10 11 20 / .94), transparent);
+  text-shadow: 0 1px 5px #0008;
+}
+html[data-void-native="1"] [data-void-rank-card] [data-void-rank-number] {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding-inline: 7px;
+  border-radius: 7px;
+  background: rgb(12 12 23 / .86);
+  border: 1px solid rgb(220 227 251 / .28);
+  color: #edf2ff;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}

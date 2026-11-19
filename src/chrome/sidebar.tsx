@@ -144,15 +144,20 @@ export function Sidebar() {
           retainLabels={retainLabels}
           onPinNav={(v) => setPendingPinView(v)}
         />
+        {/* VOID's full-width music dock must never cover account or rail utilities.
+            Move them into the persistent upper-right toolbar instead. */}
+        {(!voidNative || editing) && (
         <div data-harbor-sidebar-footer className={`relative p-2 ${collapsed ? "" : "lg:p-4"}`}>
           <div className="mb-1 px-1">
             <NavHiddenTray orientation="vertical" compact={collapsed} />
           </div>
-          <div className={`flex flex-col gap-1 pb-1 ${collapsed ? "items-center" : ""}`}>
-            <SidebarBigPictureEntry collapsed={collapsed} retainLabels={retainLabels} />
-            <CollapseToggle collapsed={collapsed} retainLabels={retainLabels} />
-          </div>
-          {locked ? (
+          {!voidNative && (
+            <div className={`flex flex-col gap-1 pb-1 ${collapsed ? "items-center" : ""}`}>
+              <SidebarBigPictureEntry collapsed={collapsed} retainLabels={retainLabels} />
+              <CollapseToggle collapsed={collapsed} retainLabels={retainLabels} />
+            </div>
+          )}
+          {!voidNative && (locked ? (
             <div
               className={`flex w-full items-center justify-center gap-3 rounded-xl py-2.5 ${
                 collapsed ? "" : "lg:justify-start lg:px-3"
@@ -178,8 +183,9 @@ export function Sidebar() {
             </div>
           ) : (
             <ProfileChip collapsed={collapsed} />
-          )}
+          ))}
         </div>
+        )}
       </aside>
       {pendingPinView && (
         <ParentalPinModal

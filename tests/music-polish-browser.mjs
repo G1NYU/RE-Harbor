@@ -41,6 +41,26 @@ try {
   await page.goto("http://127.0.0.1:1420", { waitUntil: "domcontentloaded" });
   await page.locator('[data-harbor-nav="music"]').click();
   await page.locator("[data-music-view]").waitFor();
+  await page.locator("[data-music-mast-form]").waitFor();
+  const mastForm = await page.locator("[data-music-mast-form]").evaluate(el => ({
+    width: el.getBoundingClientRect().width,
+    border: getComputedStyle(el).borderTopWidth,
+  }));
+  assert.ok(mastForm.width >= 300, "Music search must have readable width");
+  assert.equal(mastForm.border, "0px", "Music search must not add an outer border");
+  await page.screenshot({ path: folder + "/music-search-1600.png" });
+  const voidTools = page.locator("[data-void-topbar-utilities]");
+  if (await voidTools.count()) {
+    await voidTools.locator("[data-void-topbar-account] button").first().waitFor();
+    const topRect = await voidTools.boundingBox();
+    assert.ok(topRect && topRect.y >= 0 && topRect.y < 85,
+      "Account and sidebar controls belong in the topbar, above the player");
+    assert.equal(await page.locator("[data-harbor-sidebar-footer]").count(), 0,
+      "VOID sidebar must not hide the account behind the full-width music dock");
+    const topSearch = await page.locator("[data-music-mast-form]").boundingBox();
+    assert.ok(topSearch && topRect.x > topSearch.x + topSearch.width - 12,
+      "Music search and window utilities must not overlap");
+  }
 
   // Add a provider-free Tauri invoke shim only AFTER mounting the browser app.
   // Production environment detection stays unchanged, while fixture data is returned.

@@ -213,10 +213,11 @@ export function MusicArtistStory({
           </div>
         </div>
       )}
-      {artistLinks.length > 0 && (
-        <div>
-          <h3>{t("music.artist.aroundWeb")}</h3>
-          <div className="music-artist-links">
+      {/* Keep database provenance, external sites and official stores in one
+          discoverable section instead of orphaned links at the page bottom. */}
+      <div className="music-artist-resources">
+        <h3>{t("music.artist.aroundWeb")}</h3>
+        <div className="music-artist-links">
             {artistLinks.map((link) => (
               <button key={link.url} type="button" onClick={() => openUrl(link.url)}>
                 <MusicLinkFavicon
@@ -240,27 +241,21 @@ export function MusicArtistStory({
                 <ArrowUpRight size={14} />
               </button>
             ))}
-          </div>
+          {!artistLinks.some((link) => link.url.includes("musicbrainz.org/artist/")) && (
+            <button type="button" data-musicbrainz-link
+              onClick={() => openUrl(`https://musicbrainz.org/artist/${profile.id}`)}
+              aria-label="MusicBrainz artist profile"
+            >
+              <img src="https://icons.duckduckgo.com/ip3/musicbrainz.org.ico"
+                alt="" width={18} height={18} loading="lazy"
+                referrerPolicy="no-referrer" style={{ borderRadius: 3 }} />
+              <span>MusicBrainz<small>Artist database</small></span>
+              <ArrowUpRight size={14} aria-hidden />
+            </button>
+          )}
         </div>
-      )}
-      <MusicArtistExtras profile={profile} />
-      <button
-        type="button"
-        className="music-home-text"
-        onClick={() => openUrl(`https://musicbrainz.org/artist/${profile.id}`)}
-      >
-        <img
-          src="https://icons.duckduckgo.com/ip3/musicbrainz.org.ico"
-          alt=""
-          width={15}
-          height={15}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          style={{ borderRadius: 3 }}
-        />
-        MusicBrainz
-        <ArrowUpRight size={14} />
-      </button>
+        <MusicArtistExtras profile={profile} />
+      </div>
     </section>
   );
 }

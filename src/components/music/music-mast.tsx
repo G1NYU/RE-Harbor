@@ -174,7 +174,8 @@ export function MusicMast({
         ref={formRef}
         role="search"
         onSubmit={submit}
-        className="flex h-11 w-full max-w-full min-w-0 items-center gap-2 rounded-lg bg-elevated px-2 ring-1 ring-edge-soft/70 transition-[box-shadow,background-color] duration-200 ease-out focus-within:ring-ink-muted sm:w-[min(400px,100%)]"
+        data-music-mast-form
+        className="flex h-11 w-full max-w-full min-w-0 items-center gap-3 rounded-lg bg-elevated px-3 transition-[background-color] duration-200 sm:w-[min(460px,100%)]"
       >
         <button
           type="submit"
@@ -207,7 +208,7 @@ export function MusicMast({
           aria-autocomplete="list"
           aria-expanded={suggestOpen}
           type="search"
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-subtle [&::-webkit-search-cancel-button]:hidden"
+          className="min-w-0 flex-1 bg-transparent px-1 text-[13px] text-ink outline-none placeholder:text-ink-subtle [&::-webkit-search-cancel-button]:hidden"
         />
         {query ? (
           <button
@@ -228,7 +229,8 @@ export function MusicMast({
             aria-expanded={menuOpen}
             aria-label={scopeTitle}
             title={scopeTitle}
-            className="flex h-[29px] min-w-0 max-w-[136px] shrink-0 items-center gap-1 rounded-full bg-canvas/60 px-2.5 text-[11px] font-semibold text-ink-muted transition-colors duration-200 ease-out hover:text-ink"
+            data-music-mast-scope
+            className="flex h-[30px] min-w-0 max-w-[155px] shrink-0 items-center gap-1.5 rounded-md bg-canvas/70 px-3 text-[11px] font-semibold text-ink-muted transition-colors duration-200 ease-out hover:text-ink"
           >
             <span className="truncate">{scopeLabel}</span>
             <ChevronDown size={12} aria-hidden="true" className="shrink-0" />

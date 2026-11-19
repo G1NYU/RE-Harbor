@@ -83,3 +83,13 @@ Updated: 2026-11-19
 - **Remaining manual acceptance checks:** On Windows extract ZIP to fresh folder and run `harbor.exe`; verify initial launch, source connection, actual song playback, pause/resume, seek, queue controls, docking/undocking, OS media controls, album/artist metadata/artwork, source switching, and Last.fm account authorization, Now Playing, thresholded scrobble without repeats. Test Refract and Movies unchanged.
 - The app cannot be declared fully user-accepted without these actual Windows interactions; no production release, automatic deployment, branch overwrite, or installation was performed.
 
+
+## Final screenshot-led UI pass (2026-11-19)
+- Seven annotated user screenshots inspected at 2048x1124. Scope: preserved Harbor music polish, no VOID 03 replacement.
+- Relocate VOID sidebar Big Picture, Collapse and account/login controls to upper-right topbar, preserving parental lock indicator and original non-VOID footer; do not let full-bleed music dock cover them.
+- Replace hard rectangular active nav highlight with a left-to-right fade; preserve icon and slim selected marker.
+- Improve Music search affordance: remove double outer border, increase input/scope separation and width; use full available canvas for Explore instead of narrow centered columns; group discovery filters.
+- Consolidate artist external sources, official website and MusicBrainz into a single resources section with meaningful link labels and accessible buttons.
+- Move Top 10 rank numbers onto posters; avoid giant outline numbers in VOID, keep other themes intact.
+- Make VOID media connecting logo transparent and flat instead of a rounded bordered tile. Other loader themes unchanged.
+- Run `tests/void-final-ui.test.ts`, TypeScript, music/VOID/Refract suite, Edge screenshots, and Windows portable build. Inspect all results; do not claim user-acceptance for real services without on-device tests.

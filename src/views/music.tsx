@@ -1196,7 +1196,7 @@ function MusicViewContent({ active }: { active: boolean }) {
         <ScrollRootContext.Provider value={scrollEl}>
           <div
             data-music-consolidated-back
-            className={`mx-auto flex w-full ${detail?.item.kind === "artist" || detail?.item.kind === "album" ? "max-w-none" : "max-w-[1480px]"} flex-col gap-6 pb-24 [&_[data-music-inner-back]]:hidden`}
+            className={`mx-auto flex w-full ${detail?.item.kind === "artist" || detail?.item.kind === "album" || (!detail && !search && tab === "explore") ? "max-w-none" : "max-w-[1480px]"} flex-col gap-6 pb-24 [&_[data-music-inner-back]]:hidden`}
           >
             <section data-scroll-anchor="mast">
               <MusicMast

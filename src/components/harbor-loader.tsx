@@ -51,7 +51,7 @@ export function VoidDefaultArtwork({ size = "md" }: { size?: Size }) {
     <span
       data-void-default-artwork
       aria-label="VOID"
-      className={`inline-grid shrink-0 place-items-center rounded-xl border border-[#313244] bg-[#181825] font-display font-extrabold tracking-[0.08em] text-[#cdd6f4] ${SIZE_CLASS[size]}`}
+      className={`inline-grid shrink-0 place-items-center border-0 bg-transparent font-display font-extrabold tracking-[0.16em] text-[#cdd6f4] ${SIZE_CLASS[size]}`}
       style={{ fontSize: compact ? 20 : size === "sm" ? 15 : size === "md" ? 24 : size === "lg" ? 30 : 38 }}
     >
       {compact ? "V" : "VOID"}

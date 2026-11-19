@@ -201,3 +201,31 @@
   height: 100%;
   object-fit: cover;
 }
+
+/* Metadata links are one intentional resource shelf, not detached bottom actions. */
+.music-artist-resources {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+.music-artist-resources h3 {
+  margin-bottom: 3px;
+}
+.music-artist-resources .music-artist-links {
+  align-items: stretch;
+  gap: 10px;
+}
+.music-artist-resources .music-artist-links button {
+  max-width: min(100%, 265px);
+  min-height: 48px;
+  flex-shrink: 0;
+}
+.music-artist-resources .music-artist-extras {
+  gap: 12px;
+  min-height: 0;
+}
+.music-artist-resources .music-artist-extras > .music-merch-store {
+  width: fit-content;
+  min-height: 44px;
+}

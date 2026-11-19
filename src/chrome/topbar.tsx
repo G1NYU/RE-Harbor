@@ -1,4 +1,9 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock, Monitor, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { AccountMenu } from "@/chrome/account-menu/account-menu";
+import { useParental } from "@/lib/parental";
+import { enterBigPicture } from "@/lib/big-picture";
+import { shouldOfferBigPicture } from "@/views/big-picture/bp-logic";
+import { SFX } from "@/lib/sfx";
 import { WindowControlButton as Control, WindowControlGlyph } from "./window-control-button";
 import { Search } from "@/components/icons/search-icon";
 import { UiIcon } from "@/components/ui-icon";
@@ -73,8 +78,10 @@ function PresenceAvatar({ name, src, color }: { name: string; src: string | null
 export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   const { chromeHidden, canGoBack, view, setView, topKind } = useView();
   const liveHasSources = usePlaylists().length > 0;
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const kid = useActiveKid();
+  const { locked } = useParental();
+  const voidNative = settings.theme.preset === "cool-grey" && !kid;
   const t = useT();
   const [closeConfirm, setCloseConfirm] = useState(false);
   const preview = useThemePreview();
@@ -191,6 +198,34 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
               {!kid && <NotificationCenter />}
               {!kid && <BookmarksButton />}
               {!onLiveRoot && !kid && <TogetherButton />}
+            </div>
+          )}
+          {!connecting && voidNative && (
+            <div data-void-topbar-utilities className="flex shrink-0 items-center gap-1">
+              {shouldOfferBigPicture({
+                kidProfileActive: false,
+                buttonEnabled: settings.bigPictureButton,
+                suppressedByChrome: false,
+              }) && (
+                <button type="button" aria-label={t("Big Picture")} title={t("Big Picture")}
+                  className="void-topbar-tool" onClick={() => { SFX.open(); enterBigPicture(); }}>
+                  <Monitor size={18} strokeWidth={1.8} aria-hidden />
+                </button>
+              )}
+              <button type="button" aria-label={settings.sidebarCollapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+                aria-pressed={settings.sidebarCollapsed} title={settings.sidebarCollapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+                className="void-topbar-tool" onClick={() => update({ sidebarCollapsed: !settings.sidebarCollapsed })}>
+                {settings.sidebarCollapsed ? <PanelLeftOpen size={18} aria-hidden /> : <PanelLeftClose size={18} aria-hidden />}
+              </button>
+              {locked ? (
+                <span aria-label={t("chrome.locked")} title={t("chrome.locked")} className="void-topbar-tool text-ink-muted">
+                  <Lock size={18} aria-hidden />
+                </span>
+              ) : (
+                <div data-void-topbar-account className="ms-1 shrink-0">
+                  <AccountMenu trigger="avatar" placement="down" align="end" />
+                </div>
+              )}
             </div>
           )}
           {IS_TAURI && !settings.useNativeTitleBar && !settings.hybridTitleBar && (

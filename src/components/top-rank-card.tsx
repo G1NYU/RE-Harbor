@@ -77,7 +77,8 @@ export const TopRankCard = memo(function TopRankCard({ meta, rank }: { meta: Met
       onBlur={(e) => hoverPreviewBlur(e.currentTarget)}
       className="group relative w-full min-w-0"
       data-no-card-ring
-      style={{ aspectRatio: "228 / 246", containerType: "inline-size" }}
+      data-void-rank-card={settings.theme.preset === "cool-grey" || undefined}
+      style={{ aspectRatio: settings.theme.preset === "cool-grey" ? "2 / 3" : "228 / 246", containerType: "inline-size" }}
     >
       <span
         aria-hidden
@@ -124,6 +125,9 @@ export const TopRankCard = memo(function TopRankCard({ meta, rank }: { meta: Met
           ratio="portrait"
           className="harbor-card-ring rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.4)] transition-shadow duration-300 group-hover/card:shadow-[0_26px_50px_-16px_rgba(0,0,0,0.65)]"
         />
+        <span aria-hidden data-void-rank-number className="pointer-events-none absolute bottom-3 end-3 z-20 hidden tabular-nums">
+          {rank}
+        </span>
         {inWatchlist && <WatchlistDot />}
         <AwardDot name={meta.name} year={parseAwardYear(meta.releaseInfo)} />
       </div>
@@ -155,7 +159,8 @@ export const AnimeRankCard = memo(function AnimeRankCard({ meta, rank }: { meta:
       onBlur={(e) => hoverPreviewBlur(e.currentTarget)}
       className="group relative w-full min-w-0"
       data-no-card-ring
-      style={{ aspectRatio: "228 / 246", containerType: "inline-size" }}
+      data-void-rank-card={settings.theme.preset === "cool-grey" || undefined}
+      style={{ aspectRatio: settings.theme.preset === "cool-grey" ? "2 / 3" : "228 / 246", containerType: "inline-size" }}
     >
       <span
         aria-hidden
@@ -196,6 +201,9 @@ export const AnimeRankCard = memo(function AnimeRankCard({ meta, rank }: { meta:
           ratio="portrait"
           className="harbor-card-ring rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.4)] transition-shadow duration-300 group-hover/card:shadow-[0_26px_50px_-16px_rgba(0,0,0,0.65)]"
         />
+        <span aria-hidden data-void-rank-number className="pointer-events-none absolute bottom-3 end-3 z-20 hidden tabular-nums">
+          {rank}
+        </span>
         {inWatchlist && <WatchlistDot />}
         <AwardDot name={meta.name} year={parseAwardYear(meta.releaseInfo)} />
       </div>
