@@ -17,6 +17,7 @@ import type { NavItemId } from "@/chrome/nav-items";
 import { NavHiddenTray, NavEditableItem, SidebarPositionEditor, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { useSidebarNavigation } from "./context-page-navigation";
+import { voidNavSectionBoundaries } from "./void-sidebar-order";
 
 export function Sidebar() {
   const editing = useNavEditMode();
@@ -206,16 +207,6 @@ export function Sidebar() {
   );
 }
 
-// Section labels follow the saved order; they never constrain arbitrary tab moves.
-const VOID_NAV_SECTIONS: Partial<Record<NavItemId, string>> = {
-  movies: "Watch", shows: "Watch", anime: "Watch", kids: "Watch",
-  live: "Watch", sports: "Watch", vod: "Watch",
-  manga: "Read", ebook: "Read",
-  music: "Listen & Play", games: "Listen & Play",
-  library: "Yours", downloads: "Yours", calendar: "Yours", collections: "Yours",
-  addons: "More", plugins: "More", settings: "More",
-};
-
 function ScrollableNav({
   view,
   setView,
@@ -242,6 +233,7 @@ function ScrollableNav({
   const editing = useNavEditMode();
   const visibleOrder = entries.map(({ item }) => item.id);
   const grouped = voidNative && !collapsed && !editing;
+  const sectionAt = new Map(voidNavSectionBoundaries(visibleOrder).map(({ index, label }) => [index, label]));
   const ref = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState<{ top: boolean; bottom: boolean }>({
     top: false,
@@ -296,11 +288,10 @@ function ScrollableNav({
       >
         <div className="flex flex-col gap-1.5" data-void-sidebar-groups={grouped || undefined}>
           {entries.map(({ item, gated }, index) => {
-            const section = grouped ? VOID_NAV_SECTIONS[item.id] : undefined;
-            const previous = index > 0 ? VOID_NAV_SECTIONS[entries[index - 1].item.id] : undefined;
+            const section = grouped ? sectionAt.get(index) : undefined;
             return (
               <Fragment key={item.id}>
-                {section && section !== previous && (
+                {section && (
                   <div data-void-nav-section aria-hidden="true">{t(section)}</div>
                 )}
                 <NavItem

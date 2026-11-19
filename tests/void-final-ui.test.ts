@@ -63,7 +63,7 @@ test("original VOID grouped right-aligned sidebar preserves arbitrary tab moves"
   const side = read("src/chrome/sidebar.tsx");
   const css = read("src/void-native.css");
   assert.match(side, /data-void-sidebar-groups=\{grouped \|\| undefined\}/);
-  assert.match(side, /VOID_NAV_SECTIONS/);
+  assert.match(side, /voidNavSectionBoundaries/);
   assert.match(side, /data-void-nav-section/);
   assert.match(side, /visibleOrder=\{visibleOrder\}/);
   assert.match(side, /SidebarPositionEditor/);

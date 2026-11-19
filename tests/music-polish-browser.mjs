@@ -74,6 +74,15 @@ const artist = {
 };
 try {
   await page.goto("http://127.0.0.1:1420", { waitUntil: "domcontentloaded" });
+  const sidebarSections = page.locator("[data-void-nav-section]");
+  const sectionLabels = async () => (await sidebarSections.allTextContents())
+    .map((value) => value.trim().toUpperCase());
+  const expectedSections = ["WATCH", "READ", "LISTEN & PLAY", "YOURS", "MORE"];
+  if (await page.locator("[data-void-sidebar-groups]").count()) {
+    await sidebarSections.first().waitFor();
+    assert.deepEqual(await sectionLabels(), expectedSections, "VOID default groups should occur only once");
+    await page.screenshot({ path: folder + "/void-sidebar-default-1600.png" });
+  }
   const musicTab = page.locator('aside [data-harbor-nav="music"]');
   await musicTab.click({ button: "right" });
   await page.getByText("Edit sidebar", { exact: true }).last().click();
@@ -112,6 +121,9 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await musicTab.waitFor();
   assert.equal((await sidebarOrder()).indexOf("music"), liveIndex);
+  if (await page.locator("[data-void-sidebar-groups]").count()) {
+    assert.deepEqual(await sectionLabels(), expectedSections, "reordering must not duplicate section labels");
+  }
   await page.locator('[data-harbor-nav="music"]').click();
   await page.locator("[data-music-view]").waitFor();
   await page.locator("[data-music-mast-form]").waitFor();

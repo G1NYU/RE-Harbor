@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { VOID_DEFAULT_NAV_ORDER, withVoidDefaultNavOrder } from "../src/chrome/void-sidebar-order";
+import { VOID_DEFAULT_NAV_ORDER, voidNavSectionBoundaries, withVoidDefaultNavOrder } from "../src/chrome/void-sidebar-order";
 
 test("VOID default follows original grouped navigation without duplicates", () => {
   const order = VOID_DEFAULT_NAV_ORDER;
@@ -22,4 +22,12 @@ test("VOID default follows original grouped navigation without duplicates", () =
 test("VOID respects a user's arbitrary saved order", () => {
   const custom = { order: ["music", "home", "manga", "games"], hidden: [], renamed: {} };
   assert.equal(withVoidDefaultNavOrder(custom), custom);
+});
+
+test("section labels remain unique when a custom order crosses groups", () => {
+  const custom = ["home", "movies", "music", "live", "manga", "games", "addons"] as typeof VOID_DEFAULT_NAV_ORDER;
+  const headings = voidNavSectionBoundaries(custom);
+  assert.deepEqual(headings.map(({ label }) => label), ["Watch", "Read", "Listen & Play", "More"]);
+  assert.equal(new Set(headings.map(({ label }) => label)).size, headings.length);
+  assert.deepEqual(headings.map(({ index }) => index), [1, 4, 5, 6]);
 });
