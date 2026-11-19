@@ -193,7 +193,7 @@ function Skeleton({ shape }: { shape: RowShape }) {
   }
   if (shape === "rank") {
     return (
-      <div className={`${settings.theme.preset === "cool-grey" ? "aspect-[2/3]" : "aspect-[228/246]"} w-full bg-elevated/30` style={{ borderRadius: radius }} />
+      <div className={`${settings.theme.preset === "cool-grey" ? "aspect-[2/3]" : "aspect-[228/246]"} w-full bg-elevated/30`} style={{ borderRadius: radius }} />
     );
   }
   if (shape === "tile") {
