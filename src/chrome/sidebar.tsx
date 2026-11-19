@@ -14,7 +14,7 @@ import { KidsSidebarDoodles } from "./kids-sidebar-doodles";
 import { CollapseToggle } from "@/chrome/sidebar/collapse-toggle";
 import { SidebarBigPictureEntry } from "@/chrome/sidebar/big-picture-entry";
 import type { NavItemId } from "@/chrome/nav-items";
-import { NavHiddenTray, NavEditableItem, useNavDrag } from "@/chrome/nav-edit";
+import { NavHiddenTray, NavEditableItem, SidebarPositionEditor, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { useSidebarNavigation } from "./context-page-navigation";
 
@@ -28,7 +28,7 @@ export function Sidebar() {
   const [pendingPinView, setPendingPinView] = useState<View | null>(null);
 
   const { mark: customMark, wordmark: customWordmark } = useHarborLogo();
-  const collapsed = settings.sidebarCollapsed;
+  const collapsed = settings.sidebarCollapsed && !editing;
   const voidNative = settings.theme.preset === "cool-grey" && !kid;
   const retainLabels = (settings.theme.preset as string) === "elegantfin" && !kid;
   const hybridBar =
@@ -45,7 +45,7 @@ export function Sidebar() {
         data-harbor-sidebar
         data-void-native={voidNative ? "1" : undefined}
         data-collapsed={collapsed ? "true" : "false"}
-        className={`relative z-[60] flex w-[72px] shrink-0 flex-col border-e border-edge-soft bg-canvas transition-[opacity,transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`relative z-[60] flex ${editing ? "w-60 max-w-[60vw]" : "w-[72px]"} shrink-0 flex-col border-e border-edge-soft bg-canvas transition-[opacity,transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           collapsed ? "" : "lg:w-60"
         } ${
           chromeHidden
@@ -226,6 +226,7 @@ function ScrollableNav({
     openContextMenu(e, { kind: "nav" });
   };
   const { entries } = useSidebarNavigation();
+  const editing = useNavEditMode();
   const visibleOrder = entries.map(({ item }) => item.id);
   const ref = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState<{ top: boolean; bottom: boolean }>({
@@ -267,6 +268,12 @@ function ScrollableNav({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      {editing && entries.length > 1 && (
+        <SidebarPositionEditor
+          items={entries.map((entry) => entry.item)}
+          active={entries.find((entry) => entry.item.view === view)?.item.id}
+        />
+      )}
       <div
         ref={ref}
         data-nav-sort-scope

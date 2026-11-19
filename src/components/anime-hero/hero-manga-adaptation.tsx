@@ -41,7 +41,8 @@ export function HeroMangaAdaptation({ meta }: { meta: Meta }) {
     <button
       type="button"
       onClick={open}
-      className="group flex items-center gap-2.5 transition-opacity duration-150 hover:opacity-80"
+      title={node.title}
+      className="group flex max-w-full items-center gap-3 rounded-lg px-1 py-1 text-start hover:bg-elevated focus-visible:outline-2 focus-visible:outline-accent"
     >
       {node.poster && (
         <img
@@ -51,10 +52,10 @@ export function HeroMangaAdaptation({ meta }: { meta: Meta }) {
         />
       )}
       <div className="flex min-w-0 flex-col items-start">
-        <span className="text-[9.5px] font-semibold uppercase tracking-[0.13em] text-accent drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
+        <span className="text-[12px] font-semibold text-ink-muted">
           {t(kind === "ebook" ? "Read the eBook" : "Read the Manga")}
         </span>
-        <span className="max-w-[168px] truncate text-[12.5px] font-medium text-ink drop-shadow-[0_1px_6px_rgba(0,0,0,0.85)]">
+        <span className="line-clamp-2 max-w-[28ch] break-words text-sm font-semibold leading-snug text-ink">
           {node.title}
         </span>
       </div>

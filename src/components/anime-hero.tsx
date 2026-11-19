@@ -245,8 +245,11 @@ export function AnimeHero({
           <h2 className="text-[20px] font-medium tracking-tight text-ink">
             {t("Top Picks for You")}
           </h2>
-          <div className="flex flex-col items-end gap-2.5">
-            <div className="flex min-h-[48px] items-center gap-3">
+          <div
+            data-anime-slide-details
+            className="ms-auto grid max-w-full justify-items-end gap-1 rounded-xl border border-edge-soft bg-surface px-3 py-2 empty:hidden"
+          >
+            <div className="flex max-w-full flex-wrap items-center justify-end gap-3">
               <HeroMangaAdaptation meta={current} />
               <HeroSlideBadges meta={current} />
             </div>

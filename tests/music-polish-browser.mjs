@@ -14,6 +14,13 @@ page.setDefaultTimeout(35000);
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 await page.addInitScript(() => {
+  for (const key of ["harbor.settings.shared", "harbor.settings"]) {
+    const settings = JSON.parse(localStorage.getItem(key) ?? "{}");
+    localStorage.setItem(
+      key,
+      JSON.stringify({ ...settings, sportsWithoutProvider: true, showPlaylistsTab: true }),
+    );
+  }
   localStorage.setItem(
     "harbor.onboarding",
     JSON.stringify({
@@ -76,6 +83,25 @@ try {
       .locator("aside [data-harbor-nav]")
       .evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute("data-harbor-nav")));
   const original = await sidebarOrder();
+  const itemSelect = page.locator("[data-nav-move-item]");
+  const positionSelect = page.locator("[data-nav-move-position]");
+  const tabs = await page
+    .locator("aside [data-nav-drop-id]")
+    .evaluateAll((buttons) =>
+      buttons.map((button) => [button.dataset.navDropId, button.dataset.harborNav]),
+    );
+  assert.ok(tabs.some(([id]) => id === "sports"));
+  for (const [id, view] of tabs) {
+    await itemSelect.selectOption(id);
+    for (let position = 0; position < tabs.length; position++) {
+      const otherTabs = (await sidebarOrder()).filter((tab) => tab !== view);
+      await positionSelect.selectOption(String(position));
+      otherTabs.splice(position, 0, view);
+      assert.deepEqual(await sidebarOrder(), otherTabs, `${id} at position ${position + 1}`);
+    }
+  }
+  assert.deepEqual(await sidebarOrder(), original);
+  console.log("Sidebar positions verified", { tabs: tabs.length, placements: tabs.length ** 2 });
   const liveIndex = original.indexOf("live");
   assert.ok(liveIndex >= 0 && liveIndex < original.indexOf("music"));
   const moveUp = musicTab.locator("..").getByRole("button", { name: "Move up" });

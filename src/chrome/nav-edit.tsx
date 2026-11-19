@@ -107,6 +107,63 @@ function EditingNavItem({
   );
 }
 
+export function SidebarPositionEditor({
+  items,
+  active,
+}: {
+  items: { id: NavItemId; label: string }[];
+  active?: NavItemId;
+}) {
+  const t = useT();
+  const { cfg, commit } = useNavCfg();
+  const [selected, select] = useState(active ?? items[0]?.id);
+  const index = Math.max(
+    0,
+    items.findIndex((item) => item.id === selected),
+  );
+  const item = items[index];
+  if (!item) return null;
+  const control = "h-8 min-w-0 rounded-md border border-edge-soft bg-surface px-1 text-sm text-ink";
+  return (
+    <fieldset className="mx-3 mb-2 grid grid-cols-[minmax(0,1fr)_auto] gap-1">
+      <legend className="mb-1 text-xs font-semibold text-ink-muted">{t("Edit sidebar")}</legend>
+      <select
+        data-nav-move-item
+        className={control}
+        aria-label={t("Tab")}
+        value={item.id}
+        onChange={(event) => select(event.target.value as NavItemId)}
+      >
+        {items.map((entry) => (
+          <option key={entry.id} value={entry.id}>
+            {t(entry.label)}
+          </option>
+        ))}
+      </select>
+      <select
+        data-nav-move-position
+        className={control}
+        aria-label={t("Position")}
+        value={index}
+        onChange={(event) => {
+          const position = Number(event.target.value);
+          const anchor = items[position];
+          if (anchor && position !== index) {
+            select(item.id);
+            commit(moveNavItem(cfg, item.id, anchor.id, position < index ? "before" : "after"));
+          }
+        }}
+      >
+        {items.map((entry, position) => (
+          <option key={entry.id} value={position}>
+            #{position + 1}
+          </option>
+        ))}
+      </select>
+    </fieldset>
+  );
+}
+
 type ActiveDrag = {
   fromId: string;
   target: string | null;
@@ -157,6 +214,7 @@ export function useNavDrag(
 ) {
   const { cfg, commit } = useNavCfg();
   const editing = useNavEditMode();
+  const scrollFrame = useRef(0);
   const cfgRef = useRef(cfg);
   const cleanupDrag = useRef<(() => void) | null>(null);
   cfgRef.current = cfg;
@@ -174,6 +232,7 @@ export function useNavDrag(
   }, [editing]);
 
   const finish = (commitMove: boolean) => {
+    cancelAnimationFrame(scrollFrame.current);
     const drag = activeDrag;
     activeDrag = null;
     cancelActiveDrag = null;
@@ -271,6 +330,19 @@ export function useNavDrag(
       drag.ghost.style.transform = `translate(${dx}px, ${dy}px) scale(${drag.reducedMotion ? 1 : 1.06})`;
       drag.ghost.style.boxShadow = "0 14px 30px -10px rgba(0,0,0,0.55)";
     }
+    cancelAnimationFrame(scrollFrame.current);
+    const scrollport = draggedEl?.closest<HTMLElement>("[data-nav-sort-scope]");
+    if (scrollport && orientation === "vertical") {
+      const rect = scrollport.getBoundingClientRect();
+      const edge = 40;
+      const speed = e.clientY < rect.top + edge ? -12 : e.clientY > rect.bottom - edge ? 12 : 0;
+      const previous = scrollport.scrollTop;
+      if (e.clientX >= rect.left && e.clientX <= rect.right && speed) {
+        scrollport.scrollTop += speed;
+        if (scrollport.scrollTop !== previous)
+          scrollFrame.current = requestAnimationFrame(() => onMove(e));
+      }
+    }
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const cell = el?.closest?.("[data-nav-drop-id]") as HTMLElement | null;
     const vertical = orientation === "vertical";
@@ -293,7 +365,8 @@ export function useNavDrag(
     const cursor = (vertical ? e.clientY : e.clientX) * direction;
     let idx = kids.length;
     for (let i = 0; i < kids.length; i++) {
-      const r = kids[i].getBoundingClientRect();
+      const row = kids[i].closest("[data-nav-edit-wrapper]") ?? kids[i];
+      const r = row.getBoundingClientRect();
       const mid = (vertical ? r.top + r.height / 2 : r.left + r.width / 2) * direction;
       if (cursor < mid) {
         idx = i;
