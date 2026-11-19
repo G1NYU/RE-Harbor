@@ -336,7 +336,7 @@ function SourceCount({
     return (
       <>
         <span className="max-w-[42ch] truncate" title={error}>
-          {error || t("music.error.load")}
+          {t("music.error.load")}
         </span>
         <button
           type="button"

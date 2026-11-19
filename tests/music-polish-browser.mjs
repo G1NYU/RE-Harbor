@@ -67,6 +67,25 @@ const artist = {
 };
 try {
   await page.goto("http://127.0.0.1:1420", { waitUntil: "domcontentloaded" });
+  const musicTab = page.locator('aside [data-harbor-nav="music"]');
+  await musicTab.click({ button: "right" });
+  await page.getByText("Edit sidebar", { exact: true }).last().click();
+  await page.locator("[data-harbor-context-layer]").waitFor({ state: "hidden" });
+  const sidebarOrder = () =>
+    page
+      .locator("aside [data-harbor-nav]")
+      .evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute("data-harbor-nav")));
+  const original = await sidebarOrder();
+  const liveIndex = original.indexOf("live");
+  assert.ok(liveIndex >= 0 && liveIndex < original.indexOf("music"));
+  const moveUp = musicTab.locator("..").getByRole("button", { name: "Move up" });
+  for (let index = original.indexOf("music"); index > liveIndex; index--) {
+    await moveUp.click();
+    assert.equal((await sidebarOrder()).indexOf("music"), index - 1);
+  }
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await musicTab.waitFor();
+  assert.equal((await sidebarOrder()).indexOf("music"), liveIndex);
   await page.locator('[data-harbor-nav="music"]').click();
   await page.locator("[data-music-view]").waitFor();
   await page.locator("[data-music-mast-form]").waitFor();
@@ -356,27 +375,6 @@ try {
     "The artist name must stay visible above the fold at 960px",
   );
   await page.screenshot({ path: folder + "/artist-960.png" });
-  await page.setViewportSize({ width: 1600, height: 900 });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  const musicTab = page.locator('aside [data-harbor-nav="music"]');
-  await musicTab.click({ button: "right" });
-  await page.getByText("Edit sidebar", { exact: true }).last().click();
-  await page.locator("[data-harbor-context-layer]").waitFor({ state: "hidden" });
-  const sidebarOrder = () =>
-    page
-      .locator("aside [data-harbor-nav]")
-      .evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute("data-harbor-nav")));
-  const original = await sidebarOrder();
-  const liveIndex = original.indexOf("live");
-  assert.ok(liveIndex >= 0 && liveIndex < original.indexOf("music"));
-  const moveUp = musicTab.locator("..").getByRole("button", { name: "Move up" });
-  for (let index = original.indexOf("music"); index > liveIndex; index--) {
-    await moveUp.click();
-    assert.equal((await sidebarOrder()).indexOf("music"), index - 1);
-  }
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await musicTab.waitFor();
-  assert.equal((await sidebarOrder()).indexOf("music"), liveIndex);
   console.log("Harbor Music geometry passed:", {
     dockRect,
     albumMetrics,

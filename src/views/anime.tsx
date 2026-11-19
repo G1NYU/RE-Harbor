@@ -914,12 +914,21 @@ export function AnimeView({ active = true }: { active?: boolean }) {
                 favoriteGenreCount={favoriteGenres.length}
               />
             </div>
-          ) : (
+          ) : SPECS.some((spec) => !rowsByKey[spec.key]?.ready) ? (
             <div className="harbor-anime-hero">
               <AnimeHeroSkeleton />
             </div>
-          )}
+          ) : null}
           <div className="-mb-6 -mt-6 flex items-center justify-end gap-2">
+            {heroMetas.length === 0 && !announcement && (
+              <button
+                type="button"
+                onClick={() => setShowPicker(true)}
+                className="rounded-md border border-edge-soft bg-canvas px-3 py-1.5 text-sm text-ink"
+              >
+                {t("Tune anime")}
+              </button>
+            )}
             {editMode && animeHasCustomization(settings.animeRows) && (
               <button
                 onClick={() => update({ animeRows: { order: [], hidden: [], renamed: {} } })}
