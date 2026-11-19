@@ -232,9 +232,7 @@ test("watchlist retries transient CONFLICT failures, preserving the final operat
   let writes = 0;
   const h = harness((_url, init) => {
     if (init.method === "GET")
-      return new Response(
-        JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }),
-      );
+      return new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }));
     writes++;
     return writes < 3
       ? new Response(JSON.stringify({ code: "CONFLICT" }), { status: 409 })
@@ -251,7 +249,10 @@ test("watchlist retries transient CONFLICT failures, preserving the final operat
     );
     assert.equal(result, undefined);
     assert.equal(writes, 3);
-    assert.deepEqual(h.calls.map((call) => call.init.method), ["GET", "PUT", "PUT", "PUT"]);
+    assert.deepEqual(
+      h.calls.map((call) => call.init.method),
+      ["GET", "PUT", "PUT", "PUT"],
+    );
   } finally {
     globalThis.window = oldWindow;
   }
@@ -263,9 +264,7 @@ test("watchlist also retries a temporary lookup network failure", async () => {
     if (init.method === "GET") {
       lookups++;
       if (lookups === 1) throw new TypeError("Temporary network failure");
-      return new Response(
-        JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }),
-      );
+      return new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }));
     }
     return new Response("{}", { status: 201 });
   });
@@ -282,7 +281,10 @@ test("watchlist also retries a temporary lookup network failure", async () => {
       undefined,
     );
     assert.equal(lookups, 2);
-    assert.deepEqual(h.calls.map((call) => call.init.method), ["GET", "GET", "PUT"]);
+    assert.deepEqual(
+      h.calls.map((call) => call.init.method),
+      ["GET", "GET", "PUT"],
+    );
   } finally {
     globalThis.window = oldWindow;
   }
@@ -304,7 +306,10 @@ test("watchlist does not retry permanent permission failures", async () => {
       () => {},
     );
     assert.match(result, /library:write/);
-    assert.deepEqual(h.calls.map((call) => call.init.method), ["GET", "PUT"]);
+    assert.deepEqual(
+      h.calls.map((call) => call.init.method),
+      ["GET", "PUT"],
+    );
   } finally {
     globalThis.window = oldWindow;
   }
@@ -314,9 +319,7 @@ test("watchlist cancels a scheduled retry when the account changes", async () =>
   let writes = 0;
   const h = harness((_url, init) => {
     if (init.method === "GET")
-      return new Response(
-        JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }),
-      );
+      return new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }));
     writes++;
     return new Response(JSON.stringify({ code: "CONFLICT" }), { status: 409 });
   });
