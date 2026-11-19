@@ -10,7 +10,7 @@ export function MusicMikuSettings() {
   const t = useT();
   const appearance = useMusicAppearance();
   return (
-    <section className="music-audio-section music-miku-settings" aria-labelledby="music-miku-title">
+    <section className="music-audio-section music-miku-settings" data-motion-override={appearance.visualizerMotion || undefined} aria-labelledby="music-miku-title">
       <div className="music-miku-preview"><MikuIdlePreview /></div>
       <div className="music-miku-copy">
         <label className="music-audio-toggle" id="music-miku-title">
@@ -20,7 +20,7 @@ export function MusicMikuSettings() {
         </label>
         <p>{t("music.miku.body")}</p>
         <p>{t("music.miku.rest")}</p>
-        <p className="music-motion-reduced">{t("music.motion.reduced")}</p>
+        {!appearance.visualizerMotion && <p className="music-motion-reduced">{t("music.motion.reduced")}</p>}
         <div className="music-miku-model">
           <span>{t("music.miku.model")}</span>
           <Dropdown value={appearance.mikuModel} ariaLabel={t("music.miku.model")}

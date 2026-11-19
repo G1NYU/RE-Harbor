@@ -54,7 +54,7 @@ export function MusicGifSettings() {
           {asset.frames.frames.length < 2 && ` · ${t("music.gif.static")}`}
         </p>
       )}
-      <p className="music-motion-reduced">{t("music.motion.reduced")}</p>
+      {!appearance.visualizerMotion && <p className="music-motion-reduced">{t("music.motion.reduced")}</p>}
       <input ref={input} type="file" accept="image/gif,.gif" hidden onChange={event => void upload(event.target.files?.[0])} />
       <div className="music-gif-actions">
         <button ref={uploadButton} type="button" disabled={busy} onClick={() => input.current?.click()}>{t(busy ? "music.gif.loading" : appearance.gifId ? "music.gif.replace" : "music.gif.upload")}</button>

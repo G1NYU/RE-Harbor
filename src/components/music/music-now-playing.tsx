@@ -85,6 +85,7 @@ function ArtworkLevels({ track, enabled }: { track: MusicTrack; enabled: boolean
 /** Keep 20Hz meter re-renders scoped to the tiny caption, not the player shell. */
 function MusicVisualizerCaption({ track, playing }: { track: MusicTrack; playing: boolean }) {
   const t = useT();
+  const { visualizerMotion } = useMusicAppearance();
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -94,9 +95,11 @@ function MusicVisualizerCaption({ track, playing }: { track: MusicTrack; playing
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-  const meter = useMusicAudioMeter(track, playing && !reducedMotion);
-  const status = musicVisualizerStatus(meter, track, playing, reducedMotion);
-  const label = status === "loading" ? "common.loading" : `music.quality.${status}`;
+  const motionBlocked = reducedMotion && !visualizerMotion;
+  const meter = useMusicAudioMeter(track, playing && !motionBlocked);
+  const status = musicVisualizerStatus(meter, track, playing, motionBlocked);
+  const label = playing && motionBlocked ? "music.motion.reducedShort" :
+    status === "loading" ? "common.loading" : `music.quality.${status}`;
   return <small data-music-visualizer-status={status} aria-live="polite">{t(label)}</small>;
 }
 

@@ -21,6 +21,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .music-miku-preview .music-miku-idle-preview { animation: none; }
+  .music-miku-settings[data-motion-override] .music-miku-idle-preview {
+    animation: music-miku-idle 8s step-end infinite;
+  }
 }
 /* Only the reveal moves; her mounted pose and beat clock keep running. CSS
    transitions reverse from their current position during rapid toggles. */
@@ -188,3 +191,8 @@
 }
 @container (max-width: 700px) { .music-miku-perch { inset-inline-start: 4px; width: 148.5px; height: 99px; } }
 @media (max-height: 460px) { .music-miku-perch { width: 121.5px; height: 81px; } }
+@media (prefers-reduced-motion: reduce) {
+  .music-miku-perch[data-motion-override][data-stage="idle"] .music-miku-idle {
+    animation: music-miku-idle 8s step-end infinite;
+  }
+}

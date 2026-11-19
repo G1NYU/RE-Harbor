@@ -15,6 +15,9 @@ import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
   "music.motion.reduced": "Animation is paused because reduced motion is enabled in your system accessibility settings.",
+  "music.motion.reducedShort": "Reduced motion",
+  "music.motion.override": "Allow animated music visualizers",
+  "music.motion.overrideHelp": "Overrides Windows reduced-motion preference for Miku, custom GIFs and spectrum bars only. Other app animations remain unchanged.",
   "music.gif.frameCount": "{count} frames",
   "music.gif.static": "This GIF contains only one frame and cannot move.",
   "music.xxl.newer": "Newer class",

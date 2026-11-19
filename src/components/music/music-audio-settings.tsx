@@ -10,7 +10,7 @@ import {
 import { ArrowLeft, Disc3, Plus, RefreshCw, X } from "@/components/icons/music-icons";
 import { UiIcon } from "@/components/ui-icon";
 import { useSettings } from "@/lib/settings";
-import { useMusicAppearance } from "@/lib/music/appearance";
+import { setMusicAppearance, useMusicAppearance } from "@/lib/music/appearance";
 import { openDjDeck } from "@/lib/music/dj-deck";
 import djDeckPreview from "@/assets/settings-preview/dj-deck.png";
 import { useT } from "@/lib/i18n";
@@ -478,6 +478,14 @@ export function MusicAudioSettings({
           </span>
         </footer>
       </fieldset>
+      <section className="music-audio-section music-motion-override">
+        <label className="music-audio-toggle">
+          <input type="checkbox" checked={appearance.visualizerMotion}
+            onChange={event => setMusicAppearance({ visualizerMotion: event.target.checked })} />
+          {t("music.motion.override")}
+        </label>
+        <p>{t("music.motion.overrideHelp")}</p>
+      </section>
       <MusicMikuSettings />
       <MusicGifSettings />
     </section>

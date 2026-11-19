@@ -11,6 +11,7 @@ import "./music-gif-visualizer.css";
 export function MusicGifCanvas({ animation, playing = true, track, timing = "auto" }: {
   animation: MusicGifFrames; playing?: boolean; track?: MusicTrack; timing?: GifTiming;
 }) {
+  const { visualizerMotion } = useMusicAppearance();
   const canvas = useRef<HTMLCanvasElement>(null);
   const playback = useRef({ playing, track, timing }); playback.current = { playing, track, timing };
   const refresh = useRef<(() => void) | null>(null);
@@ -37,8 +38,10 @@ export function MusicGifCanvas({ animation, playing = true, track, timing = "aut
       const { track, playing } = playback.current;
       const key = track ? JSON.stringify([track.connectorId, track.id]) : "";
       if (key !== trackKey) { trackKey = key; groove.reset(); clock.retime(); }
-      const animate = playing && inView && !document.hidden && !motion.matches && !!surface.offsetWidth;
-      surface.dataset.motion = motion.matches ? "reduced" : animate ? "running" : "paused";
+      const animate = animation.frames.length > 1 && playing && inView && !document.hidden &&
+        (!motion.matches || visualizerMotion) && !!surface.offsetWidth;
+      surface.dataset.motion = motion.matches && !visualizerMotion ? "reduced" :
+        animation.frames.length < 2 ? "static" : animate ? "running" : "paused";
       surface.dataset.frames = String(animation.frames.length);
       const analyze = animate && track && track.mediaKind !== "video";
       if (!analyze) { release?.(); release = null; }
@@ -56,7 +59,7 @@ export function MusicGifCanvas({ animation, playing = true, track, timing = "aut
     document.addEventListener("visibilitychange", reconcile); motion.addEventListener("change", reconcile);
     return () => { release?.(); cancelAnimationFrame(raf); resize.disconnect(); intersection.disconnect(); refresh.current = null;
       document.removeEventListener("visibilitychange", reconcile); motion.removeEventListener("change", reconcile); };
-  }, [animation]);
+  }, [animation, visualizerMotion]);
   return <canvas ref={canvas} className="music-gif-canvas" aria-hidden="true" />;
 }
 

@@ -49,7 +49,7 @@ export function MusicMikuVisualizer({ track, playing, concealed = false, stream 
   concealed?: boolean;
   stream?: MusicMeterStream;
 }) {
-  const { mikuModel } = useMusicAppearance();
+  const { mikuModel, visualizerMotion } = useMusicAppearance();
   const [active, setActive] = useState<{ model: MikuModel; art: MikuArtworkSet } | null>(null);
   useEffect(() => {
     let disposed = false;
@@ -246,12 +246,12 @@ export function MusicMikuVisualizer({ track, playing, concealed = false, stream 
     const start = () => { if (!frame) { previous = 0; frame = requestAnimationFrame(tick); } };
     const visible = () => {
       reconcileTrack();
-      setState("ambient", String(!document.hidden && !motion.matches && !!host.offsetWidth));
-      videoPlaying = video && playingRef.current && !document.hidden && !motion.matches && !!host.offsetWidth;
-      if (!playingRef.current || document.hidden || motion.matches || !host.offsetWidth) {
+      setState("ambient", String(!document.hidden && (!motion.matches || visualizerMotion) && !!host.offsetWidth));
+      videoPlaying = video && playingRef.current && !document.hidden && (!motion.matches || visualizerMotion) && !!host.offsetWidth;
+      if (!playingRef.current || document.hidden || (motion.matches && !visualizerMotion) || !host.offsetWidth) {
         if (release && !playingRef.current) groove.suspend();
         release?.(); release = undefined; target = 0; audibleAt = 0;
-        if (motion.matches || document.hidden || !host.offsetWidth) {
+        if ((motion.matches && !visualizerMotion) || document.hidden || !host.offsetWidth) {
           cancelAnimationFrame(frame); frame = 0; lift = 0; energy = 0; bob = sway = videoTime = 0; groove.reset(); dance.reset();
           expression.reset(); listeningPerformance.reset(); eyes = expression.advance(0, false);
           danceState = dance.advance(0, { beat: 0, locked: false, excitement: 0 }, false, false); paint();
@@ -285,12 +285,12 @@ export function MusicMikuVisualizer({ track, playing, concealed = false, stream 
       expression.reset(); eyes = expression.advance(0, false);
       danceState = dance.advance(0, { beat: 0, locked: false, excitement: 0 }, false, false); paint();
     };
-  }, [video, stream, active]);
+  }, [video, stream, active, visualizerMotion]);
   if (!active) return <div className="music-miku-perch" data-concealed={concealed || undefined} aria-hidden="true">
     <div className="music-miku-reveal"><MikuArtwork /></div>
   </div>;
   const { art } = active;
-  return <div ref={root} data-model={active.model} className="music-miku-perch" data-concealed={concealed || undefined} data-stage="idle" aria-hidden="true">
+  return <div ref={root} data-model={active.model} className="music-miku-perch" data-motion-override={visualizerMotion || undefined} data-concealed={concealed || undefined} data-stage="idle" aria-hidden="true">
     <div className="music-miku-reveal">
       <div className="music-miku-art music-miku-sprite" style={{ backgroundImage: `url(${art.motion})`, backgroundSize: `${MIKU_ATLAS.columns * 100}% ${MIKU_ATLAS.rows * 100}%` }} />
       <div className="music-miku-eyes" style={{ backgroundImage: `url(${art.eyes})`, backgroundSize: `${MIKU_ATLAS.columns * 100}% ${MIKU_ATLAS.rows * 100}%` }} />

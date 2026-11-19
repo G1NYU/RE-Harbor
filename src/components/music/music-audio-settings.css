@@ -704,3 +704,8 @@
   color: var(--color-danger, #ff6b5e);
   font-size: 12px;
 }
+/* Only shown if Windows asks to suppress motion; default follows the OS. */
+.music-motion-override { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .music-motion-override { display: block; }
+}

@@ -82,6 +82,18 @@ try {
   if (await page.locator("[data-void-sidebar-groups]").count()) {
     await sidebarSections.first().waitFor();
     assert.deepEqual(await sectionLabels(), expectedSections, "VOID default groups should occur only once");
+    const homeRow = await page.locator('aside [data-harbor-nav="home"]').evaluate((el) => {
+      const icon = el.querySelector("[data-harbor-sidebar-icon]")?.getBoundingClientRect();
+      const label = el.querySelector("[data-harbor-sidebar-label]")?.getBoundingClientRect();
+      const button = el.getBoundingClientRect();
+      return { iconLeft: icon?.left, labelLeft: label?.left, buttonLeft: button.left };
+    });
+    assert.ok(
+      homeRow.iconLeft !== undefined && homeRow.labelLeft !== undefined &&
+        homeRow.iconLeft < homeRow.labelLeft &&
+        homeRow.iconLeft - homeRow.buttonLeft < 24,
+      "VOID navigation icons and labels must align to the left, not the right",
+    );
     await page.screenshot({ path: folder + "/void-sidebar-default-1600.png" });
   }
   const musicTab = page.locator('aside [data-harbor-nav="music"]');

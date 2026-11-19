@@ -76,3 +76,23 @@ test("album details use a wide image-and-metadata header with faded right/bottom
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /@container \(max-width: 770px\)/);
 });
+test("VOID sidebar aligns the original grouped navigation to the left", () => {
+  const css = read("src/void-native.css");
+  assert.match(css, /\[data-void-sidebar-groups\] button\[data-harbor-nav\] \{\s*flex-direction: row;/);
+  assert.match(css, /\[data-void-nav-section\] \{[\s\S]*?text-align: start/);
+  assert.doesNotMatch(css, /flex-direction: row-reverse/);
+});
+
+test("audio visualizers share a reduced-motion override and skip static GIF RAF", () => {
+  const preferences = read("src/lib/music/appearance.ts");
+  const audio = read("src/components/music/music-audio-settings.tsx");
+  const gif = read("src/components/music/music-gif-visualizer.tsx");
+  const miku = read("src/components/music/music-miku-visualizer.tsx");
+  const bars = read("src/components/music/music-dock-visualizer.tsx");
+  assert.match(preferences, /visualizerMotion: value\.visualizerMotion === true/);
+  assert.match(audio, /visualizerMotion: event\.target\.checked/);
+  assert.match(gif, /animation\.frames\.length > 1 && playing/);
+  assert.match(gif, /!motion\.matches \|\| visualizerMotion/);
+  assert.match(miku, /motion\.matches && !visualizerMotion/);
+  assert.match(bars, /motion\.matches && !visualizerMotion/);
+});

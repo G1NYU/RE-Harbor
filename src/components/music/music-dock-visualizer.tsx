@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useT } from "@/lib/i18n";
+import { useMusicAppearance } from "@/lib/music/appearance";
 import { acquireMusicMeter, type MusicAudioMeterState } from "@/lib/music/audio-meter";
 import type { MusicTrack } from "@/lib/music/types";
 import { DOCK_VISUALIZER_BARS, musicDockSpectrum } from "@/lib/music/dock-visualizer";
@@ -27,6 +28,7 @@ export function MusicDockVisualizer({
   stream?: MusicMeterStream;
 }) {
   const t = useT();
+  const { visualizerMotion } = useMusicAppearance();
   const root = useRef<HTMLDivElement>(null);
   const bars = useRef<HTMLSpanElement[]>([]);
 
@@ -65,7 +67,7 @@ export function MusicDockVisualizer({
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     // Hidden, paused, and compact docks must not hold native analysis open.
     const visibility = () => {
-      if (!live || !playing || document.hidden || motion.matches || !root.current?.offsetWidth) {
+      if (!live || !playing || document.hidden || (motion.matches && !visualizerMotion) || !root.current?.offsetWidth) {
         release?.();
         release = undefined;
         levels = musicDockSpectrum(undefined, false);
@@ -89,7 +91,7 @@ export function MusicDockVisualizer({
       levels = musicDockSpectrum(undefined, false);
       paint();
     };
-  }, [live, playing, trackId, connectorId, stream]);
+  }, [live, playing, trackId, connectorId, stream, visualizerMotion]);
 
   if (!live) return null;
 
@@ -98,6 +100,7 @@ export function MusicDockVisualizer({
       ref={root}
       className="music-dock-viz"
       data-resting="true"
+      data-motion-override={visualizerMotion || undefined}
       role="img"
       aria-label={t("music.quality.levels")}
       title={t("music.quality.levels")}

@@ -102,7 +102,7 @@ html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] butt
    Editing and collapsed rail continue to use their original layout. */
 @media (min-width: 1024px) {
   html[data-void-native="1"] aside[data-harbor-sidebar][data-collapsed="false"] [data-void-sidebar-groups] button[data-harbor-nav] {
-    flex-direction: row-reverse;
+    flex-direction: row;
     justify-content: flex-start;
     height: 42px;
     min-height: 42px;
@@ -114,14 +114,14 @@ html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] butt
   }
   html[data-void-native="1"] aside[data-harbor-sidebar] [data-void-sidebar-groups] [data-harbor-sidebar-label] {
     min-width: 0;
-    text-align: end;
+    text-align: start;
   }
   html[data-void-native="1"] aside[data-harbor-sidebar] [data-void-nav-section] {
     margin-block: 13px 1px;
-    padding-inline-end: 18px;
+    padding-inline-start: 16px;
     color: var(--void-muted);
     opacity: .76;
-    text-align: end;
+    text-align: start;
     text-transform: uppercase;
     font-size: 10px;
     font-weight: 800;
