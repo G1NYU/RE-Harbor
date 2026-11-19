@@ -58,8 +58,13 @@ try {
     assert.equal(await page.locator("[data-harbor-sidebar-footer]").count(), 0,
       "VOID sidebar must not hide the account behind the full-width music dock");
     const topSearch = await page.locator("[data-music-mast-form]").boundingBox();
-    assert.ok(topSearch && topRect.x > topSearch.x + topSearch.width - 12,
-      "Music search and window utilities must not overlap");
+    // X-ranges can overlap safely when controls occupy different vertical bands.
+    assert.ok(topSearch && (
+      topRect.y + topRect.height <= topSearch.y + 1 ||
+      topSearch.y + topSearch.height <= topRect.y + 1 ||
+      topRect.x + topRect.width <= topSearch.x + 1 ||
+      topSearch.x + topSearch.width <= topRect.x + 1
+    ), "Music search and window utilities must not intersect");
   }
 
   // Add a provider-free Tauri invoke shim only AFTER mounting the browser app.

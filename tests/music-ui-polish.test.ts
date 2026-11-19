@@ -43,7 +43,7 @@ test("artist detail becomes full-width with a spacious editorial header and two-
   const view = read("src/views/music.tsx");
   const detail = read("src/views/music/music-detail.tsx");
   const css = read("src/views/music/music-detail.css");
-  assert.match(view, /detail\?\.item\.kind === "artist" \|\| detail\?\.item\.kind === "album" \? "max-w-none"/);
+  assert.ok(view.includes('detail?.item.kind === "artist" || detail?.item.kind === "album" || (!detail && !search && tab === "explore") ? "max-w-none"'));
   assert.match(detail, /data-music-artist=\{item\.kind === "artist"/);
   assert.match(detail, /music-artist-eyebrow/);
   assert.match(css, /grid-template-areas: "art identity" "art stats"/);
@@ -67,7 +67,7 @@ test("album details use a wide image-and-metadata header with faded right/bottom
   const view = read("src/views/music.tsx");
   const detail = read("src/views/music/music-detail.tsx");
   const css = read("src/views/music/music-detail.css");
-  assert.match(view, /detail\?\.item\.kind === "album" \? "max-w-none"/);
+  assert.ok(view.includes('detail?.item.kind === "artist" || detail?.item.kind === "album" || (!detail && !search && tab === "explore") ? "max-w-none"'));
   assert.match(detail, /data-music-album=\{item\.kind === "album"/);
   assert.match(detail, /music-album-eyebrow/);
   assert.match(css, /\.music-detail-page\[data-music-album\] \.music-detail-hero::before/);

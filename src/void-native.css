@@ -81,8 +81,8 @@ html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] butt
 }
 
 html[data-void-native="1"] aside[data-harbor-sidebar][data-void-native="1"] button[data-harbor-nav][data-active] {
-  background: var(--void-raised);
-  border-color: var(--void-edge);
+  background: linear-gradient(to right, color-mix(in srgb, var(--void-raised) 80%, transparent), transparent 100%);
+  border-color: transparent;
   color: var(--void-ink);
   box-shadow: none;
 }
