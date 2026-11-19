@@ -121,6 +121,12 @@ pub(super) async fn resolve_track_with_refresh(
     refresh: bool,
 ) -> Result<MusicStream, String> {
     state.db.upsert_track(track)?;
+    // Disconnecting an account must also block cached VK stream playback.
+    if track.connector_id.as_deref() == Some("vk")
+        && !state.registry.get("vk").is_some_and(|connector| connector.playable())
+    {
+        return Err("Connect an approved VK Music account first".to_string());
+    }
     if let Some(url) = track
         .playback_url
         .as_deref()

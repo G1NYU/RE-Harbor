@@ -1,6 +1,8 @@
 const SOURCE_LABEL: Record<string, string> = {
   spotify: "Spotify",
   soundcloud: "SoundCloud",
+  vk: "VK Music",
+  vkmusic: "VK Music",
   youtube: "YouTube Music",
   youtubemusic: "YouTube Music",
   "youtube-music": "YouTube Music",
