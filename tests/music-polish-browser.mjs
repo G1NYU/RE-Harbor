@@ -339,6 +339,52 @@ try {
     );
   }
 
+  // The search-to-song screen has a distinct `track` hero. Exercise the exact
+  // production selectors without contacting a music provider or playing audio.
+  await page.evaluate(() => {
+    const parent = document.querySelector("[data-music-view]");
+    if (!parent) throw new Error("Missing Music view");
+    const fixture = document.createElement("section");
+    fixture.className = "music-detail-page";
+    fixture.dataset.musicTrack = "true";
+    fixture.dataset.songHeroLayoutCheck = "true";
+    fixture.innerHTML = `<header class="music-detail-hero">
+      <div class="music-detail-art"><div style="width:100%;height:100%;background:#6c7086"></div></div>
+      <div class="music-detail-title"><h1>Seven Goblins</h1>
+        <p class="music-detail-meta">Masayoshi Takanaka</p>
+        <div class="music-detail-hero-actions"><button type="button">Play</button></div>
+      </div></header>`;
+    parent.append(fixture);
+  });
+  const songFixture = page.locator("[data-song-hero-layout-check]");
+  const songMetrics = () => songFixture.evaluate((root) => {
+    const hero = root.querySelector(".music-detail-hero");
+    const art = root.querySelector(".music-detail-art").getBoundingClientRect();
+    const title = root.querySelector(".music-detail-title").getBoundingClientRect();
+    const play = root.querySelector(".music-detail-hero-actions").getBoundingClientRect();
+    return {
+      display: getComputedStyle(hero).display,
+      artWidth: art.width,
+      artHeight: art.height,
+      artRight: art.right,
+      artBottom: art.bottom,
+      titleLeft: title.left,
+      titleTop: title.top,
+      playLeft: play.left,
+    };
+  });
+  const songWide = await songMetrics();
+  assert.equal(songWide.display, "grid", "Song detail must use a two-column hero");
+  assert.ok(songWide.artWidth >= 200, "Song artwork must not remain a tiny thumbnail");
+  assert.ok(Math.abs(songWide.artWidth - songWide.artHeight) < 2, "Song artwork stays square");
+  assert.ok(songWide.titleLeft >= songWide.artRight + 12, "Song title must sit beside artwork");
+  assert.ok(songWide.playLeft >= songWide.titleLeft - 2, "Transport controls align with title");
+  await songFixture.screenshot({ path: folder + "/song-detail-hero-1600.png" });
+  await songFixture.evaluate((root) => { root.style.width = "520px"; });
+  const songNarrow = await songMetrics();
+  assert.ok(songNarrow.titleTop >= songNarrow.artBottom + 10, "Narrow song hero must stack cleanly");
+  await songFixture.evaluate((root) => root.remove());
+
   await explore("album");
   const albumView = page.locator('.music-detail-page[data-music-album="true"]');
   await albumView.waitFor();

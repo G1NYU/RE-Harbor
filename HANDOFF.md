@@ -137,3 +137,9 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - VOID nav keeps groups and custom reorder, but icons, labels and headers now align left, with an Edge geometry assertion and screenshot test.
 - Miku, spectrum and GIFs honor OS reduced-motion by default, with a small explicit user opt-in shown only if Windows requests reduced motion. One-frame GIFs no longer run an RAF loop or subscribe to the audio meter. Existing persistent music preferences and GIF assets are preserved.
 - These changes have not yet been confirmed with real Windows audio; check native CI, then test Miku/GIF while actually playing and inspect performance.
+
+## Single-song detail hero sizing (2026-11-19)
+- Identified the last visual gap in the Music search result → individual track detail. Album and artist pages have grid heroes; track detail lacked a display layout and inherited the fixed `size-48` cover, leaving the title/Play below a tiny image and an almost empty tinted header.
+- Added a `data-music-track` discriminator and CSS-only 320px maximum artwork/two-column hero. At narrow container widths, art and controls stack vertically with proper spacing. The existing square `Poster` and playback actions are reused; no extra media, filters, timers, observers or dependencies.
+- Source-level and browser geometry regressions check the art's square aspect, title/action alignment, and stacked narrow layout. Do not treat browser fixture validation as native provider playback testing.
+- Patch prepared against `feature/harbor-music-polish` at `740c4b3bee6f8028e7ee8f2328b9a55d673e1459`; branch not yet modified pending push approval.

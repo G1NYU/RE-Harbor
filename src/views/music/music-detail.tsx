@@ -293,7 +293,12 @@ export function MusicDetail({
     </div>
   );
   return (
-    <section className="music-detail-page flex min-w-0 flex-col gap-6" data-music-artist={item.kind === "artist" || undefined} data-music-album={item.kind === "album" || undefined}>
+    <section
+      className="music-detail-page flex min-w-0 flex-col gap-6"
+      data-music-artist={item.kind === "artist" || undefined}
+      data-music-album={item.kind === "album" || undefined}
+      data-music-track={item.kind === "track" || undefined}
+    >
       <button
         type="button"
         data-music-inner-back

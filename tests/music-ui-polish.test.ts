@@ -96,3 +96,14 @@ test("audio visualizers share a reduced-motion override and skip static GIF RAF"
   assert.match(miku, /motion\.matches && !visualizerMotion/);
   assert.match(bars, /motion\.matches && !visualizerMotion/);
 });
+
+test("individual song hero uses full-size square art beside its transport controls", () => {
+  const detail = read("src/views/music/music-detail.tsx");
+  const css = read("src/views/music/music-detail.css");
+  assert.match(detail, /data-music-track=\{item\.kind === "track" \|\| undefined\}/);
+  assert.match(css, /\.music-detail-page\[data-music-track\] \.music-detail-hero \{\s*display: grid;\s*grid-template-columns: minmax\(220px, 320px\) minmax\(0, 1fr\)/);
+  assert.match(css, /\.music-detail-page\[data-music-track\] \.music-detail-art \{\s*width: 100%;\s*height: auto;\s*aspect-ratio: 1;/);
+  assert.match(css, /@container \(max-width: 560px\) \{\s*\.music-detail-page\[data-music-track\]/);
+  assert.match(css, /\.music-detail-page\[data-music-album\] \.music-detail-hero/);
+  assert.match(css, /\.music-detail-page\[data-music-artist\] \.music-detail-hero/);
+});
