@@ -53,8 +53,25 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $env:HARBOR_CAPSTAN_SRC = Join-Path $env:RUNNER_TEMP 'void-installer-no-extension-runtime'
-          pnpm run setup
-          if ($LASTEXITCODE -ne 0) { throw 'Preview dependency setup failed' }
+          foreach ($script in @('setup:binaries', 'setup:libmpv', 'setup:mpv')) {
+            pnpm run $script
+            if ($LASTEXITCODE -ne 0) { throw "Preview dependency step failed: $script" }
+          }
+          # The raw GitHub font host intermittently returns HTTP 503.
+          # fetch-fonts.mjs SHA-256 verifies each downloaded file and skips
+          # verified files, so only transient failures are retried.
+          $fontReady = $false
+          for ($attempt = 1; $attempt -le 4; $attempt++) {
+            pnpm run setup:fonts
+            if ($LASTEXITCODE -eq 0) { $fontReady = $true; break }
+            if ($attempt -lt 4) {
+              Write-Warning "Font endpoint failed on attempt $attempt; retrying."
+              Start-Sleep -Seconds (10 * $attempt)
+            }
+          }
+          if (-not $fontReady) { throw 'Verified font download failed after four attempts' }
+          pnpm run setup:capstan
+          if ($LASTEXITCODE -ne 0) { throw 'Preview extension setup failed' }
 
       - name: Build signed-independent per-user NSIS installer
         shell: pwsh
