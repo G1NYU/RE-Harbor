@@ -514,3 +514,33 @@ test("HTTP 409 remains retryable while 404 and 422 are terminal", async () => {
     }
   }
 });
+
+test("distinct movie viewings within fifteen minutes are preserved", async () => {
+  const h = harness();
+  try {
+    const first = movieEvent();
+    h.sync.enqueueRefractWatch(first);
+    await tick();
+    h.sync.enqueueRefractWatch({ ...first, at: first.at + 60_000 });
+    await tick();
+    assert.equal(h.calls.length, 2);
+    assert.equal(h.sync.refractStatus().synced, 2);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("an explicitly empty or invalid episode hint never falls back to native episode numbering", async () => {
+  const h = harness();
+  try {
+    h.sync.enqueueRefractWatch(episodeEvent(), { episodes: [] });
+    h.sync.enqueueRefractWatch(episodeEvent(), {
+      episodes: [{ season: -1, episode: 0 }],
+    });
+    await tick();
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.sync.refractStatus().pending, 0);
+  } finally {
+    h.cleanup();
+  }
+});

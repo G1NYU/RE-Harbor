@@ -382,3 +382,9 @@ test("watchlist membership writes serialize across different titles on one accou
     globalThis.window = original;
   }
 });
+
+test("movie history normalizes numeric Refract IDs as API strings", async () => {
+  const h = harness();
+  await h.client.writeRefractMovie("rfk_private", 37, Date.UTC(2026, 10, 12), "numeric-ref");
+  assert.equal(JSON.parse(h.calls[0].init.body).movie_id, "37");
+});
