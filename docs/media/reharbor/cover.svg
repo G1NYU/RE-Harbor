@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="title desc">
+  <title id="title">RE-Harbor — the VOID edition</title>
+  <desc id="desc">Minimal editorial masthead in dark night-purple, with a large white RE-HARBOR wordmark, periwinkle accents, and a quiet sound-wave motif.</desc>
+  <rect width="1200" height="470" fill="#11111b"/>
+  <g fill="none" stroke="#2b2c40" stroke-width="1">
+    <path d="M840 0V470 M930 0V470 M1020 0V470 M1110 0V470" />
+    <path d="M840 100H1200 M840 190H1200 M840 280H1200 M840 370H1200" />
+  </g>
+  <path d="M808 250h30l12-38 15 79 21-135 22 188 23-215 24 245 22-173 15 82 12-33h33" stroke="#89b4fa" fill="none" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <rect x="76" y="67" width="36" height="4" fill="#89b4fa" />
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="128" y="76" fill="#89b4fa" font-size="17" font-weight="700" letter-spacing="3">GIINYU  /  SELECTED EDITION</text>
+    <text x="70" y="253" fill="#cdd6f4" font-size="110" font-weight="800" letter-spacing="-7">RE-HARBOR<tspan fill="#89b4fa">.</tspan></text>
+    <text x="76" y="311" fill="#b3b9d1" font-size="29" letter-spacing="-1.0">THE VOID EXPERIENCE</text>
+    <text x="76" y="356" fill="#777e9e" font-size="17" letter-spacing=".7">MUSIC FIRST. EVERY SCREEN INTENTIONAL.</text>
+    <text x="76" y="422" fill="#646b87" font-size="14" letter-spacing="1.7">DESIGN SYSTEM / 01</text>
+    <text x="1087" y="422" fill="#646b87" font-size="14" letter-spacing="1.7">2026</text>
+  </g>
+</svg>

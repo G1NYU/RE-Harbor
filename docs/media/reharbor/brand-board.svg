@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">VOID brand board — colors and typography</title>
+  <desc id="desc">An editorial brand system showing the VOID near-black background, Mocha surfaces, blue accents, text, typography, and spacing rules.</desc>
+  <rect width="1200" height="680" fill="#11111b"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="76" y="73" font-size="17" font-weight="700" letter-spacing="3.4" fill="#89b4fa">IDENTITY  /  01</text>
+    <text x="74" y="153" font-size="72" font-weight="800" letter-spacing="-4" fill="#cdd6f4">VOID.</text>
+    <text x="76" y="194" font-size="22" fill="#a6adc8">An after-hours interface.</text>
+    <text x="760" y="112" font-size="14" letter-spacing="2" fill="#777e9e">DESIGN PRINCIPLES</text>
+    <text x="760" y="154" font-size="26" font-weight="700" fill="#cdd6f4">Flat, not glossy.</text>
+    <text x="760" y="189" font-size="26" font-weight="700" fill="#cdd6f4">Quiet, not empty.</text>
+    <text x="760" y="224" font-size="26" font-weight="700" fill="#cdd6f4">Content takes the stage.</text>
+    <path d="M76 268 H1124" stroke="#34354a" stroke-width="1"/>
+    <text x="76" y="309" font-size="14" letter-spacing="2.3" fill="#8890ae">01 / THE PALETTE</text>
+    <g>
+      <rect x="76" y="330" width="200" height="150" rx="8" fill="#11111b" stroke="#3b3c53"/>
+      <rect x="290" y="330" width="200" height="150" rx="8" fill="#181825"/>
+      <rect x="504" y="330" width="200" height="150" rx="8" fill="#252638"/>
+      <rect x="718" y="330" width="200" height="150" rx="8" fill="#89b4fa"/>
+      <rect x="932" y="330" width="192" height="150" rx="8" fill="#cdd6f4"/>
+      <g font-size="15" font-weight="700" fill="#cdd6f4">
+        <text x="76" y="507">VOID BASE</text>
+        <text x="290" y="507">MOCHA SURFACE</text>
+        <text x="504" y="507">ELEVATION</text>
+        <text x="718" y="507">SIGNAL BLUE</text>
+        <text x="932" y="507">TEXT / ICE</text>
+      </g>
+      <g font-size="14" font-family="monospace" fill="#8c94b0">
+        <text x="76" y="530">#11111B</text>
+        <text x="290" y="530">#181825</text>
+        <text x="504" y="530">#252638</text>
+        <text x="718" y="530">#89B4FA</text>
+        <text x="932" y="530">#CDD6F4</text>
+      </g>
+    </g>
+    <path d="M76 561 H1124" stroke="#34354a" stroke-width="1"/>
+    <text x="76" y="605" font-size="14" letter-spacing="2.3" fill="#8890ae">02 / TYPOGRAPHY &amp; RHYTHM</text>
+    <text x="76" y="649" font-size="25" font-weight="800" letter-spacing="-.9" fill="#cdd6f4">BOLD GROTESK HEADLINES</text>
+    <text x="760" y="647" font-size="17" fill="#a6adc8">Wide margins · tight type · zero gradients</text>
+  </g>
+</svg>
