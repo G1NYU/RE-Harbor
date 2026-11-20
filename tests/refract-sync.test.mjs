@@ -272,20 +272,29 @@ test("a bulk history action exceeding remaining capacity is rejected without par
     }));
     h.db.set(storeKey, JSON.stringify({ pending, recent: {}, failed: [], synced: 0 }));
     h.sync.enqueueRefractWatch(episodeEvent(), {
-      episodes: [{ season: 2, episode: 4 }, { season: 2, episode: 5 }],
+      episodes: [
+        { season: 2, episode: 4 },
+        { season: 2, episode: 5 },
+      ],
     });
     await tick();
 
     // One independent queued movie succeeded, but the rejected batch remains visible.
     const stored = JSON.parse(h.db.get(storeKey));
     assert.equal(stored.pending.length, 2498);
-    assert.equal(stored.pending.some((job) => job.type === "episode"), false);
+    assert.equal(
+      stored.pending.some((job) => job.type === "episode"),
+      false,
+    );
     assert.equal(h.calls.length, 1);
     assert.equal(h.calls[0].kind, "movie");
     assert.equal(h.sync.refractStatus().failed, 1);
     assert.equal(h.sync.refractStatus().failureDetails[0].sourceId, episodeEvent().id);
     assert.match(h.sync.refractStatus().failureDetails[0].reason, /queue full/);
-    assert.equal(h.sync.refractStatus().message, "Refract queue full; unable to save another watch");
+    assert.equal(
+      h.sync.refractStatus().message,
+      "Refract queue full; unable to save another watch",
+    );
   } finally {
     h.cleanup();
   }

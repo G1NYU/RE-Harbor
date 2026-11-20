@@ -77,9 +77,7 @@ export function musicVisualizerStatus(
   if (!musicMeterMatchesTrack(state.data, track)) return "loading";
   if (!state.data?.active) return "inactive";
   if (state.data.spectrumDb?.some((db) => db > -119)) return "on";
-  return state.data.channels.some((channel) => channel.rmsDb > -90)
-    ? "unavailable"
-    : "inactive";
+  return state.data.channels.some((channel) => channel.rmsDb > -90) ? "unavailable" : "inactive";
 }
 
 /** Decibel scale: silence and stopped playback stay empty; never synthesize movement. */

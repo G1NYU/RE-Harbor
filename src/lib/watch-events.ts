@@ -96,7 +96,12 @@ export function recordRefractWatch(e: WatchEvent, hint: RefractHint = {}): void 
   if (!key) return;
   void import("./refract/sync")
     .then(({ enqueueRefractWatch }) => {
-      if (getRefractKey() === key && activeScopedProfileId() === owner && refractEnabled() && activeProfileIsPrimary())
+      if (
+        getRefractKey() === key &&
+        activeScopedProfileId() === owner &&
+        refractEnabled() &&
+        activeProfileIsPrimary()
+      )
         enqueueRefractWatch(e, hint);
     })
     .catch(() => {});

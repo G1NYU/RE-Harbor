@@ -309,7 +309,12 @@ test("watchlist toggles preserve write order across TMDB to IMDb enrichment", as
     const title = { id: "tmdb:tv:100", type: "series" };
     const add = h.client.syncRefractWatchlist("rfk_fixture", title, true, () => {});
     await started;
-    const remove = h.client.syncRefractWatchlist("rfk_fixture", { ...title, imdbId: "tt100" }, false, () => {});
+    const remove = h.client.syncRefractWatchlist(
+      "rfk_fixture",
+      { ...title, imdbId: "tt100" },
+      false,
+      () => {},
+    );
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(
       h.calls.map(({ init }) => init.method),

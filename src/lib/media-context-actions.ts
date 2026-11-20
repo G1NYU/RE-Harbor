@@ -349,11 +349,14 @@ export async function setContextWatched(
                 episodes: isMovie
                   ? undefined
                   : options.providerEpisode
-                    ? [{
-                        season: options.providerEpisode.season,
-                        episode: options.providerEpisode.episode,
-                      }]
-                    : (mapped ?? episodes.map((item) => ({
+                    ? [
+                        {
+                          season: options.providerEpisode.season,
+                          episode: options.providerEpisode.episode,
+                        },
+                      ]
+                    : (mapped ??
+                      episodes.map((item) => ({
                         season: item.imdbSeason ?? item.season,
                         episode: item.imdbEpisode ?? item.episode,
                       }))),
