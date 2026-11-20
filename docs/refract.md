@@ -8,7 +8,7 @@ This opt-in integration sends movie and episode watches (manual or playback) and
 
 Watched events are queued locally for retry, with original timestamps and duplicate protection. Identity resolution uses external IDs rather than guessed titles. Watchlist changes use membership-only endpoints, preserving existing watched history and other library statuses. Unmatched items are reported in the Refract settings.
 
-The initial upstream contribution is outbound only. Reverse history/watchlist sync, bulk imports and additional media types are not included. Desktop is the supported environment; web builds make direct requests to Refract and require Refract to permit browser-origin requests through CORS. Refract enabled state and playback threshold are included in Settings backups, but personal API keys are deliberately excluded.
+The initial upstream contribution is outbound only. Reverse history/watchlist sync, bulk imports and additional media types are not included. Desktop is the supported environment; web builds make direct requests to Refract and require Refract to permit browser-origin requests through CORS. Refract enabled state and playback threshold are stored with Harbor profile settings (and included in Settings backups), but personal API keys are deliberately excluded.
 
 ## Validation
 

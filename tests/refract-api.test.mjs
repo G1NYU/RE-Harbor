@@ -394,3 +394,15 @@ test("movie history normalizes numeric Refract IDs as API strings", async () => 
   await h.client.writeRefractMovie("rfk_private", 37, Date.UTC(2026, 10, 12), "numeric-ref");
   assert.equal(JSON.parse(h.calls[0].init.body).movie_id, "37");
 });
+
+test("Refract preference types and legacy migration stay in the profile settings store", () => {
+  const type = readFileSync(new URL("../src/lib/settings/types.ts", import.meta.url), "utf8");
+  const defaults = readFileSync(new URL("../src/lib/settings/defaults.ts", import.meta.url), "utf8");
+  const load = readFileSync(new URL("../src/lib/settings/load.ts", import.meta.url), "utf8");
+  assert.match(type, /refractSyncEnabled: boolean/);
+  assert.match(type, /refractAutoThreshold:/);
+  assert.match(defaults, /refractSyncEnabled: true/);
+  assert.match(defaults, /refractAutoThreshold: 70/);
+  assert.match(load, /harbor\.refract\.enabled\.v1/);
+  assert.match(load, /harbor\.refract\.auto-threshold\.v1/);
+});

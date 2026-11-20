@@ -544,3 +544,87 @@ test("an explicitly empty or invalid episode hint never falls back to native epi
     h.cleanup();
   }
 });
+
+test("two windows serialize queue appends and only the main window drains", async () => {
+  const prior = {
+    storage: globalThis.localStorage,
+    window: globalThis.window,
+    document: globalThis.document,
+    navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator"),
+  };
+  const db = new Map();
+  const calls = [];
+  const locks = new Map();
+  const storage = {
+    getItem: (key) => db.get(key) ?? null,
+    setItem: (key, value) => db.set(key, value),
+    removeItem: (key) => db.delete(key),
+  };
+  const lockManager = {
+    request: (name, action) => {
+      const previous = locks.get(name) ?? Promise.resolve();
+      const next = previous.then(action);
+      locks.set(name, next.catch(() => {}));
+      return next;
+    },
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { locks: lockManager },
+  });
+  globalThis.localStorage = storage;
+  globalThis.document = {};
+  globalThis.window = Object.assign(new EventTarget(), { setInterval: () => 0 });
+  const source = readFileSync(new URL("../src/lib/refract/sync.ts", import.meta.url), "utf8");
+  const compileWindow = () => {
+    const output = ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const module = { exports: {} };
+    const client = {
+      getRefractKey: () => "rfk_fixture",
+      refractEnabled: () => true,
+      lookupRefract: async () => [{ ids: { refract: "movie-ref" } }],
+      writeRefractMovie: async (...args) => {
+        calls.push(args);
+      },
+      writeRefractEpisode: async () => {},
+      RefractApiError: class RefractApiError extends Error {},
+    };
+    new Function("require", "module", "exports", output)(
+      (id) => {
+        if (id === "@/lib/active-profile-id")
+          return { activeProfileIsPrimary: () => true, activeScopedProfileId: () => "primary" };
+        if (id === "./client") return client;
+        if (id === "./identity") return { parseRefractHistoryId };
+        throw new Error(`Unexpected import: ${id}`);
+      },
+      module,
+      module.exports,
+    );
+    return module.exports;
+  };
+  try {
+    const main = compileWindow();
+    const companion = compileWindow();
+    main.enqueueRefractWatch(movieEvent("tmdb:movie:55"));
+    companion.enqueueRefractWatch(movieEvent("tmdb:movie:56"));
+    for (let i = 0; i < 10; i++) await tick();
+    const queued = JSON.parse(db.get("harbor.refract.sync.v1"));
+    assert.equal(queued.pending.length, 2, "one window must not overwrite the other's enqueue");
+    assert.equal(calls.length, 0, "companion windows must not send HTTP writes");
+
+    main.startRefractSync();
+    for (let i = 0; i < 15; i++) await tick();
+    assert.equal(main.refractStatus().pending, 0);
+    assert.equal(main.refractStatus().synced, 2);
+    assert.equal(calls.length, 2);
+  } finally {
+    globalThis.localStorage = prior.storage;
+    globalThis.window = prior.window;
+    globalThis.document = prior.document;
+    if (prior.navigator)
+      Object.defineProperty(globalThis, "navigator", prior.navigator);
+    else delete globalThis.navigator;
+  }
+});
