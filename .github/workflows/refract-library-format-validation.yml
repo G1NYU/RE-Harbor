@@ -36,6 +36,18 @@ jobs:
           echo PROBE_CONFLICTS_START
           git diff --name-only --diff-filter=U
           echo PROBE_CONFLICTS_END
+          echo PROBE_CONFLICT_COUNTS_START
+          while IFS= read -r conflict; do
+            printf '%s: ' "$conflict"
+            grep -c '^<<<<<<< ' "$conflict" || true
+          done < <(git diff --name-only --diff-filter=U)
+          echo PROBE_CONFLICT_COUNTS_END
+          for lang in ar fr ja; do
+            path="src/lib/i18n/locales/$lang.ts"
+            echo "PROBE_LOCALE_HUNKS_BEGIN $lang"
+            awk '/^<<<<<<< / { active = 1 } active { print } /^>>>>>>> / { active = 0 }' "$path"
+            echo "PROBE_LOCALE_HUNKS_END $lang"
+          done
           if [ "$result" -ne 0 ]; then
             git merge --abort || true
           fi
