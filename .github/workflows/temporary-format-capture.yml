@@ -7,7 +7,7 @@ on:
       - validation/format-vk-music
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   capture:
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          persist-credentials: false
+          persist-credentials: true
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: 24
@@ -67,3 +67,22 @@ jobs:
           path: /tmp/formatted-files.tar.gz
           retention-days: 2
           if-no-files-found: error
+      - name: Commit only formatter output to temporary validation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF_NAME" in
+            validation/format-harbor-upstream|validation/format-vk-music) ;;
+            *) echo "Ref not permitted" >&2; exit 1 ;;
+          esac
+          git add -u -- .
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No formatting differences"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git diff --cached --stat
+          git commit -m "style: run exact CI formatter on temporary validation"
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
