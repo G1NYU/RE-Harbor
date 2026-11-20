@@ -35,4 +35,3 @@ export function sourceLabel(id: string, override?: string): string {
   const words = key.replace(/[_-]+/g, " ").trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
 }
-
