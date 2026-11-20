@@ -731,8 +731,8 @@ const extra: Record<string, string> = {
     "Hiển thị nhanh lớp phủ âm lượng khi bạn thay đổi âm lượng trong lúc các nút điều khiển trình phát đang ẩn, để thay đổi bằng bàn phím và con lăn luôn hiển thị.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Hiển thị nút Bỏ qua khi phát quảng cáo chèn đã nhận diện và nút báo cáo nhỏ trên nội dung mới phát hành để bạn đánh dấu quảng cáo cần xem xét.",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Hiển thị nút Bỏ qua phần mở đầu / Bỏ qua phần giới thiệu cuối phim khi Harbor phát hiện. Tắt tùy chọn này để không bao giờ hiển thị. Bạn cũng có thể nhấn X trên nút để ẩn mục bị nhận diện sai trong phần còn lại của tập.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Hiển thị nút Bỏ qua phần mở đầu / Bỏ qua phần giới thiệu cuối phim khi Harbor phát hiện. Tắt tùy chọn này để không bao giờ hiển thị. Nút tự ẩn khi phần mở đầu hoặc phần giới thiệu cuối phim kết thúc, hoặc sau độ trễ bên dưới.",
   "Show an “on disk” badge on cards": "Hiển thị nhãn “trên ổ đĩa” trên thẻ",
   "Show audience score on cards": "Hiển thị điểm khán giả trên thẻ",
   "Show comments on detail pages": "Hiển thị bình luận trên trang chi tiết",

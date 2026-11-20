@@ -65,8 +65,7 @@ test("Seekr lookup uses movie and episode identifiers", () => {
     seekrQueryFor({
       apiKey: "k",
       metaId: "tt0944947",
-      season: 1,
-      episode: 2,
+      episode: { season: 1, episode: 2 },
       durationSec: 60,
     }),
     "duration_ms=60000&show_imdb_id=tt0944947&season=1&episode=2",
@@ -76,8 +75,7 @@ test("Seekr lookup uses movie and episode identifiers", () => {
       apiKey: "k",
       metaId: "tmdb:tv:1399",
       type: "series",
-      season: 1,
-      episode: 1,
+      episode: { season: 1, episode: 1 },
       durationSec: 60,
     }),
     "duration_ms=60000&show_tmdb_id=1399&season=1&episode=1",
@@ -87,4 +85,70 @@ test("Seekr lookup uses movie and episode identifiers", () => {
     null,
   );
   assert.equal(seekrQueryFor({ apiKey: "k", metaId: "kitsu:1", durationSec: 60 }), null);
+});
+
+test("Seekr uses the verified provider coordinates for Tanya the Evil S2E8", () => {
+  assert.equal(
+    seekrQueryFor({
+      apiKey: "k",
+      metaId: "kitsu:44778",
+      imdbId: "tt6455986",
+      imdbIdVerified: true,
+      type: "series",
+      episode: {
+        season: 1,
+        episode: 8,
+        kitsuStreamId: "kitsu:44778:8",
+        sourceMetaId: "kitsu:44778",
+        imdbId: "tt6455986",
+        imdbSeason: 2,
+        imdbEpisode: 8,
+      },
+      durationSec: 1420.054,
+    }),
+    "duration_ms=1420054&show_imdb_id=tt6455986&season=2&episode=8",
+  );
+});
+
+test("Seekr skips native anime episodes without a verified IMDb episode candidate", () => {
+  const playback = {
+    apiKey: "k",
+    metaId: "kitsu:44778",
+    imdbId: "tt6455986",
+    type: "series",
+    durationSec: 1420,
+  };
+  assert.equal(
+    seekrQueryFor({ ...playback, imdbIdVerified: true, episode: { season: 1, episode: 8 } }),
+    null,
+  );
+  assert.equal(
+    seekrQueryFor({
+      ...playback,
+      episode: { season: 1, episode: 8, imdbSeason: 2, imdbEpisode: 8 },
+    }),
+    null,
+  );
+});
+
+test("Seekr does not use the base show alias for an excluded split-franchise episode", () => {
+  assert.equal(
+    seekrQueryFor({
+      apiKey: "k",
+      metaId: "tt0434665",
+      imdbIdVerified: true,
+      type: "series",
+      episode: {
+        season: 4,
+        episode: 9,
+        kitsuStreamId: "kitsu:49444:9",
+        sourceMetaId: "kitsu:49444",
+        imdbId: "tt0434665",
+        imdbSeason: 17,
+        imdbEpisode: 49,
+      },
+      durationSec: 1420,
+    }),
+    null,
+  );
 });

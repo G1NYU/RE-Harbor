@@ -1,6 +1,7 @@
 import type { FranchiseEntry } from "@/lib/providers/anime-detail";
 
 export type SeasonArt = { background?: string; logo?: string; description?: string };
+export type SeasonArtSelection = SeasonArt & { name?: string; entryId: string };
 
 const SIDE_FORMATS = new Set(["ova", "ona", "special", "music", "movie"]);
 const DAY = 86_400_000;

@@ -712,8 +712,8 @@ const catalog11: Record<string, string> = {
     "Wyświetlaj na profilu kartę Minecrafta. Pozostaw nazwę użytkownika pustą, aby ją ukryć.",
   "Show a Minecraft card with your username":
     "Wyświetlaj kartę Minecrafta z Twoją nazwą użytkownika",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Pokazuj przycisk Pomiń intro / Pomiń napisy końcowe, gdy Harbor je wykryje. Wyłącz tę opcję, aby nigdy go nie wyświetlać. Możesz też nacisnąć X na przycisku, aby ukryć błędną sugestię do końca odcinka.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Pokazuj przycisk Pomiń intro / Pomiń napisy końcowe, gdy Harbor je wykryje. Wyłącz tę opcję, aby nigdy go nie wyświetlać. Przycisk sam się ukrywa, gdy intro lub napisy się skończą albo po opóźnieniu poniżej.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Pokazuj przycisk Pomiń podczas odtwarzania znanej wstawionej reklamy oraz mały przycisk zgłaszania w nowych wydaniach, aby oznaczać reklamy do sprawdzenia.",
   "Show a bookmark on saved titles": "Pokazuj zakładkę na zapisanych tytułach",

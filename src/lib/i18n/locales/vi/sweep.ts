@@ -40,6 +40,7 @@ const sweep: Record<string, string> = {
   "6-digit code": "Mã gồm 6 chữ số",
   "64 neurons": "64 nơ-ron",
   "8 seconds": "8 giây",
+  "10 seconds": "10 giây",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1. Số lượt xử lý giảm một nửa, nhẹ hơn với card yếu.",
   "A Harbor account": "Tài khoản Harbor",

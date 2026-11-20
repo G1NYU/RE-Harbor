@@ -96,7 +96,7 @@ export function useFaceId({ metaKey, cast, liveScan, isPaused, loadBitmap }: Arg
         }
         if (!bmp) return;
         try {
-          const faces: WireFace[] = await scanFrame(bmp, bmp.width, bmp.height);
+          const faces: WireFace[] = await scanFrame(bmp);
           if (!liveScanRef.current || generation !== scanGenerationRef.current) return;
           const now = Date.now();
           for (const f of faces) {

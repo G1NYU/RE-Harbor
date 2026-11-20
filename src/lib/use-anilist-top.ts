@@ -7,7 +7,7 @@ const browse = createBrowseCache((key) =>
   key === "top" ? fetchAnilistTopAnime(100) : fetchAnilistTrendingAnime(40),
 );
 
-export function useAnilistBrowseState(key: BrowseKey) {
+export function useAnilistBrowseState(key: BrowseKey, active = true) {
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
   const [state, setState] = useState(() => ({
@@ -16,6 +16,7 @@ export function useAnilistBrowseState(key: BrowseKey) {
     error: false,
   }));
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
     setState({ metas: browse.peek(key), loading: true, error: false });
     browse
@@ -29,7 +30,7 @@ export function useAnilistBrowseState(key: BrowseKey) {
     return () => {
       cancelled = true;
     };
-  }, [key, attempt]);
+  }, [key, active, attempt]);
   return { ...state, retry };
 }
 

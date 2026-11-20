@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
 import { type Meta } from "@/lib/cinemeta";
-import { library, libraryMetaType, removeStremioBookmark, type LibraryItem } from "@/lib/stremio";
+import {
+  CW_FINISHED_RATIO,
+  library,
+  libraryMetaType,
+  removeStremioBookmark,
+  type LibraryItem,
+} from "@/lib/stremio";
 import { fetchWatchlist } from "@/lib/trakt/watchlist";
 import { useTrakt } from "@/lib/trakt/provider";
 import { traktItemToMeta } from "@/lib/trakt/to-meta";
@@ -17,6 +23,7 @@ import {
   readLocalEntries,
   removeFromWatchlist,
   removeFromWatchlistEntry,
+  prepareRefractLibraryRemoval,
   subscribeWatchlist,
   type LocalEntry,
 } from "@/lib/watchlist";
@@ -37,6 +44,10 @@ import {
 } from "@/lib/nuvio/nuvio-library";
 import { useT } from "@/lib/i18n";
 import { useSessionState } from "@/lib/session-state";
+import { useMovieWatchedIds } from "@/lib/movie-watched";
+import { useWatchedFlagIds } from "@/lib/watched-flag";
+import { collectStremioFinishedIds, isMergedWatchlistCardFinished } from "@/lib/watchlist-watched";
+import { useFinishedSeries } from "@/lib/use-finished-series";
 import {
   applyFilter,
   countByType,
@@ -80,6 +91,12 @@ export function WatchlistTab({
   const [trakt, setTrakt] = useState<TraktItem[]>([]);
   const [localEntries, setLocalEntries] = useState<LocalEntry[]>(() => readLocalEntries());
   const [traktStatus, setTraktStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  // Keep the unfiltered library items: the Watchlist view needs their raw
+  // watched state, and the lazy series check needs the series bitfield.
+  const [stremioItems, setStremioItems] = useState<LibraryItem[]>([]);
+  const stremioFinished = useMemo(() => collectStremioFinishedIds(stremioItems), [stremioItems]);
+  const movieWatched = useMovieWatchedIds();
+  const watchedFlags = useWatchedFlagIds();
   // Bumped on every removal. Fetch completions capture the value at start and
   // revalidate instead of applying when a removal landed mid-flight, so a
   // stale response can never resurrect a just-removed card for a beat.
@@ -121,6 +138,7 @@ export function WatchlistTab({
           })
           .catch(() => {});
       };
+      setStremioItems((prev) => (prev.length === 0 ? prev : []));
       loadNuvio();
 
       const onChange = () => {
@@ -151,6 +169,7 @@ export function WatchlistTab({
             return;
           }
           setRawCount(items.filter((i) => !i.removed).length);
+          setStremioItems(items);
           setStremio(filterLibrary(items, settings.libraryBookmarkedOnly, mode));
           setStremioAggregate(items.filter((i) => !i.removed && !i.temp).map((i) => i._id));
         })
@@ -163,11 +182,15 @@ export function WatchlistTab({
       setLocalEntries(readLocalEntries());
       loadStremio();
     };
-    window.addEventListener("storage", onChange);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key?.startsWith("harbor.watchlistSeriesFinished.v1.")) return;
+      onChange();
+    };
+    window.addEventListener("storage", onStorage);
     const unsub = subscribeWatchlist(onChange);
     return () => {
       cancelled = true;
-      window.removeEventListener("storage", onChange);
+      window.removeEventListener("storage", onStorage);
       unsub();
     };
   }, [authKey, settings.libraryBookmarkedOnly, mode, refreshSeq, isNuvio]);
@@ -208,6 +231,11 @@ export function WatchlistTab({
           nuvioItems.find((x) => targetIds.has(x.content_id)) ||
           readCachedNuvioLibrary(slot).find((x) => targetIds.has(x.content_id));
         const contentType = item?.content_type || localMatch?.type || "movie";
+        const syncRefractRemoval = prepareRefractLibraryRemoval({
+          id: cleanId,
+          type: contentType,
+          imdbId: localMatch?.imdbId ?? null,
+        });
 
         for (const tid of targetIds) {
           removeNuvioLibraryItem(slot, tid, contentType);
@@ -215,6 +243,7 @@ export function WatchlistTab({
         if (localMatch) {
           removeFromWatchlist(localMatch.id);
         }
+        syncRefractRemoval();
 
         // 3. Background flush & third-party tracking sync (non-blocking)
         const tr = stremioIdToTraktTarget(cleanId);
@@ -239,7 +268,17 @@ export function WatchlistTab({
       const closure = filmClosure([stremioId], allLocals, trakt);
       evictWatchlistAggregate(closure);
       const twins = allLocals.filter((l) => closure.has(l.id));
+      const localMatch = twins.find(
+        (entry) => entry.id === stremioId || entry.imdbId === stremioId,
+      );
+      const stremioMatch = stremio.find((entry) => entry._id === stremioId);
+      const syncRefractRemoval = prepareRefractLibraryRemoval({
+        id: stremioId,
+        type: localMatch?.type ?? stremioMatch?.type,
+        imdbId: localMatch?.imdbId ?? null,
+      });
       setStremio((prev) => prev.filter((i) => !closure.has(i._id)));
+      setStremioItems((prev) => prev.filter((i) => !closure.has(i._id)));
       setLocalEntries((prev) => prev.filter((e) => !closure.has(e.id)));
       setTrakt((prev) =>
         prev.filter((t) => {
@@ -269,6 +308,7 @@ export function WatchlistTab({
         if (results.some((result) => result.status === "rejected"))
           throw new Error("Watchlist removal failed");
         for (const l of twins) removeFromWatchlist(l.id);
+        syncRefractRemoval();
       } catch {
         setLocalEntries(readLocalEntries());
       } finally {
@@ -296,6 +336,7 @@ export function WatchlistTab({
       const all = readLocalEntries();
       const e = all.find((x) => x.id === localId);
       if (!e) return;
+      const syncRefractRemoval = prepareRefractLibraryRemoval(e);
       guardSeq.current += 1;
 
       if (isNuvio) {
@@ -320,6 +361,7 @@ export function WatchlistTab({
           poster: e.poster,
           imdbId: e.imdbId ?? null,
         });
+        syncRefractRemoval();
         return;
       }
 
@@ -327,6 +369,7 @@ export function WatchlistTab({
       evictWatchlistAggregate(closure);
       setLocalEntries((prev) => prev.filter((x) => !closure.has(x.id)));
       setStremio((prev) => prev.filter((i) => !closure.has(i._id)));
+      setStremioItems((prev) => prev.filter((i) => !closure.has(i._id)));
       setTrakt((prev) =>
         prev.filter((t) => {
           const tk = traktTmdbForm(t.type, t.ids.tmdb);
@@ -340,6 +383,7 @@ export function WatchlistTab({
         poster: e.poster,
         imdbId: e.imdbId ?? null,
       });
+      syncRefractRemoval();
     },
     [trakt, isNuvio],
   );
@@ -375,10 +419,22 @@ export function WatchlistTab({
     };
   }, [traktConnected, refreshSeq]);
 
-  const merged = useMemo(
+  const mergedAll = useMemo(
     () => mergeWatchlist(localEntries, stremio, trakt, isNuvio ? nuvioItems : undefined),
     [localEntries, stremio, trakt, isNuvio, nuvioItems],
   );
+  const finishedSeries = useFinishedSeries(
+    mergedAll,
+    localEntries,
+    stremioItems,
+    mode === "watchlist",
+  );
+  const merged = useMemo(() => {
+    if (mode !== "watchlist") return mergedAll;
+    return mergedAll.filter(
+      (card) => !isMergedWatchlistCardFinished(card, localEntries, stremioFinished, finishedSeries),
+    );
+  }, [mergedAll, mode, localEntries, stremioFinished, finishedSeries, movieWatched, watchedFlags]);
 
   const [type, setType] = useSessionState<TypeKey>(`library.${mode}.type`, "all");
   const [query, setQuery] = useSessionState<string>(`library.${mode}.query`, "");
@@ -413,7 +469,6 @@ export function WatchlistTab({
         traktStatus === "loading" ? tr("Syncing Trakt…") : tr("{n} on Trakt", { n: trakt.length }),
       );
     else parts.push(tr("Connect Trakt in Settings to sync"));
-    parts.push(tr("{n} saved on this device", { n: localEntries.length }));
     if (isNuvio && rawCount > 0) {
       parts.push(tr("{n} in your Nuvio library", { n: rawCount }));
     } else if (authKey && rawCount > 0) {
@@ -547,8 +602,13 @@ export function filterLibrary(
     // can still appear in Library when its bookmarked-only filter is disabled.
     if ((bookmarkedOnly || mode === "watchlist") && i.temp) return false;
     if (mode === "library") return true;
+    // Series stay in Watchlist until the lazy released-episode check confirms
+    // they are finished; only finished movies are dropped here.
+    if (i.type !== "movie") return true;
     if ((i.state?.flaggedWatched ?? 0) > 0 || (i.state?.timesWatched ?? 0) > 0) return false;
-    if ((i.state?.timeOffset ?? 0) > 0) return false;
+    const duration = i.state?.duration ?? 0;
+    const offset = i.state?.timeOffset ?? 0;
+    if (duration > 0 && offset / duration >= CW_FINISHED_RATIO) return false;
     return true;
   });
 }

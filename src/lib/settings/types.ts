@@ -4,6 +4,7 @@ import type { ThemeSettings } from "@/lib/theme";
 import type { CustomList } from "@/lib/lists/types";
 import type { SourceRow } from "@/lib/custom-sources";
 import type { CustomStreamFilter } from "@/lib/streams/custom-filters";
+import type { SourceSort } from "@/lib/streams/source-sort";
 import type { SyncIndicatorPosition } from "@/lib/sync-toast-position";
 import type { FullscreenClockFormat, FullscreenClockStyle } from "@/lib/local-time";
 import type { SubtitleOffsetPosition, SubtitleOffsetSize } from "@/lib/player/subtitle-offset";
@@ -218,6 +219,8 @@ export type Settings = {
   playerTitleSeriesFirst: boolean;
   playerTitleLogo: boolean;
   uiScale: number;
+  harborCursor: boolean;
+  harborCursorScale: number;
   serveWebUi: boolean;
   remoteControlEnabled: boolean;
   controllerSupportEnabled: boolean;
@@ -533,6 +536,14 @@ export type Settings = {
   seekForwardStepSec: number;
   seekBackStepShortSec: number;
   seekForwardStepShortSec: number;
+  // The "long seek" hotkeys (30s by default).
+  seekBackStepLongSec: number;
+  seekForwardStepLongSec: number;
+  // Slow rate the Toggle slow speed hotkey switches to from normal speed.
+  halfSpeedRate: number;
+  // How much the Speed down / Speed up hotkeys change the rate per press.
+  speedDownStep: number;
+  speedUpStep: number;
   shareWatchPresence: boolean;
   playerHdrOpaqueWindow: boolean;
   playerEscExitsFullscreen: boolean;
@@ -741,6 +752,7 @@ export type Settings = {
   syncIndicatorPosition: SyncIndicatorPosition;
   pickerLayout: "condensed" | "stremio";
   streamSort: "harbor" | "addon";
+  sourceSort: SourceSort;
   streamPriority: StreamPriorityEntry[];
   fullStreamDescription: boolean;
   pickerShowFilename: boolean;

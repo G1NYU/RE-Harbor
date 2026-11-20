@@ -1,4 +1,9 @@
-import { episodeFromVideoId, libraryMetaType, type LibraryItem } from "@/lib/stremio";
+import {
+  CW_FINISHED_RATIO,
+  episodeFromVideoId,
+  libraryMetaType,
+  type LibraryItem,
+} from "@/lib/stremio";
 import type { HistoryItem } from "@/lib/trakt/history";
 import { parseTs, type WatchlistMerged } from "./shared";
 
@@ -16,12 +21,21 @@ export type HistoryEntry = WatchlistMerged & {
 export function filterHistory(items: LibraryItem[]): LibraryItem[] {
   return items
     .filter((i) => !i.removed || i.temp)
-    .filter(
-      (i) =>
+    .filter((i) => {
+      // Movies belong in History only once finished; series keep watched
+      // episodes and current progress visible in the episode view.
+      if (i.type === "movie") {
+        if ((i.state?.flaggedWatched ?? 0) > 0 || (i.state?.timesWatched ?? 0) > 0) return true;
+        const duration = i.state?.duration ?? 0;
+        const offset = i.state?.timeOffset ?? 0;
+        return duration > 0 && offset / duration >= CW_FINISHED_RATIO;
+      }
+      return (
         (i.state?.flaggedWatched ?? 0) > 0 ||
         (i.state?.timesWatched ?? 0) > 0 ||
-        (i.state?.timeOffset ?? 0) > 0,
-    )
+        (i.state?.timeOffset ?? 0) > 0
+      );
+    })
     .sort(
       (a, b) =>
         Date.parse(b.state?.lastWatched ?? b._mtime) - Date.parse(a.state?.lastWatched ?? a._mtime),

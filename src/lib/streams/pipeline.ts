@@ -1,6 +1,6 @@
 import { streamKey } from "./identity";
 import type { Addon } from "@/lib/addons";
-import { dlog } from "@/lib/debug";
+import { dlog, dwarn } from "@/lib/debug";
 import type { DebridStore } from "@/lib/debrid/types";
 import {
   fetchAddonStreams,
@@ -367,6 +367,9 @@ export async function runPipeline(
   stopPartials();
   signal.removeEventListener("abort", stopPartials);
   if (librarySettled.status === "fulfilled") library = librarySettled.value;
+  if (addonSettled.status !== "fulfilled") {
+    dwarn("[pipeline] addon batch failed, no addon streams this round", addonSettled.reason);
+  }
   const addonStreams = addonSettled.status === "fulfilled" ? addonSettled.value : [];
   const merged = mergeAndDedupe(library, addonStreams);
   await cacheCheckInFlight;

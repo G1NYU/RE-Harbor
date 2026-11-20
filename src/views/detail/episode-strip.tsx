@@ -35,6 +35,7 @@ export function EpisodeStrip({
   seriesImdbId,
   cinemetaVideos,
   markRatingSeasons = false,
+  showSeason,
 }: {
   meta: Meta;
   episodes: Episode[];
@@ -46,6 +47,7 @@ export function EpisodeStrip({
   seriesImdbId?: string | null;
   cinemetaVideos?: Meta["videos"];
   markRatingSeasons?: boolean;
+  showSeason?: boolean;
 }) {
   const { settings } = useSettings();
   const playLocalAware = useLocalAwareSeriesPlay();
@@ -61,11 +63,16 @@ export function EpisodeStrip({
             : `https://image.tmdb.org/t/p/${settings.hdEpisodeImages ? "original" : "w300"}${ep.stillPath}`
           : ep.stillUrl;
         const stills = [tmdbStill, thumbnailFor(ep)].filter((u): u is string => !!u);
+        const episodeNumber = ep.orderNumber ?? ep.episodeNumber;
+        const seasonNumber = ep.orderSeason ?? ep.seasonNumber;
         return {
           key: String(ep.id),
           number: ep.episodeNumber,
+          displayNumber: episodeNumber,
           season: ep.seasonNumber,
-          title: ep.name || t("Episode {n}", { n: ep.episodeNumber }),
+          displaySeason: seasonNumber,
+          seasonLabel: showSeason ? `S${seasonNumber}` : undefined,
+          title: ep.name || t("Episode {n}", { n: episodeNumber }),
           stills,
           runtime: ep.runtime,
           airDate: ep.airDate,
@@ -106,6 +113,7 @@ export function EpisodeStrip({
       seriesImdbId,
       reviewsImdbId,
       cinemetaVideos,
+      showSeason,
     ],
   );
   const epByNumber = useMemo(() => {
@@ -322,10 +330,10 @@ function EpisodeStripCard({
           <span
             className={`truncate text-[13.5px] font-semibold text-ink ${spoiler?.title ? SPOILER_TEXT_CLASS : ""}`}
           >
-            {ep.name || t("Episode {n}", { n: ep.episodeNumber })}
+            {ep.name || t("Episode {n}", { n: ep.orderNumber ?? ep.episodeNumber })}
           </span>
           <span className="text-[11.5px] text-ink-subtle">
-            S{ep.seasonNumber} E{ep.episodeNumber}
+            S{ep.orderSeason ?? ep.seasonNumber} E{ep.orderNumber ?? ep.episodeNumber}
             {ep.runtime ? ` · ${t("{n} min", { n: ep.runtime })}` : ""}
             {formatAirDate(ep.airDate) ? ` · ${formatAirDate(ep.airDate)}` : ""}
           </span>
@@ -385,9 +393,11 @@ function EpisodeStripCard({
               g={{
                 key: String(ep.id),
                 number: ep.episodeNumber,
+                displayNumber: ep.orderNumber ?? ep.episodeNumber,
                 season: ep.seasonNumber,
-                seasonLabel: `S${ep.seasonNumber}`,
-                title: ep.name || t("Episode {n}", { n: ep.episodeNumber }),
+                displaySeason: ep.orderSeason ?? ep.seasonNumber,
+                seasonLabel: `S${ep.orderSeason ?? ep.seasonNumber}`,
+                title: ep.name || t("Episode {n}", { n: ep.orderNumber ?? ep.episodeNumber }),
                 stills: still ? [still] : [],
                 runtime: ep.runtime,
                 airDate: ep.airDate,

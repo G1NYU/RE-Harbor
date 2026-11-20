@@ -1,3 +1,4 @@
+import { lruSet } from "@/lib/cache";
 import { addonOnlyMetadata } from "@/lib/metadata-policy";
 import type { Meta } from "@/lib/cinemeta";
 import { adultContentHidden, isAdultText } from "@/lib/addons-store/adult-filter";
@@ -55,10 +56,16 @@ const FRANCHISE_STRIP_RX: RegExp[] = [
   /\s+[-:(]*\s*(?:19|20)\d{2}[)\s:]*$/,
 ];
 
+const franchiseTitles = new Map<string, string>();
+
 export function stripFranchiseSuffix(name: string): string {
-  let t = name;
-  for (const rx of FRANCHISE_STRIP_RX) t = t.replace(rx, "");
-  return t.replace(/[\s°'."’˚_:-]+$/g, "").trim();
+  const cached = franchiseTitles.get(name);
+  if (cached !== undefined) return cached;
+  let title = name;
+  for (const rx of FRANCHISE_STRIP_RX) title = title.replace(rx, "");
+  const cleaned = title.replace(/[\s°'."’˚_:-]+$/g, "").trim();
+  lruSet(franchiseTitles, name, cleaned, 4096);
+  return cleaned;
 }
 
 export function animeFranchiseKey(name: string): string {

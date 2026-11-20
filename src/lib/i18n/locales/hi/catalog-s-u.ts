@@ -641,8 +641,8 @@ const catalogSU: Record<string, string> = {
   "Show a Minecraft card on your profile. Leave the username blank to hide it.":
     "अपनी प्रोफ़ाइल पर Minecraft कार्ड दिखाएँ। इसे छिपाने के लिए यूज़रनेम खाली छोड़ें।",
   "Show a Minecraft card with your username": "अपने यूज़रनेम वाला Minecraft कार्ड दिखाएँ",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Harbor को इंट्रो या क्रेडिट मिलने पर इंट्रो छोड़ें / क्रेडिट छोड़ें बटन दिखाएँ। इसे कभी न दिखाने के लिए यह विकल्प बंद करें। अगर पहचान गलत हो, तो बाकी एपिसोड के लिए इसे हटाने हेतु बटन पर मौजूद X टैप करें।",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Harbor को इंट्रो या क्रेडिट मिलने पर इंट्रो छोड़ें / क्रेडिट छोड़ें बटन दिखाएँ। इसे कभी न दिखाने के लिए यह विकल्प बंद करें। इंट्रो या क्रेडिट खत्म होने पर, या नीचे दी गई देरी के बाद, बटन अपने आप छिप जाता है।",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "किसी पहचाने गए डाले हुए विज्ञापन के चलने पर छोड़ें बटन दिखाएँ, और नई रिलीज़ पर एक छोटा रिपोर्ट बटन दिखाएँ ताकि आप विज्ञापनों को समीक्षा के लिए चिह्नित कर सकें।",
   "Show a bookmark on saved titles": "सेव किए गए शीर्षकों पर बुकमार्क दिखाएँ",

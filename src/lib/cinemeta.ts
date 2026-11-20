@@ -1,5 +1,5 @@
 import { withMetaCache } from "@/lib/cinemeta-cache";
-import { addonOnlyMetadata } from "./metadata-policy";
+import { addonOnlyMetadata, readMetadataSettings } from "./metadata-policy";
 import { safeFetch as fetch } from "@/lib/safe-fetch";
 export { persistableAddonOrigin } from "./addon-configuration-key";
 
@@ -172,13 +172,8 @@ export const topSeries = (genre?: string, skip = 0) =>
   catalog(cinemetaTopPath("series", genre, skip));
 
 export function cinemetaEnabled(): boolean {
-  if (addonOnlyMetadata()) return false;
-  try {
-    const raw = localStorage.getItem("harbor.settings");
-    return raw ? JSON.parse(raw).cinemetaEnabled !== false : true;
-  } catch {
-    return true;
-  }
+  const settings = readMetadataSettings();
+  return settings.addonOnlyMetadata !== true && settings.cinemetaEnabled !== false;
 }
 
 export async function meta(

@@ -47,6 +47,7 @@ function harness() {
     "./discover": { trackEvent: () => {}, profileFromMeta: () => ({}) },
     "./settings": { useSettings: () => ({ settings: {} }) },
     "./smooth-scroll": {},
+    "./scroll-activity": { noteScrollActivity: () => {} },
     "./together/provider": { useTogether: () => ({ snapshot: { state: "idle" } }) },
     "./fullscreen-state": { beginMarathonAdvance: () => calls.push("advance") },
     "./back-intercept": back,
@@ -197,6 +198,83 @@ test("card and row actions stay stable across navigation while view consumers up
     assert.equal(renders, before, "navigation must not wake every card and row");
     actions.rememberRowScroll("fixture-row", 456);
     assert.equal(actions.recallRowScroll("fixture-row"), 456);
+  } finally {
+    await h.dispose();
+  }
+});
+
+test("push, Back, and Forward save scroll before changing the active view", async () => {
+  const h = harness();
+  const { ViewProvider, useView } = h.load("src/lib/view.tsx");
+  let view: any;
+  const savedFrom: string[] = [];
+  function Probe() {
+    view = useView();
+    return null;
+  }
+  try {
+    await React.act(() => h.root.render(jsx.jsx(ViewProvider, { children: jsx.jsx(Probe, {}) })));
+    const unregister = view.registerScrollSave(() => savedFrom.push(view.topKind));
+    await React.act(() => view.openMeta({ id: "tt1", name: "Fixture", type: "movie" }));
+    await React.act(() => view.goBack());
+    await React.act(() => view.goForward());
+    assert.deepEqual(savedFrom, ["home", "meta", "home"]);
+    assert.equal(view.topKind, "meta");
+    unregister();
+    await React.act(() => view.goBack());
+    assert.equal(savedFrom.length, 3);
+  } finally {
+    await h.dispose();
+  }
+});
+
+test("catalog stays mounted behind detail but unmounts on a sidebar root switch", async () => {
+  const h = harness();
+  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const start = app.indexOf("function useIdleEvict(");
+  const end = app.indexOf("\nexport function App(", start);
+  const output = ts.transpileModule(app.slice(start, end), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const useIdleEvict = new Function(
+    "useState",
+    "useEffect",
+    "subscribeMemoryPressure",
+    "IDLE_EVICT_MS",
+    "PRESSURE_EVICT_MS",
+    output + "\nreturn useIdleEvict;",
+  )(React.useState, React.useEffect, () => () => {}, 10000, 1500);
+  const { ViewProvider, useView } = h.load("src/lib/view.tsx");
+  let view: any;
+  let mounts = 0;
+  function Catalog() {
+    React.useEffect(() => {
+      mounts++;
+    }, []);
+    return jsx.jsx("div", { id: "catalog" });
+  }
+  function Probe() {
+    view = useView();
+    const alive = useIdleEvict(
+      view.topKind === "movies",
+      false,
+      view.stackKinds.includes("movies"),
+    );
+    return alive ? jsx.jsx(Catalog, {}) : null;
+  }
+  try {
+    await React.act(() => h.root.render(jsx.jsx(ViewProvider, { children: jsx.jsx(Probe, {}) })));
+    await React.act(() => view.setView("movies"));
+    const original = document.querySelector("#catalog");
+    assert.ok(original);
+    await React.act(() => view.openMeta({ id: "tt1", name: "Fixture", type: "movie" }));
+    assert.equal(document.querySelector("#catalog"), original);
+    await React.act(() => view.goBack());
+    assert.equal(document.querySelector("#catalog"), original);
+    await React.act(() => view.setView("discover"));
+    assert.equal(document.querySelector("#catalog"), null);
+    await React.act(() => view.setView("movies"));
+    assert.equal(mounts, 2);
   } finally {
     await h.dispose();
   }

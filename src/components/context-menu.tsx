@@ -554,7 +554,7 @@ export function ContextMenu() {
             addonOrigin: meta.addonOrigin,
             videos: meta.videos,
           },
-          !isWatchlisted,
+          true,
           UNSAFE_MEDIA_PROVIDER_POLICY,
         ),
       );
@@ -675,20 +675,13 @@ export function ContextMenu() {
         />,
       );
     }
-    if (organizedMedia)
+    if (organizedMedia && !isWatchlisted)
       items.push(
         <Item
           key="watchlist"
-          icon={
-            isWatchlisted ? (
-              <BookmarkCheck size={14} strokeWidth={2} />
-            ) : (
-              <Bookmark size={14} strokeWidth={2} />
-            )
-          }
-          label={isWatchlisted ? t("Remove from watchlist") : t("Add to watchlist")}
+          icon={<Bookmark size={14} strokeWidth={2} />}
+          label={t("Save to library")}
           onClick={handleWatchlist}
-          accent={isWatchlisted}
         />,
       );
     if (organizedMedia)

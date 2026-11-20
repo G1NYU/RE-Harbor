@@ -15,6 +15,7 @@ import { isPlayerInteractionLocked } from "@/lib/player/interaction-lock";
 import { HOLD_SPEED_DELAY_MS, holdSpeedRate } from "@/lib/player/hold-speed";
 import { tracePlayback } from "@/lib/player/pause-trace";
 import { round2 } from "../player-utils";
+import { slowSpeedToggleRate, stepPlaybackRate } from "@/lib/seek-step";
 import { SFX } from "@/lib/sfx";
 
 export function useKeyboardShortcuts(params: {
@@ -114,6 +115,11 @@ export function useKeyboardShortcuts(params: {
   const seekForwardStepSec = settings.seekForwardStepSec;
   const seekBackStepShortSec = settings.seekBackStepShortSec;
   const seekForwardStepShortSec = settings.seekForwardStepShortSec;
+  const seekBackStepLongSec = settings.seekBackStepLongSec;
+  const seekForwardStepLongSec = settings.seekForwardStepLongSec;
+  const speedDownStep = settings.speedDownStep;
+  const speedUpStep = settings.speedUpStep;
+  const halfSpeedRate = settings.halfSpeedRate;
   const [subtitleOffsetSec, setSubtitleOffsetSec] = useState<number | null>(null);
   const subtitleOffsetTimerRef = useRef<number | null>(null);
   const showSubtitleOffset = (delaySec: number) => {
@@ -286,12 +292,12 @@ export function useKeyboardShortcuts(params: {
       }
       if (match("playerSeekBack30")) {
         e.preventDefault();
-        seekStep(-30);
+        seekStep(-seekBackStepLongSec);
         return;
       }
       if (match("playerSeekForward30")) {
         e.preventDefault();
-        seekStep(30);
+        seekStep(seekForwardStepLongSec);
         return;
       }
       if (match("playerFrameForward") && onFrameStep) {
@@ -454,14 +460,22 @@ export function useKeyboardShortcuts(params: {
       }
       if (match("playerSpeedDown")) {
         e.preventDefault();
-        const r = Math.max(0.25, +(snap.rate - 0.25).toFixed(2));
+        const r = stepPlaybackRate(snap.rate, -speedDownStep);
         bridgeRef.current?.setRate(r);
         writePlayerPrefs(metaId, { rate: r });
         return;
       }
       if (match("playerSpeedUp")) {
         e.preventDefault();
-        const r = Math.min(3, +(snap.rate + 0.25).toFixed(2));
+        const r = stepPlaybackRate(snap.rate, speedUpStep);
+        bridgeRef.current?.setRate(r);
+        writePlayerPrefs(metaId, { rate: r });
+        return;
+      }
+      if (match("playerHalfSpeed")) {
+        e.preventDefault();
+        if (e.repeat) return;
+        const r = slowSpeedToggleRate(snap.rate, halfSpeedRate);
         bridgeRef.current?.setRate(r);
         writePlayerPrefs(metaId, { rate: r });
         return;
@@ -612,6 +626,11 @@ export function useKeyboardShortcuts(params: {
     seekForwardStepSec,
     seekBackStepShortSec,
     seekForwardStepShortSec,
+    seekBackStepLongSec,
+    seekForwardStepLongSec,
+    speedDownStep,
+    speedUpStep,
+    halfSpeedRate,
     seekTo,
     toggleSwitcher,
     toggleEpisodePanel,

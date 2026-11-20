@@ -745,8 +745,8 @@ const extra: Record<string, string> = {
     "Muestra un indicador rápido de volumen cuando lo cambies con los controles del reproductor ocultos, para que los cambios con el teclado y la rueda del mouse siempre sean visibles.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Muestra un botón Omitir cuando se reproduzca un anuncio insertado conocido y un pequeño botón para reportar en estrenos, para que puedas marcar anuncios para revisión.",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Muestra un botón Omitir intro / Omitir créditos cuando Harbor los detecte. Desactiva esta opción para no mostrarlo nunca. También puedes tocar la X del botón para descartar una detección incorrecta durante el resto del episodio.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Muestra un botón Omitir intro / Omitir créditos cuando Harbor los detecte. Desactiva esta opción para no mostrarlo nunca. El botón se oculta solo cuando terminan la intro o los créditos, o tras la demora de abajo.",
   "Show an “on disk” badge on cards": "Mostrar una insignia «en disco» en las tarjetas",
   "Show audience score on cards": "Mostrar puntuación de la audiencia en las tarjetas",
   "Show comments on detail pages": "Mostrar comentarios en las páginas de detalles",

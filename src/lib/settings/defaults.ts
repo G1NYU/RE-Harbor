@@ -9,6 +9,8 @@ import type { Settings, SecondaryProfilePrivileges } from "./types";
 
 export const STORAGE_KEY = "harbor.settings";
 
+export const HARBOR_CURSOR_SCALE = { min: 0.75, max: 2, step: 0.05 };
+
 export const DEFAULT_SECONDARY_PRIVILEGES: SecondaryProfilePrivileges = {
   canAddProfiles: false,
   canManageStartup: false,
@@ -129,6 +131,8 @@ export const DEFAULT: Settings = {
   playerTitleSeriesFirst: false,
   playerTitleLogo: false,
   uiScale: 1,
+  harborCursor: false,
+  harborCursorScale: 1,
   serveWebUi: false,
   remoteControlEnabled: false,
   controllerSupportEnabled: true,
@@ -372,7 +376,7 @@ export const DEFAULT: Settings = {
   autoSkipOutro: false,
   autoSkipAd: false,
   showSkipButton: true,
-  skipButtonHideSec: 0,
+  skipButtonHideSec: 10,
   trackBlockWords: ["commentary"],
   forcedSubsWhenNativeAudio: false,
   tmdbLanguage: "",
@@ -438,6 +442,11 @@ export const DEFAULT: Settings = {
   seekForwardStepSec: 10,
   seekBackStepShortSec: 3,
   seekForwardStepShortSec: 3,
+  seekBackStepLongSec: 30,
+  seekForwardStepLongSec: 30,
+  halfSpeedRate: 0.5,
+  speedDownStep: 0.25,
+  speedUpStep: 0.25,
   shareWatchPresence: false,
   playerHdrOpaqueWindow: false,
   playerEscExitsFullscreen: true,
@@ -590,6 +599,7 @@ export const DEFAULT: Settings = {
   syncIndicatorPosition: "top-right",
   pickerLayout: "stremio",
   streamSort: "addon",
+  sourceSort: "default",
   streamPriority: [],
   fullStreamDescription: true,
   pickerShowFilename: false,

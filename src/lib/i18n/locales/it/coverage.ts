@@ -1293,6 +1293,10 @@ const coverage: Record<string, string> = {
     "Facoltativo. TheIntroDB risponde anche senza chiave, ma una chiave aumenta il limite di richieste, così i tempi continuano ad arrivare durante le maratone. Ottienine una su",
   "Linking your Discord account also joins you to Harbor's Discord server, so the bot can send your Backup keys privately.":
     "Linking your Discord account also joins you to Harbor's Discord server, so the bot can send your Backup keys privately.",
+  "Largest first": "Prima i più grandi",
+  "Smallest first": "Prima i più piccoli",
+  "Default order": "Ordine predefinito",
+  "Sort sources: {value}": "Ordina fonti: {value}",
   "Show keyboard shortcuts": "Mostra scorciatoie da tastiera",
   "Show or hide the list of player shortcuts.":
     "Mostra o nasconde l'elenco delle scorciatoie del lettore.",
@@ -1306,6 +1310,18 @@ const coverage: Record<string, string> = {
   "Increase the subtitle text size.": "Aumenta la dimensione del testo dei sottotitoli.",
   "Audio: {name}": "Audio: {name}",
   "Subtitle size: {size}": "Dimensione sottotitoli: {size}",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

@@ -1,6 +1,7 @@
 import { evictLocalPrefix, idbCacheGet, idbCacheSet } from "@/lib/idb-cache";
 import type { Meta } from "@/lib/cinemeta";
 import { registerEvictable } from "@/lib/maintenance";
+import { createRequestScheduler } from "@/lib/request-scheduler";
 
 const ARM = "https://relations.yuna.moe/api/ids";
 
@@ -32,7 +33,7 @@ function writeCache(cache: ArmCache) {
 }
 
 const armMem: ArmCache = readCache();
-const armInflight = new Map<number, Promise<ArmEntry | null>>();
+const armRequests = createRequestScheduler({ concurrency: ARM_CONCURRENCY });
 let armFlushTimer = 0;
 
 function armRemember(malId: number, entry: ArmEntry) {
@@ -47,9 +48,7 @@ async function armLookup(malId: number): Promise<ArmEntry | null> {
     const age = Date.now() - hit.t;
     if (hit.neg ? age < ARM_NEG_TTL_MS : age < ARM_TTL_MS) return hit.neg ? null : hit;
   }
-  const existing = armInflight.get(malId);
-  if (existing) return existing;
-  const p = (async () => {
+  return armRequests.schedule(String(malId), async () => {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), ARM_TIMEOUT_MS);
     try {
@@ -67,15 +66,12 @@ async function armLookup(malId: number): Promise<ArmEntry | null> {
       return null;
     } finally {
       clearTimeout(timer);
-      armInflight.delete(malId);
     }
-  })();
-  armInflight.set(malId, p);
-  return p;
+  });
 }
 
-// A cold profile has no armcache, so an unbounded map over a catalog page opened
-// one socket per card and a page of rows opened hundreds at once on a stick.
+// All catalog pages share the request budget. A batch of rows can otherwise
+// open eight requests per row and compete with visible artwork.
 export async function armKitsuIds(malIds: number[]): Promise<Map<number, number>> {
   const out = new Map<number, number>();
   if (malIds.length === 0) return out;

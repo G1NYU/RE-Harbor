@@ -10,7 +10,16 @@ function searchHarness() {
     states = [],
     deps = [];
   let ri, si, ei, pending;
-  const state = { open: true, mounted: true, closing: false, query: "ozark", profile: "first" };
+  const state = {
+    open: true,
+    mounted: true,
+    closing: false,
+    query: "ozark",
+    profile: "first",
+    topPath: "home",
+    navigating: false,
+  };
+  const TopMatch = () => null;
   const mocks = {
     react: {
       lazy: () => () => null,
@@ -36,17 +45,46 @@ function searchHarness() {
     },
     "react/jsx-runtime": require("react/jsx-runtime"),
     "react-dom": { createPortal: (tree) => tree },
-    "@/lib/search-context": { useSearch: () => ({ ...state, results: null, status: "idle" }) },
-    "@/lib/view": { useView: () => ({}) },
+    "@/lib/search-context": {
+      useSearch: () => ({
+        ...state,
+        results: null,
+        status: "idle",
+        closeForNavigation: () => {
+          state.open = false;
+        },
+      }),
+    },
+    "@/lib/view": { useView: () => ({ topPath: state.topPath }) },
+    "./top-match": { TopMatch },
     "@/lib/i18n": { useT: () => (text) => text },
     "@/lib/settings": { useSettings: () => ({ settings: { aiSearchKey: "", aiGroqKey: "" } }) },
     "@/lib/profiles": { useProfiles: () => ({ activeProfile: { id: state.profile } }) },
     "@/lib/use-exit-presence": { useExitPresence: () => state },
     "@/lib/use-window-fullscreen": { useWindowFullscreen: () => false },
     "@/lib/games/steam-store-search": { steamStoreQuery: () => null },
-    "./use-collection-hits": { useCollectionHits: () => [] },
-    "./person-top-match": { matchPersonForQuery: () => null },
-    "@/lib/search-display-state": { getSearchDisplayState: () => ({ currentResults: null }) },
+    "./use-collection-hits": { useCollectionHits: () => [], collectionForTitle: () => null },
+    "@/lib/search-top-match": { matchPersonForQuery: () => null },
+    "@/lib/search-display-state": {
+      getSearchDisplayState: () =>
+        state.navigating
+          ? {
+              hasResults: true,
+              currentResults: {
+                topMatch: { meta: { name: "Ozark" } },
+                movies: [],
+                series: [],
+                people: [],
+                liveTv: [],
+                anime: [],
+                manga: [],
+                music: [],
+                ebooks: [],
+                sports: [],
+              },
+            }
+          : { currentResults: null },
+    },
     "@/lib/torrent/magnet": { isMagnetInput: () => false, isDirectVideoUrl: () => false },
     "@/lib/features/install": { useInstallFeatures: () => ({ games: false }) },
   };
@@ -65,11 +103,11 @@ function searchHarness() {
   new Function("require", "exports", "document", code)((name) => mocks[name] ?? {}, exports, {
     body: {},
   });
-  function body(node) {
+  function find(node, predicate) {
     if (!node || typeof node !== "object") return null;
-    if (node.props?.className?.startsWith("harbor-search-body")) return node;
+    if (predicate(node)) return node;
     for (const child of [node.props?.children].flat(Infinity)) {
-      const found = body(child);
+      const found = find(child, predicate);
       if (found) return found;
     }
     return null;
@@ -80,7 +118,8 @@ function searchHarness() {
     render() {
       ri = si = ei = 0;
       pending = [];
-      const node = body(exports.SearchOverlay());
+      const tree = exports.SearchOverlay();
+      const node = find(tree, (el) => el.props?.className?.startsWith("harbor-search-body"));
       if (node) {
         element ??= { scrollTop: 0 };
         node.props.ref.current = element;
@@ -92,6 +131,7 @@ function searchHarness() {
       return node
         ? {
             element,
+            commit: () => find(tree, (el) => el.type === TopMatch).props.onClose(),
             scroll: (top) => {
               element.scrollTop = top;
               node.props.onScroll({ currentTarget: element });
@@ -125,4 +165,18 @@ test("a new query or profile cannot inherit another search position", () => {
   h.render().scroll(700);
   h.state.profile = "second";
   assert.equal(h.render().element.scrollTop, 0);
+});
+
+test("search removes results on committed navigation and restores scroll on immediate Back", () => {
+  const h = searchHarness();
+  h.state.navigating = true;
+  const panel = h.render();
+  panel.scroll(1400);
+  panel.commit();
+  assert.ok(h.render(), "closing without a destination keeps the ordinary exit");
+  h.state.topPath = "meta:ozark";
+  assert.equal(h.render(), null);
+  h.state.topPath = "home";
+  h.state.open = true;
+  assert.equal(h.render().element.scrollTop, 1400);
 });

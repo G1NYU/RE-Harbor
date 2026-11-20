@@ -281,8 +281,8 @@ const catalog09: Record<string, string> = {
   "Show a Minecraft card on your profile. Leave the username blank to hide it.":
     "프로필에 Minecraft 카드를 표시합니다. 숨기려면 사용자 이름을 비워 두세요.",
   "Show a Minecraft card with your username": "사용자 이름이 포함된 Minecraft 카드 표시",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Harbor가 오프닝 또는 엔딩을 감지하면 오프닝 건너뛰기 / 엔딩 건너뛰기 버튼을 표시합니다. 표시하지 않으려면 이 옵션을 끄세요. 잘못 감지된 경우 버튼의 X를 눌러 해당 에피소드가 끝날 때까지 숨길 수도 있습니다.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Harbor가 오프닝 또는 엔딩을 감지하면 오프닝 건너뛰기 / 엔딩 건너뛰기 버튼을 표시합니다. 표시하지 않으려면 이 옵션을 끄세요. 오프닝이나 엔딩이 끝나거나 아래 지연 시간이 지나면 버튼이 자동으로 숨겨집니다.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "알려진 삽입 광고가 재생될 때 건너뛰기 버튼을 표시하고, 새로 공개된 콘텐츠에는 작은 신고 버튼을 표시하여 광고를 검토 대상으로 지정할 수 있게 합니다.",
   "Show a bookmark on saved titles": "저장한 제목에 북마크 표시",

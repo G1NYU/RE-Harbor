@@ -1,3 +1,4 @@
+import { ScrollRootContext } from "@/components/row";
 import { addonBaseUrl } from "@/lib/addon-url";
 import {
   startTransition,
@@ -9,7 +10,6 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { Ban, Check, Plus } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import { animePlayEpisode } from "./detail/anime-play-episode";
 import {
@@ -21,6 +21,7 @@ import {
 } from "@/lib/providers/anime-detail";
 import { isTextInLanguage } from "@/lib/providers/anime-episode-build";
 import { peekAnimeArt, saveAnimeArt } from "@/lib/providers/anime-art-cache";
+import { animeArtworkKind } from "@/lib/providers/anime-format";
 import { imdbToKitsu, tmdbTvToKitsu } from "@/lib/providers/anime-mapping";
 import {
   kitsuAnime,
@@ -97,7 +98,7 @@ import {
 } from "@/lib/manual-watched";
 import { useTogether } from "@/lib/together/provider";
 import { useTrakt } from "@/lib/trakt/provider";
-import { noteLocalImdbId, toggleWatchlist, useInWatchlist } from "@/lib/watchlist";
+import { noteLocalImdbId, useInWatchlist } from "@/lib/watchlist";
 import {
   pullWatchProgressFromNuvio,
   pullWatchedItemsFromNuvio,
@@ -147,6 +148,7 @@ import { AddToAnilistButton } from "./detail/add-to-anilist-button";
 import { AddToMalButton } from "@/components/mal/add-to-mal-button";
 import { AddToSimklButton } from "./detail/add-to-simkl-button";
 import { AddToPmdbButton } from "./detail/add-to-publicmetadb-button";
+import { LibraryActionButton } from "./detail/library-action-button";
 import { getLocalCache, saveLocalCache } from "@/lib/simkl/activities";
 import { simklRequest } from "@/lib/simkl/client";
 import { CollectionRow } from "./detail/collection-row";
@@ -204,7 +206,7 @@ import { mergeTrailerCandidates } from "@/lib/trailer-candidates";
 import { SeriesEpisodes } from "./detail/series-episodes";
 import { CinemetaEpisodes } from "./detail/cinemeta-episodes";
 import { AnimeEpisodes } from "./detail/anime-episodes";
-import type { SeasonArt } from "./detail/anime-episodes/anime-season-art";
+import type { SeasonArt, SeasonArtSelection } from "./detail/anime-episodes/anime-season-art";
 import { EpisodeGridSkeleton } from "./detail/episode-grid-skeleton";
 import { MovieEntrySkeleton } from "./detail/movie-entry-skeleton";
 import { StreamingLinks } from "./detail/streaming-links";
@@ -270,15 +272,27 @@ function FadeInUp({ children }: { children: ReactNode }) {
   return <div className="harbor-fade-in-up">{children}</div>;
 }
 
-export function DetailView({
-  meta,
-  liveContext = false,
-  episodeHint,
-}: {
+type DetailViewProps = {
   meta: Meta;
   liveContext?: boolean;
   episodeHint?: { season: number; episode: number };
-}) {
+};
+
+export function DetailView(props: DetailViewProps) {
+  const scrollRef = useRef<HTMLElement>(null);
+  return (
+    <ScrollRootContext.Provider value={scrollRef}>
+      <DetailContent {...props} scrollRef={scrollRef} />
+    </ScrollRootContext.Provider>
+  );
+}
+
+function DetailContent({
+  meta,
+  liveContext = false,
+  episodeHint,
+  scrollRef,
+}: DetailViewProps & { scrollRef: React.RefObject<HTMLElement | null> }) {
   const t = useT();
   const { settings } = useSettings();
   const contentDrag = useContentDrag();
@@ -320,49 +334,36 @@ export function DetailView({
   const [enrichedBg, setEnrichedBg] = useState<string | undefined>(undefined);
   const [seasonArt, setSeasonArt] = useState<SeasonArt | null>(null);
   const seasonEntryRef = useRef<string | null>(null);
-  const handleSeasonArt = useCallback(
-    (
-      sel: {
-        background?: string;
-        description?: string;
-        logo?: string;
-        name?: string;
-        entryId: string;
-      } | null,
-    ) => {
-      if (!sel) {
-        seasonEntryRef.current = null;
-        setSeasonArt(null);
-        return;
-      }
-      seasonEntryRef.current = sel.entryId;
-      const cachedLogo = peekAnimeArt(sel.entryId)?.logo;
-      startTransition(() => {
-        setSeasonArt({
-          background: sel.background,
-          description: sel.description,
-          logo: cachedLogo ?? sel.logo,
-        });
+  const handleSeasonArt = useCallback((sel: SeasonArtSelection | null) => {
+    if (!sel) {
+      seasonEntryRef.current = null;
+      setSeasonArt(null);
+      return;
+    }
+    seasonEntryRef.current = sel.entryId;
+    const cachedLogo = peekAnimeArt(sel.entryId, "tv")?.logo;
+    startTransition(() => {
+      setSeasonArt({
+        background: sel.background,
+        description: sel.description,
+        logo: cachedLogo ?? sel.logo,
       });
-      if (!cachedLogo && sel.name) {
-        const entryId = sel.entryId;
-        void resolveLogo(
-          settingsRef.current.tmdbKey,
-          { id: entryId, type: "series", name: sel.name },
-          { preferOwn: true },
-        )
-          .then((u) => {
-            if (u && seasonEntryRef.current === entryId) {
-              startTransition(() => setSeasonArt((p) => (p ? { ...p, logo: u } : p)));
-            }
-          })
-          .catch(() => {});
-      }
-    },
-    [],
-  );
-  // Season picker swaps franchise seasons in-place without re-running animeDetails, so the
-  // localized TMDB series overview must be passed down for the season hero description.
+    });
+    if (!cachedLogo && sel.name) {
+      const entryId = sel.entryId;
+      void resolveLogo(
+        settingsRef.current.tmdbKey,
+        { id: entryId, type: "series", name: sel.name },
+        { preferOwn: true },
+      )
+        .then((u) => {
+          if (u && seasonEntryRef.current === entryId) {
+            startTransition(() => setSeasonArt((p) => (p ? { ...p, logo: u } : p)));
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
   const localizedAnimeOverview = useMemo(() => {
     if (!detail?.overview) return undefined;
     const iso1 = settings.tmdbLanguage || settings.uiLanguage || "en";
@@ -422,7 +423,6 @@ export function DetailView({
     detail?.imdbId ?? (meta.id.startsWith("tt") ? meta.id : null),
     meta.type === "movie" ? "movie" : "show",
   );
-  const scrollRef = useRef<HTMLElement>(null);
 
   const {
     setNavStack,
@@ -442,7 +442,9 @@ export function DetailView({
   const { toggle: toggleFavorite } = useMediaFavorites();
   const isFav = useIsFavorite(meta.id, [detail?.imdbId]);
   const inSession = roomSnapshot.state === "joined" && roomSnapshot.participants.length >= 2;
-  useScrollMemory(`meta:${meta.id}`, scrollRef, settings.resumeDetailScroll, true);
+  useScrollMemory(`meta:${meta.id}`, scrollRef, settings.resumeDetailScroll, true, {
+    followLayout: true,
+  });
 
   useEffect(() => {
     if (!meta.id.startsWith("simkl:")) return;
@@ -1347,7 +1349,7 @@ export function DetailView({
                 .then((bg) => {
                   if (cancelled || request !== generation || !bg) return;
                   setEnrichedBg(bg);
-                  saveAnimeArt(meta.id, { bg });
+                  saveAnimeArt(meta.id, res.detail.kind, { bg });
                 })
                 .catch(() => {});
               // Install the base detail before subscribing: on a warm cache this
@@ -1358,7 +1360,7 @@ export function DetailView({
                     if (cancelled || request !== generation) return;
                     setDetail((prev) => (prev ? mergeAnimeDetailExtras(prev, patch) : prev));
                     if (patch.gallery?.backdrops?.length) setBackdrops(patch.gallery.backdrops);
-                    saveAnimeArt(meta.id, {
+                    saveAnimeArt(meta.id, res.detail.kind, {
                       logo: patch.logo,
                       backdrops: patch.gallery?.backdrops,
                     });
@@ -1605,7 +1607,9 @@ export function DetailView({
   const tagline = detail?.tagline ?? "";
   const detailCast = sourceText.cast ?? detail?.cast ?? [];
   const pinnedLogo = useTitleLogo(meta.id);
-  const animeArt = isAnime ? peekAnimeArt(meta.id) : undefined;
+  const animeArt = isAnime
+    ? peekAnimeArt(meta.id, detail?.kind ?? animeArtworkKind(meta))
+    : undefined;
   const stableBackdrop = useStableAsset(
     isAnime
       ? [
@@ -1625,27 +1629,33 @@ export function DetailView({
   );
   // Anime resolves curated 16:9 art after the page opens; letting it replace the cached
   // artwork avoids pinning an older promo image for the whole visit.
+  const textlessBackdrops = detail?.textlessBackdrops;
+  const firstTextlessBackdrop = textlessBackdrops?.[0];
   const primaryBackdrop =
     pinnedBackdropHi ||
     sourceText.backdrop ||
     (prioritizeMetadataAddons
       ? (detail?.backdrop ?? cinemetaFull?.background ?? meta.background)
       : isAnime
-        ? (enrichedBg ?? animeArt?.bg)
-        : stableBackdrop) ||
+        ? ((detail?.kind === "movie" ? firstTextlessBackdrop : undefined) ??
+          enrichedBg ??
+          animeArt?.bg)
+        : firstTextlessBackdrop
+          ? (detail?.backdrop ?? firstTextlessBackdrop)
+          : stableBackdrop) ||
     (isAnime ? undefined : loading ? undefined : meta.poster) ||
     undefined;
   const backdropPool = useMemo(() => {
     const seen = new Set<string>();
     const pool: string[] = [];
-    for (const b of [primaryBackdrop, ...backdrops]) {
+    for (const b of [primaryBackdrop, ...(textlessBackdrops ?? backdrops)]) {
       const hi = toHiResBackdrop(b ?? undefined, settings.heroFullQuality);
       if (!hi || seen.has(hi)) continue;
       seen.add(hi);
       pool.push(hi);
     }
     return pool;
-  }, [primaryBackdrop, backdrops, settings.heroFullQuality]);
+  }, [primaryBackdrop, backdrops, textlessBackdrops, settings.heroFullQuality]);
   const reducedMotion = useReducedMotion();
   const carouselOn =
     settings.heroBackdropCarousel && !pinnedBackdrop && backdropPool.length >= 2 && !reducedMotion;
@@ -2654,15 +2664,17 @@ export function DetailView({
 
   const hasHeroProviders = isAnime ? streamers.length > 0 : watchProviders.length > 0;
   const hasHeroAside = !!(heroAwardsInline || hasHeroProviders);
+  const stableSeasonSynopsis = !liveContext && !addonEpisodeList && isAnime && franchise.length > 1;
+  const hasSynopsis = !!overview || stableSeasonSynopsis;
   const heroGridColumns =
-    overview && hasHeroAside ? "xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "";
+    hasSynopsis && hasHeroAside ? "xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "";
 
   return (
     <main
       ref={scrollRef}
       className="harbor-detail-enter absolute inset-0 z-30 overflow-y-auto bg-canvas"
     >
-      <section className="relative">
+      <section className="relative" data-scroll-anchor="detail-hero">
         <div
           data-tauri-drag-region
           data-tv-hero-zone
@@ -2791,55 +2803,37 @@ export function DetailView({
                     </button>
                   </PlayModeHint>
                 )}
-                {actionStage < 2 && (
-                  <HoverTooltip
-                    label={
-                      isNuvio
-                        ? t("Synced to Nuvio Cloud")
-                        : traktConnected
-                          ? t("Synced to Trakt")
-                          : t("Saved locally. Connect Trakt in Settings to sync.")
-                    }
-                    align="center"
-                    className="shrink-0"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toggleWatchlist({
-                          id: meta.id,
-                          type: meta.type,
-                          name: title || meta.name,
-                          poster: poster,
-                          imdbId: detail?.imdbId,
-                          background: meta.background,
-                          logo: ownLogo || meta.logo,
-                          description: meta.description,
-                          releaseInfo: meta.releaseInfo,
-                          imdbRating: meta.imdbRating,
-                          genres: meta.genres,
-                          posterShape:
-                            ((meta as unknown as Record<string, unknown>).posterShape as
-                              | "POSTER"
-                              | "SQUARE"
-                              | "LANDSCAPE") || "POSTER",
-                        })
-                      }
-                      className={`flex h-12 items-center gap-2.5 whitespace-nowrap rounded-full px-6 text-[15px] font-medium transition-[transform,background-color] duration-200 active:scale-[0.98] ${
-                        inWatchlist
-                          ? "bg-ink/15 text-ink hover:bg-ink/20"
-                          : "bg-canvas/80 text-ink hover:bg-canvas/95"
-                      }`}
-                    >
-                      <PopIcon
-                        active={inWatchlist}
-                        activeIcon={<Check size={18} strokeWidth={2.4} />}
-                        inactiveIcon={<Plus size={18} strokeWidth={2} />}
-                      />
-                      {inWatchlist ? t("In Watchlist") : t("Add to Watchlist")}
-                    </button>
-                  </HoverTooltip>
-                )}
+                <LibraryActionButton
+                  input={{
+                    id: meta.id,
+                    type: meta.type,
+                    name: title || meta.name,
+                    poster: poster,
+                    imdbId: detail?.imdbId,
+                    background: meta.background,
+                    logo: ownLogo || meta.logo,
+                    description: meta.description,
+                    releaseInfo: meta.releaseInfo,
+                    imdbRating: meta.imdbRating,
+                    genres: meta.genres,
+                    posterShape:
+                      ((meta as unknown as Record<string, unknown>).posterShape as
+                        | "POSTER"
+                        | "SQUARE"
+                        | "LANDSCAPE") || "POSTER",
+                    animeId: isAnime ? (animeCanonicalId ?? meta.id) : null,
+                  }}
+                  inWatchlist={inWatchlist}
+                  canDrop={canDropTitle}
+                  onDrop={() => setDropConfirmOpen(true)}
+                  syncLabel={
+                    isNuvio
+                      ? t("Synced to Nuvio Cloud")
+                      : traktConnected
+                        ? t("Synced to Trakt")
+                        : t("Saved locally. Connect Trakt in Settings to sync.")
+                  }
+                />
                 {actionStage < 2 && animeIdentity && (
                   <AddToAnilistButton
                     harborId={animeCanonicalId ?? meta.id}
@@ -2865,16 +2859,6 @@ export function DetailView({
                     title={title || meta.name}
                     type={meta.type === "movie" ? "movie" : "series"}
                   />
-                )}
-                {actionStage < 2 && canDropTitle && (
-                  <button
-                    type="button"
-                    onClick={() => setDropConfirmOpen(true)}
-                    className="flex h-12 items-center gap-2.5 rounded-full border border-danger/30 bg-danger/10 px-5 text-[15px] font-medium text-danger transition-[transform,background-color,border-color] duration-200 hover:bg-danger/15 active:scale-[0.98]"
-                  >
-                    <Ban size={17} strokeWidth={2.1} />
-                    {t("Drop show")}
-                  </button>
                 )}
                 {!liveContext && (
                   <RateButton
@@ -2908,27 +2892,6 @@ export function DetailView({
                     onWatched={markThisMovieWatched}
                     showSync={actionStage >= 2}
                     listItem={listSeed}
-                    inWatchlist={inWatchlist}
-                    onToggleWatchlist={() =>
-                      toggleWatchlist({
-                        id: meta.id,
-                        type: meta.type,
-                        name: title || meta.name,
-                        poster: poster,
-                        imdbId: detail?.imdbId,
-                        background: meta.background,
-                        logo: ownLogo || meta.logo,
-                        description: meta.description,
-                        releaseInfo: meta.releaseInfo,
-                        imdbRating: meta.imdbRating,
-                        genres: meta.genres,
-                        posterShape:
-                          ((meta as unknown as Record<string, unknown>).posterShape as
-                            | "POSTER"
-                            | "SQUARE"
-                            | "LANDSCAPE") || "POSTER",
-                      })
-                    }
                     simkl={{
                       harborId: isAnime ? (animeCanonicalId ?? meta.id) : meta.id,
                       type: meta.type === "movie" ? "movie" : "series",
@@ -2938,8 +2901,6 @@ export function DetailView({
                       harborId: isAnime ? (animeCanonicalId ?? meta.id) : meta.id,
                       type: meta.type === "movie" ? "movie" : "series",
                     }}
-                    canDrop={canDropTitle}
-                    onDrop={() => setDropConfirmOpen(true)}
                   />
                 ) : (
                   <>
@@ -3063,11 +3024,12 @@ export function DetailView({
       </section>
 
       <div {...contentDrag} className="flex flex-col gap-16 px-12 pb-24 pt-14">
-        {(overview || hasHeroAside) && (
+        {(hasSynopsis || hasHeroAside) && (
           <div
+            data-scroll-anchor="detail-overview"
             className={`grid min-w-0 grid-cols-1 items-start gap-8 xl:gap-10 ${heroGridColumns}`}
           >
-            {overview && <Synopsis text={overview} />}
+            {hasSynopsis && <Synopsis text={overview} stableHeight={stableSeasonSynopsis} />}
             {hasHeroAside && (
               <div className="flex min-w-0 flex-col gap-6">
                 {isAnime && streamers.length > 0 && <StreamingLinks streamers={streamers} />}

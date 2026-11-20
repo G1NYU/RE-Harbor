@@ -212,6 +212,7 @@ test("the anime TVDB panel uses the selected language on matched franchise episo
     ["fr", "L’avenir", "Suzuki regarde Tani monter dans le train."],
   ]) {
     const ep = { ...episode(), sourceMetaId: "kitsu:50634" };
+    let titleSelections = 0;
     const { useAnimeTvdbPanel } = load("src/views/detail/anime-episodes/use-anime-tvdb-panel.ts", {
       react: hooks([
         1,
@@ -228,15 +229,31 @@ test("the anime TVDB panel uses the selected language on matched franchise episo
       "@/lib/providers/anime-detail": {},
       "@/lib/providers/tvdb": {},
       "@/lib/providers/tmdb/tmdb-client": { tmdbLanguageIso: () => lang },
-      "@/lib/localized-text": text,
+      "@/lib/localized-text": {
+        ...text,
+        pickPreferredEpisodeTitle: (...args: Parameters<typeof pickPreferredEpisodeTitle>) => {
+          titleSelections++;
+          return pickPreferredEpisodeTitle(...args);
+        },
+      },
       "@/lib/providers/harbor-imdb": {},
       "@/lib/providers/tvdb-order": { seasonDateRange: () => ({}) },
       "@/lib/streams/anime-identity": {},
       "./anime-slot-match": { resolveAnimeSlotMatch },
     });
     const { panel } = useAnimeTvdbPanel(49372, null, [], "aired", "", true, [ep]);
+    assert.equal(panel.items.length, 2);
+    assert.equal(titleSelections, 1, "only the selected season resolves episode text");
     assert.deepEqual(panel.visibleEpisodes, [
-      { ...ep, title: name, synopsis, titleLanguage: lang, synopsisLanguage: lang },
+      {
+        ...ep,
+        title: name,
+        synopsis,
+        titleLanguage: lang,
+        synopsisLanguage: lang,
+        displayNumber: 13,
+        displaySeason: 2,
+      },
     ]);
     assert.equal(panel.items.find((item: any) => item.key === "2").name, "Season 2");
   }
@@ -530,9 +547,11 @@ test("persisted ordering carries provenance, ignores old entries, and separates 
     const cache = load("src/lib/providers/tvdb-order-cache.ts", {});
     entries.set("harbor.tvdbo.v5.42:aired:tur", JSON.stringify({ t: Date.now() }));
     assert.equal(cache.readOrderCache(42, "aired:tur"), null);
+    entries.set("harbor.tvdbo.v8.42:aired:tur", JSON.stringify({ t: Date.now() }));
+    assert.equal(cache.readOrderCache(42, "aired:tur"), null);
     const snapshot = order(turkishTitle, finaleTitle, turkishOverview, "tr");
     entries.set(
-      "harbor.tvdbo.v8.42:aired:tur",
+      "harbor.tvdbo.v9.42:aired:tur",
       JSON.stringify({
         t: Date.now(),
         textEvidenceVersion: 1,
@@ -581,7 +600,7 @@ test("the anime TVDB panel keeps Turkish source metadata when TVDB only has Engl
     "./anime-slot-match": { resolveAnimeSlotMatch },
   });
   const { panel } = useAnimeTvdbPanel(49372, null, [ep], "aired", "", true);
-  assert.deepEqual(panel.visibleEpisodes, [ep]);
+  assert.deepEqual(panel.visibleEpisodes, [{ ...ep, displayNumber: 13, displaySeason: 2 }]);
 });
 
 test("built-in series selects the language-scoped cached data without reusing English for Turkish", () => {
@@ -941,7 +960,7 @@ test("English titles and descriptions survive original-language fallbacks in ani
     "./anime-slot-match": { resolveAnimeSlotMatch },
   });
   assert.deepEqual(useAnimeTvdbPanel(49372, null, [ep], "aired", "", true).panel.visibleEpisodes, [
-    ep,
+    { ...ep, displayNumber: 13, displaySeason: 2 },
   ]);
   assert.equal(episodeTextLanguage("鬼の血", "en", "鬼の血"), "und");
   assert.equal(
@@ -967,7 +986,7 @@ test("legacy order caches retain their data but downgrade unreliable language ev
   try {
     const cache = load("src/lib/providers/tvdb-order-cache.ts", {});
     const snapshot = order("Le début", "物語", "Une description", "tr");
-    const key = "harbor.tvdbo.v8.42:aired:tur";
+    const key = "harbor.tvdbo.v9.42:aired:tur";
     const legacy = {
       t: Date.now(),
       textEvidenceVersion: 1,

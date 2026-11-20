@@ -833,8 +833,8 @@ const extra: Record<string, string> = {
     "プレイヤーの操作ボタンが非表示でも、音量を変更したときに音量表示を短時間表示します。キーボードやスクロールホイールによる変更も常に確認できます。",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "既知の埋め込み広告が再生されたときに「スキップ」ボタンを表示します。また、新作には小さな報告ボタンを表示し、広告を確認対象として報告できます。",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Harborが検出したときに「イントロをスキップ」/「クレジットをスキップ」ボタンを表示します。今後一切表示しない場合はオフにしてください。誤検出の場合はボタンのXをタップすると、そのエピソード中は非表示にできます。",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Harborが検出したときに「イントロをスキップ」/「クレジットをスキップ」ボタンを表示します。今後一切表示しない場合はオフにしてください。イントロやクレジットが終了したとき、または下の遅延時間が経過すると、ボタンは自動的に非表示になります。",
   "Show an “on disk” badge on cards": "カードに「ディスク上」バッジを表示",
   "Show audience score on cards": "カードに視聴者スコアを表示",
   "Show comments on detail pages": "詳細ページにコメントを表示",

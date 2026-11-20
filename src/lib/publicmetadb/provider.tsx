@@ -11,7 +11,7 @@ import { verifyApiKey } from "./client";
 import { invalidatePmdbWatchedCache, markPmdbWatched, unmarkPmdbWatched } from "./history";
 import { resolvePmdbEpisodeTarget, resolvePmdbTarget, stremioIdToPmdbTarget } from "./ids";
 import { armOnlineFlush, clearPendingResumes, flushPendingResumes } from "./pending-sync";
-import { pmdbSaveResume } from "./scrobble";
+import { syncPmdbPlayback } from "./scrobble";
 import { getSession, setSession, subscribeSession, updateSessionUsername } from "./session";
 import { clearPmdbWatchlistCache } from "./watchlist";
 import { setPmdbDefaultListId } from "./lists";
@@ -159,8 +159,7 @@ export function PublicMetaDbProvider({ children }: { children: ReactNode }) {
     () =>
       armOnlineFlush({
         hasSession: () => getSession() != null,
-        save: (target, positionMs, runtimeMs) =>
-          pmdbSaveResume(target, positionMs, runtimeMs).then((res) => res !== null),
+        save: syncPmdbPlayback,
       }),
     [],
   );

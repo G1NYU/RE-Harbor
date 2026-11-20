@@ -24,17 +24,17 @@ fn root() -> PathBuf {
 fn policy() -> SeedPolicy { SeedPolicy { ratio_milli: 1000, seconds: 60, upload_bps: 64*1024 } }
 async fn completed() -> (PathBuf, Arc<Torrents>, TorrentRecord, Vec<u8>, Vec<u8>) {
     let payload: Vec<u8> = (0..256*1024+97).map(|i| ((i*31+i/13)%251) as u8).collect();
-    let (root,manager,row,meta)=completed_files(&[("game.bin", &payload)], "game.bin").await;
+    let (root,manager,row,meta)=completed_files(&[("game.bin", &payload)], 0).await;
     (root,manager,row,meta,payload)
 }
-async fn completed_files(entries: &[(&str, &[u8])], selected_name: &str) -> (PathBuf, Arc<Torrents>, TorrentRecord, Vec<u8>) {
+async fn completed_files(entries: &[(&str, &[u8])], selected_file: usize) -> (PathBuf, Arc<Torrents>, TorrentRecord, Vec<u8>) {
     let root = root(); let source = root.join("original"); fs::create_dir(&source).unwrap();
     for (name,bytes) in entries { fs::write(source.join(name), bytes).unwrap(); }
     let meta = librqbit::create_torrent(&source, librqbit::CreateTorrentOptions { piece_length: Some(32*1024), ..Default::default() }).await.unwrap().as_bytes().unwrap().to_vec();
     let manager = Torrents::new(root.join("state"), Arc::new(|_|{})).unwrap();
     let held = manager.slots.clone().acquire_many_owned(2).await.unwrap();
     let plan = manager.prepare("one", meta.clone(), vec![]).unwrap();
-    let selected=plan.files.iter().find(|file| file.path==selected_name).unwrap().index;
+    let selected = plan.files[selected_file].index;
     let row = manager.start(StartTorrent { profile: "one".into(), token: plan.token, parent: root.to_string_lossy().into_owned(), name: "download".into(), game: None, selected: vec![selected], download_bps: 0, upload_bps: 64*1024 }).await.unwrap();
     manager.action("one".into(), row.id.clone(), "pause".into()).await.unwrap(); drop(held);
     for (name,bytes) in entries { fs::write(Path::new(&row.destination).join(name), bytes).unwrap(); }
@@ -140,18 +140,32 @@ async fn legacy_second_timestamps_migrate_once_and_completion_remains_independen
 #[tokio::test(flavor="multi_thread", worker_threads=4)]
 async fn selected_file_shares_boundary_pieces_but_never_advertises_unselected_pieces() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    let first=vec![13;96*1024+37]; let middle=vec![29;37*1024+5]; let last=vec![71;70*1024];
-    let entries=[("a.bin",first.as_slice()),("b.bin",middle.as_slice()),("c.bin",last.as_slice())];
-    let (root,manager,row,meta)=completed_files(&entries,"b.bin").await;
-    let (metadata,items,_)=files::metadata(&meta).unwrap();
-    let mut offset=0; let mut wanted=Vec::new();
-    for item in &items {
-        if row.selected.contains(&item.index) {
-            wanted.extend(offset/metadata.info.piece_length as u64..(offset+item.bytes).div_ceil(metadata.info.piece_length as u64));
-        }
-        offset+=item.bytes;
-    }
-    assert!(wanted[0]>0, "fixture must have unselected pieces before the boundary");
+    let a_bytes = vec![13; 96 * 1024 + 37];
+    let b_bytes = vec![29; 37 * 1024 + 5];
+    let c_bytes = vec![71; 70 * 1024];
+    let entries = [
+        ("a.bin", a_bytes.as_slice()),
+        ("b.bin", b_bytes.as_slice()),
+        ("c.bin", c_bytes.as_slice()),
+    ];
+    // The torrent builder preserves filesystem iteration order.
+    let (root, manager, row, meta) = completed_files(&entries, 1).await;
+    let (metadata, items, total_bytes) = files::metadata(&meta).unwrap();
+    let [before, selected, _] = items.as_slice() else {
+        panic!("fixture must contain three files");
+    };
+    assert_eq!(row.selected, [selected.index]);
+    let piece_length = u64::from(metadata.info.piece_length);
+    let start = before.bytes;
+    let end = start + selected.bytes;
+    let wanted = start / piece_length..end.div_ceil(piece_length);
+    let piece_count = total_bytes.div_ceil(piece_length);
+    assert_ne!(start % piece_length, 0, "leading piece must be shared");
+    assert_ne!(end % piece_length, 0, "trailing piece must be shared");
+    assert!(
+        wanted.start > 0 && wanted.end < piece_count,
+        "fixture must have unselected pieces on both sides"
+    );
     let mut limits=policy(); limits.ratio_milli=10000;
     manager.seed("one".into(),row.id.clone(),limits).await.unwrap();
     let port=tokio::time::timeout(Duration::from_secs(20),async { loop {
@@ -173,14 +187,25 @@ async fn selected_file_shares_boundary_pieces_but_never_advertises_unselected_pi
             if body[0]==5 { break body[1..].to_vec(); }
         }
     }).await.unwrap();
-    for piece in 0..offset.div_ceil(metadata.info.piece_length as u64) {
-        assert_eq!(bitfield[piece as usize/8] & (0x80>>(piece%8)) != 0,wanted.contains(&piece),"advertised piece {piece}");
+    for piece in 0..piece_count {
+        assert_eq!(
+            bitfield[piece as usize / 8] & (0x80 >> (piece % 8)) != 0,
+            wanted.contains(&piece),
+            "advertised piece {piece}"
+        );
     }
     let destination=root.join("selected-peer");fs::create_dir(&destination).unwrap();
     let peer=Session::new_with_opts(destination.clone(),SessionOptions {disable_dht:true,disable_dht_persistence:true,..Default::default()}).await.unwrap();
     let handle=peer.add_torrent(AddTorrent::from_bytes(meta),Some(AddTorrentOptions {output_folder:Some(destination.to_string_lossy().into_owned()),only_files:Some(row.selected.clone()),initial_peers:Some(vec![format!("127.0.0.1:{port}").parse().unwrap()]),disable_trackers:true,..Default::default()})).await.unwrap().into_handle().unwrap();
     tokio::time::timeout(Duration::from_secs(25),async {loop {if handle.stats().finished {break;} tokio::time::sleep(Duration::from_millis(50)).await;}}).await.unwrap();
-    assert_eq!(fs::read(destination.join("b.bin")).unwrap(),middle);
+    let (_, selected_bytes) = entries
+        .iter()
+        .find(|(name, _)| *name == selected.path.as_str())
+        .unwrap();
+    assert_eq!(
+        fs::read(destination.join(&selected.path)).unwrap().as_slice(),
+        *selected_bytes
+    );
     manager.action("one".into(),row.id.clone(),"pause".into()).await.unwrap();
     let uploaded=manager.list("one").unwrap()[0].sharing.as_ref().unwrap().uploaded_bytes;
     assert!(uploaded>0);

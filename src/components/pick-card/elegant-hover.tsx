@@ -65,8 +65,8 @@ export function ElegantHoverActions({
         )}
         <span
           role="button"
-          aria-label={inWatchlist ? t("Remove from watchlist") : t("Add to watchlist")}
-          title={inWatchlist ? t("Remove from watchlist") : t("Add to watchlist")}
+          aria-label={inWatchlist ? t("Remove from library") : t("Save to library")}
+          title={inWatchlist ? t("Remove from library") : t("Save to library")}
           onClick={(e) =>
             act(e, () => {
               toggleWatchlist({

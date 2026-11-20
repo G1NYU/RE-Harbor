@@ -40,6 +40,7 @@ export function ContentRails({
             key={key}
             data-section={key}
             data-detail-section={key}
+            data-scroll-anchor={hidden ? undefined : `detail-rail:${key}`}
             className="flex scroll-mt-24 flex-col"
           >
             <div

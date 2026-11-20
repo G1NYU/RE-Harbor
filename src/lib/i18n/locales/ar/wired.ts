@@ -392,6 +392,7 @@ const wired: Record<string, string> = {
   "Episode titles, alternate names, network info, and the arc/DVD/absolute orderings. Layered on TMDB so the better source wins per field. Free for personal use at":
     "عناوين الحلقات والأسماء البديلة ومعلومات الشبكة وترتيبات الأجزاء وDVD والترتيب المطلق. تُضاف فوق بيانات TMDB ليُعتمد المصدر الأفضل لكل حقل. مجاني للاستخدام الشخصي على",
   "Episode {number}": "الحلقة {number}",
+  "Episode pages": "صفحات الحلقات",
   "Episodes that air after you add a series grab themselves":
     "تُنزّل تلقائيًا الحلقات التي تُعرض بعد إضافة المسلسل",
   "Estimating…": "جارٍ التقدير…",
@@ -454,6 +455,7 @@ const wired: Record<string, string> = {
   "Gilded Trophies": "جوائز مذهّبة",
   "Go to featured item {n}": "الانتقال إلى العنصر المميز {n}",
   "Go to host": "الانتقال إلى المضيف",
+  "Go to page": "الانتقال إلى صفحة",
   "Go to page {page}": "الانتقال إلى الصفحة {page}",
   "Go to pages {pages}": "الانتقال إلى الصفحات {pages}",
   Good: "جيد",

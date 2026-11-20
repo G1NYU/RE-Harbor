@@ -435,7 +435,7 @@
   -webkit-app-region: no-drag;
 }
 .games-view button {
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-view button:disabled {
   opacity: 0.3;

@@ -1,4 +1,10 @@
 import { useSyncExternalStore } from "react";
+import {
+  buildStreamIds,
+  hasAnimeStreamIds,
+  preferredAnimeImdbStreamId,
+} from "./streams/stream-ids";
+import type { PlayEpisode } from "./view";
 
 const API_BASE = "https://api.seekr.tv";
 
@@ -10,9 +16,9 @@ export type SeekrStartInput = {
   apiKey: string;
   metaId: string;
   imdbId?: string | null;
+  imdbIdVerified?: boolean;
   type?: string;
-  season?: number | null;
-  episode?: number | null;
+  episode?: PlayEpisode;
   durationSec: number;
 };
 
@@ -60,21 +66,43 @@ export function seekrQueryFor(input: SeekrStartInput): string | null {
   if (!Number.isFinite(durationMs) || durationMs <= 0) return null;
   const imdb = imdbFrom(input.imdbId) ?? imdbFrom(input.metaId);
   const tmdb = tmdbFrom(input.metaId) ?? tmdbFrom(input.imdbId);
-  const season = input.season;
   const episode = input.episode;
-  const episodeLookup =
-    season != null && episode != null && Number.isInteger(season) && Number.isInteger(episode);
-  const isSeries = input.type === "series" || input.type === "tv";
-  if (!episodeLookup && isSeries) return null;
-  if (episodeLookup) {
+  if (episode) {
+    const sourceId = episode.sourceMetaId;
+    const episodeMetaId = sourceId && hasAnimeStreamIds([sourceId]) ? sourceId : input.metaId;
+    if (hasAnimeStreamIds([episodeMetaId, episode.kitsuStreamId ?? ""])) {
+      // Native anime numbering belongs to the entry. Use the same mapped IMDb
+      // candidate that the episode-aware stream lookup trusts.
+      const verifiedImdb = /^tt\d+$/.test(input.metaId)
+        ? input.metaId
+        : input.imdbIdVerified
+          ? (input.imdbId ?? null)
+          : null;
+      const candidates = buildStreamIds(episodeMetaId, episode, verifiedImdb);
+      const mapped = preferredAnimeImdbStreamId(
+        episodeMetaId,
+        episode,
+        verifiedImdb,
+        verifiedImdb != null,
+        candidates,
+      );
+      if (!mapped) return null;
+      const [showId, season, number] = mapped.split(":");
+      return `duration_ms=${durationMs}&show_imdb_id=${showId}&season=${season}&episode=${number}`;
+    }
+    const { season, episode: number } = episode;
+    if (!Number.isInteger(season) || !Number.isInteger(number) || season < 0 || number < 1) {
+      return null;
+    }
     if (imdb) {
-      return `duration_ms=${durationMs}&show_imdb_id=${imdb}&season=${season}&episode=${episode}`;
+      return `duration_ms=${durationMs}&show_imdb_id=${imdb}&season=${season}&episode=${number}`;
     }
     if (tmdb != null) {
-      return `duration_ms=${durationMs}&show_tmdb_id=${tmdb}&season=${season}&episode=${episode}`;
+      return `duration_ms=${durationMs}&show_tmdb_id=${tmdb}&season=${season}&episode=${number}`;
     }
     return null;
   }
+  if (input.type === "series" || input.type === "tv") return null;
   if (imdb) return `duration_ms=${durationMs}&imdb_id=${imdb}`;
   if (tmdb != null) return `duration_ms=${durationMs}&tmdb_id=${tmdb}`;
   return null;

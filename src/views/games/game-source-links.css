@@ -144,7 +144,7 @@
   flex-shrink: 0;
 }
 .games-source-link-dialog button {
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-source-link-dialog button:disabled {
   opacity: 0.45;

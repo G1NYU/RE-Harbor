@@ -88,7 +88,10 @@ export function mergeSetupJob(jobs: SetupJob[], incoming: SetupJob, profile: str
 const executableName = (value: string) =>
   value
     .normalize("NFKC")
-    .toLocaleLowerCase()
+    // Locale-independent: under tr-TR, toLocaleLowerCase turns "I" into "ı", so
+    // "Game.AppImage" would never match the title "Game" and setup would find no
+    // executable at all.
+    .toLowerCase()
     .replace(/\.(?:exe|app|appimage)$/i, "")
     .replace(/[-_ ](?:win(?:32|64)|shipping)(?:[-_ ]shipping)?$/i, "")
     .replace(/[^\p{L}\p{N}]/gu, "");

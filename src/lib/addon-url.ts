@@ -1,5 +1,8 @@
 /** Keep transport query parameters separate from Stremio resource paths. */
 export function addonBaseUrl(transportUrl: string): string {
+  // A plugin addon is served by the app, not over HTTP: its transport URL is already the key
+  // every lookup uses, and `plugin:` in the authority is not a valid host:port pair for URL.
+  if (transportUrl.startsWith("harbor-plugin://")) return transportUrl;
   const url = new URL(transportUrl);
   url.pathname = url.pathname.replace(/\/manifest\.json\/?$/i, "").replace(/\/+$/, "");
   url.hash = "";

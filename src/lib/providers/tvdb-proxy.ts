@@ -3,6 +3,7 @@ import { safeFetch } from "@/lib/safe-fetch";
 import { kitsuToTvdb } from "./anime-mapping";
 import { HARBOR_TVDB_BASE } from "@/lib/config/endpoints";
 import { lruSet } from "@/lib/cache";
+import type { AnimeArtworkKind } from "./anime-format";
 
 const PROXY = `${HARBOR_TVDB_BASE}/api/tvdb/images`;
 const ART_PROXY = `${HARBOR_TVDB_BASE}/api/tvdb/artwork`;
@@ -38,11 +39,14 @@ export type TvdbImageMap = Record<string, string>;
 export type TvdbArtwork = { backgrounds: string[]; clearLogos: string[]; posters: string[] };
 
 export async function fetchTvdbArtwork(opts: {
+  kind: AnimeArtworkKind;
   imdb?: string | null;
   kitsuId?: number | null;
   series?: number | null;
 }): Promise<TvdbArtwork> {
   const empty: TvdbArtwork = { backgrounds: [], clearLogos: [], posters: [] };
+  // The artwork proxy resolves TVDB series IDs, including for film aliases.
+  if (opts.kind === "movie") return empty;
   let series: number | null = opts.series ?? null;
   if (series == null && opts.kitsuId != null) {
     series = await kitsuToTvdb(opts.kitsuId).catch(() => null);

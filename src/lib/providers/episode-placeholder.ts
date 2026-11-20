@@ -59,22 +59,26 @@ export function fillAiredPlaceholderTitles(
   // pool's English name can replace it instead of the row sitting on Japanese.
   const mismatched = (text: string | null | undefined) =>
     (base === "" || base === "en") && isForeignScriptTitle(text);
-  const byTvdbId = new Map<number, KitsuEpisode>();
-  const byPair = new Map<string, KitsuEpisode>();
-  const byAbs = new Map<number, KitsuEpisode>();
-  for (const ep of pool) {
-    const hasRealSynopsis = !!ep.synopsis?.trim() && !isPlaceholderEpisodeText(ep.synopsis);
-    if (!isRealTitle(ep.title) && !hasRealSynopsis) continue;
-    if (ep.tvdbEpisodeId != null && !byTvdbId.has(ep.tvdbEpisodeId)) {
-      byTvdbId.set(ep.tvdbEpisodeId, ep);
+  const indexPool = () => {
+    const byTvdbId = new Map<number, KitsuEpisode>();
+    const byPair = new Map<string, KitsuEpisode>();
+    const byAbs = new Map<number, KitsuEpisode>();
+    for (const ep of pool) {
+      const hasRealSynopsis = !!ep.synopsis?.trim() && !isPlaceholderEpisodeText(ep.synopsis);
+      if (!isRealTitle(ep.title) && !hasRealSynopsis) continue;
+      if (ep.tvdbEpisodeId != null && !byTvdbId.has(ep.tvdbEpisodeId)) {
+        byTvdbId.set(ep.tvdbEpisodeId, ep);
+      }
+      if (ep.imdbSeason != null && ep.imdbEpisode != null) {
+        const key = `${ep.imdbSeason}:${ep.imdbEpisode}`;
+        if (!byPair.has(key)) byPair.set(key, ep);
+      }
+      const abs = ep.absoluteNumber ?? ep.number;
+      if (abs != null && !byAbs.has(abs)) byAbs.set(abs, ep);
     }
-    if (ep.imdbSeason != null && ep.imdbEpisode != null) {
-      const key = `${ep.imdbSeason}:${ep.imdbEpisode}`;
-      if (!byPair.has(key)) byPair.set(key, ep);
-    }
-    const abs = ep.absoluteNumber ?? ep.number;
-    if (abs != null && !byAbs.has(abs)) byAbs.set(abs, ep);
-  }
+    return { byTvdbId, byPair, byAbs };
+  };
+  let indexed: ReturnType<typeof indexPool> | undefined;
   let changed = false;
   const out = rows.map((ep) => {
     const titleMissing =
@@ -84,6 +88,7 @@ export function fillAiredPlaceholderTitles(
       mismatched(ep.title);
     const synopsisMissing = !ep.synopsis?.trim() || isPlaceholderEpisodeText(ep.synopsis);
     if (!titleMissing && !synopsisMissing) return ep;
+    const { byTvdbId, byPair, byAbs } = (indexed ??= indexPool());
     const abs = ep.absoluteNumber;
     const base =
       (ep.tvdbEpisodeId != null ? byTvdbId.get(ep.tvdbEpisodeId) : undefined) ??

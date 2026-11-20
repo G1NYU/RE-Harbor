@@ -221,7 +221,7 @@
 .game-calendar-more {
   font-size: 11px;
   color: var(--color-ink-muted);
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   margin: 7px 0;
   padding: 3px;
 }

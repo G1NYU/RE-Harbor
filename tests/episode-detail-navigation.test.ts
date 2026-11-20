@@ -35,6 +35,7 @@ function fixture(initial: any[]) {
   const names = [
     "STACK_MAX",
     "pushFrame",
+    "saveScrollBeforeNavigation",
     "pop",
     "clearForwardStack",
     "setNavStack",
@@ -47,6 +48,7 @@ function fixture(initial: any[]) {
   const scope = {
     stackRef,
     forwardStackRef,
+    scrollSavers: { current: new Set() },
     navigateUnderPreview,
     previewPageStack,
     useCallback: (fn: any) => fn,

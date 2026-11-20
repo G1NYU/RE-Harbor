@@ -910,6 +910,10 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "NYT Books API anahtarı",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Harbor'ın doğrudan ve debrid kaynaklarını mı, eşler arası torrentleri mi tercih edeceğini veya ikisini birden mi göstereceğini seçin.",
+  "Largest first": "Önce en büyük",
+  "Smallest first": "Önce en küçük",
+  "Default order": "Varsayılan sıra",
+  "Sort sources: {value}": "Kaynakları sırala: {value}",
   "Show keyboard shortcuts": "Klavye kısayollarını göster",
   "Show or hide the list of player shortcuts.":
     "Oynatıcı kısayolları listesini gösterir veya gizler.",
@@ -923,6 +927,18 @@ const coverage: Record<string, string> = {
   "Increase the subtitle text size.": "Altyazı metin boyutunu büyütür.",
   "Audio: {name}": "Ses: {name}",
   "Subtitle size: {size}": "Altyazı boyutu: {size}",
+  "Save to library": "Kütüphaneye kaydet",
+  "In library": "Kütüphanede",
+  "In your library": "Kütüphanenizde",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Harbor\'da herhangi bir başlığa sağ tıklayın veya buraya eklemek için ayrıntı sayfasındaki "Kütüphaneye kaydet" düğmesine basın.',
+  "Add to all trackers": "Tüm izleyicilere ekle",
+  "Remove from all trackers": "Tüm izleyicilerden kaldır",
+  "Remove from all trackers?": "Tüm izleyicilerden kaldırılsın mı?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "Bu, başlığı bağlı tüm izleyicilerden kaldırır. Simkl'de tamamlanmış veya izlenen başlıklar değişmez; AniList ve MyAnimeList liste ilerlemesi kaldırılabilir.",
+  "Updated: {providers}.": "Güncellendi: {providers}.",
+  "No changes were made.": "Değişiklik yapılmadı.",
 };
 
 export default coverage;

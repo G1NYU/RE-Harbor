@@ -627,6 +627,8 @@ const catalog05: Record<string, string> = {
   "Go to episode": "Przejdź do odcinka",
   "Go to featured item {n}": "Przejdź do wyróżnionego elementu {n}",
   "Go to live": "Przejdź do transmisji na żywo",
+  "Episode pages": "Strony odcinków",
+  "Go to page": "Przejdź do strony",
   "Go to page {page}": "Przejdź do strony {page}",
   "Go to pages {pages}": "Przejdź do stron {pages}",
   "Go to show": "Przejdź do serialu",

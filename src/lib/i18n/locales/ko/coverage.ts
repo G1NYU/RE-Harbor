@@ -627,6 +627,7 @@ const coverage: Record<string, string> = {
   "70s": "70년대",
   "70s Auteurs": "70년대 작가주의 영화",
   "8 seconds": "8초",
+  "10 seconds": "10초",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1. 패스 수가 절반이라 저사양 그래픽 카드에 더 적합합니다.",
   "8-character key": "8자 키",
@@ -678,6 +679,10 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "NYT Books API 키",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Harbor가 직접 및 debrid 소스, P2P 토렌트를 우선할지 또는 둘 다 표시할지 선택합니다.",
+  "Largest first": "큰 순서",
+  "Smallest first": "작은 순서",
+  "Default order": "기본 순서",
+  "Sort sources: {value}": "소스 정렬: {value}",
   "Show keyboard shortcuts": "키보드 단축키 보기",
   "Show or hide the list of player shortcuts.": "플레이어 단축키 목록을 표시하거나 숨깁니다.",
   "Press {key} to close. Change these in Settings.":
@@ -690,6 +695,18 @@ const coverage: Record<string, string> = {
   "Increase the subtitle text size.": "자막 글자 크기를 키웁니다.",
   "Audio: {name}": "오디오: {name}",
   "Subtitle size: {size}": "자막 크기: {size}",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

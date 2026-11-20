@@ -506,6 +506,7 @@ function directAttempt(host: string, input: string, init?: RequestInit): Promise
 }
 
 function tauriStringFetch(input: string, init?: RequestInit, timeoutMs = 30000): Promise<Response> {
+  if (init?.signal?.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
   const deadlineMs = timeoutMs + 5_000;
   const directHost = hasSensitiveRequestHeaders(init?.headers) ? null : directHostFor(input);
   if (directHost) {
@@ -514,7 +515,7 @@ function tauriStringFetch(input: string, init?: RequestInit, timeoutMs = 30000):
   }
   const exec = isIdempotent(init?.method)
     ? tauriHarborFetch(input, init, undefined, timeoutMs).catch((e: unknown) => {
-        if (isCancellation(e)) throw e;
+        if (init?.signal?.aborted || isCancellation(e)) throw e;
         if (!shouldFallbackToPluginHttp(e, init)) throw e;
         return pluginHttpFetch(input, init);
       })

@@ -5,9 +5,13 @@ import { useT } from "@/lib/i18n";
 import { useAnilistBrowseState } from "@/lib/use-anilist-top";
 import { AnimeRowStatus } from "./anime-row-status";
 
-export function AnilistTrendingRow() {
+export function AnilistTrendingRow({
+  browse,
+}: {
+  browse: ReturnType<typeof useAnilistBrowseState>;
+}) {
   const t = useT();
-  const { metas, loading, error, retry } = useAnilistBrowseState("trending");
+  const { metas, loading, error, retry } = browse;
   if (metas.length === 0)
     return loading || error ? (
       <AnimeRowStatus title={t("Trending on AniList")} loading={loading} onRetry={retry} />

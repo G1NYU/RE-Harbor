@@ -29,6 +29,7 @@ import { profileFromMeta, trackEvent } from "./discover";
 import type { StreamingService } from "./settings";
 import { useSettings } from "./settings";
 import { useSmoothWheel } from "./smooth-scroll";
+import { noteScrollActivity } from "./scroll-activity";
 import { useTogether } from "./together/provider";
 import { beginMarathonAdvance } from "./fullscreen-state";
 import { consumeBack } from "./back-intercept";
@@ -409,6 +410,7 @@ type ViewValue = {
   exitPlayer: () => void;
   rememberScroll: (key: string, snap: ScrollSnapshot) => void;
   recallScroll: (key: string) => ScrollSnapshot | null;
+  registerScrollSave: (save: () => void) => () => void;
   rememberRowScroll: (key: string, scrollLeft: number) => void;
   recallRowScroll: (key: string) => number | null;
   chromeHidden: boolean;
@@ -597,6 +599,17 @@ export function ViewProvider({ children }: { children: ReactNode }) {
   const [homeResetTick, setHomeResetTick] = useState(0);
   const scrollMem = useRef<Map<string, ScrollSnapshot>>(new Map());
   const rowScrollMem = useRef<Map<string, number>>(new Map());
+  const scrollSavers = useRef(new Set<() => void>());
+  const registerScrollSave = useCallback((save: () => void) => {
+    const savers = scrollSavers.current;
+    savers.add(save);
+    return () => {
+      savers.delete(save);
+    };
+  }, []);
+  const saveScrollBeforeNavigation = useCallback(() => {
+    for (const save of scrollSavers.current) save();
+  }, []);
   const rememberRowScroll = useCallback((k: string, scrollLeft: number) => {
     rowScrollMem.current.set(k, scrollLeft);
   }, []);
@@ -765,18 +778,20 @@ export function ViewProvider({ children }: { children: ReactNode }) {
     const cur = stackRef.current;
     const pages = previewPageStack(cur);
     if (pages.length <= 1) return;
+    saveScrollBeforeNavigation();
     const nextStack = navigateUnderPreview(cur, (frames) => frames.slice(0, -1));
     const nextForwardStack = pushFrame(forwardStackRef.current, pages[pages.length - 1]);
     stackRef.current = nextStack;
     forwardStackRef.current = nextForwardStack;
     setStack(nextStack);
     setForwardStack(nextForwardStack);
-  }, []);
+  }, [saveScrollBeforeNavigation]);
 
   const goForward = useCallback(() => {
     const curForward = forwardStackRef.current;
     const nextFrame = curForward[curForward.length - 1];
     if (!nextFrame) return;
+    saveScrollBeforeNavigation();
     const nextForwardStack = curForward.slice(0, -1);
     const nextStack = navigateUnderPreview(stackRef.current, (frames) =>
       pushFrame(frames, nextFrame),
@@ -785,7 +800,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
     forwardStackRef.current = nextForwardStack;
     setStack(nextStack);
     setForwardStack(nextForwardStack);
-  }, []);
+  }, [saveScrollBeforeNavigation]);
 
   const clearForwardStack = useCallback(() => {
     if (forwardStackRef.current.length === 0) return;
@@ -795,12 +810,13 @@ export function ViewProvider({ children }: { children: ReactNode }) {
 
   const setNavStack = useCallback(
     (updater: (s: Frame[]) => Frame[], preserveDock = true) => {
+      saveScrollBeforeNavigation();
       clearForwardStack();
       setStack((current) =>
         preserveDock ? navigateUnderPreview(current, updater) : updater(current),
       );
     },
-    [clearForwardStack],
+    [clearForwardStack, saveScrollBeforeNavigation],
   );
 
   const exitPlayback = useCallback(() => {
@@ -1627,6 +1643,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       exitPlayer,
       rememberScroll,
       recallScroll,
+      registerScrollSave,
       rememberRowScroll,
       recallRowScroll,
       chromeHidden: chromeHidden || bigPictureActive,
@@ -1712,6 +1729,7 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       exitPlayer,
       rememberScroll,
       recallScroll,
+      registerScrollSave,
       chromeHidden,
       bigPictureActive,
       setNavStack,
@@ -1759,32 +1777,32 @@ function anchorOffsetIn(scrollEl: HTMLElement, anchor: HTMLElement): number {
   );
 }
 
-function pickAnchor(el: HTMLElement, scrollTop: number): { key: string; delta: number } | null {
+function pickAnchor(el: HTMLElement): { key: string; delta: number } | null {
   const anchors = el.querySelectorAll<HTMLElement>("[data-scroll-anchor]");
   if (anchors.length === 0) return null;
-  let best: { key: string; offset: number } | null = null;
   const scrollerTop = el.getBoundingClientRect().top;
-  for (const a of anchors) {
-    const k = a.dataset.scrollAnchor;
-    if (!k) continue;
-    const off = a.getBoundingClientRect().top - scrollerTop + scrollTop;
-    if (off > scrollTop + 1) continue;
-    if (!best || off > best.offset) best = { key: k, offset: off };
+  let closest: { key: string; delta: number } | null = null;
+  for (const anchor of anchors) {
+    const key = anchor.dataset.scrollAnchor;
+    if (!key) continue;
+    const rect = anchor.getBoundingClientRect();
+    if (rect.height === 0) continue;
+    const delta = scrollerTop - rect.top;
+    if (!closest || (delta >= -1 && (closest.delta < -1 || delta < closest.delta))) {
+      closest = { key, delta };
+    }
   }
-  if (!best) {
-    const first = anchors[0];
-    const k = first.dataset.scrollAnchor;
-    if (!k) return null;
-    return { key: k, delta: scrollTop - anchorOffsetIn(el, first) };
-  }
-  return { key: best.key, delta: scrollTop - best.offset };
+  return closest;
 }
 
-function targetForSnap(el: HTMLElement, snap: ScrollSnapshot): number | null {
+function targetForSnap(el: HTMLElement, snap: ScrollSnapshot, allowFallback = true): number | null {
   if (snap.anchor) {
     const sel = `[data-scroll-anchor="${CSS.escape(snap.anchor)}"]`;
     const anchorEl = el.querySelector<HTMLElement>(sel);
-    if (anchorEl) return Math.max(0, anchorOffsetIn(el, anchorEl) + snap.delta);
+    if (anchorEl?.getClientRects().length) {
+      return Math.max(0, anchorOffsetIn(el, anchorEl) + snap.delta);
+    }
+    if (!allowFallback) return null;
   }
   return snap.fallback >= 0 ? snap.fallback : null;
 }
@@ -1794,8 +1812,9 @@ export function useScrollMemory(
   ref: RefObject<HTMLElement | null>,
   active: boolean = true,
   hideUntilRestored: boolean = false,
+  { followLayout = false }: { followLayout?: boolean } = {},
 ) {
-  const { rememberScroll, recallScroll } = useView();
+  const { rememberScroll, recallScroll, registerScrollSave } = useView();
   const { settings } = useSettings();
   useSmoothWheel(ref, active && settings.smoothScroll);
 
@@ -1816,13 +1835,22 @@ export function useScrollMemory(
     const el = ref.current;
     if (!el || !active) return;
 
-    let restoring = true;
+    const initialSnap = recallScroll(key);
+    const startsAtTop = initialSnap?.fallback === 0 && !initialSnap.anchor;
+    // A fresh page or a saved top position needs no layout read during the commit.
+    const initialHeight = initialSnap && !startsAtTop ? el.clientHeight : undefined;
+    let restoring = initialSnap != null;
+    let following = followLayout && restoring && !startsAtTop;
+    const previousOverflowAnchor = following ? el.style.overflowAnchor : "";
+    let followSettleId: number | undefined;
+    let followDeadline: number | undefined;
+    const observedContent = following ? el.firstElementChild?.nextElementSibling : null;
     let settleId: number | null = null;
     let saveTimer: number | null = null;
     let revealId: number | null = null;
-    let pendingSnap: ScrollSnapshot | null = null;
-    let parked = el.clientHeight === 0;
-    let everVisible = !parked;
+    let lastScrollAt = 0;
+    let parked = initialHeight === 0 || el.closest("[data-layer-inactive]") != null;
+    let everVisible = initialHeight !== undefined && !parked;
     let retries = 0;
     let retryId: number | null = null;
 
@@ -1833,9 +1861,9 @@ export function useScrollMemory(
       }
     };
 
-    const initialSnap = recallScroll(key);
-    const wantsHide =
-      hideUntilRestored && !!initialSnap && (targetForSnap(el, initialSnap) ?? 0) > 8;
+    const initialTarget =
+      initialSnap && !startsAtTop && hideUntilRestored ? targetForSnap(el, initialSnap) : undefined;
+    const wantsHide = (initialTarget ?? 0) > 8;
     let revealed = !wantsHide;
     const reveal = () => {
       if (revealed) return;
@@ -1865,7 +1893,28 @@ export function useScrollMemory(
       }, 30000);
     };
 
-    const tryRestore = (clamp = false) => {
+    const stopFollowing = () => {
+      if (!following) return;
+      following = false;
+      clearTimeout(followSettleId);
+      clearTimeout(followDeadline);
+      if (observedContent) ro.unobserve(observedContent);
+      el.style.overflowAnchor = previousOverflowAnchor;
+      el.removeEventListener("wheel", cancelFollow);
+      el.removeEventListener("pointerdown", cancelFollow);
+      el.removeEventListener("touchstart", cancelFollow);
+      window.removeEventListener("keydown", cancelFollow);
+    };
+
+    const cancelFollow = () => {
+      stopFollowing();
+      restoring = false;
+      cancelSettle();
+      cancelRetry();
+      reveal();
+    };
+
+    const tryRestore = (clamp = false, height?: number, measuredTarget?: number | null) => {
       if (!restoring) return;
       const snap = recallScroll(key);
       if (!snap) {
@@ -1875,7 +1924,8 @@ export function useScrollMemory(
         reveal();
         return;
       }
-      if (el.clientHeight === 0) {
+      const viewportHeight = height ?? el.clientHeight;
+      if (viewportHeight === 0) {
         /* The layer is parked, or it has just been shown and has not been laid out yet. Giving up
          * here is what loses the position: the effect runs in the same commit that lifts the park,
          * so the element can still report no height, and the resize observer does not fire for a
@@ -1890,35 +1940,41 @@ export function useScrollMemory(
         }
         return;
       }
-      const target = targetForSnap(el, snap);
+      const target =
+        measuredTarget === undefined ? targetForSnap(el, snap, !following) : measuredTarget;
       if (target === null) {
+        if (following) return;
         restoring = false;
         cancelSettle();
         cancelRetry();
         reveal();
         return;
       }
-      const max = el.scrollHeight - el.clientHeight;
+      const max = target === 0 ? 0 : el.scrollHeight - viewportHeight;
       if (max < target - 4 && !clamp) return;
-      el.scrollTop = Math.min(target, max);
+      const offset = Math.min(target, max);
+      if (following) {
+        if (Math.abs(el.scrollTop - offset) > 0.5) el.scrollTop = offset;
+        reveal();
+        clearTimeout(followSettleId);
+        followSettleId = window.setTimeout(() => {
+          stopFollowing();
+          tryRestore(true);
+        }, 450);
+        return;
+      }
+      el.scrollTop = offset;
       restoring = false;
       cancelSettle();
       cancelRetry();
       reveal();
     };
 
-    const capture = (): ScrollSnapshot => {
-      const top = el.scrollTop;
-      const found = pickAnchor(el, top);
-      return {
-        anchor: found?.key,
-        delta: found?.delta ?? 0,
-        fallback: top,
-      };
-    };
     const saveNow = () => {
-      if (el.clientHeight === 0) return;
-      rememberScroll(key, capture());
+      if (el.closest("[data-layer-inactive]") || el.clientHeight === 0) return;
+      const top = el.scrollTop;
+      const anchor = top > 0 ? pickAnchor(el) : null;
+      rememberScroll(key, { anchor: anchor?.key, delta: anchor?.delta ?? 0, fallback: top });
     };
 
     const cancelSave = () => {
@@ -1928,65 +1984,100 @@ export function useScrollMemory(
       }
     };
 
-    const flushParked = () => {
-      if (saveTimer === null || restoring || !pendingSnap) return;
+    const flushSave = () => {
+      if (restoring) return;
       cancelSave();
-      rememberScroll(key, pendingSnap);
+      saveNow();
     };
 
     const onResize = () => {
-      const hidden = el.clientHeight === 0;
+      const height = el.clientHeight;
+      const hidden = height === 0;
       if (hidden && !parked) {
         parked = true;
-        flushParked();
+        flushSave();
         return;
       }
       if (!hidden && parked) {
         parked = false;
         restoring = true;
         armSettle();
-        tryRestore(everVisible);
+        tryRestore(everVisible, height);
         everVisible = true;
         return;
       }
       if (!hidden) everVisible = true;
-      tryRestore();
+      tryRestore(false, height);
+    };
+
+    const saveAfterScroll = () => {
+      saveTimer = null;
+      const remaining = 200 - (performance.now() - lastScrollAt);
+      if (remaining > 1) {
+        saveTimer = window.setTimeout(saveAfterScroll, remaining);
+        return;
+      }
+      // Read the position now that the gesture is over, not on every scroll event.
+      saveNow();
     };
 
     const onScroll = () => {
-      if (restoring) return;
-      if (el.clientHeight === 0) return;
-      // Capture geometry while the page is visible. Navigation can hide it
-      // before the debounce runs, when anchor offsets can no longer be read.
-      pendingSnap = capture();
-      cancelSave();
-      saveTimer = window.setTimeout(() => {
-        saveTimer = null;
-        if (pendingSnap) rememberScroll(key, pendingSnap);
-      }, 200);
+      noteScrollActivity();
+      if (restoring || parked) return;
+      lastScrollAt = performance.now();
+      saveTimer ??= window.setTimeout(saveAfterScroll, 200);
     };
 
-    armSettle();
-    if (wantsHide) revealId = window.setTimeout(reveal, 220);
-    tryRestore();
+    // Save while the outgoing layer still has layout, even when navigation happens
+    // before the scroll timer or comes from keyboard, controller, or app code.
+    const unregisterScrollSave = registerScrollSave(flushSave);
 
     const ro = new ResizeObserver(onResize);
     ro.observe(el);
     if (el.firstElementChild) ro.observe(el.firstElementChild);
-    el.addEventListener("scroll", onScroll, { passive: true });
+    if (following) {
+      // Let sections replace their loading placeholders without WebView picking
+      // a different scroll anchor. Release the viewport on input or after layout settles.
+      el.style.overflowAnchor = "none";
+      if (observedContent) ro.observe(observedContent);
+      followDeadline = window.setTimeout(() => {
+        stopFollowing();
+        tryRestore(true);
+      }, 2200);
+      el.addEventListener("wheel", cancelFollow, { passive: true });
+      el.addEventListener("pointerdown", cancelFollow, { passive: true });
+      el.addEventListener("touchstart", cancelFollow, { passive: true });
+      window.addEventListener("keydown", cancelFollow);
+    }
+    if (initialSnap) {
+      armSettle();
+      if (wantsHide && !following) revealId = window.setTimeout(reveal, 220);
+      if (!startsAtTop) tryRestore(false, initialHeight, following ? undefined : initialTarget);
+    }
 
+    el.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      if (!restoring && el.clientHeight > 0 && el.scrollTop > 0) saveNow();
-      else if (el.clientHeight === 0) flushParked();
+      flushSave();
+      stopFollowing();
       cancelSave();
       cancelSettle();
       cancelRetry();
+      unregisterScrollSave();
       if (revealId !== null) clearTimeout(revealId);
       reveal();
       ro.disconnect();
       el.removeEventListener("scroll", onScroll);
     };
-  }, [active, key, ref, rememberScroll, recallScroll, hideUntilRestored]);
+  }, [
+    active,
+    key,
+    ref,
+    rememberScroll,
+    recallScroll,
+    registerScrollSave,
+    hideUntilRestored,
+    followLayout,
+  ]);
 }
 
 export { frameKey };

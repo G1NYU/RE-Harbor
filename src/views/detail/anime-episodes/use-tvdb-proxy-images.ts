@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { fetchTvdbProxyImages, type TvdbImageMap } from "@/lib/providers/tvdb-proxy";
 
+const EMPTY_IMAGES: TvdbImageMap = {};
+
 export function useTvdbProxyImages(
   kitsuId: number | null,
   imdbId: string | null,
@@ -20,5 +22,5 @@ export function useTvdbProxyImages(
       cancel = true;
     };
   }, [kitsuId, imdbId, seasonType, enabled, scope]);
-  return enabled && result?.scope === scope ? result.map : {};
+  return enabled && result?.scope === scope ? result.map : EMPTY_IMAGES;
 }

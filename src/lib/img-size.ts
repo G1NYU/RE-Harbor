@@ -39,6 +39,21 @@ export function sizeImageUrl(url: string, targetPx: number): string {
   return upgradeArtworkUrl(url, targetPx);
 }
 
+/** Match the CDN buckets through card sizes and group larger requests for the disk cache. */
+export function posterThumbnailWidth(targetPx: number): number {
+  return TMDB_TIERS.find((width) => width >= targetPx) ?? Math.ceil(targetPx / 256) * 256;
+}
+
+export function nativePosterThumbnailWidth(
+  url: string | undefined,
+  targetPx: number,
+): number | undefined {
+  if (!url || targetPx <= 0) return undefined;
+  const tmdbWidth = /^https?:\/\/image\.tmdb\.org\/t\/p\/w(\d+)\//i.exec(url);
+  if (tmdbWidth && Number(tmdbWidth[1]) <= targetPx) return undefined;
+  return targetPx;
+}
+
 export type PosterQuality = "balanced" | "high" | "max";
 
 export function qualityMultiplier(q: PosterQuality): number {

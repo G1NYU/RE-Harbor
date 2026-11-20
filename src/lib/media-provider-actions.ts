@@ -28,6 +28,7 @@ import {
   invalidateSimklListStatus,
   loadSimklStatusMap,
   setSimklStatus,
+  SIMKL_STATUS_LABELS,
 } from "./simkl/list-status";
 import { invalidateWatchlistCache } from "./simkl/watchlist";
 import { invalidateHistoryCache } from "./simkl/history";
@@ -392,14 +393,30 @@ export function watchlistProviderWrites(input: WatchlistInput, on: boolean): Pro
         const current = await readSimklStateStrict(target);
         assertCurrent();
         if (!simklConnected()) throw new Error("Simkl disconnected.");
-        // Simkl's whole-title removal also deletes history. It cannot implement membership-only removal.
-        if (!on)
-          return current.status === "plantowatch"
-            ? "Unchanged: Simkl removal also deletes watched history. Manage this title in Simkl."
-            : undefined;
-        if (current.status === "plantowatch") return;
+        // Simkl's whole-title removal also deletes history. A plan-to-watch
+        // entry with no watch history is the only safe removal.
+        if (!on) {
+          if (current.status !== "plantowatch") {
+            return current.status
+              ? `Unchanged: Simkl already has a status (${SIMKL_STATUS_LABELS[current.status]}).`
+              : "Unchanged: this title is not on Simkl.";
+          }
+          if (current.watched.size > 0)
+            return "Unchanged: Simkl removal also deletes watched history. Manage this title in Simkl.";
+          const response = await simklRequest<SyncResponse>("/sync/history/remove", {
+            method: "POST",
+            body: { [bucket]: [{ ids }] },
+          });
+          ensureResponse(response, bucket, "deleted", 0);
+          invalidateWatchlistCache();
+          invalidateHistoryCache();
+          invalidateSimklListStatus();
+          return;
+        }
+        if (current.status === "plantowatch")
+          return "Unchanged: Simkl already has it as Plan to Watch.";
         if (current.status)
-          return "Unchanged: this title already has a Simkl status. Change its status in Simkl.";
+          return `Unchanged: Simkl already has a status (${SIMKL_STATUS_LABELS[current.status]}).`;
         const response = await simklRequest<SyncResponse>("/sync/add-to-list", {
           method: "POST",
           body: { [bucket]: [{ to: "plantowatch", ids }] },

@@ -235,7 +235,7 @@ function MarqueeBlock({
           <Play size={20} fill="currentColor" strokeWidth={0} className="translate-x-[1px]" />
         </button>
         <CircleAction
-          label={inList ? t("Remove from watchlist") : t("Add to watchlist")}
+          label={inList ? t("Remove from library") : t("Save to library")}
           active={inList}
           onClick={(e) => {
             stop(e);

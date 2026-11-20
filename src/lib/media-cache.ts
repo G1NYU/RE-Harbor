@@ -21,6 +21,8 @@ export type MediaCachePolicy<T> = {
   staleWhileRevalidate?: boolean;
   fallbackOnError?: boolean;
   valid?: (value: T) => boolean;
+  /** Return an independent snapshot of this namespace's value. */
+  clone?: (value: T) => T;
 };
 
 export type MediaCacheResult<T> = {
@@ -189,7 +191,7 @@ export function createMediaCache(
       typeof policy.ttl === "function" ? policy.ttl(value) : (policy.ttl ?? MEDIA_TTL.episodes);
     const record: MediaCacheRecord<T> = {
       key,
-      value: copy(value),
+      value: (policy.clone ?? copy)(value),
       storedAt,
       bytes,
       freshUntil: storedAt + ttl,
@@ -229,6 +231,7 @@ export function createMediaCache(
     loader: () => Promise<T | null>,
     policy: MediaCachePolicy<T> = {},
   ): Promise<MediaCacheResult<T>> {
+    const clone = policy.clone ?? copy;
     const scope = generation;
     await clearing;
     if (scope !== generation) return { value: null };
@@ -262,14 +265,14 @@ export function createMediaCache(
         });
       }
       remember(record);
-      return { value: copy(record.value as T), storedAt: record.storedAt };
+      return { value: clone(record.value as T), storedAt: record.storedAt };
     }
     const stale = record;
     // An explicit refresh (maxAge 0) must not be swallowed by the negative
     // retry window that protects ordinary background lookups from storms.
     if (policy.maxAge !== 0 && (retryAt.get(key) ?? 0) > now()) {
       return {
-        value: policy.fallbackOnError !== false && stale ? copy(stale.value as T) : null,
+        value: policy.fallbackOnError !== false && stale ? clone(stale.value as T) : null,
         storedAt: stale?.storedAt,
       };
     }
@@ -306,7 +309,7 @@ export function createMediaCache(
           return {
             value:
               !policy.staleWhileRevalidate && policy.fallbackOnError !== false && stale
-                ? copy(stale.value as T)
+                ? clone(stale.value as T)
                 : null,
             storedAt: stale?.storedAt,
           };
@@ -320,13 +323,13 @@ export function createMediaCache(
       counters.staleHits++;
       traceCache(key, "stale");
       return {
-        value: copy(stale.value as T),
+        value: clone(stale.value as T),
         storedAt: stale.storedAt,
-        refresh: running.then(({ value }) => (value == null ? null : copy(value))),
+        refresh: running.then(({ value }) => (value == null ? null : clone(value))),
       };
     }
     const { value, storedAt } = await running;
-    return { value: value == null ? null : copy(value), storedAt };
+    return { value: value == null ? null : clone(value), storedAt };
   }
 
   return {

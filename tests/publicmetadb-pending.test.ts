@@ -11,6 +11,7 @@ import {
   recordPendingResume,
   removePendingResume,
   syncPendingResume,
+  type PendingResume,
 } from "../src/lib/publicmetadb/pending-sync.ts";
 import type { PmdbTarget } from "../src/lib/publicmetadb/types.ts";
 
@@ -23,7 +24,7 @@ function online(saveImpl: (target: PmdbTarget) => Promise<boolean> = async () =>
     calls,
     deps: {
       hasSession: () => true,
-      save: async (target: PmdbTarget, positionMs: number, runtimeMs: number) => {
+      save: async ({ target, positionMs, runtimeMs }: PendingResume) => {
         calls.push({ target, positionMs, runtimeMs });
         return saveImpl(target);
       },

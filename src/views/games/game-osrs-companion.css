@@ -79,7 +79,7 @@
   border: 0;
   padding: 10px;
   border-radius: 8px;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   font: inherit;
   font-size: 12px;
 }

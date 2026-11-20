@@ -1,16 +1,35 @@
-/** Read the active profile's settings mirror without importing the React settings provider. */
-export function addonOnlyMetadata(): boolean {
+import type { MetadataSourceChain } from "./metadata-sources";
+
+type MetadataSettings = {
+  addonOnlyMetadata?: boolean;
+  searchTmdbTopMatch?: boolean;
+  cinemetaEnabled?: boolean;
+  metadataSources?: MetadataSourceChain;
+};
+
+const defaults: Readonly<MetadataSettings> = {};
+let previousRaw: string | null = null;
+let previousSettings = defaults;
+
+/** Read the profile mirror without running settings migrations on the artwork path. */
+export function readMetadataSettings(): Readonly<MetadataSettings> {
   try {
-    return JSON.parse(localStorage.getItem("harbor.settings") ?? "{}").addonOnlyMetadata === true;
+    const raw = localStorage.getItem("harbor.settings");
+    if (raw !== previousRaw) {
+      previousRaw = raw;
+      previousSettings = defaults;
+      if (raw) previousSettings = (JSON.parse(raw) as MetadataSettings | null) ?? defaults;
+    }
+    return previousSettings;
   } catch {
-    return false;
+    return defaults;
   }
 }
 
+export function addonOnlyMetadata(): boolean {
+  return readMetadataSettings().addonOnlyMetadata === true;
+}
+
 export function useTmdbTopMatch(): boolean {
-  try {
-    return JSON.parse(localStorage.getItem("harbor.settings") ?? "{}").searchTmdbTopMatch !== false;
-  } catch {
-    return true;
-  }
+  return readMetadataSettings().searchTmdbTopMatch !== false;
 }

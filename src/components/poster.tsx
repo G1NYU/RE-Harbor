@@ -27,12 +27,17 @@ import { firstPosterTransform, posterTransformEnabled } from "@/lib/metadata-sou
 import { externalToKitsu, kitsuToImdb, kitsuToTvdb } from "@/lib/providers/anime-mapping";
 import { simklAnimeArtworkIds } from "@/lib/simkl/anime-artwork-ids";
 import { tmdbLocalizedPoster } from "@/lib/providers/tmdb/tmdb-images";
-import { sizeImageUrl, qualityMultiplier } from "@/lib/img-size";
+import {
+  nativePosterThumbnailWidth,
+  posterThumbnailWidth,
+  qualityMultiplier,
+  sizeImageUrl,
+} from "@/lib/img-size";
 import { shouldLocalizePosters } from "@/lib/providers/tmdb/tmdb-image-lang";
 import { useProxiedImageSrc } from "@/lib/remote-image-proxy";
 import { observeResize, observeWithin } from "@/lib/visibility";
 import { noteProbe, recordRenderCause } from "@/lib/render-cause";
-import { ScrollRootContext } from "./row";
+import { resolveRowScrollRoot, ScrollRootContext } from "./row";
 
 type Ratio = "portrait" | "landscape" | "wide" | "square";
 
@@ -349,6 +354,7 @@ function PosterBody({
   const pageScrollRoot = useContext(ScrollRootContext);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [imageEnabled, setImageEnabled] = useState(!lazy);
+  const imageEnabledRef = useRef(!lazy);
   const [targetPx, setTargetPx] = useState(0);
   const targetPxRef = useRef(0);
   const measuredPxRef = useRef(0);
@@ -356,26 +362,22 @@ function PosterBody({
   const rawCandidates = [src, ...(fallbacks ?? [])].filter((u): u is string => !!u);
   const rawCandidatesRef = useRef(rawCandidates);
   rawCandidatesRef.current = rawCandidates;
-  // Visibility is a DOM attribute, not React state. `inView`/`eager` used to be state, so every
-  // poster that crossed the viewport boundary re-rendered — scrolling up and down made that the
-  // largest render source in the profiler (~19 renders per poster). Because the `<img>` also stays
-  // mounted now, a poster that leaves and comes back no longer has to decode its image again.
+  // Wake lazy images once, and pause the shimmer outside the artwork loading range.
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    const onNear = (e: IntersectionObserverEntry) => {
-      const near = e.isIntersecting;
-      if (near) setImageEnabled(true);
-      el.toggleAttribute("data-near", near);
-      el.toggleAttribute("data-idle", !near);
-      const img = el.querySelector<HTMLImageElement>("img.harbor-poster-img");
-      if (!img) return;
-      if (near) img.fetchPriority = "high";
-      else img.removeAttribute("fetchpriority");
-    };
-    return pageScrollRoot
-      ? observeWithin(el, "1200px", onNear, pageScrollRoot)
-      : observeWithin(el, "1200px", onNear);
+    return observeWithin(
+      el,
+      "360px",
+      (entry) => {
+        const near = entry.isIntersecting;
+        el.toggleAttribute("data-idle", !near);
+        if (!near || imageEnabledRef.current) return;
+        imageEnabledRef.current = true;
+        setImageEnabled(true);
+      },
+      resolveRowScrollRoot(pageScrollRoot, el),
+    );
   }, [pageScrollRoot]);
   useEffect(() => {
     if (qMult === 0) return;
@@ -391,10 +393,10 @@ function PosterBody({
       measuredPxRef.current = t;
       const prev = targetPxRef.current;
       if (t <= prev) return;
-      // Expansion animates the width every frame. Only render when it actually selects
-      // different image bytes, rather than once per pixel within the same CDN size rung.
+      // During expansion, only update when the requested CDN URL or native thumbnail changes.
       if (
         prev > 0 &&
+        posterThumbnailWidth(prev) === posterThumbnailWidth(t) &&
         rawCandidatesRef.current.every((url) => sizeImageUrl(url, prev) === sizeImageUrl(url, t))
       )
         return;
@@ -462,15 +464,15 @@ function PosterBody({
   }, [sig]);
 
   // `lazy="release"` used to unmount the `<img>` once a poster sat more than 2400px away for 1.5s.
-  // That freed the bitmap but made every return re-decode and re-render, which is what made
-  // scrolling up and down expensive. The `<img>` now stays mounted, the 1200px observer above owns
-  // the idle flag, and the far-card release in row.tsx (300px / 15s) is what unmounts a card — so
-  // the prop is kept only for call sites, not for eviction.
+  // The image stays mounted once loaded. Catalog rows can release the entire card when far away.
 
   let cursor = idx;
   while (cursor < candidates.length && failedRef.current.has(candidates[cursor])) cursor++;
   const current: string | undefined = candidates[cursor];
   const exhausted = cursor >= candidates.length;
+  const posterWidth = qMult > 0 && targetPx > 0 ? posterThumbnailWidth(targetPx) : 0;
+  const thumbWidthPx = nativePosterThumbnailWidth(current, posterWidth);
+  const displayedThumbWidth = nativePosterThumbnailWidth(displayed, posterWidth);
   // Remote plain-HTTP images (e.g. a Suwayomi server on a VPS) are mixed-content
   // blocked by the WebView; resolve them to a same-origin blob URL.
   const currentSrc = useProxiedImageSrc(current, {
@@ -479,13 +481,17 @@ function PosterBody({
       (!preferDirect || nativeRetryUrl === current || !current?.startsWith("https://")),
     persistent: true,
     enabled: imageEnabled && (qMult === 0 || targetPx > 0),
-    originalSize: true,
+    thumbWidthPx,
+    originalSize: thumbWidthPx === undefined,
   });
   const displayedSrc = useProxiedImageSrc(displayed, {
-    forceProxy: /^https?:\/\//.test(displayed ?? ""),
+    forceProxy:
+      /^https?:\/\//.test(displayed ?? "") &&
+      (!preferDirect || nativeRetryUrl === displayed || !displayed?.startsWith("https://")),
     persistent: true,
-    enabled: imageEnabled,
-    originalSize: true,
+    enabled: imageEnabled && displayed !== current,
+    thumbWidthPx: displayedThumbWidth,
+    originalSize: displayedThumbWidth === undefined,
   });
   const stateCauseRef = useRef<{
     targetPx: number;

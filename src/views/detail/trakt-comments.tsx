@@ -507,7 +507,7 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
   const handleOpenTrakt = useCallback(() => {
     if (!target) return;
     const ids = target.kind === "episode" ? target.show.ids : target.ids;
-    const slug = ids.tmdb ? `tmdb:${ids.tmdb}` : ids.imdb;
+    const slug = ids.imdb ?? ids.trakt ?? ids.slug;
     if (!slug) return;
     if (target.kind === "episode") {
       openUrl(
@@ -519,6 +519,8 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
       openUrl(`https://app.trakt.tv/shows/${slug}?mode=media`);
     }
   }, [target]);
+  const traktIds = target?.kind === "episode" ? target.show.ids : target?.ids;
+  const traktDestinationAvailable = !!(traktIds?.imdb ?? traktIds?.trakt ?? traktIds?.slug);
 
   const handlePost = useCallback(async () => {
     if (!target || !text.trim() || posting) return;
@@ -653,7 +655,8 @@ export function TraktComments({ resolution }: { resolution: IdResolution | null 
             </div>
             <button
               onClick={handleOpenTrakt}
-              className="flex items-center gap-1 rounded-lg bg-white/[0.06] px-3 py-1.5 text-[12px] font-medium text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink"
+              disabled={!traktDestinationAvailable}
+              className="flex items-center gap-1 rounded-lg bg-white/[0.06] px-3 py-1.5 text-[12px] font-medium text-ink-muted transition-colors hover:bg-white/[0.10] hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("Open on Trakt")}
             </button>

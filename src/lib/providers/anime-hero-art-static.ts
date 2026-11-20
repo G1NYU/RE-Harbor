@@ -2,6 +2,7 @@ import type { Meta } from "@/lib/cinemeta";
 import { safeFetch } from "@/lib/safe-fetch";
 import { HARBOR_API_BASE } from "@/lib/config/endpoints";
 import { readHeroArtCache, writeHeroArtCache } from "./anime-hero-art-cache";
+import type { AnimeArtworkKind } from "./anime-format";
 
 export type StaticHeroArt = {
   bg?: string;
@@ -89,13 +90,19 @@ export function ensureStaticHeroArt(): Promise<void> {
   return loading;
 }
 
-export function peekStaticHeroArt(id: string): StaticHeroArt | undefined {
-  return map?.[id];
+export function peekStaticHeroArt(id: string, kind: AnimeArtworkKind): StaticHeroArt | undefined {
+  const entry = map?.[id];
+  // Catalog aliases can point at the parent series' record through TVDB.
+  const isMovie = entry?.format?.toUpperCase() === "MOVIE";
+  return isMovie === (kind === "movie") ? entry : undefined;
 }
 
-export async function staticHeroArt(id: string): Promise<StaticHeroArt | undefined> {
+export async function staticHeroArt(
+  id: string,
+  kind: AnimeArtworkKind,
+): Promise<StaticHeroArt | undefined> {
   await ensureStaticHeroArt();
-  return map?.[id];
+  return peekStaticHeroArt(id, kind);
 }
 
 const SCHEME_RANK = (k: string) =>

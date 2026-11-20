@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
+import { animeArtworkKind } from "../src/lib/providers/anime-format.ts";
 
 function load(file, mocks) {
   const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
@@ -78,6 +79,7 @@ function artworkFixture() {
     "@/components/card-award": { useClassicAwardWin: () => null },
     "@/components/card-status-badges": { stackTop: () => "top-2" },
     "@/lib/img-size": { sizeImageUrl: (url) => url },
+    "@/lib/providers/anime-format": { animeArtworkKind },
     "@/lib/providers/anime-hero-art-static": {
       peekStaticHeroArt: (id) => cached.get(id),
       ensureStaticHeroArt: async () => {},

@@ -1,3 +1,4 @@
+import seekSteps from "./vi/seek-steps";
 import reviews from "./vi/reviews";
 import playOrders from "./vi/play-orders";
 import gameRomLibrary from "./vi/game-rom-library";
@@ -416,6 +417,7 @@ const vi: Record<string, string> = {
   ...reviews,
   ...queueBasket,
   ...liveWeb,
+  ...seekSteps,
   "Refract sync": "Đồng bộ Refract",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "Đồng bộ lịch sử xem và các thay đổi trong danh sách muốn xem của Harbor với Refract.",

@@ -18,13 +18,14 @@ import {
   type SearchResults,
 } from "@/lib/search";
 import {
+  createAddonSearchCatalogReader,
   searchAddonCatalogs,
   searchAddonGroups,
   mergeMetas,
   type AddonQuery,
 } from "@/lib/search-addons";
 import { searchAddonIndex } from "@/lib/search-addon-index";
-import { createSearchRequestGuard } from "@/lib/search-request-guard";
+import { settleSearchSource } from "@/lib/search-request-guard";
 import { normalizeSearchQuery } from "@/lib/search-query";
 import { orderedMetadataAddons } from "@/lib/metadata-addons";
 import { addonKeyFromSource } from "@/lib/metadata-sources";
@@ -80,6 +81,7 @@ function cachedSearch<T>(
   cache: SearchCache<T>,
   key: string,
   ttlMs: number,
+  signal: AbortSignal,
   load: () => Promise<T>,
 ): Promise<T> {
   const now = Date.now();
@@ -89,6 +91,7 @@ function cachedSearch<T>(
   const cached = cache.get(key);
   if (cached) return Promise.resolve(cached.result);
   return load().then((result) => {
+    signal.throwIfAborted();
     if (cache.size >= MAX_CACHE_ENTRIES) {
       const oldest = cache.keys().next().value;
       if (oldest) cache.delete(oldest);
@@ -197,8 +200,6 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [aiHold, setAiHold] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [recent, setRecent] = useState<string[]>(() => loadRecent());
-  const debounceRef = useRef<number | null>(null);
-  const requestGuardRef = useRef(createSearchRequestGuard());
   const tmdbCacheRef = useRef<SearchCache<SearchResults | null>>(new Map());
   const animeCacheRef = useRef<SearchCache<Awaited<ReturnType<typeof searchAnime>>>>(new Map());
   const cinemetaCacheRef = useRef<SearchCache<Awaited<ReturnType<typeof searchCinemeta>>>>(
@@ -228,9 +229,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   }, [hiddenTabs.anime]);
 
   useEffect(() => {
-    const id = requestGuardRef.current.begin();
     const trimmed = query.trim();
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
     if (!trimmed) {
       setResults(null);
       setAddonQueries([]);
@@ -250,17 +249,14 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     const mangaAllowed = settings.mangaEnabled;
     const franchiseAllowed = animeAllowed || mangaAllowed;
     const liveTvAllowed = !hiddenTabs.liveTv && playlists.length > 0;
-    debounceRef.current = window.setTimeout(() => {
-      if (!requestGuardRef.current.isCurrent(id)) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    const debounce = window.setTimeout(() => {
+      if (signal.aborted) return;
       setStatus("loading");
       const liveTv = liveTvAllowed ? searchLiveTvChannels(trimmed, playlists) : [];
       const guard = <T,>(p: Promise<T>, fallback: T): Promise<T> =>
-        Promise.race([
-          p.catch(() => fallback),
-          new Promise<T>((resolve) => {
-            window.setTimeout(() => resolve(fallback), SOURCE_TIMEOUT_MS);
-          }),
-        ]);
+        settleSearchSource(p, fallback, SOURCE_TIMEOUT_MS, signal);
       const normalizedQuery = normalizeSearchQuery(trimmed);
       const tmdbCacheKey = [
         settings.tmdbKey,
@@ -287,6 +283,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         : ["__default_search_addons__", "tmdb"];
       let searchAddons: Addon[] = [];
       const addonsP = ensureAddons().then((addons) => {
+        signal.throwIfAborted();
         const metadata = orderedMetadataAddons(addons, metadataOrder);
         const keys = new Set(metadata.map((addon) => addon.transportUrl));
         searchAddons = [...metadata, ...addons.filter((addon) => !keys.has(addon.transportUrl))];
@@ -296,10 +293,11 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         settings.addonOnlyMetadata && !settings.searchTmdbTopMatch
           ? Promise.resolve(null)
           : guard<SearchResults | null>(
-              cachedSearch(tmdbCacheRef.current, tmdbCacheKey, TMDB_CACHE_TTL_MS, () =>
+              cachedSearch(tmdbCacheRef.current, tmdbCacheKey, TMDB_CACHE_TTL_MS, signal, () =>
                 searchAll(settings.tmdbKey, trimmed, {
                   excludeGenres,
                   topMatchOnly: settings.addonOnlyMetadata,
+                  signal,
                 }),
               ),
               null,
@@ -307,8 +305,12 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       const animePromise =
         animeAllowed && !settings.addonOnlyMetadata
           ? guard(
-              cachedSearch(animeCacheRef.current, normalizedQuery, SECONDARY_CACHE_TTL_MS, () =>
-                searchAnime(trimmed),
+              cachedSearch(
+                animeCacheRef.current,
+                normalizedQuery,
+                SECONDARY_CACHE_TTL_MS,
+                signal,
+                () => searchAnime(trimmed, undefined, signal),
               ),
               [],
             )
@@ -321,12 +323,16 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         [],
       );
       const ebookPromise: Promise<EBook[]> = guard(searchEBooks(trimmed), []);
-      const sportsPromise: Promise<SportsEventHit[]> = guard(searchSportsEvents(trimmed), []);
+      const sportsPromise: Promise<SportsEventHit[]> = guard(
+        searchSportsEvents(trimmed, signal),
+        [],
+      );
       const charactersPromise: Promise<CharacterHit[]> = franchiseAllowed
-        ? guard(anilistCharacterSearch(trimmed), [])
+        ? guard(anilistCharacterSearch(trimmed, signal), [])
         : Promise.resolve([]);
+      const readAddonCatalog = createAddonSearchCatalogReader(signal);
       const addonPromise = guard(
-        addonsP.then((a) => searchAddonCatalogs(a, trimmed)),
+        addonsP.then((a) => searchAddonCatalogs(a, trimmed, readAddonCatalog)),
         { movies: [], series: [] },
       );
       const addonGroupsPromise = guard(
@@ -335,6 +341,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
             a,
             trimmed,
             (g) => {
+              if (signal.aborted) return;
               acc.groups = [...acc.groups.filter((x) => x.id !== g.id), g];
               publish();
             },
@@ -347,12 +354,14 @@ export function SearchProvider({ children }: { children: ReactNode }) {
             // through it turned `results` non-null with nothing in it and killed the
             // desktop overlay's loading skeleton.
             (q) => {
-              if (!requestGuardRef.current.isCurrent(id)) return;
+              if (signal.aborted) return;
               const metas = settings.hideContent.anime
                 ? q.metas.filter((m) => !metaLooksAnime(m))
                 : q.metas;
               setAddonQueries((prev) => upsertAddonQuery(prev, { ...q, metas }));
             },
+            readAddonCatalog,
+            signal,
           ),
         ),
         [],
@@ -360,8 +369,12 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       const cinemetaPromise = settings.addonOnlyMetadata
         ? Promise.resolve({ movies: [], series: [] })
         : guard(
-            cachedSearch(cinemetaCacheRef.current, normalizedQuery, SECONDARY_CACHE_TTL_MS, () =>
-              searchCinemeta(trimmed),
+            cachedSearch(
+              cinemetaCacheRef.current,
+              normalizedQuery,
+              SECONDARY_CACHE_TTL_MS,
+              signal,
+              () => searchCinemeta(trimmed, signal),
             ),
             { movies: [], series: [] },
           );
@@ -378,7 +391,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         groups: [] as Awaited<typeof addonGroupsPromise>,
       };
       const publish = () => {
-        if (!requestGuardRef.current.isCurrent(id)) return;
+        if (signal.aborted) return;
         const base: SearchResults = tmdbResult ?? {
           query: trimmed,
           topMatch: null,
@@ -538,17 +551,15 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         cinemetaPromise,
         addonGroupsPromise,
       ]).then(() => {
-        if (!requestGuardRef.current.isCurrent(id)) return;
+        if (signal.aborted) return;
         publish();
         setStatus("done");
       });
     }, 180);
 
     return () => {
-      if (debounceRef.current) {
-        window.clearTimeout(debounceRef.current);
-        debounceRef.current = null;
-      }
+      window.clearTimeout(debounce);
+      controller.abort();
     };
   }, [
     query,

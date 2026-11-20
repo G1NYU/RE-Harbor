@@ -103,8 +103,8 @@ const miscC: Record<string, string> = {
   "Show TMDB score on cards": "Kartlarda TMDB puanını göster",
   "Show Trakt score on cards": "Kartlarda Trakt puanını göster",
   "Show Up Next on Simkl rail": "Simkl şeridinde Sıradaki'ni göster",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Harbor algıladığında Jeneriği Atla / Kapanış Jeneriğini Atla düğmesini gösterir. Hiç gösterilmemesi için bunu kapatın. Hatalı bir düğmeyi bölümün geri kalanında gizlemek için düğmedeki X'e de dokunabilirsiniz.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Harbor algıladığında Jeneriği Atla / Kapanış Jeneriğini Atla düğmesini gösterir. Hiç gösterilmemesi için bunu kapatın. Düğme, jenerik veya kapanış jeneriği bittiğinde ya da aşağıdaki gecikmeden sonra kendini gizler.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Bilinen bir gömülü reklam oynatıldığında Atla düğmesini, yeni çıkan içeriklerdeyse reklamları incelenmek üzere işaretleyebilmeniz için küçük bir bildirme düğmesini gösterir.",
   "Show a button on the detail page to mark a title or episode as watched. Syncs to Trakt and Simkl if connected.":

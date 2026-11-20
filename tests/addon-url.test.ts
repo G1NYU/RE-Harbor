@@ -34,6 +34,18 @@ test("plain, root, trailing slash and encoded configuration paths remain valid",
   }
 });
 
+test("a plugin addon is its own base", () => {
+  // Plugin addons are addressed by an app-internal URL whose `plugin:` authority is not a host:port
+  // pair, so it must not be parsed and rebuilt as one.
+  for (const url of [
+    "harbor-plugin://plugin:k3j4.uhdmovies",
+    "harbor-plugin://plugin:k3j4.uhdmovies/provider",
+    "harbor-plugin://repo/k3j4",
+  ]) {
+    assert.equal(addonBaseUrl(url), url);
+  }
+});
+
 test("real stream, metadata and catalog callers preserve the manifest query", async () => {
   const { fetchAddonStreams } = await import("../src/lib/streams/addons.ts");
   const { fetchAddonMeta, fetchAddonCatalogPage } = await import("../src/lib/addons.ts");

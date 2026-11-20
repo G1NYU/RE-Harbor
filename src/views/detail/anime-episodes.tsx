@@ -1,5 +1,6 @@
 import {
   memo,
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -28,7 +29,7 @@ import { manualWatchedVersion, subscribeManualWatched } from "@/lib/manual-watch
 import { useT } from "@/lib/i18n";
 import { AnimeEpisodeRow } from "./anime-episodes/episode-row";
 import { AnimeSeasonPicker } from "./anime-episodes/anime-season-picker";
-import { mapSeasonToEntry } from "./anime-episodes/anime-season-art";
+import { mapSeasonToEntry, type SeasonArtSelection } from "./anime-episodes/anime-season-art";
 import { MovieEntryCard } from "./anime-episodes/movie-entry-card";
 import { useAnimeOrder } from "./anime-episodes/use-anime-order";
 import { SeasonArcPicker } from "./series-episodes/season-arc-picker";
@@ -75,7 +76,8 @@ import { parseKitsuId } from "@/lib/providers/kitsu";
 import { aiIsGroq, aiKey, providerForModel } from "@/lib/ai-models";
 import { animeSeasonKey } from "./anime-episodes/anime-season-key";
 
-const WINDOW_STEP = 60;
+const STRIP_BATCH_SIZE = 60;
+const LIST_BATCH_SIZE = 20;
 
 function parseTmdbTvId(id: string): number | null {
   const m = /^tmdb:tv:(\d+)$/.exec(id);
@@ -143,15 +145,7 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
   tmdbTvId?: number;
   tmdbSeasons?: Season[];
   seasonPosters?: Record<number, string>;
-  onSeasonArt?: (
-    sel: {
-      background?: string;
-      description?: string;
-      logo?: string;
-      name?: string;
-      entryId: string;
-    } | null,
-  ) => void;
+  onSeasonArt?: (sel: SeasonArtSelection | null) => void;
 }) {
   const t = useT();
   const { isConnected: traktConnected } = useTrakt();
@@ -343,8 +337,7 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
     () => mapSeasonToEntry(tvdbActiveSeason, franchise, currentId),
     [tvdbActiveSeason, franchise, currentId],
   );
-  // The matched franchise entry's episodes carry their TMDB season number (AniZip), which selects
-  // the right localized per-season overview so the hero changes per season instead of staying static.
+  // Use the TMDB season number carried by this franchise entry's mapped episodes.
   const seasonOverview = useMemo(() => {
     if (!seasonEntry || !seasonOverviews) return undefined;
     const counts = new Map<number, number>();
@@ -367,8 +360,6 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
       seasonEntry
         ? {
             background: seasonEntry.meta.background,
-            // Prefer the localized per-season TMDB overview, then the localized series overview,
-            // over the franchise entry's Kitsu synopsis (localized* is only set when localization is active).
             description: seasonOverview ?? localizedOverview ?? seasonEntry.meta.description,
             logo: seasonEntry.meta.logo,
             name: seasonEntry.meta.name,
@@ -511,7 +502,9 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
   );
   const { watchedKeys: entryMalWatched } = useMalWatched(displaySourceId ?? "", entryPoolEpisodes);
   const showSeason = useMemo(
-    () => new Set(displayEpisodes.map((e) => e.imdbSeason ?? e.seasonNumber ?? 1)).size > 1,
+    () =>
+      new Set(displayEpisodes.map((e) => e.displaySeason ?? e.seasonNumber ?? e.imdbSeason ?? 1))
+        .size > 1,
     [displayEpisodes],
   );
   const { pickerItems, selectPickerItem, franchiseActiveKey } = useAnimeFranchiseNav(
@@ -596,30 +589,31 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
     [displayEpisodes, settings.episodeSort],
   );
   const windowed = settings.episodeLayout === "list" || settings.episodeLayout === "strip";
-  const [renderCount, setRenderCount] = useState(WINDOW_STEP);
+  const batchSize = settings.episodeLayout === "list" ? LIST_BATCH_SIZE : STRIP_BATCH_SIZE;
+  const [renderCount, setRenderCount] = useState(batchSize);
   useEffect(() => {
-    setRenderCount(WINDOW_STEP);
-  }, [meta.id, settings.episodeLayout, settings.episodeSort, activeEntryId]);
+    setRenderCount(batchSize);
+  }, [meta.id, settings.episodeLayout, settings.episodeSort, activeEntryId, batchSize]);
   const onPickerSelect = useCallback(
     (key: string) => {
-      setRenderCount(WINDOW_STEP);
+      setRenderCount(batchSize);
       selectPickerItem(key);
     },
-    [selectPickerItem],
+    [selectPickerItem, batchSize],
   );
   const onTvdbSelect = useCallback(
     (key: string) => {
-      setRenderCount(WINDOW_STEP);
+      setRenderCount(batchSize);
       tvdbPanel.panel?.onSelect(key);
     },
-    [tvdbPanel.panel?.onSelect],
+    [tvdbPanel.panel?.onSelect, batchSize],
   );
   const grow = useCallback(
     () =>
       setRenderCount((c) =>
-        c >= orderedEpisodes.length ? c : Math.min(orderedEpisodes.length, c + WINDOW_STEP),
+        c >= orderedEpisodes.length ? c : Math.min(orderedEpisodes.length, c + batchSize),
       ),
-    [orderedEpisodes.length],
+    [orderedEpisodes.length, batchSize],
   );
   const reveal = useCallback(
     (n: number, epId?: number | null) => {
@@ -649,7 +643,10 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
     const q = query.trim().toLowerCase();
     if (!q) return null;
     return displayEpisodes.filter(
-      (e) => String(e.number).includes(q) || (e.title ?? "").toLowerCase().includes(q),
+      (e) =>
+        String(e.displayNumber ?? e.number).includes(q) ||
+        String(e.number).includes(q) ||
+        (e.title ?? "").toLowerCase().includes(q),
     );
   }, [query, displayEpisodes, aiMode, ai.matched]);
   const gridEpisodes = filteredEpisodes ?? displayEpisodes;
@@ -659,19 +656,20 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
       : filteredEpisodes
     : listEpisodes;
   const hasMore = windowed && renderCount < orderedEpisodes.length;
+  const showSentinel = settings.episodeLayout === "list" && hasMore && !filteredEpisodes;
   useEffect(() => {
-    if (settings.episodeLayout !== "list" || !hasMore) return;
+    if (!showSentinel) return;
     const el = sentinelRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) grow();
+        if (entries.some((e) => e.isIntersecting)) startTransition(grow);
       },
       { root: scrollRef.current ?? null, rootMargin: "1200px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [settings.episodeLayout, hasMore, grow, scrollRef]);
+  }, [showSentinel, grow, scrollRef]);
 
   const didJumpRef = useRef("");
   useEffect(() => {
@@ -767,7 +765,7 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
           onSelect={tvdbPanel.panel ? onTvdbSelect : onPickerSelect}
         />
       )}
-      <div className="flex flex-col gap-4">
+      <div data-scroll-anchor="detail-episodes" className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <h3 className="shrink-0 pt-1 text-[22px] font-medium tracking-tight text-ink">
             {isOneOff ? t("Movie") : t("Episodes")}
@@ -900,9 +898,7 @@ export const AnimeEpisodes = memo(function AnimeEpisodes({
                   forceUpcoming={unairedIds.has(ep.id)}
                 />
               ))}
-              {hasMore && !filteredEpisodes && (
-                <div ref={sentinelRef} aria-hidden className="h-px w-full" />
-              )}
+              {showSentinel && <div ref={sentinelRef} aria-hidden className="h-px w-full" />}
             </div>
           ) : (
             <AnimeEpisodeStrip

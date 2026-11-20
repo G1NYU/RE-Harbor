@@ -228,7 +228,7 @@
   border: 1.5px solid var(--color-ink-subtle);
   border-radius: 4px;
   background: transparent;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   transition:
     background-color 140ms ease,
     border-color 140ms ease;

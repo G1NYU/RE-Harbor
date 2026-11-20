@@ -31,11 +31,12 @@ export function useBpQueueArt(entry: BpQueueEntry | null): BpQueueArt {
 
   const poster = bpCardArt(meta?.poster, COMPOSITE_POSTER_WIDTH) ?? null;
 
+  const preferredBackdrop = detail?.textlessBackdrops?.[0] ?? detail?.gallery.backdrops[0];
   const candidates = useMemo(() => {
     if (!meta) return [] as string[];
-    const raw = [detail?.gallery.backdrops[0], detail?.backdrop, meta.background];
+    const raw = [preferredBackdrop, detail?.backdrop, meta.background];
     return [...new Set(raw.map((u) => bpHeroArt(u)).filter(Boolean) as string[])];
-  }, [detail?.gallery.backdrops[0], detail?.backdrop, meta]);
+  }, [preferredBackdrop, detail?.backdrop, meta]);
 
   const [graceFor, setGraceFor] = useState("");
   const [resolved, setResolved] = useState<BpQueueResolved | null>(null);

@@ -335,7 +335,7 @@ export function CinemetaEpisodes({
           onSelect={(key) => selectSeason(Number(key))}
         />
       )}
-      <div className="flex items-end justify-between gap-6">
+      <div data-scroll-anchor="detail-episodes" className="flex items-end justify-between gap-6">
         <h3 className="text-[22px] font-medium tracking-tight text-ink">{t("Episodes")}</h3>
         <div className="flex items-center gap-3">
           {grouped.length > 1 && (

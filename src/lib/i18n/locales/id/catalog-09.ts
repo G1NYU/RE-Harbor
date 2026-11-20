@@ -167,8 +167,8 @@ const catalog: Record<string, string> = {
   "Show a Minecraft card on your profile. Leave the username blank to hide it.":
     "Tampilkan kartu Minecraft di profil Anda. Kosongkan nama pengguna untuk menyembunyikannya.",
   "Show a Minecraft card with your username": "Tampilkan kartu Minecraft dengan nama pengguna Anda",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Tampilkan tombol Lewati Intro / Lewati Kredit saat Harbor mendeteksinya. Nonaktifkan ini agar tombol tidak pernah ditampilkan. Anda juga dapat mengetuk X pada tombol untuk menutup deteksi yang salah hingga episode selesai.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Tampilkan tombol Lewati Intro / Lewati Kredit saat Harbor mendeteksinya. Nonaktifkan ini agar tombol tidak pernah ditampilkan. Tombol menyembunyikan dirinya saat intro atau kredit berakhir, atau setelah jeda di bawah.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Tampilkan tombol Lewati saat iklan sisipan yang dikenali diputar, serta tombol laporkan kecil pada rilisan baru agar Anda dapat menandai iklan untuk ditinjau.",
   "Show a bookmark on saved titles": "Tampilkan penanda pada judul yang disimpan",

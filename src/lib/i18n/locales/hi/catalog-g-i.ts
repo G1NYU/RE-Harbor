@@ -93,6 +93,8 @@ const catalogGI: Record<string, string> = {
   "Go to featured item {n}": "फ़ीचर्ड आइटम {n} पर जाएँ",
   "Go to host": "होस्ट पर जाएँ",
   "Go to live": "लाइव पर जाएँ",
+  "Episode pages": "एपिसोड पृष्ठ",
+  "Go to page": "पृष्ठ पर जाएँ",
   "Go to page {page}": "पेज {page} पर जाएँ",
   "Go to pages {pages}": "पेज {pages} पर जाएँ",
   "Go to show": "शो पर जाएँ",

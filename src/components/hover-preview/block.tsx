@@ -56,8 +56,8 @@ function WatchlistToggle({ data }: { data: PreviewData }) {
     <button
       type="button"
       tabIndex={-1}
-      title={active ? t("In watchlist") : t("Add to watchlist")}
-      aria-label={active ? t("In watchlist") : t("Add to watchlist")}
+      title={active ? t("In library") : t("Save to library")}
+      aria-label={active ? t("In library") : t("Save to library")}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();

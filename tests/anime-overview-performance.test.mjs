@@ -7,6 +7,7 @@ import * as cache from "../src/lib/cache.ts";
 import * as scheduler from "../src/lib/request-scheduler.ts";
 import * as language from "../src/lib/episode-text-language.ts";
 import { mergeAnimeDetailExtras } from "../src/lib/providers/anime-detail-extras.ts";
+import * as animeArtQuality from "../src/lib/providers/anime-art-quality.ts";
 
 function load(path, dependencies, globals = {}) {
   const code = ts.transpileModule(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"), {
@@ -142,6 +143,190 @@ test("Kitsu's page cache is bounded across a long browsing session", async () =>
   assert.equal(calls, 303);
 });
 
+test("catalog artwork checks the caller's film or series kind on cache load and live refresh", async () => {
+  const filmIds = ["kitsu:48323", "kitsu:6539"];
+  const series = { format: "TV", bg: "series.jpg", logo: "series.png" };
+  const film = { format: "MOVIE", bg: "film.jpg", logo: "film.png" };
+  const seed = {
+    v: 1,
+    art: {
+      "kitsu:12": series,
+      "kitsu:42": film,
+      "kitsu:43": { bg: "unknown.jpg" },
+      ...Object.fromEntries(filmIds.map((id) => [id, series])),
+    },
+  };
+  const cached = structuredClone(seed);
+  const updated = structuredClone(seed);
+  updated.v++;
+  updated.art["kitsu:12"].bg = "updated-series.jpg";
+  let latest;
+  const catalog = load(
+    "src/lib/providers/anime-hero-art-static.ts",
+    {
+      "@/lib/config/endpoints": { HARBOR_API_BASE: "https://fixture.invalid" },
+      "@/lib/safe-fetch": { safeFetch: async () => ({ ok: true, json: async () => updated }) },
+      "./anime-hero-art-cache": {
+        readHeroArtCache: async () => ({
+          savedAt: 0,
+          v: cached.v,
+          count: Object.keys(cached.art).length,
+          payload: cached,
+        }),
+        writeHeroArtCache: async (entry) => {
+          latest = entry;
+        },
+      },
+    },
+    { fetch: async () => ({ ok: true, json: async () => seed }) },
+  );
+
+  await catalog.ensureStaticHeroArt();
+  for (const id of filmIds) assert.equal(catalog.peekStaticHeroArt(id, "movie"), undefined);
+  await tick();
+  assert.equal(latest.v, updated.v);
+  assert.equal(catalog.peekStaticHeroArt("kitsu:12", "tv").bg, "updated-series.jpg");
+  for (const id of filmIds) assert.equal(catalog.peekStaticHeroArt(id, "movie"), undefined);
+  assert.equal(catalog.peekStaticHeroArt("kitsu:42", "movie").logo, "film.png");
+  assert.equal(catalog.peekStaticHeroArt("kitsu:42", "tv"), undefined);
+  assert.equal(catalog.peekStaticHeroArt("kitsu:43", "movie"), undefined);
+});
+
+test("legacy anime artwork is ignored for films and cannot leak into newly saved movie art", () => {
+  const legacy = { t: Date.now(), bg: "old-series.jpg", logo: "old-series.png" };
+  let stored = JSON.stringify({
+    map: {
+      "kitsu:6539": legacy,
+      "kitsu:5646": legacy,
+      tt30472557: legacy,
+      "tmdb:movie:225745": { ...legacy, kind: "movie", logo: "movie-logo.png" },
+    },
+  });
+  const artCache = load(
+    "src/lib/providers/anime-art-cache.ts",
+    {
+      "@/lib/maintenance": { registerEvictable() {} },
+      "@/lib/memory-profiler": { registerCache() {} },
+      "./anime-art-quality": animeArtQuality,
+    },
+    {
+      localStorage: {
+        getItem: () => stored,
+        setItem: (_key, value) => {
+          stored = value;
+        },
+      },
+    },
+  );
+
+  const cachedMovie = artCache.peekAnimeArt("tmdb:movie:225745", "movie");
+  assert.equal(cachedMovie.bg, undefined);
+  assert.equal(cachedMovie.logo, "movie-logo.png");
+  for (const id of ["kitsu:6539", "tt30472557"]) {
+    assert.equal(artCache.peekAnimeArt(id, "movie"), undefined);
+    artCache.saveAnimeArt(id, "movie", { bg: "movie.jpg" });
+    assert.equal(artCache.peekAnimeArt(id, "movie").bg, "movie.jpg");
+    assert.equal(artCache.peekAnimeArt(id, "movie").logo, undefined);
+    assert.equal(artCache.peekAnimeArt(id, "tv"), undefined);
+    assert.equal(JSON.parse(stored).map[id].kind, "movie");
+  }
+  assert.equal(artCache.peekAnimeArt("kitsu:5646", "tv").bg, legacy.bg);
+});
+
+test("mapped anime films use the textless TMDB backdrop and keep their localized logo", async () => {
+  const requested = [];
+  const backdrops = [
+    { file_path: "/with-title.jpg", iso_639_1: "en", vote_average: 9 },
+    { file_path: "/unknown.jpg", vote_average: 8 },
+    { file_path: "/clean.jpg", iso_639_1: null, vote_average: 6 },
+  ];
+  const logos = [{ file_path: "/localized-logo.png", iso_639_1: "en" }];
+  const images = load("src/lib/providers/tmdb/tmdb-images.ts", {
+    "@/lib/cache": cache,
+    "@/lib/memory-profiler": { registerCache() {} },
+    "@/lib/settings/load": { loadStoredSettings: () => ({}) },
+    "./tmdb-client": { get: async () => ({ backdrops, logos }) },
+    "./tmdb-image-rungs": {
+      tmdbBackdropUrl: (path) => path,
+      tmdbLogoUrl: (path) => path,
+    },
+    "./tmdb-image-lang": { imageLangParam: () => "en,ja,null", imageLangRank: () => 1 },
+  });
+  const tmdb = load("src/lib/providers/tmdb/tmdb-anime.ts", {
+    "./tmdb-client": {
+      get: async (_key, path, params) => {
+        requested.push(path);
+        if (path.startsWith("search/")) {
+          return { results: [{ id: 116, title: "Steins;Gate", release_date: "2013-01-01" }] };
+        }
+        assert.equal(params.include_image_language, "en,ja,null");
+        return { backdrops, logos };
+      },
+    },
+    "./tmdb-images": images,
+    "./tmdb-image-lang": { imageLangParam: () => "en,ja,null" },
+  });
+
+  const title = "Steins;Gate: The Movie − Load Region of Déjà Vu";
+  const art = await tmdb.tmdbAnimeLogo("key", title, "2013", "movie", {
+    exact: true,
+    tmdbId: 225745,
+  });
+  assert.deepEqual(requested, ["movie/225745/images"]);
+  assert.equal(art.backdrop, "https://image.tmdb.org/t/p/original/clean.jpg");
+  assert.equal(art.logo, "/localized-logo.png");
+  assert.deepEqual(Array.from(art.textlessBackdrops), [art.backdrop]);
+  assert.deepEqual(Array.from(await images.tmdbMovieImages("key", "tmdb:movie:225745")), [
+    "/clean.jpg",
+    "/with-title.jpg",
+    "/unknown.jpg",
+  ]);
+  assert.equal(backdrops[0].file_path, "/with-title.jpg");
+  assert.equal(await tmdb.tmdbAnimeLogo("key", title, "2013", "movie", { exact: true }), null);
+  assert.deepEqual(requested, ["movie/225745/images", "search/movie"]);
+
+  backdrops.pop();
+  const fallback = await tmdb.tmdbAnimeLogo("key", title, "2013", "movie", { tmdbId: 225745 });
+  assert.equal(fallback.backdrop, "https://image.tmdb.org/t/p/original/with-title.jpg");
+  assert.equal(fallback.textlessBackdrops, undefined);
+});
+
+test("a mapped anime TV id skips the search and keeps the original image language", async () => {
+  const requested = [];
+  const tmdb = load("src/lib/providers/tmdb/tmdb-anime.ts", {
+    "./tmdb-client": {
+      get: async (_key, path, params) => {
+        requested.push({ path, params });
+        return {
+          backdrops: [
+            { file_path: "/with-title.jpg", iso_639_1: "en", vote_average: 9 },
+            { file_path: "/clean.jpg", iso_639_1: null, vote_average: 6 },
+          ],
+          logos: [{ file_path: "/logo.png", iso_639_1: "ja" }],
+        };
+      },
+    },
+    "./tmdb-images": {
+      pickLogo: (logos) => logos[0]?.file_path,
+      textlessTmdbBackdrops: (backdrops) => backdrops.filter((b) => !b.iso_639_1),
+    },
+    "./tmdb-image-lang": {
+      imageLangParam: (lang) => (lang === "ja" ? "en,ja,null" : "en,null"),
+    },
+  });
+  const art = await tmdb.tmdbAnimeLogo("key", "One Piece", "1999", "tv", {
+    tmdbId: 30984,
+    originalLang: "ja",
+  });
+  assert.equal(art.tmdbId, 30984);
+  assert.equal(art.backdrop, "https://image.tmdb.org/t/p/original/clean.jpg");
+  assert.deepEqual(
+    requested.map((request) => request.path),
+    ["tv/30984/images"],
+  );
+  assert.equal(requested[0].params.include_image_language, "en,ja,null");
+});
+
 test("TVDB proxy caches share requests, isolate order types, expire, and retry failures", async () => {
   let calls = 0;
   let fail = false;
@@ -165,6 +350,16 @@ test("TVDB proxy caches share requests, isolate order types, expire, and retry f
     },
     { Date: { now: () => now } },
   );
+  for (const lookup of [
+    { kind: "movie", kitsuId: 48323 },
+    { kind: "movie", imdb: "tt2967286" },
+    { kind: "movie", kitsuId: 6539, series: 244061 },
+  ]) {
+    const art = await f.fetchTvdbArtwork(lookup);
+    assert.equal(art.backgrounds.length, 0);
+  }
+  assert.equal(calls, 0);
+
   await Promise.all([
     f.fetchTvdbProxyImages({ kitsuId: 12 }),
     f.fetchTvdbProxyImages({ series: 100 }),
@@ -178,17 +373,20 @@ test("TVDB proxy caches share requests, isolate order types, expire, and retry f
   await f.fetchTvdbProxyImages({ series: 100 });
   assert.equal(calls, 3);
   fail = true;
-  await f.fetchTvdbArtwork({ series: 100 });
+  await f.fetchTvdbArtwork({ kind: "tv", series: 100 });
   fail = false;
-  assert.equal((await f.fetchTvdbArtwork({ series: 100 })).backgrounds[0], "bg");
+  assert.equal((await f.fetchTvdbArtwork({ kind: "tv", series: 100 })).backgrounds[0], "bg");
   assert.equal(calls, 5);
 });
 
-function detailFixture() {
+function detailFixture(options = {}) {
   let loads = 0;
   let ratingLoads = 0;
+  let anilistCalls = 0;
   const tvdb = deferred();
   const extras = deferred();
+  const tvdbArt = options.tvdbArt ?? {};
+  const anilistArt = options.anilistArt ?? {};
   const episodes = [
     {
       id: 1,
@@ -199,7 +397,6 @@ function detailFixture() {
       imdbEpisode: 1,
     },
   ];
-  const no = async () => null;
   const f = load("src/lib/providers/anime-detail.ts", {
     "@/lib/providers/harbor-imdb": {
       harborImdbEpisodes: async () => {
@@ -221,7 +418,7 @@ function detailFixture() {
     "@/lib/providers/anime-mapping": {
       animeMappingByKitsu: async () => ({ mappings: { imdb_id: "tt1" } }),
       kitsuToTvdb: async () => 100,
-      kitsuToAnilist: no,
+      kitsuToAnilist: async () => options.anilistId ?? null,
       applyAnidbSeasonWindow: async () => {},
     },
     "@/lib/providers/episode-placeholder": { episodesMissingTitle: () => false },
@@ -229,7 +426,12 @@ function detailFixture() {
     "@/lib/streams/anime-identity-core": { splitFranchiseDisplaySeason: () => null },
     "@/lib/providers/mal-episodes": {},
     "@/lib/anilist/relations": { anilistFranchise: async () => [] },
-    "@/lib/anilist/browse": {},
+    "@/lib/anilist/browse": {
+      anilistArtById: async () => {
+        anilistCalls++;
+        return anilistArt;
+      },
+    },
     "./anime-recommendations": { animeRecommendations: async () => [] },
     "./anime-art-quality": {
       pickAnimeHeroBackdrop: (sources) =>
@@ -243,7 +445,7 @@ function detailFixture() {
       },
     },
     "@/lib/providers/fanart": {},
-    "@/lib/providers/tvdb-proxy": { fetchTvdbArtwork: async () => ({}) },
+    "@/lib/providers/tvdb-proxy": { fetchTvdbArtwork: async () => tvdbArt },
     "@/lib/providers/tvdb": {
       tvdbLangFromIso1: () => "eng",
       tvdbEpisodesByType: () => tvdb.promise,
@@ -263,7 +465,14 @@ function detailFixture() {
     },
     "@/lib/providers/tmdb": {},
   });
-  return { ...f, tvdb, extras, loads: () => loads, ratingLoads: () => ratingLoads };
+  return {
+    ...f,
+    tvdb,
+    extras,
+    loads: () => loads,
+    ratingLoads: () => ratingLoads,
+    anilistCalls: () => anilistCalls,
+  };
 }
 
 test("overview remounts share early callbacks and reuse finalized episode snapshots", async () => {
@@ -315,6 +524,24 @@ test("anime core detail does not wait for TVDB or cast and enrichment cannot mut
   await work;
 });
 
+test("anime hero art skips the AniList banner when another provider has a backdrop", async () => {
+  const f = detailFixture({
+    tvdbArt: { backgrounds: ["tvdb.jpg"] },
+    anilistId: 1,
+    anilistArt: { banner: "banner.jpg" },
+  });
+  const result = await f.animeDetails({ uiLanguage: "en" }, { id: "kitsu:12", name: "One Piece" });
+  assert.equal(await result.heroBgPromise, "tvdb.jpg");
+  assert.equal(f.anilistCalls(), 0);
+});
+
+test("anime hero art falls back to the AniList banner only when no artwork exists", async () => {
+  const f = detailFixture({ anilistId: 1, anilistArt: { banner: "banner.jpg" } });
+  const result = await f.animeDetails({ uiLanguage: "en" }, { id: "kitsu:12", name: "One Piece" });
+  assert.equal(await result.heroBgPromise, "banner.jpg");
+  assert.equal(f.anilistCalls(), 1);
+});
+
 test("supplementary detail patches preserve usable metadata and unchanged state identity", () => {
   const base = {
     logo: "logo",
@@ -341,6 +568,7 @@ test("supplementary detail patches preserve usable metadata and unchanged state 
 });
 
 function imageFixture(disk, invoke, now, failStorage = false) {
+  const reads = [];
   const effects = [];
   const states = [];
   let index = 0;
@@ -366,6 +594,7 @@ function imageFixture(disk, invoke, now, failStorage = false) {
       },
       "@/lib/manga/sources/suwayomi/auth-registry": { suwayomiAuthFor: () => null },
       "@/lib/settings": { useSettings: () => ({ settings: { posterQuality: "high" } }) },
+      "./request-scheduler": load("src/lib/request-scheduler.ts"),
       "./object-url-cache": load(
         "src/lib/object-url-cache.ts",
         {},
@@ -378,6 +607,7 @@ function imageFixture(disk, invoke, now, failStorage = false) {
       ),
       "@/lib/idb-cache": {
         idbCacheGet: async (key) => {
+          reads.push(key);
           if (failStorage) throw new Error("disabled storage");
           return disk.get(key);
         },
@@ -401,10 +631,11 @@ function imageFixture(disk, invoke, now, failStorage = false) {
   );
   return {
     ...f,
-    render(url) {
+    reads,
+    render(url, options = {}) {
       index = 0;
       effects.length = 0;
-      const result = f.useProxiedImageSrc(url, { forceProxy: true, persistent: true });
+      const result = f.useProxiedImageSrc(url, { forceProxy: true, persistent: true, ...options });
       effects.forEach((effect) => effect());
       return result;
     },
@@ -429,6 +660,46 @@ test("public poster requests opt into the native persistent cache and clearing r
   await first.clearThumbCache();
   assert.equal(disk.size, 0);
   assert.equal(calls.at(-1).name, "clear_thumb_cache");
+});
+
+test("sized posters use the same width for cache lookup and native fetch", async () => {
+  const calls = [];
+  const f = imageFixture(
+    new Map(),
+    async (name, args) => {
+      calls.push([name, args]);
+      if (name === "cached_thumb_path") return null;
+      return { ok: true, body: "", contentType: "image/jpeg", assetPath: "fixture.jpg" };
+    },
+    () => 1000,
+  );
+  f.render("https://artworks.thetvdb.com/poster.jpg", { thumbWidthPx: 342 });
+  await tick();
+  assert.equal(calls[0][1].width, 342);
+  assert.equal(calls[1][1].args.thumbWidthPx, 342);
+  assert.equal(calls[1][1].args.returnImageAsset, true);
+  assert.deepEqual(f.reads, []);
+});
+
+test("a newly cached poster uses the asset path and skips unrelated legacy blob reads", async () => {
+  const disk = new Map([["season-poster:v1:other", { at: 1000, data: new Blob(["old"]) }]]);
+  const calls = [];
+  const f = imageFixture(
+    disk,
+    async (name, args) => {
+      calls.push({ name, args });
+      if (name === "cached_thumb_path") return null;
+      return { ok: true, body: "", contentType: "image/jpeg", assetPath: "C:\\cache\\new.jpg" };
+    },
+    () => 1000,
+    true,
+  );
+  const url = "https://artworks.thetvdb.com/new.jpg";
+  f.render(url);
+  await tick();
+  assert.equal(f.render(url), "asset:C:\\cache\\new.jpg");
+  assert.deepEqual(f.reads, []);
+  assert.equal(calls.find((call) => call.name === "harbor_fetch").args.args.returnImageAsset, true);
 });
 
 test("unavailable poster storage falls back to fetching the image", async () => {

@@ -33,6 +33,7 @@ function fixture(initial: any[]) {
   const rowScrollMem = { current: new Map([["home:popular", 560]]) };
   const names = [
     "STACK_MAX",
+    "saveScrollBeforeNavigation",
     "pushFrame",
     "pop",
     "goForward",
@@ -48,6 +49,7 @@ function fixture(initial: any[]) {
     forwardStackRef,
     scrollMem,
     rowScrollMem,
+    scrollSavers: { current: new Set<() => void>() },
     navigateUnderPreview,
     previewPageStack,
     useCallback: (fn: any) => fn,

@@ -191,11 +191,14 @@ function fromChar(c: RawChar): CharacterHit | null {
   };
 }
 
-export async function anilistCharacterSearch(query: string): Promise<CharacterHit[]> {
+export async function anilistCharacterSearch(
+  query: string,
+  signal?: AbortSignal,
+): Promise<CharacterHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   try {
-    const data = await anilistRequest<Resp>(QUERY, { q }, undefined, true);
+    const data = await anilistRequest<Resp>(QUERY, { q }, undefined, true, signal);
     const media = data?.m?.media?.[0] ?? null;
     const character = data?.c?.characters?.[0] ?? null;
     if (media && titleRelates(media, q) && TITLE_FORMATS.has(media.format ?? "")) {

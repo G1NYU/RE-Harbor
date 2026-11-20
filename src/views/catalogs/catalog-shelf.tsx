@@ -11,56 +11,82 @@ export function CatalogShelf({ catalog }: { catalog: BrowseCatalog }) {
   const t = useT();
   const typeLabelKey = catalogTypeLabelKey(catalog.type);
   const [items, setItems] = useState<Meta[] | null>(null);
-  const pageRef = useRef(1);
-  const loadedRef = useRef(0);
-  const startedRef = useRef(false);
+  const pagination = useRef<{
+    fetchPage: ReturnType<typeof browseFetcher>;
+    page: number;
+    offset: number;
+    items: Meta[];
+    loading: boolean;
+  } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setItems(null);
-    startedRef.current = false;
-    pageRef.current = 1;
-    loadedRef.current = 0;
     const el = ref.current;
     if (!el) return;
-    const load = () => {
-      if (startedRef.current) return;
-      startedRef.current = true;
-      void browseFetcher(
-        catalog,
-        null,
-      )(1)
-        .then((list) => {
-          setItems(list);
-          loadedRef.current = list.length;
-        })
-        .catch(() => setItems([]));
-    };
+    let observing = true;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) load();
+        if (!observing || !entries.some((e) => e.isIntersecting)) return;
+        observing = false;
+        io.disconnect();
+        const shelf = {
+          fetchPage: browseFetcher(catalog, null),
+          page: 1,
+          offset: 0,
+          items: [] as Meta[],
+          loading: true,
+        };
+        pagination.current = shelf;
+        void shelf.fetchPage(1).then(
+          (list) => {
+            if (pagination.current !== shelf) return;
+            shelf.items = list;
+            shelf.offset = list.length;
+            shelf.loading = false;
+            setItems(list);
+          },
+          () => {
+            if (pagination.current === shelf) setItems([]);
+          },
+        );
       },
       { rootMargin: "700px 0px" },
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      observing = false;
+      io.disconnect();
+      pagination.current = null;
+    };
   }, [catalog.key]);
 
   const loadMore = () => {
-    const next = pageRef.current + 1;
-    void browseFetcher(catalog, null)(next, loadedRef.current)
+    const shelf = pagination.current;
+    if (!shelf || shelf.loading) return;
+    const next = shelf.page + 1;
+    shelf.loading = true;
+    void shelf
+      .fetchPage(next, shelf.offset)
       .then((list) => {
-        if (list.length === 0) return;
-        pageRef.current = next;
-        setItems((prev) => {
-          const seen = new Set((prev ?? []).map((m) => m.id));
-          const fresh = list.filter((m) => !seen.has(m.id));
-          if (fresh.length === 0) return prev;
-          loadedRef.current += fresh.length;
-          return [...(prev ?? []), ...fresh];
+        if (pagination.current !== shelf || list.length === 0) return;
+        shelf.page = next;
+        // The provider cursor counts every entry, including duplicates hidden by the shelf.
+        shelf.offset += list.length;
+        const seen = new Set(shelf.items.map((m) => m.id));
+        const fresh = list.filter((m) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
         });
+        if (fresh.length === 0) return;
+        shelf.items = [...shelf.items, ...fresh];
+        setItems(shelf.items);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        shelf.loading = false;
+      });
   };
 
   const shownItems = useHideAnimeMetas(items ?? []);

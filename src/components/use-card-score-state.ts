@@ -10,8 +10,15 @@ import { useSimklCardScores, useSimklCardScoresByAnimeId } from "@/lib/simkl/rat
 import type { CardBadge } from "@/components/card-score-stack";
 import { harborImdbTitle } from "@/lib/providers/harbor-imdb";
 import { isCardAnimeId } from "@/lib/card-anime";
-import { observe } from "@/lib/visibility";
+import { observe, observeSettled } from "@/lib/visibility";
 import { useProfiledEffect } from "@/components/profiled";
+import { createRequestScheduler } from "@/lib/request-scheduler";
+import { runAfterScroll } from "@/lib/scroll-activity";
+
+// A row can reveal a dozen cards in one frame. The Harbor title endpoint is
+// useful but not urgent, so keep its bursts serialized instead of firing one
+// request per card at once.
+const ratingLookups = createRequestScheduler({ concurrency: 4 });
 
 export function useCardScoreState<T extends HTMLElement>({
   meta,
@@ -70,17 +77,21 @@ export function useCardScoreState<T extends HTMLElement>({
       setHarborRating(undefined);
       if (!ratingTt?.startsWith("tt")) return;
       if (isAnime ? !settings.showMalBadge : !settings.showImdbBadge) return;
+      // A Cinemeta card (`tt` id) displays its own inline rating, so the Harbor
+      // request adds nothing. A TMDB/addon card can carry an imdbRating it cannot
+      // display; skipping the fallback there left the IMDb badge empty.
+      if (!isAnime && hasInlineImdb) return;
       const element = cardRef.current;
       if (!element) return;
-      let started = false;
       let cancelled = false;
-      const off = observe(element, (visible) => {
-        if (!visible || started) return;
-        started = true;
-        harborImdbTitle(ratingTt)
+      const off = observeSettled(element, () => {
+        ratingLookups
+          .schedule(ratingTt, () => harborImdbTitle(ratingTt))
           .then((rating) => {
             if (!cancelled && rating != null) {
-              startTransition(() => setHarborRating(rating.toFixed(1)));
+              runAfterScroll(() => {
+                if (!cancelled) startTransition(() => setHarborRating(rating.toFixed(1)));
+              });
             }
           })
           .catch(() => {});
@@ -90,7 +101,7 @@ export function useCardScoreState<T extends HTMLElement>({
         off();
       };
     },
-    [ratingTt, isAnime, settings.showImdbBadge, settings.showMalBadge, cardRef],
+    [ratingTt, isAnime, settings.showImdbBadge, settings.showMalBadge, cardRef, meta.imdbRating],
   );
 
   useEffect(() => {
@@ -109,30 +120,38 @@ export function useCardScoreState<T extends HTMLElement>({
       return;
     const element = cardRef.current;
     if (!element) return;
-    let off: (() => void) | null = null;
-    off = observe(element, async (visible) => {
-      if (!visible) return;
-      off?.();
-      off = null;
-      if (wantTmdbPoster)
-        void tmdbIdFromImdb(settings.tmdbKey, meta.id, meta.type === "series" ? "series" : "movie");
-      const needsScoreId = wantsOmdb || wantsMdblist || wantCinemetaRating || wantAnimeImdb;
-      const id =
-        needsScoreId || wantImdbForPoster
-          ? (imdbId ?? (await tmdbImdbId(settings.tmdbKey, meta.id)))
-          : undefined;
-      if (id) {
-        if (wantsOmdb) void omdbPrefetch(settings.omdbKey, id);
-        if (wantsMdblist) mdblistCardPrefetch(id, mediaKind);
-        if (wantCinemetaRating)
-          cinemetaRatingPrefetch(id, meta.type === "series" ? "series" : "movie");
-      }
-      if (wantAnimeImdb && animeImdbId) {
-        if (settings.omdbKey) void omdbPrefetch(settings.omdbKey, animeImdbId);
-        cinemetaRatingPrefetch(animeImdbId, meta.type === "series" ? "series" : "movie");
-      }
-    });
-    return () => off?.();
+    const kind = meta.type === "series" ? "series" : "movie";
+    const offArtwork =
+      wantTmdbPoster || wantImdbForPoster
+        ? observe(element, (visible) => {
+            if (!visible) return;
+            offArtwork?.();
+            if (wantTmdbPoster) void tmdbIdFromImdb(settings.tmdbKey, meta.id, kind);
+            if (wantImdbForPoster) void tmdbImdbId(settings.tmdbKey, meta.id);
+          })
+        : undefined;
+    const needsScoreId = wantsOmdb || wantsMdblist || wantCinemetaRating || wantAnimeImdb;
+    let cancelled = false;
+    const offScores = needsScoreId
+      ? observeSettled(element, async () => {
+          const id = imdbId ?? (await tmdbImdbId(settings.tmdbKey, meta.id));
+          if (cancelled) return;
+          if (id) {
+            if (wantsOmdb) void omdbPrefetch(settings.omdbKey, id);
+            if (wantsMdblist) mdblistCardPrefetch(id, mediaKind);
+            if (wantCinemetaRating) cinemetaRatingPrefetch(id, kind);
+          }
+          if (wantAnimeImdb && animeImdbId) {
+            if (settings.omdbKey) void omdbPrefetch(settings.omdbKey, animeImdbId);
+            cinemetaRatingPrefetch(animeImdbId, kind);
+          }
+        })
+      : undefined;
+    return () => {
+      cancelled = true;
+      offArtwork?.();
+      offScores?.();
+    };
   }, [
     cardRef,
     imdbId,

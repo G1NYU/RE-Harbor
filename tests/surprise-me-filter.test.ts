@@ -3,6 +3,7 @@ import test from "node:test";
 import type { Meta } from "../src/lib/cinemeta.ts";
 import {
   filterSurprisePool,
+  reconcileSurpriseTiles,
   type SurpriseWatchedSources,
 } from "../src/views/discover/surprise-me-filter.ts";
 
@@ -82,4 +83,21 @@ test("Surprise Me returns no picks if all movies have been watched", () => {
     [],
   );
   assert.deepEqual(filterSurprisePool([], true, sources()), []);
+});
+
+test("Surprise Me keeps its existing posters when more catalogs arrive", () => {
+  const tiles = Array.from({ length: 18 }, (_, i) => movie(`tt${i + 1}`));
+  const anotherTitle = movie("tt99");
+  assert.strictEqual(reconcileSurpriseTiles(tiles, [...tiles, anotherTitle]), tiles);
+});
+
+test("Surprise Me fills gaps and refreshes artwork when eligibility or metadata changes", () => {
+  const first = movie("tt1");
+  const second = movie("tt2");
+  const third = movie("tt3");
+  const refreshed = { ...second, poster: "https://example.com/updated.jpg" };
+  const watched = sources({ movieWatched: [first.id] });
+  const eligible = filterSurprisePool([first, refreshed, third], true, watched);
+  assert.deepEqual(reconcileSurpriseTiles([first, second], eligible), [refreshed, third]);
+  assert.deepEqual(reconcileSurpriseTiles([first], []), []);
 });

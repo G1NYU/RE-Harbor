@@ -35,8 +35,10 @@ function harness(responses = []) {
       },
     },
     "@/lib/active-profile-id": { activeProfileId: () => state.profile },
+    "@/lib/yield-to-browser": { yieldToBrowser: async () => {} },
     [path.join(root, "session.ts")]: {
       getSession: () => state.session,
+      subscribeSession: () => () => {},
       setSession: (value) => {
         state.session = value;
         state.clears++;

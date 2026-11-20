@@ -48,24 +48,27 @@ export function createAnimeCatalogClient(
   let lastError: unknown = new Error("Anime catalogs temporarily unavailable");
   const inflight = new Map<string, Promise<unknown>>();
 
-  return function catalogRequest<T>(path: string): Promise<{ data: T }> {
+  return function catalogRequest<T>(path: string, signal?: AbortSignal): Promise<{ data: T }> {
     if (!/^\/(?:anime|top\/anime|seasons)(?:[/?]|$)/.test(path) || path.includes("..")) {
       return Promise.reject(new Error("Invalid anime catalog path"));
     }
-    const existing = inflight.get(path);
+    // A cancelled search must not abort a lookup another view is sharing.
+    const existing = signal ? undefined : inflight.get(path);
     if (existing) return existing as Promise<{ data: T }>;
     const pending = queue.then(async () => {
+      signal?.throwIfAborted();
       for (const provider of providers) {
         // One dead provider must not add another timeout to every queued row.
         if (provider.unavailableUntil > now()) continue;
         if (provider.nextStart > now()) await sleep(provider.nextStart - now());
+        signal?.throwIfAborted();
         const controller = new AbortController();
         // Queue time never consumes the request's network timeout.
         const timer = setTimeout(() => controller.abort(), timeout);
         let retry = cooldown;
         try {
           const response = await provider.fetch(`${provider.base}${path}`, {
-            signal: controller.signal,
+            signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
             credentials: "omit",
             headers: { Accept: "application/json" },
           });
@@ -96,9 +99,11 @@ export function createAnimeCatalogClient(
           ) {
             throw new Error("Invalid anime catalog data");
           }
+          signal?.throwIfAborted();
           provider.unavailableUntil = 0;
           return payload as { data: T };
         } catch (error) {
+          signal?.throwIfAborted();
           lastError = error;
           provider.unavailableUntil = now() + retry;
         } finally {
@@ -112,6 +117,7 @@ export function createAnimeCatalogClient(
       () => {},
       () => {},
     );
+    if (signal) return pending;
     const result = pending.finally(() => inflight.delete(path));
     inflight.set(path, result);
     return result;

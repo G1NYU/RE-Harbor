@@ -526,6 +526,8 @@ const catalog04: Record<string, string> = {
   "Go to episode": "에피소드로 이동",
   "Go to host": "호스트로 이동",
   "Go to live": "실시간 방송으로 이동",
+  "Episode pages": "에피소드 페이지",
+  "Go to page": "페이지로 이동",
   "Go to page {page}": "{page}페이지로 이동",
   "Go to pages {pages}": "{pages}페이지로 이동",
   "Go to show": "시리즈로 이동",

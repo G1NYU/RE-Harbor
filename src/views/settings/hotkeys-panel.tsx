@@ -8,15 +8,25 @@ import {
   eventToBinding,
   formatBindingForDisplay,
   isModifierOnly,
+  isTypingTarget,
   type HotkeyDef,
   type HotkeyId,
   type HotkeyScope,
 } from "@/lib/hotkeys";
 import { isBackKey } from "@/lib/keyboard-navigation/geometry";
-import { SEEK_STEP_OPTIONS } from "@/lib/seek-step";
+import {
+  HALF_SPEED_MAX,
+  HALF_SPEED_MIN,
+  SEEK_STEP_MAX_SEC,
+  SEEK_STEP_MIN_SEC,
+  SPEED_STEP_MAX,
+  SPEED_STEP_MIN,
+  sanitizeHalfSpeedRate,
+  sanitizeSeekStep,
+  sanitizeSpeedStep,
+} from "@/lib/seek-step";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
-import { Dropdown } from "@/components/dropdown";
 import { Section, ToggleRow } from "./shared";
 import { ModalButton, ROW_DESC, SettingRow, SettingsModal } from "./kit";
 import { SSection } from "./ui";
@@ -75,6 +85,9 @@ export function HotkeysPanel() {
   useEffect(() => {
     if (!capturing) return;
     const onKey = (e: KeyboardEvent) => {
+      // A capture left running on the other tab must not take the keys typed
+      // into its fields.
+      if (isTypingTarget(e)) return;
       e.preventDefault();
       e.stopPropagation();
       if (isBackKey(e)) {
@@ -292,6 +305,49 @@ export function HotkeysPanel() {
               onBack={(seekBackStepShortSec) => update({ seekBackStepShortSec })}
               onForward={(seekForwardStepShortSec) => update({ seekForwardStepShortSec })}
             />
+            <SeekStepRow
+              label={t("Long seek")}
+              sub={t("The jump of the Long seek back and Long seek forward shortcuts.")}
+              back={settings.seekBackStepLongSec}
+              forward={settings.seekForwardStepLongSec}
+              onBack={(seekBackStepLongSec) => update({ seekBackStepLongSec })}
+              onForward={(seekForwardStepLongSec) => update({ seekForwardStepLongSec })}
+            />
+            <SettingRow
+              label={t("Slow speed")}
+              desc={t("The speed the Toggle slow speed shortcut switches to from normal speed.")}
+            >
+              <NumberField
+                value={settings.halfSpeedRate}
+                min={HALF_SPEED_MIN}
+                max={HALF_SPEED_MAX}
+                step={0.01}
+                suffix="x"
+                presets={[0.4, 0.5, 0.6, 0.75]}
+                format={(n) => `${n}x`}
+                sanitize={(n) => sanitizeHalfSpeedRate(n, settings.halfSpeedRate)}
+                ariaLabel={t("Slow speed")}
+                onChange={(halfSpeedRate) => update({ halfSpeedRate })}
+              />
+            </SettingRow>
+            <SettingRow
+              label={t("Speed step")}
+              desc={t("How much the Speed down and Speed up shortcuts change the speed per press.")}
+              wide
+            >
+              <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
+                <SpeedStepPicker
+                  label={t("Down step")}
+                  value={settings.speedDownStep}
+                  onChange={(speedDownStep) => update({ speedDownStep })}
+                />
+                <SpeedStepPicker
+                  label={t("Up step")}
+                  value={settings.speedUpStep}
+                  onChange={(speedUpStep) => update({ speedUpStep })}
+                />
+              </div>
+            </SettingRow>
           </Section>
         </>
       )}
@@ -335,20 +391,124 @@ function SeekStepPicker({
   onChange: (seconds: number) => void;
 }) {
   const t = useT();
-  const options = SEEK_STEP_OPTIONS.map((seconds) => ({
-    value: String(seconds),
-    label: seconds === 1 ? t("1 second") : t("{n} seconds", { n: seconds }),
-  }));
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <span className={GROUP_LABEL}>{label}</span>
-      <div className="w-[220px] max-w-full">
-        <Dropdown
-          value={String(value)}
-          options={options}
-          onChange={(next) => onChange(Number(next))}
-          size="md"
+      <NumberField
+        value={value}
+        min={SEEK_STEP_MIN_SEC}
+        max={SEEK_STEP_MAX_SEC}
+        step={0.1}
+        suffix="s"
+        presets={[1, 2, 3, 5, 10, 30]}
+        format={(n) => (n === 1 ? t("1 second") : t("{n} seconds", { n }))}
+        sanitize={(n) => sanitizeSeekStep(n, value)}
+        ariaLabel={label}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
+function SpeedStepPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (step: number) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <span className={GROUP_LABEL}>{label}</span>
+      <NumberField
+        value={value}
+        min={SPEED_STEP_MIN}
+        max={SPEED_STEP_MAX}
+        step={0.01}
+        suffix="x"
+        presets={[0.05, 0.1, 0.25, 0.5]}
+        format={(n) => `${n}x`}
+        sanitize={(n) => sanitizeSpeedStep(n, value)}
+        ariaLabel={label}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
+const NUMBER_INPUT =
+  "h-11 w-[96px] rounded-[8px] border border-edge-soft bg-elevated px-3 text-[15.5px] font-semibold tabular-nums text-ink outline-none transition-colors focus:border-accent";
+
+const PRESET_CHIP =
+  "flex h-8 min-w-[44px] items-center justify-center rounded-[6px] px-2 text-[13px] font-semibold tabular-nums transition-colors";
+
+// Any value inside min..max, typed or picked from the presets. Saves on blur
+// or Enter, so half-typed values like "0." never reach the player.
+function NumberField({
+  value,
+  min,
+  max,
+  step,
+  suffix,
+  presets,
+  format,
+  sanitize,
+  ariaLabel,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix: string;
+  presets: number[];
+  format: (n: number) => string;
+  sanitize: (n: number) => number;
+  ariaLabel: string;
+  onChange: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const next = sanitize(Number(draft.replace(",", ".")));
+    setDraft(String(next));
+    if (next !== value) onChange(next);
+  };
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          inputMode="decimal"
+          min={min}
+          max={max}
+          step={step}
+          value={draft}
+          aria-label={ariaLabel}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+          className={NUMBER_INPUT}
         />
+        <span className="text-[14px] font-semibold text-ink-subtle">{suffix}</span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {presets.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            className={`${PRESET_CHIP} ${
+              n === value
+                ? "bg-accent-soft text-accent"
+                : "bg-elevated text-ink-muted hover:bg-raised hover:text-ink"
+            }`}
+          >
+            {format(n)}
+          </button>
+        ))}
       </div>
     </div>
   );

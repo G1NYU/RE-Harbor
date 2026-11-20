@@ -186,11 +186,12 @@ export const TV_GROUPS: TvGroup[] = [
         kind: "choice",
         key: "skipButtonHideSec",
         label: "Hide skip button after",
-        def: "0",
+        def: "10",
         options: [
           { value: "0", label: "Keep it up" },
           { value: "5", label: "5 seconds" },
           { value: "8", label: "8 seconds" },
+          { value: "10", label: "10 seconds" },
           { value: "12", label: "12 seconds" },
         ],
       },

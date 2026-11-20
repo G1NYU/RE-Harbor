@@ -6,7 +6,7 @@ import { useSettings } from "@/lib/settings";
 import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { useParental } from "@/lib/parental";
 import { useUiLanguage } from "@/lib/i18n";
-import { matchPersonForQuery } from "@/components/search/person-top-match";
+import { matchPersonForQuery } from "@/lib/search-top-match";
 import { useCollectionHits } from "@/components/search/use-collection-hits";
 import type { TvdbCollectionHit } from "@/lib/providers/tvdb-collections";
 import type { CharacterHit, CharacterMediaRef } from "@/lib/anilist/character";
@@ -395,7 +395,7 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
   }
   const latch = latchRef.current;
   if (!latch.decided) {
-    latch.promote = !!matchPersonForQuery(r?.people, trimmed);
+    latch.promote = !!matchPersonForQuery(r?.people, trimmed, r?.topMatch);
     // Decided once per query. People only ever arrive on the TMDB response, so the
     // answer is final as soon as that lands. Re-deciding later swaps the People row
     // from slot 3 to slot 1 and renumbers the rail under whoever is navigating it.

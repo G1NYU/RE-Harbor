@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type RefObject } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import { peekCachedLogo, resolveLogo } from "@/lib/logo";
 import { sizeImageUrl } from "@/lib/img-size";
@@ -6,6 +6,7 @@ import { useContextMenu, type MembershipContext } from "@/lib/context-menu";
 import { useSettings } from "@/lib/settings";
 import { useViewActions } from "@/lib/view";
 import { usePosterChain } from "@/components/poster";
+import { animeArtworkKind } from "@/lib/providers/anime-format";
 import { ensureStaticHeroArt, peekStaticHeroArt } from "@/lib/providers/anime-hero-art-static";
 import { prepareExpandingCardArtwork } from "@/lib/expanding-card-artwork";
 import { ScoreStack, type CardBadge } from "@/components/card-score-stack";
@@ -130,7 +131,13 @@ export const TvCard = memo(function TvCard({
     };
   }, [meta.id, isAnimeCardId, cardSettings.animeCardRating]);
   const imdbId = useTmdbImdbId(meta.id) ?? undefined;
-  const sharedCardState = useCardSharedState({ meta, settings: cardSettings, imdbId, flagRerun });
+  const sharedCardState = useCardSharedState({
+    meta,
+    settings: cardSettings,
+    imdbId,
+    flagRerun,
+    cardRef,
+  });
   const animeRating = isAnimeCardId && cardSettings.showMalBadge ? meta.imdbRating : undefined;
   const { cardBadges } = useCardScoreState({
     meta,
@@ -180,6 +187,7 @@ export const TvCard = memo(function TvCard({
           scoreBadges={cardBadges}
           sharedState={sharedCardState}
           isAnime={isAnimeCardId}
+          cardRef={cardRef}
         />
       </span>
     </button>
@@ -192,7 +200,7 @@ function useAnimeBackdrop(meta: Meta): string | undefined {
   const isAnime = isTvCardAnimeId(meta.id);
   const [backdrop, setBackdrop] = useState<{ meta: Meta; url?: string }>(() => ({
     meta,
-    url: isAnime ? peekStaticHeroArt(meta.id)?.bg : undefined,
+    url: isAnime ? peekStaticHeroArt(meta.id, animeArtworkKind(meta))?.bg : undefined,
   }));
   useEffect(() => {
     if (!isAnime || (meta.background && meta.background !== meta.poster)) {
@@ -202,7 +210,7 @@ function useAnimeBackdrop(meta: Meta): string | undefined {
     const resolve = async () => {
       await ensureStaticHeroArt().catch(() => {});
       if (cancelled) return;
-      const staticBg = peekStaticHeroArt(meta.id)?.bg;
+      const staticBg = peekStaticHeroArt(meta.id, animeArtworkKind(meta))?.bg;
       if (staticBg) {
         setBackdrop({ meta, url: staticBg });
         return;
@@ -234,6 +242,7 @@ export function TvCardArtwork({
   scoreBadges = [],
   sharedState,
   isAnime = false,
+  cardRef,
 }: {
   meta: Meta;
   awardLookupName?: string;
@@ -249,6 +258,7 @@ export function TvCardArtwork({
   scoreBadges?: CardBadge[];
   sharedState: CardSharedState;
   isAnime?: boolean;
+  cardRef?: RefObject<HTMLElement | null>;
 }) {
   const { settings } = useSettings();
   const card = cardSettings ?? { ...settings, ...settings.tvCardOptions };
@@ -260,7 +270,7 @@ export function TvCardArtwork({
     sharedState;
   const awardYear = parseAwardYear(meta.releaseInfo);
   const awardImdb = !isAnime && card.cardAwardDisplay !== "none" ? imdbId : undefined;
-  const classicWin = useClassicAwardWin(meta, awardImdb);
+  const classicWin = useClassicAwardWin(meta, awardImdb, cardRef);
   const animeAward = isAnime
     ? (findTopAward(awardLookupName ?? meta.name, awardYear) ?? findTopAward(meta.name, awardYear))
     : null;

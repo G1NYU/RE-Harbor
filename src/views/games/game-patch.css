@@ -22,7 +22,7 @@
 }
 .games-patch button {
   -webkit-app-region: no-drag;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-patch button:disabled {
   opacity: 0.4;

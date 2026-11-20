@@ -837,8 +837,8 @@ const extra: Record<string, string> = {
     "Показывать индикатор громкости при её изменении со скрытыми элементами управления плеера, чтобы изменения с клавиатуры и колёсика были всегда видны.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Показывать кнопку «Пропустить», когда идёт известная встроенная реклама, и небольшую кнопку жалобы у новинок, чтобы отмечать рекламу для проверки.",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Показывать кнопку «Пропустить заставку» / «Пропустить титры», когда Harbor их находит. Отключите, чтобы никогда её не показывать. Нажмите X на кнопке, чтобы скрыть ошибочную до конца серии.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Показывать кнопку «Пропустить заставку» / «Пропустить титры», когда Harbor их находит. Отключите, чтобы никогда её не показывать. Кнопка скрывается сама, когда заставка или титры заканчиваются, или после задержки ниже.",
   "Show an “on disk” badge on cards": "Показывать значок «на диске» на карточках",
   "Show audience score on cards": "Показывать оценку зрителей на карточках",
   "Show comments on detail pages": "Показывать комментарии на страницах деталей",

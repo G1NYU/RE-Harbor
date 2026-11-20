@@ -1672,7 +1672,7 @@ test("TMDB English season names survive both default and TVDB-fallback picker pa
         tmdbPosterUrl: (path) => (path ? `https://image.tmdb.org/t/p/w500${path}` : undefined),
       },
       "@/lib/settings/load": { loadStoredSettings: () => ({}) },
-      "./tmdb-images": { pickLogo: () => undefined },
+      "./tmdb-images": { pickLogo: () => undefined, textlessTmdbBackdrops: () => [] },
       "./tmdb-image-lang": { imageLangParam: () => "en", imageLangRank: () => 0 },
       "./tmdb-trailers": {
         pickTrailers: () => [],
@@ -2629,6 +2629,32 @@ test("rail visibility and delayed artwork never render the parent episode page o
     await f.settle();
     assert.equal(f.card(2).getAttribute("aria-pressed"), "true");
     assert.ok(f.parentRenders > parent, "explicit selection still updates the episode page");
+  } finally {
+    await f.close();
+  }
+});
+
+test("season selection defers geometry and only reveals the latest selection", async () => {
+  const f = await scrollFixture({ reducedMotion: true });
+  try {
+    const measured = [];
+    f.rail.getBoundingClientRect = () => ({ left: 0, right: 500 });
+    for (const n of [2, 3]) {
+      f.card(n).getBoundingClientRect = () => {
+        measured.push(n);
+        return { left: 540, right: 680 };
+      };
+    }
+    await React.act(async () => f.card(2).click());
+    assert.equal(f.card(2).getAttribute("aria-pressed"), "true");
+    await f.tick();
+    assert.deepEqual(measured, []);
+    await React.act(async () => f.card(3).click());
+    await f.tick();
+    assert.deepEqual(measured, []);
+    await f.settle();
+    assert.deepEqual(measured, [3]);
+    assert.equal(f.scrollCalls.at(-1)?.behavior, "auto");
   } finally {
     await f.close();
   }

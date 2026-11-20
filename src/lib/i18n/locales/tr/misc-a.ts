@@ -74,6 +74,7 @@ const miscA: Record<string, string> = {
   "64 neurons": "64 nöron",
   "70s": "70'ler",
   "8 seconds": "8 saniye",
+  "10 seconds": "10 saniye",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1. Geçiş sayısı yarıya indiği için daha zayıf ekran kartlarını daha az zorlar.",
   "80s": "80'ler",
@@ -1539,6 +1540,8 @@ const miscA: Record<string, string> = {
   'Giving "two weeks\' notice" at a job means:':
     'Bir işte "iki hafta önceden bildirimde bulunmak" ne anlama gelir?',
   "Glow and title": "Parıltı ve başlık",
+  "Episode pages": "Bölüm sayfaları",
+  "Go to page": "Sayfaya git",
   "Go to page {page}": "{page}. sayfaya git",
   "Go to pages {pages}": "{pages} sayfalarına git",
   "Golden Bear": "Altın Ayı",

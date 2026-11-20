@@ -1,3 +1,4 @@
+import seekSteps from "./pt/seek-steps";
 import reviews from "./pt/reviews";
 import playOrders from "./pt/play-orders";
 import gameRomLibrary from "./pt/game-rom-library";
@@ -423,6 +424,7 @@ const pt: Record<string, string> = {
   ...reviews,
   ...queueBasket,
   ...liveWeb,
+  ...seekSteps,
   "Refract sync": "Sincronização do Refract",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "Sincronize o histórico de exibição e as alterações na lista de títulos para assistir do Harbor com o Refract.",

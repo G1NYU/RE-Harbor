@@ -565,6 +565,10 @@ export function SeriesEpisodes({
         : orderedEps,
     [orderedEps, hideActive, hiddenSet],
   );
+  const showOrderedSeason = useMemo(
+    () => new Set(visibleOrderedEps.map((e) => e.orderSeason ?? e.seasonNumber)).size > 1,
+    [visibleOrderedEps],
+  );
   const orderedLoading = arcActive && arc.loading;
 
   const activeSeason = seasons.find((s) => s.seasonNumber === active);
@@ -638,7 +642,7 @@ export function SeriesEpisodes({
           onSelect={picker.onSelect}
         />
       )}
-      <div className="flex items-start justify-between gap-4">
+      <div data-scroll-anchor="detail-episodes" className="flex items-start justify-between gap-4">
         <h3 className="shrink-0 pt-1 text-[22px] font-medium tracking-tight text-ink">
           {t("Episodes")}
         </h3>
@@ -753,6 +757,7 @@ export function SeriesEpisodes({
               onSeasonVisible={
                 orderActive && selectedRatingSeasons.lazy ? onRatingSeasonVisible : undefined
               }
+              showSeason={showOrderedSeason}
             />
           )}
 

@@ -215,13 +215,15 @@ export function quickGameActivityAt(game: QuickGame, now = Date.now()) {
       : 0;
 }
 export function filterQuickLibrary(games: QuickGame[], filters: QuickFilters) {
-  const query = filters.query.trim().toLocaleLowerCase(),
+  // Locale-independent matching: tr-TR lowercases "I" to "ı", which made a query
+  // for "installed" miss "Installed game".
+  const query = filters.query.trim().toLowerCase(),
     now = Date.now();
   const activity = (game: QuickGame) => quickGameActivityAt(game, now);
   return games
     .filter(
       (game) =>
-        (!query || `${game.name} ${game.originalName ?? ""}`.toLocaleLowerCase().includes(query)) &&
+        (!query || `${game.name} ${game.originalName ?? ""}`.toLowerCase().includes(query)) &&
         (filters.group !== "favorites" || game.favorite) &&
         (filters.group !== "recent" || activity(game) > 0) &&
         (filters.source === "all" || game.source === filters.source) &&

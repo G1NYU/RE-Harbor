@@ -1,3 +1,4 @@
+import seekSteps from "./zh/seek-steps";
 import reviews from "./zh/reviews";
 import playOrders from "./zh/play-orders";
 import gameRomLibrary from "./zh/game-rom-library";
@@ -369,6 +370,7 @@ const zh: Record<string, string> = {
   ...reviews,
   ...queueBasket,
   ...liveWeb,
+  ...seekSteps,
   "Refract sync": "Refract 同步",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "将观看记录和 Harbor 待看列表的变更同步到 Refract。",

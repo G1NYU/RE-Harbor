@@ -1,3 +1,4 @@
+import seekSteps from "./tr/seek-steps";
 import reviews from "./tr/reviews";
 import playOrders from "./tr/play-orders";
 import gameRomLibrary from "./tr/game-rom-library";
@@ -376,6 +377,7 @@ const tr: Record<string, string> = {
   ...reviews,
   ...queueBasket,
   ...liveWeb,
+  ...seekSteps,
   "Refract sync": "Refract eşitlemesi",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "İzleme geçmişini ve Harbor izleme listesi değişikliklerini Refract ile eşitle.",

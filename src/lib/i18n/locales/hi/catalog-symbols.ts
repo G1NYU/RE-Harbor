@@ -162,6 +162,7 @@ const catalogSymbols: Record<string, string> = {
   "70s": "70 का दशक",
   "70s Auteurs": "70 के दशक के ऑतर्स",
   "8 seconds": "8 सेकंड",
+  "10 seconds": "10 सेकंड",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1. आधे पास, कमज़ोर कार्ड के लिए अधिक अनुकूल।",
   "8-character key": "8-अक्षरों की कुंजी",

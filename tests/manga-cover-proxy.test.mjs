@@ -6,6 +6,7 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { JSDOM } from "jsdom";
 import { createObjectUrlCache } from "../src/lib/object-url-cache.ts";
+import { createRequestScheduler } from "../src/lib/request-scheduler.ts";
 
 async function withCoverProxy(
   responses,
@@ -27,6 +28,7 @@ async function withCoverProxy(
   const mocks = {
     react: React,
     "./object-url-cache": { createObjectUrlCache: () => pool },
+    "./request-scheduler": { createRequestScheduler },
     "@tauri-apps/api/core": {
       invoke: async (name, { args }) => {
         if (name === "cached_thumb_path") return null;

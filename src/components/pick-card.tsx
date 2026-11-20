@@ -25,7 +25,8 @@ import { aniZipByKitsu, aniZipByMal } from "@/lib/providers/anizip";
 import { useViewActions } from "@/lib/view";
 import { TvCard } from "@/components/tv-card";
 import { useTilt } from "@/lib/use-tilt";
-import { observe } from "@/lib/visibility";
+import { observe, observeSettled } from "@/lib/visibility";
+import { createRequestScheduler } from "@/lib/request-scheduler";
 import { LocalDot } from "@/components/local-badge";
 import { Poster, useLocalizedPoster } from "./poster";
 import { useProfiledEffect } from "./profiled";
@@ -55,6 +56,8 @@ import {
 } from "@/components/card-status-badges";
 import { findTopAward, parseAwardYear } from "@/lib/anime-awards";
 import { isCardAnimeId } from "@/lib/card-anime";
+
+const animeTitleRequests = createRequestScheduler({ concurrency: 2 });
 
 const WATCHLIST_POS: Record<string, string> = {
   topStart: "top-1.5 start-1.5",
@@ -136,7 +139,7 @@ const PosterCard = memo(function PosterCard({
   const isAnimeCardId = isCardAnimeId(meta.id);
   const resolvedImdb = useTmdbImdbId(meta.id);
   const imdbId = resolvedImdb ?? undefined;
-  const sharedCardState = useCardSharedState({ meta, settings, imdbId, flagRerun });
+  const sharedCardState = useCardSharedState({ meta, settings, imdbId, flagRerun, cardRef: ref });
   const { hasDub, showTop10, inCinema, rerun, newBadge, watched, inWatchlist, inLocalLibrary } =
     sharedCardState;
   const showCinema = inCinema && !rerun;
@@ -146,7 +149,7 @@ const PosterCard = memo(function PosterCard({
   const ribbonRight = showTop10 && settings.top10RibbonSide === "right";
   const awardYear = parseAwardYear(meta.releaseInfo);
   const awardImdb = !isAnimeCardId && settings.cardAwardDisplay !== "none" ? imdbId : undefined;
-  const classicWin = useClassicAwardWin(meta, awardImdb);
+  const classicWin = useClassicAwardWin(meta, awardImdb, ref);
   const animeAwardWin =
     settings.cardAwardDisplay !== "none" && isAnimeCardId
       ? (findTopAward(awardLookupName ?? meta.name, awardYear) ??
@@ -435,31 +438,19 @@ const PosterCard = memo(function PosterCard({
 
       const preferred = settings.animeTitleLanguage;
 
-      const fetchTitles = async () => {
+      const fetchTitles = async (): Promise<string | null> => {
         // Romaji series titles only exist in Kitsu's own map; AniZip carries an
         // abbreviated AniDB short title in `x-jat` instead.
         if (preferred !== "romaji" && malId) {
           const map = await aniZipByMal(malId).catch(() => null);
-          if (cancelled) return;
-          if (map?.titles) {
-            const title = getTitleFromAniZip(map.titles, preferred);
-            if (title) {
-              setTranslatedTitle(title);
-              return;
-            }
-          }
+          const title = map?.titles && getTitleFromAniZip(map.titles, preferred);
+          if (title) return title;
         }
 
         if (preferred !== "romaji" && kitsuId) {
           const map = await aniZipByKitsu(kitsuId).catch(() => null);
-          if (cancelled) return;
-          if (map?.titles) {
-            const title = getTitleFromAniZip(map.titles, preferred);
-            if (title) {
-              setTranslatedTitle(title);
-              return;
-            }
-          }
+          const title = map?.titles && getTitleFromAniZip(map.titles, preferred);
+          if (title) return title;
         }
 
         if (kitsuId) {
@@ -471,26 +462,24 @@ const PosterCard = memo(function PosterCard({
               const j = await res.json();
               const attr = j?.data?.attributes;
               if (attr?.titles) {
-                const title = getTitleFromKitsu(attr.titles, preferred) || attr.canonicalTitle;
-                if (cancelled) return;
-                if (title) {
-                  setTranslatedTitle(title);
-                  return;
-                }
+                return getTitleFromKitsu(attr.titles, preferred) || attr.canonicalTitle || null;
               }
             }
           } catch {
             /* ignore */
           }
         }
+        return null;
       };
 
-      let started = false;
-      const off = observe(el, (visible) => {
-        if (visible && !started && !cancelled) {
-          started = true;
-          fetchTitles().catch(() => {});
-        }
+      const off = observeSettled(el, () => {
+        if (cancelled) return;
+        void animeTitleRequests
+          .schedule(`${meta.id}:${preferred}`, fetchTitles)
+          .then((title) => {
+            if (!cancelled && title) setTranslatedTitle(title);
+          })
+          .catch(() => {});
       });
 
       return () => {
@@ -673,8 +662,8 @@ const PosterCard = memo(function PosterCard({
           {inWatchlist && settings.watchlistBadge !== "off" && (
             <span
               className={`pointer-events-none absolute flex h-6 w-6 items-center justify-center rounded-full bg-canvas/95 text-ink ring-1 ring-edge-soft/70 ${watchlistPos}`}
-              title={t("In your watchlist")}
-              aria-label={t("In watchlist")}
+              title={t("In your library")}
+              aria-label={t("In library")}
             >
               <Bookmark size={11} strokeWidth={2.6} fill="currentColor" />
             </span>

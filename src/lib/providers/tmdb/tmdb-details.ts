@@ -3,7 +3,7 @@ import { movieReleaseDates, type MovieRelease } from "./movie-release-dates";
 import { get, IMG, effectiveTmdbLanguage } from "./tmdb-client";
 import { tmdbBackdropUrl, tmdbPosterUrl } from "./tmdb-image-rungs";
 import { loadStoredSettings } from "@/lib/settings/load";
-import { pickLogo, fetchMovieAssets } from "./tmdb-images";
+import { pickLogo, fetchMovieAssets, textlessTmdbBackdrops } from "./tmdb-images";
 import { imageLangParam, imageLangRank } from "./tmdb-image-lang";
 import {
   mergeTrailerVideoGroups,
@@ -56,6 +56,8 @@ export type Episode = {
   id: number;
   episodeNumber: number;
   seasonNumber: number;
+  orderNumber?: number;
+  orderSeason?: number;
   name: string;
   overview: string;
   nameLanguage?: string;
@@ -91,6 +93,7 @@ export type TmdbDetail = {
   overview: string;
   poster?: string;
   backdrop?: string;
+  textlessBackdrops?: string[];
   logo?: string;
   year?: string;
   rating?: string;
@@ -378,6 +381,12 @@ export async function tmdbDetails(
     }));
 
   const gallery = buildGallery(raw.images, logo);
+  const textless = urlsFromImages(textlessTmdbBackdrops(raw.images?.backdrops), "original", 24);
+  const defaultBackdrop = raw.backdrop_path ? `${IMG}/original${raw.backdrop_path}` : undefined;
+  const backdrop =
+    defaultBackdrop && textless.includes(defaultBackdrop)
+      ? defaultBackdrop
+      : (textless[0] ?? defaultBackdrop);
 
   const aggCast: any[] = raw.aggregate_credits?.cast ?? [];
   const flatCast: any[] = raw.credits?.cast ?? [];
@@ -556,7 +565,8 @@ export async function tmdbDetails(
     tagline,
     overview,
     poster: tmdbPosterUrl(finalPosterPath),
-    backdrop: raw.backdrop_path ? `${IMG}/original${raw.backdrop_path}` : undefined,
+    backdrop,
+    textlessBackdrops: textless.length ? textless : undefined,
     logo,
     year: (raw.release_date ?? raw.first_air_date)?.slice(0, 4),
     rating: raw.vote_average > 0 ? Number(raw.vote_average).toFixed(1) : undefined,

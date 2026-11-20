@@ -16,14 +16,19 @@ test("Drop show is exposed from details and the right-click menu", () => {
   const detail = read("src/views/detail.tsx");
   const menu = read("src/components/context-menu.tsx");
   const overflow = read("src/views/detail/hero-action-overflow.tsx");
+  const libraryAction = read("src/views/detail/library-action-button.tsx");
   const confirm = read("src/components/drop-show-confirm-modal.tsx");
 
   assert.match(detail, /dropContextTitle\(/);
   assert.match(detail, /<DropShowConfirmModal/);
+  assert.match(detail, /canDrop=\{canDropTitle\}/);
+  assert.match(detail, /onDrop=\{\(\) => setDropConfirmOpen\(true\)\}/);
   assert.match(menu, /key="drop-show"/);
   assert.match(menu, /<DropShowConfirmModal/);
-  assert.match(overflow, /canDrop/);
-  assert.match(overflow, /label=\{t\("Drop show"\)\}/);
+  assert.match(libraryAction, /canDrop/);
+  assert.match(libraryAction, /label=\{t\("Drop show"\)\}/);
+  assert.doesNotMatch(overflow, /Drop show/);
+  assert.doesNotMatch(overflow, /canDrop/);
   assert.match(confirm, /<ModalShell/);
   assert.match(confirm, /harbor-press-pop/);
   assert.match(confirm, /PublicMetaDB will mark this show as Dropped/);

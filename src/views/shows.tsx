@@ -1,5 +1,13 @@
 import { usePinnedCatalogRows } from "./home/hooks/use-pinned-rows";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { CatalogRows } from "@/components/catalog/catalog-rows";
 import { CatalogCustomizeBar } from "@/components/catalog/customize-bar";
@@ -116,7 +124,7 @@ export function Shows({ active = true }: { active?: boolean }) {
               hasMore: !spec.noPaginate && metas.length >= 14,
               fetcher: spec.noPaginate ? undefined : spec.fetcher,
             };
-            setRows((current) => upsertOrdered(current, row, order));
+            startTransition(() => setRows((current) => upsertOrdered(current, row, order)));
             return true;
           }),
         );
@@ -169,7 +177,7 @@ export function Shows({ active = true }: { active?: boolean }) {
             fetcher: listPager(list),
           });
         }
-        setRows(built);
+        startTransition(() => setRows(built));
       }
     })().catch(console.error);
     return () => {

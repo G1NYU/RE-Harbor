@@ -124,7 +124,10 @@ test("detail keeps setting-dependent candidates and passes quality to its hero",
   const source = readFileSync(new URL("../src/views/detail.tsx", import.meta.url), "utf8");
   assert.match(source, /toHiResBackdrop\(pinnedBackdrop, settings\.heroFullQuality\)/);
   assert.match(source, /toHiResBackdrop\(b \?\? undefined, settings\.heroFullQuality\)/);
-  assert.match(source, /\[primaryBackdrop, backdrops, settings\.heroFullQuality\]/);
+  assert.match(
+    source,
+    /\[primaryBackdrop, backdrops, textlessBackdrops, settings\.heroFullQuality\]/,
+  );
   assert.match(
     source,
     /<HeroBackdrop\s+url=\{backdrop\}\s+fallbacks=\{backdropPool\}\s+fullQuality=\{settings\.heroFullQuality\}/,

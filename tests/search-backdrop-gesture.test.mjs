@@ -129,7 +129,7 @@ function harness(t, options = {}) {
       }),
     },
     "./use-collection-hits": { useCollectionHits: () => [] },
-    "./person-top-match": { matchPersonForQuery: () => null },
+    "@/lib/search-top-match": { matchPersonForQuery: () => null },
     "@tauri-apps/api/core": { isTauri: () => options.native !== false },
     "@tauri-apps/api/window": {
       getCurrentWindow: () => ({

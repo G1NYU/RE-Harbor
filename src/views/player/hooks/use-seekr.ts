@@ -1,24 +1,17 @@
 import { useEffect } from "react";
-import { seekrStart, seekrStop, useSeekrState } from "@/lib/seekr";
+import { seekrStart, seekrStop, useSeekrState, type SeekrStartInput } from "@/lib/seekr";
 
 export function useSeekr({
   apiKey,
   metaId,
   imdbId,
+  imdbIdVerified,
   type,
-  season,
   episode,
   durationSec,
   enabled,
   isLive,
-}: {
-  apiKey: string;
-  metaId: string;
-  imdbId?: string | null;
-  type?: string;
-  season?: number | null;
-  episode?: number | null;
-  durationSec: number;
+}: SeekrStartInput & {
   enabled: boolean;
   isLive: boolean;
 }) {
@@ -30,10 +23,10 @@ export function useSeekr({
       return;
     }
     const timer = window.setTimeout(() => {
-      void seekrStart({ apiKey, metaId, imdbId, type, season, episode, durationSec });
+      void seekrStart({ apiKey, metaId, imdbId, imdbIdVerified, type, episode, durationSec });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [apiKey, metaId, imdbId, type, season, episode, durationSec, enabled, isLive]);
+  }, [apiKey, metaId, imdbId, imdbIdVerified, type, episode, durationSec, enabled, isLive]);
 
   useEffect(() => () => seekrStop(), []);
 

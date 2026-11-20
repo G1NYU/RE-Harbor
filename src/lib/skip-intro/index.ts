@@ -11,10 +11,17 @@ import { fetchIntroDbAppSegments } from "./introdb-app";
 import { fetchSkipDbSegments } from "./skipdb";
 import { fetchIntroDbSegments, readTheIntroDbKey, setTheIntroDbApiKey } from "./theintrodb";
 import type { SkipSegment } from "./types";
+import { SKIP_SEGMENT_END_GUARD_SEC } from "./pill-progress";
 import { getLocalCache } from "../simkl/activities";
 import { useSettings } from "../settings";
 
 export type { SkipSegment, SkipKind, SkipSource } from "./types";
+export {
+  resolveSkipPillProgress,
+  resolveSkipPillWindowMs,
+  resolveSkipPillWindowProgress,
+  SKIP_SEGMENT_END_GUARD_SEC,
+} from "./pill-progress";
 
 const MIN_OUTRO_START_FRACTION = 0.5;
 const MAX_SEGMENT_SEC = 360;
@@ -245,7 +252,7 @@ export function useAdSegments(
 
 export function activeSegment(segments: SkipSegment[], positionSec: number): SkipSegment | null {
   for (const s of segments) {
-    if (positionSec >= s.startSec && positionSec < s.endSec - 0.75) return s;
+    if (positionSec >= s.startSec && positionSec < s.endSec - SKIP_SEGMENT_END_GUARD_SEC) return s;
   }
   return null;
 }

@@ -64,6 +64,7 @@
     "dialog:allow-ask",
     "dialog:allow-message",
     "fs:default",
+    "fs:scope-appcache-recursive",
     "deep-link:default",
     "notification:default",
     {

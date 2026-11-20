@@ -40,11 +40,26 @@ export function useAnimeProgressMap({
   mwVersion: number;
   settings: Parameters<typeof spoilerMaskFor>[0];
 }) {
-  const progressById = useMemo(() => {
+  const sourceById = useMemo(() => {
+    const byId = new Map<number, KitsuEpisode>();
+    for (const ep of episodes) {
+      if (!byId.has(ep.id)) byId.set(ep.id, ep);
+    }
+    return byId;
+  }, [episodes]);
+  const progressFor = useMemo(() => {
     const local = createEpisodeProgressSnapshot();
-    const m = new Map<number, EpisodeProgress>();
-    const add = (ep: KitsuEpisode) => {
-      if (m.has(ep.id)) return;
+    const progressById = new Map<number, EpisodeProgress>();
+    const displayById = new Map<number, KitsuEpisode>();
+    for (const ep of displayEpisodes) {
+      if (!displayById.has(ep.id)) displayById.set(ep.id, ep);
+    }
+    return (episode: KitsuEpisode): EpisodeProgress => {
+      const cached = progressById.get(episode.id);
+      if (cached) return cached;
+      // Prefer the source row's coordinates when a season view reuses its episode ID.
+      const ep = sourceById.get(episode.id) ?? displayById.get(episode.id);
+      if (!ep) return NO_PROGRESS;
       const isCurrent = ep.sourceMetaId == null;
       const isEntry = entrySourceId != null && ep.sourceMetaId === entrySourceId;
       const seasonKey = animeSeasonKey(ep);
@@ -91,13 +106,11 @@ export function useAnimeProgressMap({
         );
         if (alt.watched || alt.ratio > prog.ratio) prog = alt;
       }
-      m.set(ep.id, prog);
+      progressById.set(ep.id, prog);
+      return prog;
     };
-    for (const ep of episodes) add(ep);
-    for (const ep of displayEpisodes) add(ep);
-    return m;
   }, [
-    episodes,
+    sourceById,
     displayEpisodes,
     metaId,
     trackId,
@@ -111,28 +124,27 @@ export function useAnimeProgressMap({
     mwVersion,
   ]);
 
-  const progressFor = (ep: KitsuEpisode) => progressById.get(ep.id) ?? NO_PROGRESS;
-
   const nextUpEp = useMemo(() => {
     const scan = displayEpisodes.length > 0 ? displayEpisodes : episodes;
     for (const ep of scan) {
-      if (!progressById.get(ep.id)?.watched) return ep;
+      if (!progressFor(ep).watched) return ep;
     }
     return null;
-  }, [displayEpisodes, episodes, progressById]);
+  }, [displayEpisodes, episodes, progressFor]);
 
   const nextUpId = nextUpEp ? nextUpEp.id : null;
   const nextUpNum = nextUpEp ? nextUpEp.number : null;
 
   const spoilerFor = (ep: KitsuEpisode): SpoilerMask =>
     spoilerMaskFor(settings, {
-      watched: progressById.get(ep.id)?.watched ?? false,
+      watched: progressFor(ep).watched,
       isNextUp: ep.id === nextUpId,
     });
 
-  const airedDisplay = airedOnly(displayEpisodes, (ep) => ep.airdate);
-  const allWatched =
-    airedDisplay.length > 0 && airedDisplay.every((ep) => progressById.get(ep.id)?.watched);
+  const allWatched = useMemo(() => {
+    const aired = airedOnly(displayEpisodes, (ep) => ep.airdate);
+    return aired.length > 0 && aired.every((ep) => progressFor(ep).watched);
+  }, [displayEpisodes, progressFor]);
 
   return { progressFor, nextUpNum, nextUpId, spoilerFor, allWatched };
 }

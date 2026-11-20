@@ -693,8 +693,8 @@ const extra: Record<string, string> = {
     "Afficher brièvement le volume en surimpression lorsque vous le modifiez alors que les commandes du lecteur sont masquées, afin que les changements effectués au clavier ou avec la molette soient toujours visibles.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Afficher un bouton Passer lorsqu’une publicité ajoutée répertoriée est diffusée, ainsi qu’un petit bouton de signalement sur les nouveautés afin de marquer les publicités à vérifier.",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Afficher un bouton Passer l’intro / Passer le générique lorsque Harbor en détecte un. Désactivez cette option pour ne jamais l’afficher. Vous pouvez aussi toucher le X du bouton pour masquer une détection erronée jusqu’à la fin de l’épisode.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Afficher un bouton Passer l’intro / Passer le générique lorsque Harbor en détecte un. Désactivez cette option pour ne jamais l’afficher. Le bouton se masque de lui-même à la fin de l’intro ou du générique, ou après le délai ci-dessous.",
   "Show an “on disk” badge on cards": "Afficher un badge « présent sur le disque » sur les fiches",
   "Show audience score on cards": "Afficher la note du public sur les fiches",
   "Show comments on detail pages": "Afficher les commentaires sur les pages de détails",

@@ -199,7 +199,7 @@
   border: 0;
   text-align: left;
   color: inherit;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-source-monogram {
   width: 42px;
@@ -240,7 +240,7 @@
   width: 30px;
   height: 18px;
   border-radius: 10px;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   margin-right: 10px;
 }
 .games-source-toggle i {
@@ -954,7 +954,7 @@
   padding: 18px;
   text-align: start;
   color: var(--color-ink);
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   border: 0;
   background: none;
   border-radius: 9px;

@@ -83,7 +83,7 @@
   outline-offset: 2px;
 }
 .music-video-discovery button {
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .music-video-discovery button:focus-visible {
   outline: 2px solid var(--color-accent);

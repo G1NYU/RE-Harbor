@@ -3,6 +3,7 @@ import { narrowMediaType, type Meta } from "@/lib/cinemeta";
 import { resolveExternalKitsuId } from "@/lib/providers/anime-entry";
 import { parseKitsuId } from "@/lib/providers/kitsu";
 import { tmdbAnimeMatch, tmdbIdFromImdb, tmdbMovieImages } from "@/lib/providers/tmdb";
+import { animeArtworkKind } from "@/lib/providers/anime-format";
 import { fetchTvdbArtwork } from "@/lib/providers/tvdb-proxy";
 import { simklAnimeArtworkIds } from "@/lib/simkl/anime-artwork-ids";
 import {
@@ -82,7 +83,7 @@ async function resolveAnimeArtworkIds(meta: Meta): Promise<AnimeArtworkIds> {
     if (!imdb && simklIds.imdb) imdb = simklIds.imdb;
     if (!tvdb && simklIds.tvdb) tvdb = simklIds.tvdb;
     if (!tmdbMetaId && simklIds.tmdb) {
-      const kind = meta.type === "movie" ? "movie" : "tv";
+      const kind = animeArtworkKind(meta);
       tmdbMetaId = `tmdb:${kind}:${simklIds.tmdb}`;
     }
   }
@@ -135,12 +136,12 @@ async function artworkCandidates(meta: Meta, tmdbKey: string): Promise<string[]>
 
   if (/^(kitsu|mal|anilist|anidb|simkl):/.test(meta.id)) {
     const ids = await resolveAnimeArtworkIds(meta);
-    const kind = meta.type === "movie" ? "movie" : "tv";
+    const kind = animeArtworkKind(meta);
     let tmdbMetaId = ids.tmdbMetaId;
     if (!tmdbMetaId && tmdbKey) {
-      const match = await tmdbAnimeMatch(tmdbKey, meta.name, meta.releaseInfo, kind).catch(
-        () => null,
-      );
+      const match = await tmdbAnimeMatch(tmdbKey, meta.name, meta.releaseInfo, kind, {
+        exact: kind === "movie",
+      }).catch(() => null);
       if (match) tmdbMetaId = `tmdb:${kind}:${match.id}`;
     }
     const [tmdbArtwork, tvdbArtwork] = await Promise.all([
@@ -148,6 +149,7 @@ async function artworkCandidates(meta: Meta, tmdbKey: string): Promise<string[]>
         ? tmdbMovieImages(tmdbKey, tmdbMetaId).catch(() => [])
         : Promise.resolve([]),
       fetchTvdbArtwork({
+        kind,
         series: ids.tvdb,
         kitsuId: ids.kitsuId,
         imdb: ids.imdb,
@@ -172,7 +174,7 @@ async function artworkCandidates(meta: Meta, tmdbKey: string): Promise<string[]>
       ? tmdbIdFromImdb(tmdbKey, meta.id, narrowMediaType(meta.type)).catch(() => null)
       : Promise.resolve(null);
   const tvdbPromise = meta.id.startsWith("tt")
-    ? fetchTvdbArtwork({ imdb: meta.id }).catch(() => null)
+    ? fetchTvdbArtwork({ kind: animeArtworkKind(meta), imdb: meta.id }).catch(() => null)
     : Promise.resolve(null);
   const [tmdbId, tvdbArtwork] = await Promise.all([tmdbIdPromise, tvdbPromise]);
   const tmdbArtwork = tmdbId ? await tmdbMovieImages(tmdbKey, tmdbId).catch(() => []) : [];
@@ -188,7 +190,7 @@ async function artworkCandidates(meta: Meta, tmdbKey: string): Promise<string[]>
 }
 
 export function expandingCardArtworkKey(meta: Meta, tmdbKey: string): string {
-  return `${meta.id}|${meta.type}|${tmdbKey}|${meta.background ?? ""}|${meta.poster ?? ""}`;
+  return `${meta.id}|${meta.type}|${meta.animeFormat ?? ""}|${tmdbKey}|${meta.background ?? ""}|${meta.poster ?? ""}`;
 }
 
 export function prepareExpandingCardArtwork(

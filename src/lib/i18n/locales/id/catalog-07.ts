@@ -209,6 +209,8 @@ const catalog: Record<string, string> = {
   "Go to featured item {n}": "Buka item unggulan {n}",
   "Go to host": "Buka host",
   "Go to live": "Buka siaran langsung",
+  "Episode pages": "Halaman episode",
+  "Go to page": "Buka halaman",
   "Go to page {page}": "Buka halaman {page}",
   "Go to pages {pages}": "Buka halaman {pages}",
   "Go to show": "Buka acara",

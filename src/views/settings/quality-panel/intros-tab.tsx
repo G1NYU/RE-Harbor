@@ -40,7 +40,7 @@ export function IntrosTab() {
       <ToggleRow
         label={t("Show the Skip button")}
         sub={t(
-          "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.",
+          "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.",
         )}
         value={settings.showSkipButton}
         onChange={(v) => update({ showSkipButton: v })}

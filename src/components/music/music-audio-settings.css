@@ -140,7 +140,7 @@
   width: 28px;
   height: 130px;
   accent-color: var(--color-accent);
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .music-audio-bands output {
   font-variant-numeric: tabular-nums;

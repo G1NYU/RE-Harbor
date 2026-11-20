@@ -48,7 +48,11 @@ function detailMapper(language: string, translateTitles = true) {
     },
     "./tmdb-image-rungs": { tmdbBackdropUrl: () => undefined, tmdbPosterUrl: () => undefined },
     "@/lib/settings/load": { loadStoredSettings: () => ({ translateTitles }) },
-    "./tmdb-images": { pickLogo: () => undefined, fetchMovieAssets: async () => null },
+    "./tmdb-images": {
+      pickLogo: () => undefined,
+      fetchMovieAssets: async () => null,
+      textlessTmdbBackdrops: () => [],
+    },
     "./tmdb-image-lang": { imageLangParam: () => "ja,en", imageLangRank: () => 0 },
     "./tmdb-trailers": {
       pickTrailers: () => [],

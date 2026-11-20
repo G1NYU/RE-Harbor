@@ -1064,6 +1064,10 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "Klucz API NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Wybierz, czy Harbor ma preferować źródła bezpośrednie i debrid, torrenty peer-to-peer, czy wyświetlać oba typy.",
+  "Largest first": "Największe najpierw",
+  "Smallest first": "Najmniejsze najpierw",
+  "Default order": "Domyślna kolejność",
+  "Sort sources: {value}": "Sortuj źródła: {value}",
   "Show keyboard shortcuts": "Pokaż skróty klawiaturowe",
   "Show or hide the list of player shortcuts.": "Pokazuje lub ukrywa listę skrótów odtwarzacza.",
   "Press {key} to close. Change these in Settings.":
@@ -1076,6 +1080,18 @@ const coverage: Record<string, string> = {
   "Increase the subtitle text size.": "Zwiększa rozmiar tekstu napisów.",
   "Audio: {name}": "Audio: {name}",
   "Subtitle size: {size}": "Rozmiar napisów: {size}",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

@@ -17,6 +17,7 @@ export type SportsEventHit = {
 type DbRow = Record<string, string | null | undefined>;
 
 async function rows(url: string, field: string, signal?: AbortSignal): Promise<DbRow[]> {
+  if (signal?.aborted) return [];
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });

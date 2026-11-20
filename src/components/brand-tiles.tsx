@@ -49,7 +49,6 @@ export function BrandTiles({ kind, title }: { kind: BrandKind; title?: string })
       title={title ?? (kind === "studio" ? t("Top studios") : t("Top networks"))}
       min={210}
       shape="tile"
-      alwaysActive
       onViewAll={() => openBrands(kind)}
       viewAllLabel={t("See all")}
     >

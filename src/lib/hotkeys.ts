@@ -40,6 +40,7 @@ export type HotkeyId =
   | "playerClipRecord"
   | "playerSpeedDown"
   | "playerSpeedUp"
+  | "playerHalfSpeed"
   | "playerSubDelayDown"
   | "playerSubDelayUp"
   | "playerStreamSwitcher"
@@ -286,16 +287,16 @@ export const HOTKEYS: HotkeyDef[] = [
     id: "playerSeekBack30",
     scope: "Player",
     group: "Seeking",
-    label: "Seek back 30s",
-    description: "Jump back thirty seconds.",
+    label: "Long seek back",
+    description: "Jump back by the Long seek step set under Behavior (30 seconds by default).",
     defaultBinding: ",",
   },
   {
     id: "playerSeekForward30",
     scope: "Player",
     group: "Seeking",
-    label: "Seek forward 30s",
-    description: "Jump forward thirty seconds.",
+    label: "Long seek forward",
+    description: "Jump forward by the Long seek step set under Behavior (30 seconds by default).",
     defaultBinding: ".",
   },
   {
@@ -443,7 +444,7 @@ export const HOTKEYS: HotkeyDef[] = [
     scope: "Player",
     group: "Speed",
     label: "Speed down",
-    description: "Slow playback by 0.25x.",
+    description: "Slow playback by the Speed step set under Behavior (0.25x by default).",
     defaultBinding: "[",
   },
   {
@@ -451,8 +452,17 @@ export const HOTKEYS: HotkeyDef[] = [
     scope: "Player",
     group: "Speed",
     label: "Speed up",
-    description: "Speed playback up by 0.25x.",
+    description: "Speed playback up by the Speed step set under Behavior (0.25x by default).",
     defaultBinding: "]",
+  },
+  {
+    id: "playerHalfSpeed",
+    scope: "Player",
+    group: "Speed",
+    label: "Toggle slow speed",
+    description:
+      "Switch between normal speed and the slow speed set under Behavior (0.5x by default).",
+    defaultBinding: "",
   },
 
   {
@@ -590,6 +600,8 @@ export function effectiveBinding(id: HotkeyId, overrides: Record<string, string>
 }
 
 export function formatBindingForDisplay(binding: string): string {
+  // A shortcut with no key (such as a new action left unbound by default).
+  if (!binding) return "—";
   return binding
     .split("+")
     .map((p) => {

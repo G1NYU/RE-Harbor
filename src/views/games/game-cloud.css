@@ -31,7 +31,7 @@
   margin: 9px 0 0;
 }
 .games-cloud-dialog button {
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-cloud-dialog button:disabled {
   cursor: default;
@@ -419,7 +419,7 @@
   border-radius: 5px;
   background: var(--color-elevated);
   color: var(--color-ink-muted);
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-web-scope button[aria-pressed="true"] {
   background: var(--color-raised);

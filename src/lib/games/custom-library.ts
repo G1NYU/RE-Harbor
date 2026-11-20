@@ -386,13 +386,14 @@ export function filterCustomGames(
   visibility: string,
   sort: string,
 ) {
-  const needle = query.trim().toLocaleLowerCase(),
+  // Locale-independent for the same reason as quick-library: tr-TR maps "I" to "ı".
+  const needle = query.trim().toLowerCase(),
     now = Date.now();
   return store.games
     .filter(
       (game) =>
         (visibility === "hidden" ? game.hidden : !game.hidden) &&
-        `${game.name} ${game.linked?.name ?? ""}`.toLocaleLowerCase().includes(needle),
+        `${game.name} ${game.linked?.name ?? ""}`.toLowerCase().includes(needle),
     )
     .sort(
       (a, b) =>

@@ -5,7 +5,7 @@ import { registerEvictable } from "@/lib/maintenance";
 import { anilistArtById, anilistArtByMalId } from "@/lib/anilist/browse";
 import { anilistFranchise } from "@/lib/anilist/relations";
 import { animeKitsuMeta } from "@/lib/providers/anime-kitsu-addon";
-import { isDerivedAnimeFormat } from "@/lib/providers/anime-format";
+import { animeArtworkKind, isDerivedAnimeFormat } from "@/lib/providers/anime-format";
 import { kitsuToAnilist } from "@/lib/providers/anime-mapping";
 import { resolveExternalKitsuId } from "@/lib/providers/anime-entry";
 import { stripFranchiseSuffix } from "@/lib/providers/jikan";
@@ -30,23 +30,25 @@ const isAnimeId = (id: string) => /^(kitsu|mal|anilist|anidb):/.test(id);
 
 export async function resolveHeroArt(tmdbKey: string, meta: Meta): Promise<HeroArt> {
   if (!isAnimeId(meta.id)) return { background: meta.background ?? meta.poster, logo: meta.logo };
-  const hit = cache.get(meta.id);
+  const kind = animeArtworkKind(meta);
+  const key = `${kind}:${meta.id}`;
+  const hit = cache.get(key);
   if (hit) return hit;
-  const existing = inflight.get(meta.id);
+  const existing = inflight.get(key);
   if (existing) return existing;
   const p = (async (): Promise<HeroArt> => {
-    const stat = await staticHeroArt(meta.id).catch(() => undefined);
+    const stat = await staticHeroArt(meta.id, kind).catch(() => undefined);
     const art: HeroArt = stat?.bg
       ? { background: stat.bg, logo: stat.logo ?? meta.logo }
       : await computeArt(tmdbKey, meta).then((c) => ({
           background: c.background,
           logo: stat?.logo ?? c.logo,
         }));
-    lruSet(cache, meta.id, art, CACHE_MAX);
-    inflight.delete(meta.id);
+    lruSet(cache, key, art, CACHE_MAX);
+    inflight.delete(key);
     return art;
   })();
-  inflight.set(meta.id, p);
+  inflight.set(key, p);
   return p;
 }
 
@@ -59,15 +61,15 @@ export async function resolveHeroBackdrop(
 
 async function computeArt(tmdbKey: string, meta: Meta): Promise<HeroArt> {
   const akm = await animeKitsuMeta(meta.id).catch(() => null);
-  const kind: "movie" | "tv" = meta.type === "movie" ? "movie" : "tv";
+  const kind = animeArtworkKind(meta);
   const year = akm?.releaseInfo ?? meta.releaseInfo;
   const names = [
     ...new Set(
       [
-        stripFranchiseSuffix(meta.name ?? ""),
-        stripFranchiseSuffix(akm?.name ?? ""),
+        kind === "movie" ? meta.name : stripFranchiseSuffix(meta.name ?? ""),
+        kind === "tv" ? stripFranchiseSuffix(akm?.name ?? "") : undefined,
         akm?.name ?? "",
-      ].filter(Boolean),
+      ].filter((name): name is string => !!name),
     ),
   ];
   const malId = meta.id.startsWith("mal:")
@@ -79,20 +81,22 @@ async function computeArt(tmdbKey: string, meta: Meta): Promise<HeroArt> {
   }
 
   const derived = isDerivedAnimeFormat(meta.animeFormat);
-  const tvdbArt = await fetchTvdbArtwork({ kitsuId }).catch(() => null);
+  const tvdbArt = await fetchTvdbArtwork({ kind, kitsuId }).catch(() => null);
   let logo = derived ? undefined : (tvdbArt?.clearLogos[0] ?? akm?.logo ?? undefined);
 
   const background = await (async (): Promise<string | undefined> => {
     if (tvdbArt?.backgrounds[0]) return tvdbArt.backgrounds[0];
     if (tmdbKey) {
       for (const n of names) {
-        const hit = await tmdbAnimeLogo(tmdbKey, n, year, kind).catch(() => null);
+        const hit = await tmdbAnimeLogo(tmdbKey, n, year, kind, { exact: kind === "movie" }).catch(
+          () => null,
+        );
         if (hit?.backdrop) {
           if (!logo && !derived && hit.logo) logo = hit.logo;
           return hit.backdrop;
         }
       }
-      if (names[0]) {
+      if (kind === "tv" && names[0]) {
         const hit = await tmdbAnimeLogo(tmdbKey, names[0], undefined, kind).catch(() => null);
         if (hit?.backdrop) {
           if (!logo && !derived && hit.logo) logo = hit.logo;
@@ -116,6 +120,7 @@ async function computeArt(tmdbKey: string, meta: Meta): Promise<HeroArt> {
     if (anilistId != null) {
       const art = await anilistArtById(anilistId).catch(() => null);
       if (art?.banner) return art.banner;
+      if (kind === "movie") return akm?.background ?? meta.background ?? meta.poster;
       const fam = await anilistFranchise(anilistId).catch(() => []);
       const rooted = fam
         .filter((n) => !n.upcoming)
@@ -135,7 +140,9 @@ async function computeArt(tmdbKey: string, meta: Meta): Promise<HeroArt> {
   if (!logo && tmdbKey && (akm?.name || names[0])) {
     const hit = derived
       ? await tmdbAnimeLogo(tmdbKey, meta.name, year, kind, { exact: true }).catch(() => null)
-      : await tmdbAnimeLogo(tmdbKey, akm?.name ?? names[0], year, kind).catch(() => null);
+      : await tmdbAnimeLogo(tmdbKey, akm?.name ?? names[0], year, kind, {
+          exact: kind === "movie",
+        }).catch(() => null);
     if (hit?.logo) logo = hit.logo;
   }
 

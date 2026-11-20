@@ -39,6 +39,7 @@ function load(path, dependencies) {
 function harness() {
   const manual = new Map();
   const resumes = new Map();
+  const resumeReads = [];
   const key = (id, season, episode) => `${id}|${season}|${episode}`;
   const manualWatchedState = (id, season, episode) => manual.get(key(id, season, episode));
   const progress = load("src/lib/episode-progress.ts", {
@@ -50,8 +51,10 @@ function harness() {
     "@/lib/resume": {
       lastPlayedEpisode: () => null,
       readResumeEntry: (id, season, episode) => resumes.get(key(id, season, episode)) ?? null,
-      createResumeReader: () => (id, season, episode) =>
-        resumes.get(key(id, season, episode)) ?? null,
+      createResumeReader: () => (id, season, episode) => {
+        resumeReads.push([id, season, episode]);
+        return resumes.get(key(id, season, episode)) ?? null;
+      },
     },
   });
   const { useAnimeProgressMap } = load(
@@ -67,6 +70,7 @@ function harness() {
   );
   return {
     getEpisodeProgress: progress.getEpisodeProgress,
+    resumeReads,
     recordManualWatchedMeta: () => {},
     setManualWatchedMany(id, episodes, watched) {
       for (const ep of episodes) manual.set(key(id, ep.season, ep.episode), watched);
@@ -190,6 +194,29 @@ test("genuine sequel playback remains watched without marking the original", () 
     assert.equal(h.render([first], [first], ORIGINAL).allWatched, true);
     assert.equal(h.query({ id: ORIGINAL, mappedSeason: 1, absolute: 1 }).watched, false);
   }
+});
+
+test("season switches read only needed progress and prefer original coordinates for shared IDs", () => {
+  const h = harness();
+  const episodes = Array.from({ length: 1100 }, (_, i) => sequelEpisode(i + 1));
+  const original = episodes[15];
+  const remapped = { ...original, number: 1, imdbEpisode: 1 };
+  h.watch(SEQUEL, 1, original.number);
+  const first = h.render(episodes, [remapped, episodes[16]], ORIGINAL);
+  assert.equal(first.progressFor(remapped).watched, true);
+  assert.equal(first.nextUpId, episodes[16].id);
+  assert.equal(first.allWatched, false);
+  assert.equal(h.resumeReads.length, 4);
+  assert.ok(h.resumeReads.some(([id, , number]) => id === SEQUEL && number === original.number));
+
+  h.resumeReads.length = 0;
+  const later = episodes[400];
+  h.watch(SEQUEL, 1, later.number);
+  const second = h.render(episodes, [later], ORIGINAL);
+  assert.equal(second.progressFor(later).watched, true);
+  assert.equal(second.allWatched, true);
+  assert.equal(second.nextUpId, null);
+  assert.equal(h.resumeReads.length, 2);
 });
 
 test("resume checkpoints use each ID's own coordinates and newest valid timestamp", () => {

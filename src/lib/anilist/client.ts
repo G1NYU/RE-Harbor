@@ -24,15 +24,17 @@ function doFetch(
   query: string,
   variables: Record<string, unknown>,
   token: string | null,
+  signal?: AbortSignal,
 ): Promise<Response> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  const deadline = AbortSignal.timeout(15000);
   return safeFetch(ANILIST_GRAPHQL_URL, {
     method: "POST",
-    signal: AbortSignal.timeout(15000),
+    signal: signal ? AbortSignal.any([deadline, signal]) : deadline,
     headers,
     body: JSON.stringify({ query, variables }),
   });
@@ -43,7 +45,9 @@ export async function anilistRequest<T>(
   variables: Record<string, unknown> = {},
   accessToken?: string,
   skipAuth = false,
+  signal?: AbortSignal,
 ): Promise<T> {
+  signal?.throwIfAborted();
   const token = skipAuth ? null : (accessToken ?? getSession()?.accessToken ?? null);
   // The cooldown applies to the anonymous bucket whether the caller opted out
   // of auth explicitly or simply has no token.
@@ -52,7 +56,7 @@ export async function anilistRequest<T>(
     throw new AnilistApiError(429, "anonymous rate limit cooldown");
   }
 
-  let res = await doFetch(query, variables, token);
+  let res = await doFetch(query, variables, token, signal);
 
   if (res.status === 429) {
     const body = await res.text().catch(() => "");
@@ -65,7 +69,8 @@ export async function anilistRequest<T>(
     }
     const waitMs = Math.min(rateLimitWaitMs(res.headers.get("retry-after")), AUTH_RETRY_MAX_MS);
     await new Promise((resolve) => setTimeout(resolve, waitMs));
-    res = await doFetch(query, variables, token);
+    signal?.throwIfAborted();
+    res = await doFetch(query, variables, token, signal);
     if (res.status === 429) {
       throw new AnilistApiError(429, await res.text().catch(() => ""));
     }

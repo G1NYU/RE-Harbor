@@ -30,7 +30,10 @@ function load(file, dependencies, globals = {}) {
 function fixture({ only = true, addons = [], results = {}, order = [] } = {}) {
   addons = addons.map((a) => ({ ...a, manifest: { resources: ["meta"], ...a.manifest } }));
   const requests = [];
-  const policy = { addonOnlyMetadata: () => only };
+  const policy = {
+    addonOnlyMetadata: () => only,
+    readMetadataSettings: () => ({ addonOnlyMetadata: only }),
+  };
   const storage = {
     getItem: () => JSON.stringify({ addonOnlyMetadata: only, metadataAddonOrder: order }),
   };
@@ -195,6 +198,7 @@ test("search distinguishes addon-only mode from an actual TMDB outage with a sav
   const search = load("search.ts", {
     "@/lib/metadata-policy": { addonOnlyMetadata: () => only, useTmdbTopMatch: () => true },
     "./providers/anime-catalog-client": {},
+    "./search-request-guard": {},
     "@/lib/providers/tmdb/tmdb-client": {
       effectiveTmdbLanguage: () => "en",
       get: async () => {
@@ -232,6 +236,85 @@ test("search distinguishes addon-only mode from an actual TMDB outage with a sav
   assert.equal(topOnly.movies.length, 0);
   assert.equal(topOnly.series.length, 0);
   assert.equal(topOnly.people.length, 0);
+});
+
+test("translated TMDB search starts both language lookups before either can finish", async () => {
+  const requests = [];
+  const { promise: localized, resolve: finishLocalized } = Promise.withResolvers();
+  const search = load("search.ts", {
+    "@/lib/metadata-policy": { addonOnlyMetadata: () => false, useTmdbTopMatch: () => true },
+    "./providers/anime-catalog-client": {},
+    "./search-request-guard": {},
+    "@/lib/providers/tmdb/tmdb-client": {
+      effectiveTmdbLanguage: () => "tr-TR",
+      get: async (_key, path, { language }) => {
+        requests.push([path, language]);
+        return language === "en-US" ? { results: [{ id: 1, title: "English title" }] } : localized;
+      },
+    },
+    "@/lib/providers/tmdb/tmdb-meta-mappers": {
+      movieMeta: (row, englishTitle, language) => ({ name: row.title, englishTitle, language }),
+    },
+    "@/lib/feed/tags": { MOVIE_GENRES: {}, TV_GENRES: {} },
+    "@/lib/iptv/store": {},
+    "@/lib/iptv/rtl": {},
+    "@/lib/settings/load": { loadStoredSettings: () => ({ translateTitles: true }) },
+    "@/lib/safe-fetch": {},
+    "@/lib/anilist/browse": {},
+  });
+  const pending = search.searchAll("fixture", "Batman");
+  assert.deepEqual(requests, [
+    ["search/multi", undefined],
+    ["search/multi", "en-US"],
+  ]);
+  finishLocalized({
+    results: [{ id: 1, media_type: "movie", title: "Localized title", poster_path: "/poster" }],
+  });
+  const result = await pending;
+  assert.deepEqual(result.movies[0], {
+    name: "Localized title",
+    englishTitle: "English title",
+    language: "tr-TR",
+  });
+});
+
+test("a cancelled queued TMDB search does not send a request or cancel a repeat query", async () => {
+  const queued = [];
+  const sent = [];
+  const tmdb = load(
+    "providers/tmdb/tmdb-client.ts",
+    {
+      "@/lib/safe-fetch": {
+        safeFetch: async (url) => {
+          sent.push(new URL(url).searchParams.get("query"));
+          return Response.json({ results: [] });
+        },
+      },
+      "@/lib/request-scheduler": {
+        createRequestScheduler: () => ({
+          schedule: (key, task) =>
+            new Promise((resolve, reject) => {
+              queued.push({ key, run: () => task().then(resolve, reject) });
+            }),
+        }),
+      },
+      "./tmdb-catalog-cache": { createCatalogCache: () => ({}) },
+      "@/lib/cache": {},
+      "@/lib/media-cache": {},
+    },
+    { URL, AbortSignal, TextDecoder },
+  );
+  const old = new AbortController();
+  const fresh = new AbortController();
+  const run = (signal) => tmdb.get("fixture", "search/multi", { query: "One Piece" }, { signal });
+  const stale = assert.rejects(run(old.signal), { name: "AbortError" });
+  const latest = run(fresh.signal);
+  assert.notEqual(queued[0].key, queued[1].key);
+  old.abort();
+  await Promise.all(queued.map(({ run }) => run()));
+  await stale;
+  assert.deepEqual(Object.keys(await latest), ["results"]);
+  assert.deepEqual(sent, ["One Piece"]);
 });
 
 const completeMeta = (name) => ({

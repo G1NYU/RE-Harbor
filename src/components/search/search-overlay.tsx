@@ -8,6 +8,7 @@ import { tvFocus } from "@/lib/keyboard-navigation";
 import { useT } from "@/lib/i18n";
 import type { Meta } from "@/lib/cinemeta";
 import { useSearch } from "@/lib/search-context";
+import { matchPersonForQuery } from "@/lib/search-top-match";
 import { useView } from "@/lib/view";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/feed/tags";
 import { warmAnimeResolution } from "@/lib/anime-detect";
@@ -23,7 +24,7 @@ import { LiveTvRow } from "./live-tv-row";
 import { TopMatch } from "./top-match";
 import { CollectionHitsRow } from "./collection-pane";
 import { ExplorePane, type ExploreFrame } from "./explore-pane";
-import { matchPersonForQuery, PersonTopMatch } from "./person-top-match";
+import { PersonTopMatch } from "./person-top-match";
 import { PeopleRow } from "./people-row";
 import { collectionForTitle, useCollectionHits } from "./use-collection-hits";
 import { MetaList } from "./meta-list";
@@ -67,7 +68,8 @@ export function SearchOverlay() {
   const resultsBodyRef = useRef<HTMLDivElement>(null);
   const scrollMemory = useRef({ key: "", top: 0 });
   const backdropGesture = useRef<(() => void) | null>(null);
-  const { openFilter, openMeta, openPerson, setView } = useView();
+  const { openFilter, openMeta, openPerson, setView, topPath } = useView();
+  const navigationOrigin = useRef<string | null>(null);
   const [explore, setExplore] = useState<ExploreFrame[]>([]);
   const t = useT();
   const [guideOpen, setGuideOpen] = useState(false);
@@ -86,6 +88,10 @@ export function SearchOverlay() {
     setMediaFilter("all");
   }, [query]);
   const { mounted, closing } = useExitPresence(open, 150);
+  // The destination has its own entrance. Take the result tree out of the
+  // same frames once navigation commits, while ordinary dismissal still fades.
+  const present =
+    mounted && (open || navigationOrigin.current == null || navigationOrigin.current === topPath);
   const fullscreen = useWindowFullscreen();
   // The exit animation unmounts the panel; retain its position outside that DOM.
   const scrollKey = JSON.stringify([activeProfile?.id, query, mediaFilter, aiMode, explore]);
@@ -93,10 +99,10 @@ export function SearchOverlay() {
     if (scrollMemory.current.key !== scrollKey) {
       scrollMemory.current = { key: scrollKey, top: 0 };
     }
-    if (mounted && resultsBodyRef.current) {
+    if (present && resultsBodyRef.current) {
       resultsBodyRef.current.scrollTop = scrollMemory.current.top;
     }
-  }, [mounted, scrollKey]);
+  }, [present, scrollKey]);
 
   useEffect(
     () => () => backdropGesture.current?.(),
@@ -129,11 +135,17 @@ export function SearchOverlay() {
   const commit = () => {
     backdropGesture.current?.();
     if (query.trim() && results) recordRecent(query);
+    finishNavigation();
+  };
+
+  const finishNavigation = () => {
+    navigationOrigin.current = topPath;
     closeForNavigation();
   };
 
   useEffect(() => {
     if (!open) return;
+    navigationOrigin.current = null;
     const prevFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const id = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 30);
@@ -208,7 +220,7 @@ export function SearchOverlay() {
       : trimmedQ;
   const collectionHits = useCollectionHits(collectionsQuery);
 
-  if (!mounted) return null;
+  if (!present) return null;
 
   const beginDragOrClose = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget || e.button !== 0 || !open || closing) return;
@@ -285,14 +297,14 @@ export function SearchOverlay() {
       const id = (intent.mediaType === "movie" ? MOVIE_GENRES : TV_GENRES)[intent.genre];
       if (typeof id === "number") {
         recordRecent(query);
-        closeForNavigation();
+        finishNavigation();
         openFilter({ kind: "genre", mediaType: intent.mediaType, name: intent.genre, id });
       }
       return;
     }
     if (intent.kind === "year") {
       recordRecent(query);
-      closeForNavigation();
+      finishNavigation();
       openFilter({ kind: "year", mediaType: "movie", value: intent.year });
     }
   };
@@ -323,7 +335,11 @@ export function SearchOverlay() {
   const shownAddonGroups = (currentResults?.addonGroups ?? []).filter(
     (group) => !addonFilter || group.id === addonFilter,
   );
-  const personMatch = matchPersonForQuery(currentResults?.people, trimmed);
+  const personMatch = matchPersonForQuery(
+    currentResults?.people,
+    trimmed,
+    currentResults?.topMatch,
+  );
   const magnetInput = !!trimmed && isMagnetInput(trimmed);
   const urlInput = !!trimmed && !magnetInput && isDirectVideoUrl(trimmed);
   const directInput = magnetInput || urlInput;

@@ -1,6 +1,6 @@
 import type { Addon } from "./addons";
 import type { Meta } from "./cinemeta";
-import type { AnimeHit, SearchResults } from "./search";
+import type { AnimeHit, SearchPerson, SearchResults } from "./search";
 import { addonConfigurationKey } from "./addon-configuration-key";
 import { metadataAddonKey, orderedMetadataAddons } from "./metadata-addons";
 import { normalizeSearchQuery } from "./search-query";
@@ -18,6 +18,20 @@ function titleKey(value: string): string {
 export function sameSearchTitle(name: string | null | undefined, query: string): boolean {
   if (!name) return false;
   return titleKey(name) === titleKey(query);
+}
+
+export function matchPersonForQuery(
+  people: SearchPerson[] | undefined,
+  query: string,
+  title?: SearchResults["topMatch"],
+): SearchPerson | null {
+  const person = people?.[0];
+  const wanted = titleKey(query);
+  if (!person?.profile || wanted.length < 3) return null;
+  const name = titleKey(person.name);
+  if (name === wanted) return person;
+  if (sameSearchTitle(title?.meta.name, query)) return null;
+  return name.startsWith(wanted) ? person : null;
 }
 
 function animeYear(hit: AnimeHit): number {

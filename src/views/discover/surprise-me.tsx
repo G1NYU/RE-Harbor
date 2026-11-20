@@ -1,5 +1,5 @@
 import { Dices } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePosterChain } from "@/components/poster";
 import type { Meta } from "@/lib/cinemeta";
 import { useT } from "@/lib/i18n";
@@ -12,7 +12,7 @@ import { externalWatchedIds, subscribeExternalWatched } from "@/lib/feed/externa
 import { useAuth } from "@/lib/auth";
 import { libraryIfChanged } from "@/lib/stremio";
 import { stremioMovieWatched } from "@/lib/stremio-watched";
-import { filterSurprisePool } from "./surprise-me-filter";
+import { filterSurprisePool, reconcileSurpriseTiles } from "./surprise-me-filter";
 
 const EXCLUDE_WATCHED_KEY = "harbor.discover.surprise.hide-watched-movies.v1";
 
@@ -30,15 +30,6 @@ function updateExcludeWatched(value: boolean): void {
   } catch {
     // In private mode, preserve the choice for the current session.
   }
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const out = [...arr];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
 }
 
 export function SurpriseMe({ pool }: { pool: Meta[] }) {
@@ -99,7 +90,8 @@ export function SurpriseMe({ pool }: { pool: Meta[] }) {
   );
 
   useEffect(() => {
-    setTiles(shuffle(eligible).slice(0, 18));
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    setTiles((current) => reconcileSurpriseTiles(current, eligible, seed));
   }, [eligible]);
 
   const surprise = () => {
@@ -110,7 +102,7 @@ export function SurpriseMe({ pool }: { pool: Meta[] }) {
         pick = eligible[Math.floor(Math.random() * eligible.length)];
     }
     lastRef.current = pick.id;
-    setTiles(shuffle(eligible).slice(0, 18));
+    setTiles(reconcileSurpriseTiles([], eligible));
     openMeta(pick);
   };
 
@@ -156,8 +148,8 @@ export function SurpriseMe({ pool }: { pool: Meta[] }) {
         className="group relative flex min-h-[56px] flex-1 items-center overflow-hidden rounded-2xl ring-1 ring-edge-soft/50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <div className="absolute inset-0 flex">
-          {tiles.map((m, i) => (
-            <SurpriseTile key={`${m.id}-${i}`} meta={m} />
+          {tiles.map((m) => (
+            <SurpriseTile key={m.id} meta={m} />
           ))}
         </div>
         <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/85 to-canvas/30" />
@@ -183,7 +175,7 @@ export function SurpriseMe({ pool }: { pool: Meta[] }) {
   );
 }
 
-function SurpriseTile({ meta }: { meta: Meta }) {
+const SurpriseTile = memo(function SurpriseTile({ meta }: { meta: Meta }) {
   const { settings } = useSettings();
   const poster = usePosterChain(
     settings.rpdbKey,
@@ -201,4 +193,4 @@ function SurpriseTile({ meta }: { meta: Meta }) {
       className="h-full min-w-0 flex-1 object-cover transition-transform duration-700 group-hover:scale-[1.04]"
     />
   );
-}
+});

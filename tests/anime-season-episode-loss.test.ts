@@ -67,6 +67,6 @@ test("the panel builder claims each matched episode exactly once", () => {
   assert.match(matcher, /claimed\.has\(absMatch\.id\)/);
   assert.match(src, /if \(match\) claimed\.add\(match\.id\);/);
   const claimIdx = src.indexOf("if (match) claimed.add(match.id);");
-  const pushIdx = src.indexOf("eps.push(ep);");
+  const pushIdx = src.indexOf("eps.push({");
   assert.ok(claimIdx > 0 && claimIdx < pushIdx, "a slot must be claimed before it is kept");
 });

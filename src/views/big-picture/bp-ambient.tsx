@@ -66,24 +66,17 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
   // whenever that title had not resolved yet the fallback won, committed under
   // the focused id, and latched committedFor so the real art never replaced it.
   // That is the Spider-Man backdrop sitting behind a focused Silo.
+  const preferredBackdrop = detail?.textlessBackdrops?.[0] ?? detail?.gallery.backdrops[0];
   const candidates = useMemo(() => {
     const own: BpHeroSource[] = [
-      { url: art(detail?.gallery.backdrops[0]), portrait: false },
+      { url: art(preferredBackdrop), portrait: false },
       { url: art(detail?.backdrop), portrait: false },
       { url: art(meta?.background), portrait: false },
       ...(anime ? pool.slice(0, 6).map((m) => ({ url: art(m.background), portrait: false })) : []),
       { url: meta?.poster, portrait: true },
     ];
     return bpHeroCandidates(meta ? own : fallback ? [fallback] : [], settings.heroFullQuality);
-  }, [
-    anime,
-    pool,
-    detail?.backdrop,
-    detail?.gallery.backdrops[0],
-    meta,
-    fallback,
-    settings.heroFullQuality,
-  ]);
+  }, [anime, pool, detail?.backdrop, preferredBackdrop, meta, fallback, settings.heroFullQuality]);
 
   const { src: trailerSrc } = useBpTrailer(ownsTitle ? meta : null);
   const [trailerReady, setTrailerReady] = useState(false);

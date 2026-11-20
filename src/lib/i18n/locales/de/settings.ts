@@ -1962,8 +1962,8 @@ const settings: Record<string, string> = {
   "Show Simkl Trending Today rail": "Leiste „Heute im Trend bei Simkl“ anzeigen",
   "Show Simkl rails on Home": "Simkl-Leisten auf der Startseite anzeigen",
   "Show Up Next on Simkl rail": "„Als Nächstes“ in der Simkl-Leiste anzeigen",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Zeige die Schaltfläche „Intro überspringen“ / „Abspann überspringen“ an, wenn Harbor einen solchen Abschnitt erkennt. Schalte dies aus, um sie nie anzuzeigen. Du kannst auch auf das X der Schaltfläche tippen, um eine falsche Erkennung für den Rest der Folge auszublenden.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Zeige die Schaltfläche „Intro überspringen“ / „Abspann überspringen“ an, wenn Harbor einen solchen Abschnitt erkennt. Schalte dies aus, um sie nie anzuzeigen. Die Schaltfläche blendet sich selbst aus, wenn Intro oder Abspann enden, oder nach der Verzögerung unten.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Bei einer bekannten eingeschleusten Werbeanzeige eine Schaltfläche „Überspringen“ und bei Neuveröffentlichungen eine kleine Schaltfläche „Melden“ anzeigen, damit du Werbung zur Überprüfung markieren kannst.",
   "Show a bookmark on saved titles": "Lesezeichen für gespeicherte Titel anzeigen",

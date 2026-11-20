@@ -12,6 +12,43 @@ import { AnilistApiError } from "../src/lib/anilist/errors.ts";
 const json = (data: unknown) => Response.json({ data });
 const meta = { id: "mal:1", type: "series" as const, name: "Cowboy Bebop" };
 
+test("an obsolete search releases the catalog queue without affecting the latest search", async () => {
+  const old = new AbortController();
+  let markStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  const calls: string[] = [];
+  const client = createAnimeCatalogClient({
+    intervalMs: 0,
+    fetch: async (url, init) => {
+      const query = new URL(String(url)).searchParams.get("q") ?? "";
+      calls.push(query);
+      if (query === "old") {
+        markStarted();
+        await new Promise((_, reject) =>
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+            once: true,
+          }),
+        );
+      }
+      return json([{ mal_id: 1 }]);
+    },
+  });
+  const stale = Promise.allSettled([
+    client("/anime?q=old", old.signal),
+    client("/anime?q=queued", old.signal),
+  ]);
+  await started;
+  old.abort();
+  assert.deepEqual(await client("/anime?q=latest"), { data: [{ mal_id: 1 }] });
+  assert.deepEqual(
+    (await stale).map(({ status }) => status),
+    ["rejected", "rejected"],
+  );
+  assert.deepEqual(calls, ["old", "latest"]);
+});
+
 test("catalog shares concurrent requests and never sends account credentials", async () => {
   const calls: string[] = [];
   const client = createAnimeCatalogClient({

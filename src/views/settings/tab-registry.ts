@@ -4,7 +4,7 @@ import simklLogo from "@/assets/simkl.png";
 import traktLogo from "@/assets/trakt.svg";
 import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
 import publicmetadbLogo from "@/assets/publicmetadb.svg";
-import refractLogo from "@/assets/refract.svg";
+import refractLogo from "@/assets/refract.png";
 import nuvioLogo from "@/assets/nuvio.png";
 import stremioLogo from "@/assets/stremio.png";
 import type { SectionId } from "./shared";

@@ -81,16 +81,26 @@ const SeasonCardTitle = memo(function SeasonCardTitle({
 function SeasonPoster({
   src,
   name,
+  enabled = true,
   onError,
 }: {
   src?: string;
   name: string;
+  enabled?: boolean;
   onError: (src: string) => void;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
+  const [activated, setActivated] = useState(enabled);
   useEffect(() => setFailed(null), [src]);
+  useEffect(() => {
+    if (enabled) setActivated(true);
+  }, [enabled]);
   const usable = src && src !== failed ? src : undefined;
-  const cachedSrc = useProxiedImageSrc(usable, { forceProxy: true, persistent: true });
+  const cachedSrc = useProxiedImageSrc(usable, {
+    forceProxy: true,
+    persistent: true,
+    enabled: enabled || activated,
+  });
   return usable ? (
     <img
       src={cachedSrc}
@@ -206,7 +216,12 @@ const SeasonCard = memo(function SeasonCard({
       className={`season-explorer-card flex w-[136px] shrink-0 snap-start flex-col items-stretch rounded-xl p-1 text-start transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-[164px] ${selected ? "bg-accent/10 text-ink ring-1 ring-accent" : "text-ink-muted hover:bg-ink/5 hover:text-ink"}`}
     >
       <div className="aspect-[2/3] w-full shrink-0 overflow-hidden rounded-lg">
-        <SeasonPoster src={poster} name={item.name} onError={rejectPoster} />
+        <SeasonPoster
+          src={poster}
+          name={item.name}
+          enabled={nearby || focused || selected}
+          onError={rejectPoster}
+        />
       </div>
       <SeasonCardTitle
         text={title || label || item.name}
@@ -441,12 +456,11 @@ export function SeasonExplorer({
     };
   }, [cardMembership, setVisibleSeasons]);
 
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const revealSelected = (animate: boolean) => {
-      const button = rail.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
-      if (!button) return;
+  const revealSelected = useCallback(
+    (animate: boolean) => {
+      const rail = railRef.current;
+      const button = rail?.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+      if (!rail || !button) return;
       const bounds = rail.getBoundingClientRect();
       const card = button.getBoundingClientRect();
       const left =
@@ -456,8 +470,25 @@ export function SeasonExplorer({
             ? card.right - bounds.right + 4
             : 0;
       if (left) rail.scrollBy({ left, behavior: animate && !reducedMotion ? "smooth" : "auto" });
+    },
+    [reducedMotion],
+  );
+
+  useEffect(() => {
+    // Let the episode grid's new layout paint before measuring the selected card.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => revealSelected(true));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
     };
-    revealSelected(true);
+  }, [activeKey, cardMembership, revealSelected]);
+
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
     refreshGeometry();
     let frame = 0;
     let resized = false;
@@ -484,7 +515,7 @@ export function SeasonExplorer({
       cancelAnimationFrame(edgeFrame.current);
       edgeFrame.current = 0;
     };
-  }, [activeKey, cardMembership, reducedMotion, refreshGeometry]);
+  }, [cardMembership, refreshGeometry, revealSelected]);
 
   useEffect(
     () => () => {
@@ -499,7 +530,11 @@ export function SeasonExplorer({
   const posterFor = (item: PickerItem) =>
     item.seasonNumber == null ? undefined : artwork.get(item.seasonNumber)?.poster || item.poster;
   return (
-    <section aria-labelledby={titleId} className="flex min-w-0 flex-col gap-3">
+    <section
+      aria-labelledby={titleId}
+      data-scroll-anchor="detail-seasons"
+      className="flex min-w-0 flex-col gap-3"
+    >
       <h3 id={titleId} className="text-[22px] font-medium tracking-tight text-ink">
         {t("Seasons")}
       </h3>

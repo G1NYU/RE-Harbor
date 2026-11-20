@@ -1,6 +1,7 @@
 import { findTopAward, parseAwardYear } from "@/lib/anime-awards";
 import { resolveHeroArt, type HeroArt } from "@/lib/anime-backdrop";
 import { peekAnimeArt, saveAnimeArt } from "@/lib/providers/anime-art-cache";
+import { animeArtworkKind } from "@/lib/providers/anime-format";
 import {
   ensureStaticHeroArt,
   peekStaticHeroArt,
@@ -21,7 +22,7 @@ export function heroSourceLabel(source?: string): string {
 
 const isAnimeId = (id: string) => /^(kitsu|mal|anilist|anidb):/.test(id);
 
-const HERO_CACHE_KEY = "harbor.anime.hero.v4";
+const HERO_CACHE_KEY = "harbor.anime.hero.v5";
 const HERO_TTL_MS = 3 * 60 * 60 * 1000;
 const HERO_DESC_MAX = 320;
 
@@ -63,6 +64,7 @@ export function cacheHero(built: HeroBuilt, sig: string): void {
 }
 
 function cleanMeta(m: Meta): Meta {
+  if (animeArtworkKind(m) === "movie") return m;
   const cleaned = stripFranchiseSuffix(m.name);
   return cleaned === m.name ? m : { ...m, name: cleaned };
 }
@@ -72,7 +74,7 @@ export async function upgradeHeroArtFromStatic(built: HeroBuilt): Promise<HeroBu
   return {
     trending: built.trending,
     metas: built.metas.map((m) => {
-      const s = peekStaticHeroArt(m.id);
+      const s = peekStaticHeroArt(m.id, animeArtworkKind(m));
       if (!s) return m;
       const hiRes = !!s.bg && !s.bg.includes("anilist.co");
       const background = hiRes ? s.bg : m.background;
@@ -211,8 +213,9 @@ async function pickHeroRoots(built: HeroBuilt, filterOpts: AnimeFilterOpts): Pro
   const seen = new Set<string>();
   const picks: HeroPick[] = [];
   for (const m of filtered) {
-    if (isAnimeId(m.id)) prefetchFranchiseRoot(m.id);
-    const rootId = (isAnimeId(m.id) ? franchiseRootSync(m.id) : null) ?? m.id;
+    const useFranchiseRoot = isAnimeId(m.id) && animeArtworkKind(m) === "tv";
+    if (useFranchiseRoot) prefetchFranchiseRoot(m.id);
+    const rootId = (useFranchiseRoot ? franchiseRootSync(m.id) : null) ?? m.id;
     if (seen.has(rootId)) continue;
     seen.add(rootId);
     picks.push({ meta: m, rootId, src: built.trending[m.id] });
@@ -258,12 +261,13 @@ async function hydrateSlide(
         }
       : { ...meta, id: rootId };
   }
+  const kind = animeArtworkKind(slide);
   const stat = await withTimeout(
-    staticHeroArt(slide.id).catch(() => undefined),
+    staticHeroArt(slide.id, kind).catch(() => undefined),
     2500,
     undefined,
   );
-  const cached = stat?.bg ? undefined : peekAnimeArt(slide.id);
+  const cached = stat?.bg ? undefined : peekAnimeArt(slide.id, kind);
   let background: string | undefined;
   let logo: string | undefined;
   if (stat?.bg) {
@@ -281,7 +285,7 @@ async function hydrateSlide(
     );
     background = art.background ?? slide.background ?? slide.poster;
     logo = art.logo ?? slide.logo;
-    saveAnimeArt(slide.id, { bg: art.background, logo: art.logo });
+    saveAnimeArt(slide.id, kind, { bg: art.background, logo: art.logo });
   }
   await preloadImage(background);
   return { meta: { ...slide, background, logo }, src: pick.src };

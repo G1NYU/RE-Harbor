@@ -393,6 +393,7 @@ export async function signOutNuvio(): Promise<void> {
         k.startsWith("harbor.watchedFlag.nuvio.") ||
         k.startsWith("harbor.watchlist.v1.nuvio.") ||
         k.startsWith("harbor.watchlist.aggregate.v1.nuvio.") ||
+        k.startsWith("harbor.watchlistSeriesFinished.v1.nuvio-") ||
         k.startsWith("harbor.localcw.v1.nuvio-") ||
         k.startsWith("harbor.localcw.private.v1.nuvio-") ||
         k.startsWith("harbor.resume.private.v1.nuvio-") ||

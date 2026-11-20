@@ -5,6 +5,7 @@ import type { Meta } from "@/lib/cinemeta";
 import { resolveLogo } from "@/lib/logo";
 import { resolveMeta } from "@/lib/meta-resource";
 import { peekAnimeArt } from "@/lib/providers/anime-art-cache";
+import { animeArtworkKind } from "@/lib/providers/anime-format";
 import { tmdbIdFromImdb, tmdbImdbId, type Season } from "@/lib/providers/tmdb";
 import { get, effectiveTmdbLanguage } from "@/lib/providers/tmdb/tmdb-client";
 import { tmdbBackdropUrl } from "@/lib/providers/tmdb/tmdb-image-rungs";
@@ -153,7 +154,7 @@ export function useDownloadTitle(meta: Meta, isCurrent: () => boolean) {
       cancelled = true;
     };
   }, [display, settings.tmdbKey, settings.tmdbImageLangs, settings.tmdbLanguage, anime]);
-  const cachedAnime = anime ? peekAnimeArt(meta.id) : undefined;
+  const cachedAnime = anime ? peekAnimeArt(meta.id, animeArtworkKind(meta)) : undefined;
   const stableLogo = useStableAsset([loadedLogo, display.logo], meta.id);
   const stableBackdrop = useStableAsset(
     [cachedAnime?.bg, loadedBackdrop, display.background],

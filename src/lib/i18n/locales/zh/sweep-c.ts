@@ -413,6 +413,8 @@ const sweepC: Record<string, string> = {
   "Go to episode": "跳转到剧集",
   "Go to host": "前往托管网站",
   "Go to live": "回到直播",
+  "Episode pages": "剧集分页",
+  "Go to page": "前往页面",
   "Go to page {page}": "前往第{page}页",
   "Go to pages {pages}": "前往第{pages}页",
   "Golden Bear": "金熊奖",

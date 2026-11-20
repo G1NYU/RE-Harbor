@@ -80,21 +80,42 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   const preview = useThemePreview();
   const fullscreen = useWindowFullscreen();
   const maxed = useMaximized();
-  const [scrolled, setScrolled] = useState(false);
-  const scrolledRef = useRef(false);
+  const blurRef = useRef<HTMLDivElement>(null);
+  const scrollBlur =
+    !chromeHidden &&
+    view !== "settings" &&
+    settings.topbarScrollBlur &&
+    settings.topbarAppearance !== "transparent";
   useEffect(() => {
-    const onScroll = (e: Event) => {
-      const el = e.target;
-      if (!(el instanceof HTMLElement) || el.tagName !== "MAIN") return;
-      const next = el.scrollTop > 40;
-      if (next !== scrolledRef.current) {
-        scrolledRef.current = next;
-        setScrolled(next);
-      }
+    const blur = blurRef.current;
+    if (!scrollBlur || !blur) return;
+    let frame = 0;
+    let main: HTMLElement | null = document.querySelector(".harbor-layer-active main");
+    let scrolled = false;
+    const update = () => {
+      frame = 0;
+      const next = (main?.scrollTop ?? 0) > 40;
+      if (next === scrolled) return;
+      scrolled = next;
+      blur.style.opacity = next ? "1" : "0";
     };
-    document.addEventListener("scroll", onScroll, true);
-    return () => document.removeEventListener("scroll", onScroll, true);
-  }, []);
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target.tagName !== "MAIN") return;
+      if (target !== main) {
+        if (!target.closest(".harbor-layer-active")) return;
+        main = target;
+      }
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    blur.style.opacity = "0";
+    frame = requestAnimationFrame(update);
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+  }, [scrollBlur, topKind]);
   if (chromeHidden && !connecting) return null;
   const layout = kid ? "sidebar" : preview ? preview.layout : activeLayout(settings.theme);
   const onLiveRoot = topKind === "live" && liveHasSources;
@@ -124,12 +145,13 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
       data-cleannav={settings.topbarAppearance === "transparent" ? "on" : undefined}
       className={`pointer-events-none fixed inset-x-0 top-0 ${connecting ? "z-[130]" : "z-[55]"} h-20`}
     >
-      {!inSettings && settings.topbarScrollBlur && settings.topbarAppearance !== "transparent" && (
+      {scrollBlur && (
         <div
+          ref={blurRef}
           aria-hidden
           className="pointer-events-none absolute inset-0 transition-opacity duration-[350ms] ease-out"
           style={{
-            opacity: scrolled ? 1 : 0,
+            opacity: 0,
             background: "color-mix(in oklch, var(--color-canvas), transparent 20%)",
             backdropFilter: "blur(14px) saturate(115%)",
             WebkitBackdropFilter: "blur(14px) saturate(115%)",

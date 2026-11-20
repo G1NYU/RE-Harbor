@@ -28,6 +28,7 @@ import gestdownLogo from "@/assets/service-logos/gestdown.png";
 import wyzieLogo from "@/assets/wyzie.png";
 import traktLogo from "@/assets/trakt.svg";
 import simklLogo from "@/assets/simkl.png";
+import refractLogo from "@/assets/refract.png";
 import anilistLogo from "@/assets/anilist.png";
 import malLogo from "@/assets/mal.png";
 import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
@@ -393,6 +394,12 @@ const TRACKERS: Credit[] = [
     blurb: "Account sign-in, watch history and scrobbling, including anime.",
     url: "https://simkl.com",
     logo: simklLogo,
+  },
+  {
+    name: "Refract",
+    blurb: "Movie and episode watch history, automatic playback logging and Plan to Watch updates.",
+    url: "https://getrefract.app",
+    logo: refractLogo,
   },
   {
     name: "AniList",

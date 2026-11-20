@@ -8,7 +8,7 @@ import { EpisodePager } from "./episode-pager";
 
 const PAGE_SIZE = 50;
 
-export function EpisodeGrid<T extends { number: number } = GridEpisode>({
+export function EpisodeGrid<T extends { number: number; displayNumber?: number } = GridEpisode>({
   meta,
   episodes,
   progressFor,
@@ -51,7 +51,11 @@ export function EpisodeGrid<T extends { number: number } = GridEpisode>({
   const safePage = Math.min(page, pageCount - 1);
   const pageItems = displayed.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
   const maxEpisode = useMemo(
-    () => episodes.reduce((m, e) => (e.number > m ? e.number : m), 0),
+    () =>
+      episodes.reduce(
+        (m, e) => ((e.displayNumber ?? e.number) > m ? (e.displayNumber ?? e.number) : m),
+        0,
+      ),
     [episodes],
   );
 
@@ -62,7 +66,7 @@ export function EpisodeGrid<T extends { number: number } = GridEpisode>({
     );
   };
   const goToEpisode = (n: number) => {
-    const idx = displayed.findIndex((e) => e.number === n);
+    const idx = displayed.findIndex((e) => (e.displayNumber ?? e.number) === n);
     if (idx >= 0) change(Math.floor(idx / PAGE_SIZE));
   };
 

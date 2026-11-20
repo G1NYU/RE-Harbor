@@ -1,4 +1,3 @@
-import { addonOnlyMetadata } from "@/lib/metadata-policy";
 import { posterTransformEnabledFromStorage } from "@/lib/metadata-sources";
 import { normalizeLang } from "@/lib/subtitles/language";
 
@@ -197,11 +196,9 @@ function posterServiceArt(
   base: string,
   mediaType: "movie" | "series" | undefined,
 ): string | undefined {
-  if (addonOnlyMetadata() && (!posterTransformEnabledFromStorage() || (!key && !base))) {
-    return fallback;
-  }
+  if (!key && !base) return fallback;
   const parsed = parseMetaId(metaId);
-  if (!parsed) return fallback;
+  if (!parsed || !posterTransformEnabledFromStorage()) return fallback;
   const id = mergeAlt(parsed, altId);
   if (mediaType) id.mediaType = mediaType;
 
@@ -237,13 +234,18 @@ function posterServiceArt(
 }
 
 export function needsImdbForPoster(key: string, metaId: string, base = posterBase): boolean {
-  if (rpdbPoster(key, metaId, undefined, undefined, base)) return false;
-  if (!base && !key) return false;
-  return /^tmdb:(movie|tv):\d+$/.test(metaId);
+  return (
+    (!!key || !!base) &&
+    /^tmdb:(movie|tv):\d+$/.test(metaId) &&
+    !rpdbPoster(key, metaId, undefined, undefined, base)
+  );
 }
 
 export function needsTmdbForPoster(key: string, metaId: string, base = posterBase): boolean {
-  if (rpdbPoster(key, metaId, undefined, undefined, base)) return false;
-  if (!base) return false;
-  return typeof metaId === "string" && metaId.startsWith("tt");
+  return (
+    !!base &&
+    typeof metaId === "string" &&
+    metaId.startsWith("tt") &&
+    !rpdbPoster(key, metaId, undefined, undefined, base)
+  );
 }

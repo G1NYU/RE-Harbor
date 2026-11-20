@@ -6,7 +6,7 @@ import { rpdbPoster } from "@/lib/providers/rpdb";
 import { useSettings } from "@/lib/settings";
 import { claimUniqueArt, releaseUniqueArt } from "@/lib/unique-art";
 import { useView } from "@/lib/view";
-import { Row } from "./row";
+import { queueRowCardUpdate, Row } from "./row";
 import { Poster } from "./poster";
 
 type Lang = { iso: string; name: string; endonym: string; hue: number };
@@ -35,7 +35,7 @@ const LANGS: Lang[] = [
 export function LanguageTiles({ title }: { title?: string }) {
   const t = useT();
   return (
-    <Row title={title ?? t("Browse by Language")} min={210} shape="tile" alwaysActive>
+    <Row title={title ?? t("Browse by Language")} min={210} shape="tile">
       {LANGS.map((l) => (
         <LanguageTile key={l.iso} lang={l} />
       ))}
@@ -54,6 +54,7 @@ function LanguageTile({ lang }: { lang: Lang }) {
 
   useEffect(() => {
     let cancelled = false;
+    let cancelArtwork: (() => void) | undefined;
     const key = `lang:${lang.iso}`;
     tmdbDiscover(settings.tmdbKey, "tv", {
       with_original_language: lang.iso,
@@ -62,12 +63,16 @@ function LanguageTile({ lang }: { lang: Lang }) {
     })
       .then((list) => {
         if (cancelled) return;
-        const pool = list.filter((m) => m.background);
-        setBackdrops(claimUniqueArt(key, pool, (m) => m.id, 3));
+        cancelArtwork = queueRowCardUpdate(() => {
+          cancelArtwork = undefined;
+          const pool = list.filter((m) => m.background);
+          setBackdrops(claimUniqueArt(key, pool, (m) => m.id, 3));
+        });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
+      cancelArtwork?.();
       releaseUniqueArt(key);
     };
   }, [lang.iso, settings.tmdbKey]);

@@ -35,7 +35,7 @@
   transform: rotate(180deg);
 }
 .sh-esmap button {
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .sh-esmap button:disabled {
   opacity: 0.4;

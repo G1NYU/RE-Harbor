@@ -477,7 +477,7 @@ export const Hero = memo(function Hero({
                 ) : (
                   <Plus size={18} strokeWidth={2} />
                 )}
-                {inWatchlist ? t("In Watchlist") : t("Add to Watchlist")}
+                {inWatchlist ? t("In library") : t("Save to library")}
               </button>
             )}
           </div>
@@ -549,6 +549,19 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function upsizeTmdb(url?: string, full = false): string | undefined {
   if (!url) return url;
-  const size = full ? "original" : "w1280";
+  const size = full ? fullBackdropSize() : "w1280";
   return url.replace(/\/t\/p\/(w\d+|original)\//, `/t/p/${size}/`);
+}
+
+/**
+ * TMDB's image CDN serves fixed backdrop rungs and `original` can be 3840px wide.
+ * A 1080p window shows the hero at 1920 backing pixels, so decoding an 8MP image
+ * for it wasted four times the pixels on the Home carousel. w1920 covers every
+ * display up to 1920 backing pixels; wider displays keep the original.
+ */
+function fullBackdropSize(): string {
+  const ratio = typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1;
+  const backing = Math.round((typeof window === "undefined" ? 0 : window.innerWidth) * ratio);
+  if (backing > 1920) return "original";
+  return backing > 1280 ? "w1920" : "w1280";
 }

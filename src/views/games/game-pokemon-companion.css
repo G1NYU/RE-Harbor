@@ -16,7 +16,7 @@
   color: inherit;
 }
 .pokemon button {
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .pokemon button:disabled {
   opacity: 0.45;
@@ -1583,7 +1583,7 @@
 }
 .pokemon-choice-menu button {
   font: inherit;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   display: flex;
   align-items: center;
   justify-content: space-between;

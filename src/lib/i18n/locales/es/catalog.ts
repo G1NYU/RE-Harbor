@@ -955,6 +955,8 @@ const catalog: Record<string, string> = {
   GL: "GL",
   "Go to featured item {n}": "Ir al elemento destacado {n}",
   "Go to host": "Ir al sitio anfitrión",
+  "Episode pages": "Páginas de episodios",
+  "Go to page": "Ir a la página",
   "Go to page {page}": "Ir a la página {page}",
   "Go to pages {pages}": "Ir a las páginas {pages}",
   Good: "Buena",

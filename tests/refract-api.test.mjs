@@ -114,6 +114,42 @@ test("Refract is registered in the visible settings sidebar and tracker panel", 
   assert.match(panel, /active === "refract" && <RefractPanel/);
 });
 
+test("Refract appears in Licenses attribution under trackers with its existing logo", () => {
+  const panel = readFileSync(
+    new URL("../src/views/settings/licenses-panel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.ok(panel.includes('import refractLogo from "@/assets/refract.png";'));
+  const trackers = panel.slice(
+    panel.indexOf("const TRACKERS: Credit[] = ["),
+    panel.indexOf("const SUBTITLES: Credit[] = ["),
+  );
+  const refract = trackers.split('name: "Refract"')[1]?.split("},")[0];
+  assert.ok(refract, "Refract must be included among trackers");
+  assert.ok(refract.includes('url: "https://getrefract.app"'));
+  assert.ok(refract.includes("logo: refractLogo"));
+  assert.ok(panel.includes('title="Trackers and lists"'));
+  assert.ok(panel.includes("items={TRACKERS}"));
+});
+
+test("all Refract settings placements use the official 512px press-kit icon", () => {
+  const sources = [
+    "../src/views/settings/tab-registry.ts",
+    "../src/views/settings/trackers-panel.tsx",
+    "../src/views/settings/licenses-panel.tsx",
+  ];
+  for (const path of sources) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.ok(source.includes('import refractLogo from "@/assets/refract.png";'), path);
+    assert.ok(!source.includes("refract.svg"), path);
+  }
+  const logo = readFileSync(new URL("../src/assets/refract.png", import.meta.url));
+  assert.equal(logo.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(logo.readUInt32BE(16), 512);
+  assert.equal(logo.readUInt32BE(20), 512);
+  assert.equal(logo[25], 6);
+});
+
 test("automatic Refract playback threshold defaults to 70 percent and is configurable", () => {
   const original = globalThis.localStorage;
   const storage = new Map();

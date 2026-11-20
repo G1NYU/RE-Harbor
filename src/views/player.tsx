@@ -1281,10 +1281,10 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
   useSeekr({
     apiKey: settings.seekrApiKey,
     metaId: src.meta.id,
-    imdbId: resolvedImdbId ?? src.imdbId ?? null,
+    imdbId: src.imdbId ?? resolvedImdbId,
+    imdbIdVerified: src.imdbId ? src.imdbIdVerified : resolvedImdbVerified,
     type: src.meta.type,
-    season: src.episode?.season ?? null,
-    episode: src.episode?.episode ?? null,
+    episode: src.episode,
     durationSec: snap.durationSec,
     enabled: settings.seekPreviewEnabled,
     isLive: isLiveLike,
@@ -1649,7 +1649,7 @@ function NativePlayerView({ src }: { src: PlayerSrc }) {
       dir="ltr"
       className={`fixed z-[100] overflow-hidden ${docked ? "sports-player-dock" : "inset-0"} ${stageBg}`}
       style={{
-        ...(screenLocked ? { cursor: "default" } : cursorStyle),
+        ...(screenLocked ? { cursor: "var(--harbor-cursor-default, default)" } : cursorStyle),
         ...dockDrag.style,
         ...(src.pipDocked ? { visibility: "hidden", pointerEvents: "none" } : {}),
       }}

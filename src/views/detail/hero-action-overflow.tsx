@@ -1,4 +1,4 @@
-import { ArrowDownToLine, Ban, Bookmark, Check, MoreHorizontal, RotateCw, X } from "lucide-react";
+import { ArrowDownToLine, Check, MoreHorizontal, RotateCw, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { Meta } from "@/lib/cinemeta";
@@ -46,16 +46,32 @@ export function useHeroActionOverflow(rowRef: RefObject<HTMLDivElement | null>, 
       }
     };
     measure();
-    const ro = new ResizeObserver(measure);
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
+    const widths = new WeakMap<Element, number>();
+    const ro = new ResizeObserver((entries) => {
+      for (const { target, contentRect } of entries) {
+        if (widths.get(target) === contentRect.width) continue;
+        widths.set(target, contentRect.width);
+        schedule();
+      }
+    });
     ro.observe(row);
     if (section) ro.observe(section);
-    const mo = new MutationObserver(measure);
-    if (section) mo.observe(section, { childList: true, subtree: true });
-    window.addEventListener("resize", measure);
+    const mo = new MutationObserver(schedule);
+    mo.observe(row, { childList: true, characterData: true, subtree: true });
+    window.addEventListener("resize", schedule);
     return () => {
+      cancelAnimationFrame(frame);
       ro.disconnect();
       mo.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", schedule);
     };
   }, deps);
 
@@ -73,14 +89,10 @@ export function HeroActionOverflow({
   onWatched,
   watchedMark = false,
   showSync = false,
-  inWatchlist = false,
-  onToggleWatchlist,
   listItem = null,
   simkl = null,
   anilist = null,
   pmdb = null,
-  canDrop = false,
-  onDrop,
 }: {
   meta: Meta;
   isFav: boolean;
@@ -92,14 +104,10 @@ export function HeroActionOverflow({
   onWatched?: () => void;
   watchedMark?: boolean;
   showSync?: boolean;
-  inWatchlist?: boolean;
-  onToggleWatchlist?: () => void;
   listItem?: ListItemInput | null;
   simkl?: { harborId: string; type: "movie" | "series" } | null;
   anilist?: { harborId: string } | null;
   pmdb?: { harborId: string; type: "movie" | "series" } | null;
-  canDrop?: boolean;
-  onDrop?: () => void;
 }) {
   const t = useT();
   const { openPicker } = useView();
@@ -166,21 +174,6 @@ export function HeroActionOverflow({
           >
             {showSync && (
               <>
-                <Item
-                  icon={
-                    inWatchlist ? (
-                      <Check size={14} strokeWidth={2.4} />
-                    ) : (
-                      <Bookmark size={14} strokeWidth={2} />
-                    )
-                  }
-                  label={inWatchlist ? t("In Watchlist") : t("Add to Watchlist")}
-                  active={inWatchlist}
-                  onClick={() => {
-                    onToggleWatchlist?.();
-                    setMenu(null);
-                  }}
-                />
                 {simkl && (
                   <SimklMenuItems
                     harborId={simkl.harborId}
@@ -244,17 +237,6 @@ export function HeroActionOverflow({
                 active={watchedMark}
                 onClick={() => {
                   onWatched?.();
-                  setMenu(null);
-                }}
-              />
-            )}
-            {canDrop && (
-              <Item
-                icon={<Ban size={14} strokeWidth={2.1} />}
-                label={t("Drop show")}
-                danger
-                onClick={() => {
-                  onDrop?.();
                   setMenu(null);
                 }}
               />

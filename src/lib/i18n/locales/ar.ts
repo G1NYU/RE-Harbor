@@ -1,3 +1,4 @@
+import seekSteps from "./ar/seek-steps";
 import reviews from "./ar/reviews";
 import playOrders from "./ar/play-orders";
 import gameRomLibrary from "./ar/game-rom-library";
@@ -420,6 +421,7 @@ const ar: Record<string, string> = {
   ...reviews,
   ...queueBasket,
   ...liveWeb,
+  ...seekSteps,
   "Refract sync": "مزامنة Refract",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "زامن سجل المشاهدة والتغييرات في قائمة المشاهدة في Harbor مع Refract.",

@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
+import { LazyMount } from "@/components/lazy-mount";
 import { CollectionsRow } from "@/components/collections-row";
 import { CriticsPick } from "@/components/critics-pick";
 import { BrandTiles } from "@/components/brand-tiles";
@@ -652,7 +653,7 @@ export function Discover({ active = true }: { active?: boolean }) {
                     data-scroll-anchor={`discover:${item.key}`}
                     className="empty:hidden"
                   >
-                    {row}
+                    <LazyMount minHeight={340}>{row}</LazyMount>
                   </div>
                 ) : null;
               })}

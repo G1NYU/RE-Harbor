@@ -87,7 +87,7 @@
   font-size: 12px;
   max-width: 100%;
   text-overflow: ellipsis;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-mods-folder {
   margin-left: auto;

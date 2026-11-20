@@ -48,7 +48,7 @@ function frontSlides(metas: Meta[], opts: AnimeFilterOpts): Meta[] {
 }
 
 function malHeroMeta(it: MalHeroItem): Meta | null {
-  const art = peekStaticHeroArt(it.id);
+  const art = peekStaticHeroArt(it.id, it.format === "MOVIE" ? "movie" : "tv");
   if (!art?.bg) return null;
   return {
     id: it.id,

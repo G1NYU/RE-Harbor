@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { meta as fetchMeta } from "@/lib/cinemeta";
+import { createRequestScheduler } from "@/lib/request-scheduler";
 
 type Kind = "movie" | "series";
 
 const cache = new Map<string, string | null>();
 const inflight = new Map<string, Promise<void>>();
-const subs = new Set<() => void>();
+const subs = new Map<string, Set<() => void>>();
+const requests = createRequestScheduler({ concurrency: 3 });
 
 export function cinemetaRatingCached(imdbId: string | undefined): string | undefined {
   if (!imdbId) return undefined;
@@ -14,7 +16,8 @@ export function cinemetaRatingCached(imdbId: string | undefined): string | undef
 
 export function cinemetaRatingPrefetch(imdbId: string, kind: Kind): void {
   if (!imdbId.startsWith("tt") || cache.has(imdbId) || inflight.has(imdbId)) return;
-  const p = fetchMeta(kind, imdbId)
+  const p = requests
+    .schedule(imdbId, () => fetchMeta(kind, imdbId))
     .then((m) => {
       cache.set(imdbId, m?.imdbRating ?? null);
     })
@@ -23,7 +26,7 @@ export function cinemetaRatingPrefetch(imdbId: string, kind: Kind): void {
     })
     .finally(() => {
       inflight.delete(imdbId);
-      for (const fn of subs) fn();
+      for (const fn of subs.get(imdbId) ?? []) fn();
     });
   inflight.set(imdbId, p);
 }
@@ -34,9 +37,12 @@ export function useCinemetaRating(imdbId: string | undefined): string | undefine
     setV(cinemetaRatingCached(imdbId));
     if (!imdbId) return;
     const fn = () => setV(cinemetaRatingCached(imdbId));
-    subs.add(fn);
+    const listeners = subs.get(imdbId) ?? new Set<() => void>();
+    listeners.add(fn);
+    subs.set(imdbId, listeners);
     return () => {
-      subs.delete(fn);
+      listeners.delete(fn);
+      if (listeners.size === 0) subs.delete(imdbId);
     };
   }, [imdbId]);
   return v;

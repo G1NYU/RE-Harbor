@@ -87,6 +87,13 @@ function harness() {
         return map;
       },
       invalidateSimklListStatus: () => {},
+      SIMKL_STATUS_LABELS: {
+        watching: "Watching",
+        plantowatch: "Plan to Watch",
+        completed: "Completed",
+        hold: "On Hold",
+        dropped: "Dropped",
+      },
     },
     "./simkl/watchlist": { invalidateWatchlistCache: () => {} },
     "./simkl/history": { invalidateHistoryCache: () => {} },
@@ -182,14 +189,37 @@ test("Trakt watchlist idempotent existing result is confirmed", async () => {
   await h.providers.watchlistProviderWrites(series, true)[0]!.run(current);
 });
 
-test("Simkl watchlist removal never invokes the destructive history endpoint", async () => {
+test("Simkl plan-to-watch with no history can be removed safely", async () => {
   const h = harness();
   h.state("plantowatch");
   const result = await h.providers
     .watchlistProviderWrites(series, false)
     .find((w) => w.provider === "Simkl")!
     .run(current);
+  assert.equal(result, undefined);
+  assert.equal(h.calls[0]?.path, "/sync/history/remove");
+  assert.deepEqual(h.calls[0]?.body, { shows: [{ ids: { imdb: "tt123" } }] });
+});
+
+test("Simkl plan-to-watch with history is left untouched", async () => {
+  const h = harness();
+  h.state("plantowatch", ["1:1"]);
+  const result = await h.providers
+    .watchlistProviderWrites(series, false)
+    .find((w) => w.provider === "Simkl")!
+    .run(current);
   assert.match(result!, /history|Simkl/);
+  assert.deepEqual(h.calls, []);
+});
+
+test("Simkl completed removal is left untouched with a status reason", async () => {
+  const h = harness();
+  h.state("completed", ["1:1"]);
+  const result = await h.providers
+    .watchlistProviderWrites(series, false)
+    .find((w) => w.provider === "Simkl")!
+    .run(current);
+  assert.match(result!, /already has a status/);
   assert.deepEqual(h.calls, []);
 });
 

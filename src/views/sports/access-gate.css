@@ -97,7 +97,7 @@
   border-radius: 10px;
   font-size: 14px;
   line-height: 1.55;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .sports-access-check input {
   width: 19px;

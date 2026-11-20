@@ -41,7 +41,7 @@
   background: var(--color-elevated);
   color: var(--color-ink);
   border-radius: 10px;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   transition:
     background 0.18s ease,
     transform 0.18s ease;
@@ -1531,12 +1531,12 @@
   position: absolute;
   inset: 0;
   width: 100%;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .sh-date-dock .sh-calendar-input input::-webkit-calendar-picker-indicator {
   width: 38px;
   height: 38px;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .sh-match-center {
   margin: 10px 0 40px;

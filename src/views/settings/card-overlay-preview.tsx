@@ -77,7 +77,7 @@ export function CardOverlayPreview({
         {watchlist !== "off" && (
           <span
             className={`absolute ${markCorner} flex ${layout === "tv" ? "h-6 w-6" : "h-5 w-5"} items-center justify-center rounded-full bg-canvas/85 text-ink ring-1 ring-edge-soft/70`}
-            title={t("In watchlist")}
+            title={t("In library")}
           >
             <Bookmark size={layout === "tv" ? 12 : 10} strokeWidth={2.6} fill="currentColor" />
           </span>

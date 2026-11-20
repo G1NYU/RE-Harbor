@@ -1,5 +1,6 @@
 import type { Addon } from "./addons";
 import { metadataAddonKey } from "./metadata-addons";
+import { readMetadataSettings } from "./metadata-policy";
 
 export type MetadataSourceSection =
   | "title"
@@ -31,11 +32,7 @@ export function posterTransformEnabled(settings: {
 
 export function posterTransformEnabledFromStorage(): boolean {
   try {
-    const settings = JSON.parse(localStorage.getItem("harbor.settings") ?? "{}") as {
-      addonOnlyMetadata?: boolean;
-      metadataSources?: MetadataSourceChain;
-    };
-    return posterTransformEnabled(settings);
+    return posterTransformEnabled(readMetadataSettings());
   } catch {
     return true;
   }

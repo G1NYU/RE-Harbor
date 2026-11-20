@@ -1,3 +1,4 @@
+import seekSteps from "./ko/seek-steps";
 import reviews from "./ko/reviews";
 import playOrders from "./ko/play-orders";
 import gameRomLibrary from "./ko/game-rom-library";
@@ -375,6 +376,7 @@ const ko: Record<string, string> = {
   ...reviews,
   ...queueBasket,
   ...liveWeb,
+  ...seekSteps,
   "Refract sync": "Refract 동기화",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "시청 기록과 Harbor 시청 목록의 변경 사항을 Refract와 동기화합니다.",

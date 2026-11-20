@@ -651,8 +651,8 @@ const settings: Record<string, string> = {
   "Show Simkl Trending Today rail": "إظهار صف Simkl الرائج اليوم",
   "Show Simkl rails on Home": "إظهار صفوف Simkl في الصفحة الرئيسية",
   "Show Up Next on Simkl rail": 'إظهار "التالي" في صف Simkl',
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "إظهار زر تخطّي المقدمة / تخطّي الشارة عندما يكتشف Harbor واحداً منها. عطّل هذا الخيار لعدم إظهاره أبداً. يمكنك أيضاً النقر على X على الزر لتجاهل زر خاطئ لبقية الحلقة.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "إظهار زر تخطّي المقدمة / تخطّي الشارة عندما يكتشف Harbor واحداً منها. عطّل هذا الخيار لعدم إظهاره أبداً. يُخفي الزر نفسه عند انتهاء المقدمة أو الشارة، أو بعد المهلة أدناه.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "إظهار زر تخطّي عند تشغيل إعلان مُدرَج معروف، وزر إبلاغ صغير على الإصدارات الجديدة لتتمكّن من وضع علامة على الإعلانات للمراجعة.",
   "Show a bookmark on saved titles": "إظهار إشارة مرجعية على العناوين المحفوظة",
@@ -1527,6 +1527,11 @@ const settings: Record<string, string> = {
   "Make everything bigger and easier to read: sidebar, menus, popups, every page. The whole interface scales live as you drag, so you can see the change right here. Great on 4K and ultrawide monitors, or whenever the text feels small.":
     "اجعل كل شيء أكبر وأسهل للقراءة: الشريط الجانبي، القوائم، النوافذ المنبثقة، كل صفحة. الواجهة بأكملها تتغير أثناء السحب. ممتاز للشاشات الكبيرة.",
   "Interface scale": "حجم الواجهة",
+  "Harbor cursor": "مؤشر هاربور",
+  "Harbor cursor size": "حجم مؤشر هاربور",
+  "settings.harborCursor.scale": "حجم المؤشر",
+  "Use Harbor's anchor as your mouse pointer.": "استخدم مرساة هاربور كمؤشر للماوس.",
+  "Adjust the size of Harbor's mouse pointer.": "ضبط حجم مؤشر Harbor.",
   "Trailer quality": "جودة العرض الدعائي",
   "How sharp the trailer is when you hit the preview button. Auto picks from your connection speed. 1080p and Best merge separate video and audio with the bundled ffmpeg, so they take a beat longer to start.":
     "مدى دقة المقطع الدعائي عند النقر على زر المعاينة. 'تلقائي' يختار بناءً على سرعة اتصالك. '1080p' و'الأفضل' يدمجان الفيديو والصوت المنفصلين عبر ffmpeg، لذا قد يستغرقان وقتاً أطول قليلاً للبدء.",

@@ -514,6 +514,8 @@ const wired: Record<string, string> = {
   "Gilded Trophies": "Trophées dorés",
   "Go to featured item {n}": "Accéder à l’élément mis en avant {n}",
   "Go to host": "Accéder à l’hébergeur",
+  "Episode pages": "Pages des épisodes",
+  "Go to page": "Aller à la page",
   "Go to page {page}": "Aller à la page {page}",
   "Go to pages {pages}": "Aller aux pages {pages}",
   Good: "Bon",

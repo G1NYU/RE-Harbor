@@ -177,6 +177,7 @@ test("Library tab removal uses the bookmark operation and preserves History", as
   };
   visit(source);
   assert.ok(callback);
+  let refractRemovals = 0;
   const code = ts.transpileModule(callback, {
     compilerOptions: { target: ts.ScriptTarget.ES2022 },
   }).outputText;
@@ -189,6 +190,7 @@ test("Library tab removal uses the bookmark operation and preserves History", as
     filmClosure: (ids: string[]) => new Set(ids),
     evictWatchlistAggregate() {},
     setStremio() {},
+    setStremioItems() {},
     setLocalEntries() {},
     setTrakt() {},
     setRawCount() {},
@@ -198,6 +200,9 @@ test("Library tab removal uses the bookmark operation and preserves History", as
     removeStremioLibraryItem: f.api.removeStremioLibraryItem,
     removeStremioBookmark: f.api.removeStremioBookmark,
     removeFromWatchlist() {},
+    prepareRefractLibraryRemoval: () => () => {
+      refractRemovals += 1;
+    },
     refreshWatchlistAggregates: async () => [],
     settings: {},
     mode: "library",
@@ -209,6 +214,7 @@ test("Library tab removal uses the bookmark operation and preserves History", as
     ...Object.values(scope),
   );
   await remove("tt1");
+  assert.equal(refractRemovals, 1);
   assert.equal(f.history.filterHistory([f.stored()]).length, 1);
   assert.equal(f.tab.filterLibrary([f.stored()], true, "library").length, 0);
 });

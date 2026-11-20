@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
+import { animeArtworkKind } from "../src/lib/providers/anime-format.ts";
 
 const jsx = (type, props) => ({ type, props });
 const runtime = { jsx, jsxs: jsx, Fragment: "fragment" };
@@ -84,6 +85,7 @@ function renderCard({
     },
     "@/components/card-score-stack": { ScoreStack },
     "@/components/card-status-badges": { stackTop },
+    "@/lib/providers/anime-format": { animeArtworkKind },
     "@/lib/providers/anime-hero-art-static": {
       peekStaticHeroArt: () => null,
       ensureStaticHeroArt: async () => {},

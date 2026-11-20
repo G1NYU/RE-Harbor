@@ -155,6 +155,8 @@ export function purgeStremioAccountData(profileId?: string): void {
       "harbor.watchlist.v1",
       `harbor.watchlist.aggregate.v1.${pid}`,
       "harbor.watchlist.aggregate.v1",
+      `harbor.watchlistSeriesFinished.v1.${pid}`,
+      "harbor.watchlistSeriesFinished.v1",
       `harbor.newEpisodes.dismissed.${pid}`,
     ];
     for (const k of keys) localStorage.removeItem(k);

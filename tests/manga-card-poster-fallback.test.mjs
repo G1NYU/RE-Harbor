@@ -24,9 +24,12 @@ test("manga browse poster tries HTTPS directly and switches to native proxy afte
   const mocks = {
     react: React,
     "react/jsx-runtime": jsx,
-    "./row": { ScrollRootContext: React.createContext(null) },
+    "./row": {
+      ScrollRootContext: React.createContext(null),
+      resolveRowScrollRoot: () => undefined,
+    },
     "@/lib/settings": { useSettings: () => ({ settings }) },
-    "@/lib/img-size": { qualityMultiplier: () => 0 },
+    "@/lib/img-size": { qualityMultiplier: () => 0, nativePosterThumbnailWidth: () => undefined },
     "@/lib/visibility": { observeWithin: () => () => {}, observeResize: () => () => {} },
     "@/lib/render-cause": { recordRenderCause: () => {}, noteProbe: () => {} },
     "@/lib/remote-image-proxy": {

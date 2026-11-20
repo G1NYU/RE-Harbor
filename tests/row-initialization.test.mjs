@@ -79,23 +79,29 @@ test("row initialization consumes observer width and passes the known page scrol
   ).outputText;
   const exports = {};
   new Function("require", "exports", code)((name) => mocks[name] ?? {}, exports);
-  const root = createRoot(document.querySelector("#app"));
-  const scroller = document.createElement("main");
+  const scroller = document.querySelector("#app");
+  const root = createRoot(scroller);
+  const scrollerRef = { current: scroller };
   try {
     await React.act(() =>
       root.render(
         React.createElement(
           exports.ScrollRootContext.Provider,
-          { value: scroller },
+          { value: scrollerRef },
           React.createElement(exports.Row, null),
         ),
       ),
     );
     assert.ok(roots.includes(scroller));
+    assert.equal(exports.resolveRowScrollRoot(scroller, document.body), undefined);
     const container = subscriptions.find(({ el }) => el.classList.contains("group/row"));
     assert.ok(container);
     await React.act(async () => {
       container.cb({ width: 1000, height: 240 });
+      const track = subscriptions.find(({ el }) => el.classList.contains("harbor-row-track"));
+      track.cb({ width: 1000, height: 240 });
+      track.el.dispatchEvent(new dom.window.Event("scroll"));
+      assert.equal(frames.size, 1, "initialization, resize, and scroll share one measurement");
       const pending = [...frames.values()];
       frames.clear();
       for (const frame of pending) frame(0);

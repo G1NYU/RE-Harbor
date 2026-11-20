@@ -2,11 +2,11 @@ use std::path::Path;
 
 /// Bundle identity comes from Info.plist, not an arbitrary executable inside Contents.
 #[cfg(target_os = "macos")]
-pub fn bundle_executable(bundle: &Path) -> Result<PathBuf, &'static str> {
+pub fn bundle_executable(bundle: &Path) -> Result<std::path::PathBuf, &'static str> {
     use std::{
         fs,
         io::{Cursor, Read},
-        path::{Component, PathBuf},
+        path::Component,
     };
     let root = bundle.canonicalize().map_err(|_| "launch_missing")?;
     let info = root.join("Contents/Info.plist");

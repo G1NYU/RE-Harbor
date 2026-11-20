@@ -7,7 +7,7 @@ import {
 } from "@/lib/theme";
 import { languageName } from "@/lib/subtitles/language";
 import { ORIGINAL_AUDIO_LANG } from "@/lib/player/audio-language";
-import { sanitizeSeekStep } from "@/lib/seek-step";
+import { sanitizeHalfSpeedRate, sanitizeSeekStep, sanitizeSpeedStep } from "@/lib/seek-step";
 import { migrateModelId, providerTabFor } from "@/lib/ai-models";
 import {
   sanitizeFullscreenClockFormat,
@@ -39,13 +39,21 @@ const RETIRED_GEMINI = new Set([
   "gemini-pro",
   "gemini-3-pro-preview",
 ]);
-import { DEFAULT, STORAGE_KEY } from "./defaults";
+import { DEFAULT, HARBOR_CURSOR_SCALE, STORAGE_KEY } from "./defaults";
 import type { Settings } from "./types";
 import { adoptLegacyPlaylists, readPlaylists } from "@/lib/iptv/playlists-store";
 import { sanitizeDisplaySelection } from "@/lib/monitors";
 import { migratePublicRelayUrl } from "@/lib/together/relay-version";
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+export function sanitizeHarborCursorScale(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT.harborCursorScale;
+  const { min, max, step } = HARBOR_CURSOR_SCALE;
+  const bounded = Math.min(max, Math.max(min, value));
+  const stepsPerUnit = 1 / step;
+  return Math.round(bounded * stepsPerUnit) / stepsPerUnit;
+}
 
 function sanitizePosterDockTransition(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -196,7 +204,6 @@ export function parseStoredSettings(raw: string | null): {
       _pickerLayoutStremio?: boolean;
       _pickerLayoutStremioV2?: boolean;
       _stremioDeeplinkOnByDefault?: boolean;
-      _skipButtonHideSecV2?: boolean;
       _anilistSyncOnV1?: boolean;
       /** Legacy shared toggle, now split per tracker. */
       syncIndicator?: boolean;
@@ -277,16 +284,6 @@ export function parseStoredSettings(raw: string | null): {
     }
     if (typeof parsed.contentAdvisoryShowIgnore !== "boolean") {
       parsed.contentAdvisoryShowIgnore = true;
-    }
-    if (!parsed._skipButtonHideSecV2) {
-      if (
-        parsed.skipButtonHideSec === 10 ||
-        parsed.skipButtonHideSec === 20 ||
-        parsed.skipButtonHideSec == null
-      ) {
-        parsed.skipButtonHideSec = 14;
-      }
-      parsed._skipButtonHideSecV2 = true;
     }
     if (!parsed._anilistSyncOnV1) {
       parsed.anilistAutoSync = true;
@@ -441,6 +438,8 @@ export function parseStoredSettings(raw: string | null): {
     const settings: Settings = {
       ...DEFAULT,
       ...parsed,
+      harborCursor: parsed.harborCursor === true,
+      harborCursorScale: sanitizeHarborCursorScale(parsed.harborCursorScale),
       anilistSyncIndicator:
         typeof parsed.anilistSyncIndicator === "boolean"
           ? parsed.anilistSyncIndicator
@@ -602,6 +601,17 @@ export function parseStoredSettings(raw: string | null): {
         parsed.seekForwardStepShortSec,
         DEFAULT.seekForwardStepShortSec,
       ),
+      seekBackStepLongSec: sanitizeSeekStep(
+        parsed.seekBackStepLongSec,
+        DEFAULT.seekBackStepLongSec,
+      ),
+      seekForwardStepLongSec: sanitizeSeekStep(
+        parsed.seekForwardStepLongSec,
+        DEFAULT.seekForwardStepLongSec,
+      ),
+      halfSpeedRate: sanitizeHalfSpeedRate(parsed.halfSpeedRate, DEFAULT.halfSpeedRate),
+      speedDownStep: sanitizeSpeedStep(parsed.speedDownStep, DEFAULT.speedDownStep),
+      speedUpStep: sanitizeSpeedStep(parsed.speedUpStep, DEFAULT.speedUpStep),
       theme: sanitizeTheme(parsed.theme),
       animeTitleLanguage:
         parsed.animeTitleLanguage === "romaji" || parsed.animeTitleLanguage === "native"

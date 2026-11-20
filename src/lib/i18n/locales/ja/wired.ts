@@ -298,6 +298,8 @@ const wired: Record<string, string> = {
   "Get your free TMDB key": "無料のTMDBキーを取得",
   "Get your free TheTVDB key": "無料のTheTVDBキーを取得",
   "Gilded Trophies": "金色のトロフィー",
+  "Episode pages": "エピソードページ",
+  "Go to page": "ページへ移動",
   "Go to page {page}": "ページ{page}へ移動",
   "Go to pages {pages}": "ページ{pages}へ移動",
   Good: "良好",

@@ -18,13 +18,7 @@ export function CuratedListTiles({ title }: { title?: string }) {
   const lists = shelfLists();
   if (lists.length === 0) return null;
   return (
-    <Row
-      title={title ?? t("The canon")}
-      min={210}
-      shape="tile"
-      scrollKey="discover:canon"
-      alwaysActive
-    >
+    <Row title={title ?? t("The canon")} min={210} shape="tile" scrollKey="discover:canon">
       {lists.map((list) => (
         <CuratedListTile key={list.id} list={list} />
       ))}

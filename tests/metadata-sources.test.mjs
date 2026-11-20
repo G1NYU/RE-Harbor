@@ -16,6 +16,9 @@ vm.runInNewContext(
     module,
     exports: module.exports,
     require(name) {
+      if (name === "./metadata-policy") {
+        return { readMetadataSettings: () => ({}) };
+      }
       assert.equal(name, "./metadata-addons");
       return { metadataAddonKey: (addon) => addon.manifest.id };
     },

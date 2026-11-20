@@ -364,7 +364,7 @@ test("rendered movie menu has no toolbar, image/sharing/waiting tools, or orphan
     assert.deepEqual(h.labels(), [
       "View details",
       "Download",
-      "Add to watchlist",
+      "Save to library",
       "Add to favorites",
       "Add to list",
     ]);

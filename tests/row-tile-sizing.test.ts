@@ -75,10 +75,11 @@ test("scroll padding no longer offsets snapping now that the track has no inline
 });
 
 test("row measurement never recomputes from a stale effMin after a style switch", () => {
+  assert.match(row, /const measureRef = useRef\(/, "the row keeps one stable measure entry point");
   assert.match(
     row,
-    /const measureRef = useRef\(measure\)/,
-    "measure must be held in a ref so the ResizeObserver sees the latest effMin",
+    /useLayoutEffect\(\(\) => \{\s*measureRef\.current =/,
+    "measure must be refreshed in a layout effect so the ResizeObserver sees the latest effMin",
   );
   assert.match(
     row,

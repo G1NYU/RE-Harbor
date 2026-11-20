@@ -161,7 +161,7 @@ export function BpQuickPanel({ onClose }: { onClose: () => void }) {
               icon={
                 saved ? <Check size={17} strokeWidth={2.4} /> : <Plus size={17} strokeWidth={2.4} />
               }
-              label={saved ? t("Saved") : t("Watchlist")}
+              label={saved ? t("In library") : t("Save to library")}
               onPress={() =>
                 toggleWatchlist({
                   id: focused.id,

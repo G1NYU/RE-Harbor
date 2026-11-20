@@ -1,7 +1,10 @@
+import { activeProfileId } from "@/lib/active-profile-id";
+import { randomUuid } from "@/lib/uuid";
 import { PmdbApiError, pmdbRequest } from "./client";
 import { markPmdbWatched } from "./history";
 import { getTmdbForExternal } from "./mappings";
-import { isAuthenticated } from "./session";
+import { retainPendingCompletion, type PendingResume } from "./pending-sync";
+import { getSession, isAuthenticated } from "./session";
 import type { PmdbResumeResponse, PmdbSaveResumeResponse, PmdbTarget } from "./types";
 
 const RESUME_LOOKUP_PER_PAGE = 100;
@@ -77,9 +80,12 @@ async function findResumeId(target: PmdbTarget): Promise<string | null> {
   return null;
 }
 
-export async function pmdbDeleteResumeForTarget(target: PmdbTarget): Promise<boolean> {
+export async function pmdbDeleteResumeForTarget(
+  target: PmdbTarget,
+  stillOwned?: () => boolean,
+): Promise<boolean> {
   const id = await findResumeId(target);
-  if (!id) return false;
+  if (!id || stillOwned?.() === false) return false;
   return pmdbDeleteResume(id);
 }
 
@@ -137,18 +143,10 @@ export async function pmdbSaveResume(
   if (!isAuthenticated()) return null;
 
   try {
-    const res = await pmdbRequest<PmdbSaveResumeResponse>("/api/external/resume", {
+    return await pmdbRequest<PmdbSaveResumeResponse>("/api/external/resume", {
       method: "POST",
       body: resumeBody(target, positionMs, runtimeMs),
     });
-
-    if (res?.action === "completed") {
-      void markPmdbWatched(target).then(() => {
-        void pmdbDeleteResumeForTarget(target);
-      });
-    }
-
-    return res;
   } catch (err) {
     if (!isRetry && err instanceof PmdbApiError && err.status === 409) {
       try {
@@ -163,6 +161,70 @@ export async function pmdbSaveResume(
     }
     console.error("PublicMetaDB resume save failed:", err);
     return null;
+  }
+}
+
+type Playback = {
+  id: string;
+  watchedAt?: string;
+  watched: boolean;
+  marking?: Promise<boolean>;
+};
+
+// Replayed snapshots share the completion state of their live player, when present.
+const activePlaybacks = new Map<string, Playback>();
+
+export function startPmdbPlayback(): Playback {
+  const playback: Playback = { id: randomUuid(), watched: false };
+  activePlaybacks.set(playback.id, playback);
+  return playback;
+}
+
+export function endPmdbPlayback(playback: Playback): void {
+  activePlaybacks.delete(playback.id);
+}
+
+export async function syncPmdbPlayback(snapshot: PendingResume): Promise<boolean> {
+  const { target, positionMs, runtimeMs, playbackId } = snapshot;
+  const playback = playbackId ? activePlaybacks.get(playbackId) : undefined;
+  const owner = activeProfileId();
+  const session = getSession();
+  const stillOwned = () => activeProfileId() === owner && getSession()?.apiKey === session?.apiKey;
+  if (!session) return false;
+  if (playback?.watched) return true;
+
+  if (!snapshot.watchedAt && !playback?.watchedAt) {
+    const response = await pmdbSaveResume(target, positionMs, runtimeMs);
+    if (response?.action !== "completed") return response != null;
+    if (!stillOwned()) return false;
+  }
+
+  if (playback?.watched) return true;
+  const watchedAt =
+    playback?.watchedAt ?? snapshot.watchedAt ?? new Date(snapshot.at).toISOString();
+  retainPendingCompletion(snapshot, watchedAt);
+  if (playback?.marking) return playback.marking;
+
+  const mark = markPmdbWatched(target, watchedAt, {
+    assertCurrent: () => {
+      if (!stillOwned())
+        throw new DOMException("PublicMetaDB playback owner changed", "AbortError");
+    },
+  }).then(async (ok) => {
+    if (!ok || !stillOwned()) return false;
+    if (playback) playback.watched = true;
+    await pmdbDeleteResumeForTarget(target, stillOwned);
+    return true;
+  });
+
+  if (playback) {
+    playback.watchedAt = watchedAt;
+    playback.marking = mark;
+  }
+  try {
+    return await mark;
+  } finally {
+    if (playback) playback.marking = undefined;
   }
 }
 

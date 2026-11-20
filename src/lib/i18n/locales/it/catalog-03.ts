@@ -1205,6 +1205,8 @@ const catalog03: Record<string, string> = {
   "Go to ep": "Vai all'ep.",
   "Go to episode": "Vai all'episodio",
   "Go to live": "Vai alla diretta",
+  "Episode pages": "Pagine degli episodi",
+  "Go to page": "Vai alla pagina",
   "Go to page {page}": "Vai alla pagina {page}",
   "Go to pages {pages}": "Vai alle pagine {pages}",
   "Go to show": "Vai alla serie",

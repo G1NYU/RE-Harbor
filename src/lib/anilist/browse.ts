@@ -103,7 +103,11 @@ type SearchMedia = {
   description: string | null;
 };
 
-export async function anilistAnimeSearch(query: string, perPage = 8): Promise<AnilistSearchHit[]> {
+export async function anilistAnimeSearch(
+  query: string,
+  perPage = 8,
+  signal?: AbortSignal,
+): Promise<AnilistSearchHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   try {
@@ -112,6 +116,7 @@ export async function anilistAnimeSearch(query: string, perPage = 8): Promise<An
       { q, perPage },
       undefined,
       true,
+      signal,
     );
     return (data?.Page?.media ?? []).map((m) => ({
       anilistId: m.id,

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import type { Settings } from "@/lib/settings/types";
 import { isTop10, useTop10Version } from "@/lib/top10-set";
@@ -25,15 +25,17 @@ export function useCardSharedState({
   settings,
   imdbId,
   flagRerun = false,
+  cardRef,
 }: {
   meta: Meta;
   settings: Settings;
   imdbId?: string | null;
   flagRerun?: boolean;
+  cardRef?: RefObject<HTMLElement | null>;
 }): CardSharedState {
   const isAnime = isCardAnimeId(meta.id);
   useTop10Version();
-  const hasDub = useAnimeDub(meta.id, settings.showDubBadge && isAnime);
+  const hasDub = useAnimeDub(meta.id, settings.showDubBadge && isAnime, cardRef, meta.malId);
 
   const alternateIds = useMemo(() => [imdbId], [imdbId]);
   const watched = useMetaWatched(meta.id, meta.type, imdbId);

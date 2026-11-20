@@ -15,3 +15,5 @@ The initial upstream contribution is outbound only. Reverse history/watchlist sy
 The earlier isolated Windows preview was smoke-tested by users across multiple accounts, including authentication, manual and automatic logging, time/percentage thresholds, and watchlist addition/removal. The port to the latest upstream development branch needs a fresh automated and Windows smoke-test pass.
 
 Run the project's standard typecheck and tests. Focused Refract tests: `node --test tests/refract-api.test.mjs tests/refract-sync.test.mjs`. The existing resume-autosave session tests also exercise the separation between early Refract logging and native completion.
+
+The Refract icon used in Harbor's Settings and Licenses & attribution views is the official 512px transparent PNG from the [Refract press kit](https://getrefract.app/press). Refract's name and logo identify the independent third-party service.

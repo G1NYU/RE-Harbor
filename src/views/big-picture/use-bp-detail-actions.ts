@@ -100,7 +100,7 @@ export function useBpDetailActions(params: {
 
   out.push({
     key: "watchlist",
-    label: saved ? t("In Watchlist") : t("Add to Watchlist"),
+    label: saved ? t("In library") : t("Save to library"),
     icon: saved ? Check : Plus,
     active: saved,
     onPress: () => toggleWatchlist({ ...seed, imdbId }),

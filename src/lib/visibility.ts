@@ -44,6 +44,56 @@ export function observe(el: Element, cb: Callback): () => void {
   };
 }
 
+const SCROLL_SETTLE_MS = 140;
+const pendingAfterScroll = new Set<() => void>();
+let scrollSettleTimer: number | undefined;
+let lastScrollAt = 0;
+
+function flushAfterScroll() {
+  const remaining = SCROLL_SETTLE_MS - (performance.now() - lastScrollAt);
+  if (remaining > 1) {
+    scrollSettleTimer = window.setTimeout(flushAfterScroll, remaining);
+    return;
+  }
+  scrollSettleTimer = undefined;
+  document.removeEventListener("scroll", markScrolling, true);
+  const tasks = Array.from(pendingAfterScroll);
+  pendingAfterScroll.clear();
+  for (const task of tasks) task();
+}
+
+function markScrolling() {
+  lastScrollAt = performance.now();
+}
+
+/** Optional work should start only for cards still near the viewport when scrolling settles. */
+export function observeSettled(el: Element, task: () => void): () => void {
+  const run = () => {
+    stop();
+    task();
+  };
+  const stop = observe(el, (visible) => {
+    if (!visible) {
+      pendingAfterScroll.delete(run);
+      return;
+    }
+    pendingAfterScroll.add(run);
+    if (scrollSettleTimer !== undefined) return;
+    document.addEventListener("scroll", markScrolling, { capture: true, passive: true });
+    markScrolling();
+    scrollSettleTimer = window.setTimeout(flushAfterScroll, SCROLL_SETTLE_MS);
+  });
+  return () => {
+    stop();
+    pendingAfterScroll.delete(run);
+    if (pendingAfterScroll.size === 0 && scrollSettleTimer !== undefined) {
+      window.clearTimeout(scrollSettleTimer);
+      scrollSettleTimer = undefined;
+      document.removeEventListener("scroll", markScrolling, true);
+    }
+  };
+}
+
 type EntryCallback = (entry: IntersectionObserverEntry) => void;
 type MarginObserver = {
   observer: IntersectionObserver;

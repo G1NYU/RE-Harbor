@@ -86,7 +86,7 @@
   color: inherit;
   border-radius: 8px;
   padding: 10px;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .games-ffxiv-items > button:hover {
   background: var(--color-surface);

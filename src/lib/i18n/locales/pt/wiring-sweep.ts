@@ -348,6 +348,8 @@ const wiringSweep: Record<string, string> = {
   "Jump to spread": "Ir para a página dupla",
   "Jump to page": "Ir para a página",
   "Go to pages {pages}": "Ir para as páginas {pages}",
+  "Episode pages": "Páginas de episódios",
+  "Go to page": "Ir para a página",
   "Go to page {page}": "Ir para a página {page}",
   "Zoom controls, {percent} percent": "Controles de zoom, {percent} por cento",
   "Close zoom controls": "Fechar controles de zoom",

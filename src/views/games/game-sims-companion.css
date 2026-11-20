@@ -1577,7 +1577,7 @@
   background: none;
   color: var(--color-ink);
   text-align: start;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   overflow-wrap: anywhere;
 }
 .games-sims-mts-card:disabled {

@@ -94,7 +94,7 @@ export function BpStateCircle({ label, children }: { label: string; children: Re
 export function BpWatchlistMark() {
   const t = useBpT();
   return (
-    <BpStateCircle label={t("In watchlist")}>
+    <BpStateCircle label={t("In library")}>
       <Bookmark className={GLYPH} strokeWidth={2.6} fill="currentColor" />
     </BpStateCircle>
   );

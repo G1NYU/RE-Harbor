@@ -1,5 +1,5 @@
 import { get } from "./tmdb-client";
-import { pickLogo } from "./tmdb-images";
+import { pickLogo, textlessTmdbBackdrops, type RawImages } from "./tmdb-images";
 import { imageLangParam } from "./tmdb-image-lang";
 
 type SearchTvHit = {
@@ -152,19 +152,35 @@ export async function tmdbAnimeLogo(
   name: string,
   year: string | undefined,
   kind: "movie" | "tv",
-  opts?: { exact?: boolean },
-): Promise<{ logo?: string; backdrop?: string; tmdbId?: number } | null> {
-  const match = await tmdbAnimeMatch(key, name, year, kind, opts);
+  // A mapped id has no search hit to supply the original language, so callers
+  // can pass it to keep the same image-language order as a search result.
+  opts?: { exact?: boolean; tmdbId?: number; originalLang?: string },
+): Promise<{
+  logo?: string;
+  backdrop?: string;
+  textlessBackdrops?: string[];
+  tmdbId?: number;
+} | null> {
+  if (!key) return null;
+  const match = opts?.tmdbId
+    ? { id: opts.tmdbId, originalLang: opts.originalLang }
+    : await tmdbAnimeMatch(key, name, year, kind, opts);
   if (!match) return null;
   const { id, originalLang } = match;
-  const imgs = await get<{ logos?: any[]; backdrops?: any[] }>(key, `${kind}/${id}/images`, {
+  const imgs = await get<RawImages>(key, `${kind}/${id}/images`, {
     include_image_language: imageLangParam(originalLang),
   });
   const logo = pickLogo(imgs?.logos ?? [], originalLang);
-  const backdropPath = (imgs?.backdrops ?? [])[0]?.file_path;
+  const textless = textlessTmdbBackdrops(imgs?.backdrops)
+    .slice(0, 24)
+    .map(({ file_path }) => `https://image.tmdb.org/t/p/original${file_path}`);
+  const backdropPath = imgs?.backdrops?.find((image) => image.file_path)?.file_path;
   return {
     logo,
-    backdrop: backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : undefined,
+    backdrop:
+      textless[0] ??
+      (backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : undefined),
+    textlessBackdrops: textless.length ? textless : undefined,
     tmdbId: id,
   };
 }

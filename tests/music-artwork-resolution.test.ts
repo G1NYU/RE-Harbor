@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sizeImageUrl, upgradeArtworkUrl } from "../src/lib/img-size";
+import {
+  nativePosterThumbnailWidth,
+  posterThumbnailWidth,
+  sizeImageUrl,
+  upgradeArtworkUrl,
+} from "../src/lib/img-size";
 
 test("a YouTube Music cover is requested at the size it will be shown", () => {
   const url = "https://lh3.googleusercontent.com/abc=w120-h120-l90-rj";
@@ -48,6 +53,20 @@ test("an unknown host is never rewritten", () => {
 test("a size of zero leaves the url alone, so an unmeasured poster is not downgraded", () => {
   const url = "https://lh3.googleusercontent.com/abc=w120-h120";
   assert.equal(upgradeArtworkUrl(url, 0), url);
+});
+
+test("poster thumbnails share size buckets and preserve CDN-sized art and Maximum mode", () => {
+  assert.equal(posterThumbnailWidth(306), 342);
+  assert.equal(posterThumbnailWidth(325), 342);
+  assert.equal(posterThumbnailWidth(343), 500);
+  assert.equal(posterThumbnailWidth(1301), 1536);
+  assert.equal(
+    nativePosterThumbnailWidth("https://image.tmdb.org/t/p/w342/art.jpg", 342),
+    undefined,
+  );
+  assert.equal(nativePosterThumbnailWidth("https://image.tmdb.org/t/p/original/art.jpg", 342), 342);
+  assert.equal(nativePosterThumbnailWidth("https://example.invalid/art.jpg", 342), 342);
+  assert.equal(nativePosterThumbnailWidth("https://example.invalid/art.jpg", 0), undefined);
 });
 
 test("sizeImageUrl routes music covers through the upgrade", () => {

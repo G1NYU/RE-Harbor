@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import { AwardTab } from "./award-tab";
 import { AwardLogo } from "./icons/award-logo";
 import { awardSummary, useAwards } from "@/lib/providers/wikidata";
@@ -45,8 +45,12 @@ function labelFor(win: ClassicWin): string {
   return noun;
 }
 
-export function useClassicAwardWin(meta: Meta, imdbId?: string): ClassicWin | null {
-  const live = useAwards(imdbId, meta.type === "series");
+export function useClassicAwardWin(
+  meta: Meta,
+  imdbId?: string,
+  cardRef?: RefObject<HTMLElement | null>,
+): ClassicWin | null {
+  const live = useAwards(imdbId, meta.type === "series", cardRef);
   const year = parseAwardYear(meta.releaseInfo);
   return useMemo(() => {
     const summary = awardSummary(mergeBundledAwards(live, meta.name, year));

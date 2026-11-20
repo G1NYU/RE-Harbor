@@ -128,7 +128,12 @@ export function prefetchBpRowNeighbours(
   }
   for (const m of near) {
     void warmBpEnrich(tmdbKey, m).then((detail) => {
-      const best = [detail?.gallery?.backdrops?.[0], detail?.backdrop, m.background].find(Boolean);
+      const best = [
+        detail?.textlessBackdrops?.[0],
+        detail?.gallery?.backdrops?.[0],
+        detail?.backdrop,
+        m.background,
+      ].find(Boolean);
       if (m === next) {
         decodeBpHeroArt(best, fullQuality);
         return;

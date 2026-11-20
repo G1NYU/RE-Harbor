@@ -10,6 +10,7 @@ export const IMG = "https://image.tmdb.org/t/p";
 const tmdbRequests = createRequestScheduler({ concurrency: 6 });
 
 const tmdbInflight = new Map<string, Promise<unknown>>();
+let searchRequestId = 0;
 const catalogCache = createCatalogCache();
 const missingResources = new Map<string, number>();
 
@@ -88,12 +89,16 @@ function runWithDeadline<T>(ms: number, work: (signal: AbortSignal) => Promise<T
   });
 }
 
-function fetchTmdbOnce<T>(url: string, path: string): Promise<{ status: number; data: T | null }> {
-  return runWithDeadline<{ status: number; data: T | null }>(TMDB_TIMEOUT_MS, async (signal) => {
+function fetchTmdbOnce<T>(
+  url: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<{ status: number; data: T | null }> {
+  return runWithDeadline<{ status: number; data: T | null }>(TMDB_TIMEOUT_MS, async (deadline) => {
     const res = await safeFetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
-      signal,
+      signal: signal ? AbortSignal.any([deadline, signal]) : deadline,
     });
     if (!res.ok) {
       const body = await readJsonBody(res, path).catch(() => "");
@@ -115,7 +120,7 @@ export async function get<T>(
   key: string,
   path: string,
   params: Record<string, string> = {},
-  _options: { searchTopMatch?: boolean } = {},
+  options: { searchTopMatch?: boolean; signal?: AbortSignal } = {},
 ): Promise<T | null> {
   if (!key) return null;
   const url = new URL(`${TMDB}/${path}`);
@@ -126,6 +131,11 @@ export async function get<T>(
   url.searchParams.sort();
   const target = url.toString();
   if ((missingResources.get(target) ?? 0) > Date.now()) return null;
+  if (options.signal) {
+    // The query owns this request. Keep it on the shared queue without making
+    // another view's lookup depend on whether this query is cancelled.
+    return fetchWithRetry<T>(target, path, options.signal, `search:${++searchRequestId}`);
+  }
   // The full URL scopes raw pages by API key, language, region, filters and page.
   // User-specific ranking and watched filtering still run afresh after retrieval.
   const cacheable = isCatalogPath(path);
@@ -165,12 +175,19 @@ export async function get<T>(
   }
 }
 
-async function fetchWithRetry<T>(target: string, path: string): Promise<T | null> {
+async function fetchWithRetry<T>(
+  target: string,
+  path: string,
+  signal?: AbortSignal,
+  requestKey = target,
+): Promise<T | null> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
+      signal?.throwIfAborted();
       const backoffMs = Math.min(2000, 250 * 2 ** attempt);
-      const { status, data } = await tmdbRequests.schedule(target, async () => {
-        const result = await fetchTmdbOnce<T>(target, path);
+      const { status, data } = await tmdbRequests.schedule(requestKey, async () => {
+        signal?.throwIfAborted();
+        const result = await fetchTmdbOnce<T>(target, path, signal);
         if (result.status === 429 || (result.status >= 500 && result.status < 600))
           tmdbRequests.pauseFor(backoffMs);
         return result;
@@ -184,6 +201,7 @@ async function fetchWithRetry<T>(target: string, path: string): Promise<T | null
       if (status === 404) lruSet(missingResources, target, Date.now() + 60_000, 200);
       return data;
     } catch (e) {
+      signal?.throwIfAborted();
       const msg = e instanceof Error ? e.message : String(e);
       if (msg === "tmdb-parse-failure") {
         await new Promise((r) => setTimeout(r, 400));

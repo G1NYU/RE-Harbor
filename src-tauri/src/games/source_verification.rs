@@ -210,6 +210,7 @@ pub async fn fetch(profile: String, url: String, max_bytes: usize) -> Result<Opt
             if body.len() > max_bytes { return Err("source_limit"); }
             return Ok(Some(HarborFetchResponse { status: 200, ok: true,
                 body: base64::engine::general_purpose::STANDARD.encode(body.as_bytes()),
+                asset_path: None,
                 content_type: Some("application/json".into()),
                 headers: HashMap::from([("content-type".to_owned(), "application/json".to_owned())]),
                 url: Some(url.to_string()) }));
@@ -246,7 +247,7 @@ async fn read_response(mut response: reqwest::Response, max_bytes: usize, url: &
             body.extend_from_slice(&chunk);
         }
         Ok(HarborFetchResponse { status: status.as_u16(), ok: status.is_success(),
-            body: base64::engine::general_purpose::STANDARD.encode(body), content_type: headers.get("content-type").cloned(), headers, url: Some(url.to_string()) })
+            body: base64::engine::general_purpose::STANDARD.encode(body), asset_path: None, content_type: headers.get("content-type").cloned(), headers, url: Some(url.to_string()) })
 }
 
 #[cfg(test)]
