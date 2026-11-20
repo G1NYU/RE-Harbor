@@ -151,3 +151,11 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - The preview excludes separate post-merge reliability follow-ups #7 and #9. Tests and live Refract/Windows playback need verification before claiming release quality.
 - Workflows: `music-void-ui.yml` (typecheck and Refract/music regressions), `music-polish-visual.yml` (Edge layout), `music-windows-preview.yml` (portable Windows artifact). No deployment, release, or production application identifier changes.
 - Next: verify all three workflow conclusions, inspect the Windows artifact metadata/contents, run `harbor.exe` in a fresh extracted folder and test watchlist additions/removals + movies/series early watched sync, Music/Now Playing, official branding, and account separation. Report exact run IDs and commit hashes after CI.
+
+
+## Installable VOID + Refract build — 2026-11-20
+- User accepted and manually tested the exact portable build. Create a per-user Windows NSIS installer from `bd7e872`, on isolated branch `feature/void-refract-installer`.
+- Installer retains Tauri identity `app.harbor.voidnativepreview` and disables official updater, stock file associations and default deep links; stock Harbor is not overwritten.
+- New files: `src-tauri/tauri.void-installer.conf.json`, `.github/workflows/void-windows-installer.yml`, `tests/void-windows-installer.test.mjs`, `docs/void-windows-installer.md`; no music, Refract, or UI source modifications.
+- GitHub Actions packages a real NSIS setup EXE, checks hashed output, performs isolated per-user install/shortcut/registry/uninstall smoke, then uploads artifact; no release or deployment action.
+- Verification pending: record workflow result, artifact ID, SHA-256, installed-file checks, user on-device check. The installer remains unsigned.
