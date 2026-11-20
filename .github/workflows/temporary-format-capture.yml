@@ -1,0 +1,69 @@
+name: Temporary formatting capture
+
+on:
+  push:
+    branches:
+      - validation/format-harbor-upstream
+      - validation/format-vk-music
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Run repository formatter and capture its output
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_NAME" == "validation/format-harbor-upstream" ]]; then
+            files=(
+              docs/functional-upstream.md
+              src/lib/mark-watched.ts
+              src/lib/media-context-actions.ts
+              src/lib/music/audio-meter.ts
+              src/lib/music/player.ts
+              src/lib/watch-events.ts
+              src/lib/watchlist.ts
+              src/views/player/hooks/use-resume-autosave.ts
+              src/views/settings/refract-panel.tsx
+              src/views/settings/trackers-panel.tsx
+              tests/music-audio-meter.test.ts
+              tests/music-lastfm-integration.test.ts
+              tests/music-player-source-recovery.test.ts
+              tests/refract-api.test.mjs
+              tests/refract-sync.test.mjs
+            )
+          elif [[ "$GITHUB_REF_NAME" == "validation/format-vk-music" ]]; then
+            files=(
+              docs/vk-music-experimental.md
+              src/lib/music/source-label.ts
+              src/lib/music/sources.ts
+            )
+          else
+            echo "Unexpected ref: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          vp fmt "${files[@]}"
+          git diff --check
+          git diff --stat -- "${files[@]}"
+          tar --format=ustar -czf /tmp/formatted-files.tar.gz -- "${files[@]}"
+      - name: Upload formatted files for reviewed application
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-files
+          path: /tmp/formatted-files.tar.gz
+          retention-days: 2
+          if-no-files-found: error
