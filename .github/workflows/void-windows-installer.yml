@@ -1,0 +1,110 @@
+name: Harbor VOID + Refract Windows installer
+
+on:
+  push:
+    branches:
+      - feature/void-refract-2026-11-installer
+    paths:
+      - ".github/workflows/void-windows-installer.yml"
+      - "installer/void/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: void-refract-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package verified VOID portable app as Windows setup
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fetch exact validated Windows portable artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: harbor-void-refract-2026-11-windows-x64
+          repository: G1NYU/RE-Harbor
+          run-id: 44737578800
+          github-token: ${{ github.token }}
+          path: installer/void/payload
+      - name: Verify the original portable payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'installer/void/payload'
+          $must = @('harbor.exe', 'mpv.exe', 'ffmpeg.exe', 'ffprobe.exe', 'yt-dlp.exe', 'libmpv-2.dll', 'README-MUSIC-PREVIEW.txt')
+          foreach ($file in $must) {
+            $path = Join-Path $root $file
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing input: $file" }
+          }
+          $exe = Join-Path $root 'harbor.exe'
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $exe).Path)
+          if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw 'Input harbor.exe is not a Windows PE binary' }
+          Get-ChildItem -LiteralPath $root | Select-Object Name, Length
+          "SOURCE_HARBOR_SHA256=$((Get-FileHash $exe -Algorithm SHA256).Hash)"
+      - name: Install NSIS build tool
+        shell: pwsh
+        run: |
+          $exe = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Test-Path -LiteralPath $exe)) {
+            choco install nsis -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          }
+          if (-not (Test-Path -LiteralPath $exe)) { throw 'makensis.exe unavailable' }
+      - name: Build Windows setup executable
+        shell: pwsh
+        working-directory: installer/void
+        run: |
+          $makensis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          & $makensis /V3 /DPAYLOAD_DIR=payload void-preview.nsi
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS packaging failed' }
+          if (-not (Test-Path -LiteralPath 'harbor-void-refract-setup-x64.exe')) { throw 'Setup EXE missing' }
+          Get-FileHash 'harbor-void-refract-setup-x64.exe' -Algorithm SHA256 | Format-List
+      - name: Test silent installation, shortcuts, registry and uninstallation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = (Resolve-Path 'installer/void/harbor-void-refract-setup-x64.exe').Path
+          $dest = Join-Path $env:LOCALAPPDATA 'Programs\Harbor VOID'
+          $registry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HarborVOID'
+          $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Harbor VOID.lnk'
+          $desktop = Join-Path $env:USERPROFILE 'Desktop\Harbor VOID.lnk'
+          if (Test-Path -LiteralPath $dest) { throw 'Destination unexpectedly pre-exists on CI runner' }
+          $proc = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "Installer failed: $($proc.ExitCode)" }
+          $installed = Join-Path $dest 'harbor.exe'
+          if (-not (Test-Path -LiteralPath $installed)) { throw 'App not installed' }
+          $originalHash = (Get-FileHash 'installer/void/payload/harbor.exe' -Algorithm SHA256).Hash
+          $installedHash = (Get-FileHash $installed -Algorithm SHA256).Hash
+          if ($originalHash -ne $installedHash) { throw 'Installed app differs from the user-tested portable binary' }
+          foreach ($file in @('mpv.exe','ffmpeg.exe','ffprobe.exe','yt-dlp.exe','libmpv-2.dll')) {
+            $source = (Get-FileHash (Join-Path 'installer/void/payload' $file) -Algorithm SHA256).Hash
+            $actual = (Get-FileHash (Join-Path $dest $file) -Algorithm SHA256).Hash
+            if ($source -ne $actual) { throw "Changed/missing sidecar: $file" }
+          }
+          if (-not (Test-Path -LiteralPath $registry)) { throw 'Missing uninstall registration' }
+          if (-not (Test-Path -LiteralPath $menu)) { throw 'Missing Start Menu shortcut' }
+          if (-not (Test-Path -LiteralPath $desktop)) { throw 'Missing Desktop shortcut' }
+          $uninstaller = Join-Path $dest 'Uninstall Harbor VOID.exe'
+          if (-not (Test-Path -LiteralPath $uninstaller)) { throw 'Missing uninstaller' }
+          Write-Host "INSTALL_VERIFIED: exact portable binary and sidecars, shortcuts and registry"
+          $process = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Test-Path -LiteralPath (Join-Path $dest 'harbor.exe')) { throw 'Uninstall left the executable behind' }
+          if (Test-Path -LiteralPath $registry) { throw 'Uninstall left registry entry behind' }
+          if (Test-Path -LiteralPath $menu) { throw 'Uninstall left Start Menu shortcut behind' }
+          if (Test-Path -LiteralPath $desktop) { throw 'Uninstall left Desktop shortcut behind' }
+          Write-Host 'UNINSTALL_VERIFIED: files, registry, and shortcuts cleaned'
+      - name: Upload Windows setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-void-refract-setup-windows-x64
+          path: installer/void/harbor-void-refract-setup-x64.exe
+          if-no-files-found: error
+          retention-days: 30

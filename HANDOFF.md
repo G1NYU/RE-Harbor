@@ -151,3 +151,10 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - The preview excludes separate post-merge reliability follow-ups #7 and #9. Tests and live Refract/Windows playback need verification before claiming release quality.
 - Workflows: `music-void-ui.yml` (typecheck and Refract/music regressions), `music-polish-visual.yml` (Edge layout), `music-windows-preview.yml` (portable Windows artifact). No deployment, release, or production application identifier changes.
 - Next: verify all three workflow conclusions, inspect the Windows artifact metadata/contents, run `harbor.exe` in a fresh extracted folder and test watchlist additions/removals + movies/series early watched sync, Music/Now Playing, official branding, and account separation. Report exact run IDs and commit hashes after CI.
+
+## Windows installation packaging (2026-11-20)
+- Source: exact successfully built and user-tested VOID/Refract portable artifact, run `44737578800`, production application SHA `57b3285`. Test-only changes at `bd7e872` do not modify it.
+- Installer branch: `feature/void-refract-2026-11-installer`; uses an independent NSIS setup executable, no application recompilation, no user secret handling, no normal Harbor replacement.
+- Per-user install location: `%LOCALAPPDATA%\\Programs\\Harbor VOID`; desktop/start-menu shortcuts and HKCU uninstall entry. Uninstall preserves profile settings. Tauri identity remains `app.harbor.voidnativepreview` and updater is disabled.
+- Automated Windows installer workflow validates original/installed executable and media-sidecar hashes, installer registration and silent removal before publishing a GitHub Actions artifact.
+- Next: verify workflow run and artifact, inspect failed steps if any. Test normal UI launch and user-profile persistence on actual Windows; no code signing or installer auto-updates are claimed.
