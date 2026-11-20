@@ -1,0 +1,27 @@
+name: Temporary finished-VOID baseline tests
+
+on:
+  push:
+    branches:
+      - validation/harbor-void-suite-baseline
+
+permissions:
+  contents: read
+
+jobs:
+  compare-baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Run existing final-VOID full test command unchanged
+        run: vp run test
