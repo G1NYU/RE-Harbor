@@ -42,7 +42,9 @@ function readRefractSettings() {
   return loadEffective(profileId, linked);
 }
 function writeRefractSettings(
-  patch: Partial<Pick<ReturnType<typeof readRefractSettings>, "refractSyncEnabled" | "refractAutoThreshold">>,
+  patch: Partial<
+    Pick<ReturnType<typeof readRefractSettings>, "refractSyncEnabled" | "refractAutoThreshold">
+  >,
 ): void {
   const { profileId, linked } = readActiveSource();
   persistEffective({ ...loadEffective(profileId, linked), ...patch }, profileId, linked);

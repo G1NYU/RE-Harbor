@@ -50,7 +50,8 @@ function harness() {
   const module = { exports: {} };
   new Function("require", "module", "exports", output)(
     (id) => {
-      if (id === "@/lib/active-profile-id") return { activeProfileIsPrimary: () => primary, activeScopedProfileId: () => "fixture" };
+      if (id === "@/lib/active-profile-id")
+        return { activeProfileIsPrimary: () => primary, activeScopedProfileId: () => "fixture" };
       if (id === "./client") return client;
       if (id === "./identity") return { parseRefractHistoryId };
       throw new Error(`Unexpected import: ${id}`);
@@ -564,7 +565,10 @@ test("two windows serialize queue appends and only the main window drains", asyn
     request: (name, action) => {
       const previous = locks.get(name) ?? Promise.resolve();
       const next = previous.then(action);
-      locks.set(name, next.catch(() => {}));
+      locks.set(
+        name,
+        next.catch(() => {}),
+      );
       return next;
     },
   };
@@ -623,8 +627,7 @@ test("two windows serialize queue appends and only the main window drains", asyn
     globalThis.localStorage = prior.storage;
     globalThis.window = prior.window;
     globalThis.document = prior.document;
-    if (prior.navigator)
-      Object.defineProperty(globalThis, "navigator", prior.navigator);
+    if (prior.navigator) Object.defineProperty(globalThis, "navigator", prior.navigator);
     else delete globalThis.navigator;
   }
 });

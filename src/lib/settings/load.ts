@@ -47,7 +47,10 @@ import { migratePublicRelayUrl } from "@/lib/together/relay-version";
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 const REFRACT_THRESHOLD_CHOICES = ["3m", "5m", "10m", 50, 60, 70, 80, 85] as const;
-function readLegacyRefractPreferences(): Pick<Settings, "refractSyncEnabled" | "refractAutoThreshold"> {
+function readLegacyRefractPreferences(): Pick<
+  Settings,
+  "refractSyncEnabled" | "refractAutoThreshold"
+> {
   try {
     const enabled = localStorage.getItem("harbor.refract.enabled.v1");
     const threshold = localStorage.getItem("harbor.refract.auto-threshold.v1");

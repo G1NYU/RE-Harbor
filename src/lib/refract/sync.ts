@@ -292,67 +292,67 @@ export async function flushRefractSync(): Promise<void> {
   running = true;
   try {
     await withDrainLock(async () => {
-    for (let count = 0; count < 16; count++) {
-      if (getRefractKey() !== key || !refractEnabled() || !activeProfileIsPrimary()) break;
-      const s = read();
-      const job = s.pending.find((x) => x.nextAt <= Date.now());
-      if (!job) break;
-      try {
-        await push(key, job);
-        if (getRefractKey() !== key) break;
-        await withStoreLock(() => {
-          const current = read();
-          // Reset or another window may already have removed this job.
-          if (!current.pending.some((x) => x.id === job.id)) return;
-          current.pending = current.pending.filter((x) => x.id !== job.id);
-          current.recent[keyOf(job)] = Date.now();
-          current.synced++;
-          current.message = current.failed.some((failure) => failure.reason === QUEUE_FULL)
-            ? QUEUE_FULL
-            : "Last watched item sent successfully";
-          save(current);
-        });
-      } catch (error) {
-        if (error instanceof Superseded || getRefractKey() !== key) break;
-        await withStoreLock(() => {
-          const current = read();
-          const pending = current.pending.find((x) => x.id === job.id);
-          if (!pending) return;
-        if (
-          error instanceof Unmatched ||
-          (error instanceof RefractApiError &&
-            error.status >= 400 &&
-            error.status < 500 &&
-            ![401, 403, 409, 429].includes(error.status))
-        ) {
-          current.pending = current.pending.filter((x) => x.id !== job.id);
-          current.failed.push({
-            sourceId: job.sourceId,
-            season: job.season,
-            episode: job.episode,
-            reason: error instanceof Error ? error.message : "Unknown error",
+      for (let count = 0; count < 16; count++) {
+        if (getRefractKey() !== key || !refractEnabled() || !activeProfileIsPrimary()) break;
+        const s = read();
+        const job = s.pending.find((x) => x.nextAt <= Date.now());
+        if (!job) break;
+        try {
+          await push(key, job);
+          if (getRefractKey() !== key) break;
+          await withStoreLock(() => {
+            const current = read();
+            // Reset or another window may already have removed this job.
+            if (!current.pending.some((x) => x.id === job.id)) return;
+            current.pending = current.pending.filter((x) => x.id !== job.id);
+            current.recent[keyOf(job)] = Date.now();
+            current.synced++;
+            current.message = current.failed.some((failure) => failure.reason === QUEUE_FULL)
+              ? QUEUE_FULL
+              : "Last watched item sent successfully";
+            save(current);
           });
-          current.message = "Some items could not be matched or sent";
-        } else {
-          pending.attempts++;
-          const status = error instanceof RefractApiError ? error.status : 0;
-          pending.nextAt =
-            Date.now() +
-            (status === 401 || status === 403
-              ? 60 * 60_000
-              : Math.max(
-                  error instanceof RefractApiError ? error.retryAfterMs : 0,
-                  Math.min(60 * 60_000, 5000 * 2 ** Math.min(pending.attempts, 8)),
-                ));
-          current.message =
-            status === 401 || status === 403
-              ? "Refract denied access; check key and permissions"
-              : "Network error; retry scheduled";
+        } catch (error) {
+          if (error instanceof Superseded || getRefractKey() !== key) break;
+          await withStoreLock(() => {
+            const current = read();
+            const pending = current.pending.find((x) => x.id === job.id);
+            if (!pending) return;
+            if (
+              error instanceof Unmatched ||
+              (error instanceof RefractApiError &&
+                error.status >= 400 &&
+                error.status < 500 &&
+                ![401, 403, 409, 429].includes(error.status))
+            ) {
+              current.pending = current.pending.filter((x) => x.id !== job.id);
+              current.failed.push({
+                sourceId: job.sourceId,
+                season: job.season,
+                episode: job.episode,
+                reason: error instanceof Error ? error.message : "Unknown error",
+              });
+              current.message = "Some items could not be matched or sent";
+            } else {
+              pending.attempts++;
+              const status = error instanceof RefractApiError ? error.status : 0;
+              pending.nextAt =
+                Date.now() +
+                (status === 401 || status === 403
+                  ? 60 * 60_000
+                  : Math.max(
+                      error instanceof RefractApiError ? error.retryAfterMs : 0,
+                      Math.min(60 * 60_000, 5000 * 2 ** Math.min(pending.attempts, 8)),
+                    ));
+              current.message =
+                status === 401 || status === 403
+                  ? "Refract denied access; check key and permissions"
+                  : "Network error; retry scheduled";
+            }
+            save(current);
+          });
         }
-          save(current);
-        });
       }
-    }
     });
   } finally {
     running = false;
