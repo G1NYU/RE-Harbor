@@ -31,8 +31,8 @@ It keeps Harbor's wider media capabilities while giving music its own deliberate
 ## 01 / The listening room
 
 <p align="center">
-  <img src="docs/media/reharbor/music-home.webp" width="100%" alt="RE-Harbor music home showing the atmospheric Macross 82-99 hero, VOID navigation, shortcuts and a wide recently played shelf" />
-  <br/><sub>THE LISTENING ROOM — personal context, album artwork, listening shortcuts and recent records.</sub>
+  <img src="docs/media/reharbor/music-home.svg" width="100%" alt="RE-Harbor music home showing the atmospheric Macross 82-99 hero, VOID navigation, shortcuts and a wide recently played shelf" />
+  <br/><sub>THE LISTENING ROOM — vector study of personal context, album artwork, listening shortcuts and recent records.</sub>
 </p>
 
 <br/>
@@ -51,11 +51,14 @@ An editorial music home rather than a generic catalog page. The current record a
 <br/>
 
 <p align="center">
-  <img src="docs/media/reharbor/now-playing.webp" width="100%" alt="Expanded RE-Harbor Now Playing page with album artwork, Up Next queue, signal levels, visualizer and persistent transport" />
-  <br/><sub>NOW PLAYING — less interface, more album.</sub>
+  <img src="docs/media/reharbor/now-playing.svg" width="100%" alt="Expanded RE-Harbor Now Playing page with album artwork, Up Next queue, signal levels, visualizer and persistent transport" />
+  <br/><sub>NOW PLAYING — a vector interpretation of the immersive playback screen.</sub>
 </p>
 
 <br/><br/>
+
+
+<sub>Interface illustrations are original SVG mockups based on the VOID preview, not live screenshots; visible functionality may differ by build and provider.</sub>
 
 ## 02 / The VOID identity
 
@@ -85,8 +88,8 @@ An editorial music home rather than a generic catalog page. The current record a
 ## 03 / Beyond music
 
 <p align="center">
-  <img src="docs/media/reharbor/media-home.webp" width="100%" alt="VOID movie home with full-bleed cinematic hero, continue-watching cards and compact left navigation" />
-  <br/><sub>ONE VISUAL LANGUAGE — from films and series to the listening room.</sub>
+  <img src="docs/media/reharbor/media-home.svg" width="100%" alt="VOID movie home with full-bleed cinematic hero, continue-watching cards and compact left navigation" />
+  <br/><sub>ONE VISUAL LANGUAGE — vector interpretation of VOID across films, series and the listening room.</sub>
 </p>
 
 <br/>

@@ -176,3 +176,10 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - Custom branch: `feature/void-refract-2026-11-installer`. Fork default: `beta-branch`. The two README copies intentionally link the separate preview branch; docs changes must not be interpreted as an upstream sync or a new installer build.
 - Validation performed before commit: screenshot decode, SVG XML parse and visual raster previews, README internal asset paths and Markdown code fences. GitHub rendering and checks should be verified after push.
 - Next: separately rehearse upstream beta merge in an isolated branch before touching the custom implementation; then run builds and Windows UI testing. The existing verified installer remains the recovery artifact.
+
+## RE-Harbor vector showcase (2026-11-21)
+- Replaced three README raster WebP screenshots with original, self-contained SVG mockups: `docs/media/reharbor/music-home.svg`, `now-playing.svg`, and `media-home.svg`.
+- Both `beta-branch` and the installer branch use the same README vector references; removed obsolete `music-home.webp`, `now-playing.webp`, and `media-home.webp` from both branches.
+- Vectors were checked for valid SVG/XML and rasterized successfully for visual inspection; no embedded bitmap images, fonts or external asset URLs.
+- The README explicitly labels the panels as vector interpretations, not literal application screenshots. Production code, installer workflows, dependencies and binaries were not changed.
+- Next: verify GitHub renders the SVG illustrations. Upstream synchronization and a new installer remain separate tasks.
