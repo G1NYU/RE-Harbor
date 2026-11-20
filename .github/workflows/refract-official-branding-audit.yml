@@ -1,0 +1,33 @@
+name: Refract official branding audit
+
+on:
+  push:
+    branches:
+      - validation/refract-official-branding
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-brand:
+    name: Inspect official press kit and Refract logo usage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Inspect public Refract brand assets and source usages
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo BRAND_USAGE_START
+          git grep -nEi 'refract\\.svg|refractLogo|refract-logo' -- src tests || true
+          echo BRAND_USAGE_END
+          curl --retry 2 --retry-delay 2 --fail --location --silent --show-error --max-time 45 -o /tmp/refract-press-kit.zip https://getrefract.app/assets/press/refract-press-kit.zip
+          echo PRESS_KIT_FILES_START
+          unzip -Z1 /tmp/refract-press-kit.zip | head -n 120
+          echo PRESS_KIT_FILES_END
+          echo IMAGE_METADATA_START
+          unzip -Z1 /tmp/refract-press-kit.zip | grep -Ei '\\.(png|svg|webp)$' | head -n 60 | while IFS= read -r entry; do
+            unzip -p /tmp/refract-press-kit.zip "$entry" | file - | sed "s@^/dev/stdin:@$entry:@"
+          done
+          echo IMAGE_METADATA_END
