@@ -646,6 +646,7 @@ test("two windows serialize queue appends and only the main window drains", asyn
     assert.equal(main.refractStatus().synced, 3);
     assert.equal(calls.length, 3);
   } finally {
+    if (releaseFirstWrite) releaseFirstWrite();
     globalThis.localStorage = prior.storage;
     globalThis.window = prior.window;
     globalThis.document = prior.document;
