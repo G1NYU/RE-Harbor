@@ -39,6 +39,7 @@ function harness() {
   );
   return {
     prepare: module.exports.prepareRefractLibraryRemoval,
+    markMembership: module.exports.noteRefractMembershipAction,
     writes,
     setKey: (value) => {
       key = value;
@@ -136,4 +137,38 @@ test("Library Stremio, Nuvio and local removals all dispatch the captured Refrac
     remove,
     /for \(const l of twins\) removeFromWatchlist\(l.id\);\s*syncRefractRemoval\(\)/,
   );
+});
+
+test("a later re-add supersedes a pending Library removal, including IMDb enrichment", async () => {
+  const h = harness();
+  const finishRemove = h.prepare({
+    id: "tmdb:movie:55",
+    type: "movie",
+    imdbId: "tt55",
+  });
+  // Detail-page re-add may know only the enriched IMDb ID.
+  h.markMembership({ id: "tt55", type: "movie" });
+  finishRemove();
+  await tick();
+  assert.equal(h.writes.length, 0);
+});
+
+test("a delayed removal still dispatches if no later membership action occurred", async () => {
+  const h = harness();
+  const finishRemove = h.prepare({ id: "tt55", type: "movie" });
+  finishRemove();
+  await tick();
+  assert.equal(h.writes.length, 1);
+  assert.equal(h.writes[0].on, false);
+});
+
+test("acknowledged and legacy membership writes invalidate delayed Library removal", () => {
+  const source = readFileSync(new URL("../src/lib/watchlist.ts", import.meta.url), "utf8");
+  const acknowledged = source.slice(
+    source.indexOf("export function setLocalWatchlistAcknowledged("),
+    source.indexOf("export function clearWatchlistAggregate("),
+  );
+  const legacy = source.slice(source.indexOf("export function toggleWatchlist("));
+  assert.match(acknowledged, /noteRefractMembershipAction\(input\)/);
+  assert.match(legacy, /noteRefractMembershipAction\(input\)/);
 });

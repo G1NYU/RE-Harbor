@@ -83,7 +83,13 @@ export const BACKUP_SECTIONS: readonly BackupSection[] = [
     key: "settings",
     label: "Settings",
     description: "App settings and preferences, including parental controls.",
-    patterns: ["harbor.settings", "harbor.settingsNew.v1", "harbor.parental"],
+    patterns: [
+      "harbor.settings",
+      "harbor.settingsNew.v1",
+      "harbor.parental",
+      "harbor.refract.enabled.v1",
+      "harbor.refract.auto-threshold.v1",
+    ],
   },
   {
     key: "addons",

@@ -422,6 +422,7 @@ export function setLocalWatchlistAcknowledged(input: WatchlistInput, on: boolean
   localStorage.setItem(key, payload);
   if (localStorage.getItem(key) !== payload) throw new Error("The watchlist was not saved.");
   memoryFallback = null;
+  noteRefractMembershipAction(input);
   for (const listener of subs) listener();
 }
 
@@ -457,8 +458,26 @@ export function removeFromWatchlistEntry(input: string | WatchlistInput): void {
   }
 }
 
+const refractMembershipVersions = new Map<string, number>();
+let refractMembershipSequence = 0;
+function refractAliases(input: string | WatchlistInput): string[] {
+  const id = typeof input === "string" ? input : input.id;
+  const imdb = typeof input === "string" ? null : input.imdbId;
+  return [...new Set([id, imdb].filter((value): value is string => !!value))];
+}
+/** Invalidate delayed removals when a later local membership action supersedes them. */
+export function noteRefractMembershipAction(input: string | WatchlistInput): number {
+  const version = ++refractMembershipSequence;
+  for (const id of refractAliases(input)) refractMembershipVersions.set(id, version);
+  return version;
+}
+function latestRefractMembershipVersion(input: string | WatchlistInput): number {
+  return Math.max(0, ...refractAliases(input).map((id) => refractMembershipVersions.get(id) ?? 0));
+}
+
 /** Capture the Refract account before Library removals perform async provider writes. */
 export function prepareRefractLibraryRemoval(input: WatchlistInput): () => void {
+  const version = noteRefractMembershipAction(input);
   const key = getRefractKey();
   if (!key || !refractEnabled() || !activeProfileIsPrimary()) return () => {};
   const profile = currentHarborProfileId();
@@ -468,7 +487,7 @@ export function prepareRefractLibraryRemoval(input: WatchlistInput): () => void 
     activeProfileIsPrimary() &&
     currentHarborProfileId() === profile;
   return () => {
-    if (!isCurrent()) return;
+    if (!isCurrent() || latestRefractMembershipVersion(input) !== version) return;
     void syncRefractWatchlist(key, input, false, () => {
       if (!isCurrent()) throw new Error("The Refract account or profile changed.");
     }).catch(() => {});
@@ -510,6 +529,7 @@ export function toggleWatchlist(input: string | WatchlistInput): boolean {
     map.set(id, toEntry(input));
   }
   write(map);
+  noteRefractMembershipAction(input);
   void syncWithTrakt(id, !has);
   void syncWithSimkl(id, !has);
   if (isNuvioProviderActive()) {

@@ -1,6 +1,6 @@
 import type { WatchEvent } from "@/lib/watch-events";
 import { parseRefractHistoryId } from "./identity";
-import { activeProfileIsPrimary } from "@/lib/active-profile-id";
+import { activeProfileIsPrimary, activeScopedProfileId } from "@/lib/active-profile-id";
 import {
   getRefractKey,
   lookupRefract,
@@ -35,18 +35,40 @@ type Store = {
   failed: Failure[];
   synced: number;
   message: string;
+  epoch: string;
 };
 
 const STORE_KEY = "harbor.refract.sync.v1";
 const EVENT = "harbor:refract-sync-changed";
 const DEDUP_MS = 15 * 60 * 1000;
+const DRAIN_LOCK = "harbor.refract.sync.drain.v1";
 const MAX_PENDING = 2500;
 const QUEUE_FULL = "Refract queue full; unable to save another watch";
 let running = false;
 let flushRequested = false;
 let started = false;
 
-const empty = (): Store => ({ pending: [], recent: {}, failed: [], synced: 0, message: "" });
+const empty = (): Store => ({
+  pending: [],
+  recent: {},
+  failed: [],
+  synced: 0,
+  message: "",
+  epoch: "initial",
+});
+
+/** All shared queue read-modify-writes are serialized across WebView windows. */
+function withStoreLock<T>(run: () => T | Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  return locks?.request ? locks.request(STORE_KEY, run) : Promise.resolve(run());
+}
+function withDrainLock<T>(run: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  return locks?.request ? locks.request(DRAIN_LOCK, run) : run();
+}
+function hasCrossWindowLocks(): boolean {
+  return typeof navigator !== "undefined" && typeof navigator.locks?.request === "function";
+}
 function read(): Store {
   try {
     const data = JSON.parse(localStorage.getItem(STORE_KEY) || "null") as Partial<Store> | null;
@@ -57,6 +79,7 @@ function read(): Store {
           failed: Array.isArray(data.failed) ? data.failed : [],
           synced: Number(data.synced || 0),
           message: String(data.message || ""),
+          epoch: typeof data.epoch === "string" ? data.epoch : "initial",
         }
       : empty();
   } catch {
@@ -79,8 +102,15 @@ function save(state: Store): boolean {
   }
 }
 export function subscribeRefractStatus(fn: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === STORE_KEY) fn();
+  };
   window.addEventListener(EVENT, fn);
-  return () => window.removeEventListener(EVENT, fn);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(EVENT, fn);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 export function refractStatus() {
   const s = read();
@@ -97,11 +127,16 @@ export function refractStatus() {
       ),
   };
 }
-export function resetRefractSync(): void {
-  save(empty());
+export async function resetRefractSync(): Promise<void> {
+  await withStoreLock(() => {
+    save({ ...empty(), epoch: crypto.randomUUID() });
+  });
 }
 function keyOf(job: Job): string {
-  return `${job.type}|${job.sourceId}|${job.season ?? ""}|${job.episode ?? ""}`;
+  // A distinct movie viewing has a distinct timestamp, even within fifteen minutes.
+  return `${job.type}|${job.sourceId}|${job.season ?? ""}|${job.episode ?? ""}|${
+    job.type === "movie" ? job.watchedAt : ""
+  }`;
 }
 function appendBatch(s: Store, jobs: Job[]): void {
   const pendingKeys = new Set(s.pending.map(keyOf));
@@ -128,8 +163,12 @@ function appendBatch(s: Store, jobs: Job[]): void {
   s.pending.push(...fresh);
 }
 export function enqueueRefractWatch(event: WatchEvent, hint: RefractHint = {}): void {
-  // A single personal key must never accidentally receive another Harbor profile's watches.
+  // A personal key must not receive events from a replacement Harbor profile or account.
   if (!refractEnabled() || !activeProfileIsPrimary()) return;
+  const ownerKey = getRefractKey();
+  const ownerProfile = activeScopedProfileId();
+  if (!ownerKey) return;
+  const epoch = read().epoch;
   const sourceId = parseRefractHistoryId(
     hint.externalId || "",
     event.type === "movie" ? "movie" : "episode",
@@ -137,7 +176,6 @@ export function enqueueRefractWatch(event: WatchEvent, hint: RefractHint = {}): 
     ? hint.externalId!
     : event.id;
   const at = event.at || Date.now();
-  const s = read();
   const make = (type: Job["type"], season?: number, episode?: number): Job => ({
     id: crypto.randomUUID(),
     sourceId,
@@ -153,11 +191,14 @@ export function enqueueRefractWatch(event: WatchEvent, hint: RefractHint = {}): 
   const jobs: Job[] = [];
   if (event.type === "movie") jobs.push(make("movie"));
   else {
-    const episodes = hint.episodes?.length
-      ? hint.episodes
-      : event.season !== undefined && event.episode !== undefined
-        ? [{ season: event.season, episode: event.episode }]
-        : [];
+    // An explicitly supplied but unusable episode list must not fall back to
+    // the event's unrelated/native season number.
+    const episodes =
+      hint.episodes !== undefined
+        ? hint.episodes
+        : event.season !== undefined && event.episode !== undefined
+          ? [{ season: event.season, episode: event.episode }]
+          : [];
     for (const ep of episodes) {
       if (
         Number.isInteger(ep.season) &&
@@ -168,9 +209,31 @@ export function enqueueRefractWatch(event: WatchEvent, hint: RefractHint = {}): 
         jobs.push(make("episode", ep.season, ep.episode));
     }
   }
-  appendBatch(s, jobs);
-  if (save(s)) void flushRefractSync();
+  if (jobs.length === 0) return;
+  const append = () => {
+    if (
+      getRefractKey() !== ownerKey ||
+      activeScopedProfileId() !== ownerProfile ||
+      !refractEnabled() ||
+      !activeProfileIsPrimary()
+    )
+      return false;
+    const state = read();
+    if (state.epoch !== epoch) return false;
+    appendBatch(state, jobs);
+    return save(state);
+  };
+  if (hasCrossWindowLocks()) {
+    // A companion window only enqueues; the regular window drains after the
+    // cross-window storage event. The write lock protects concurrent enqueues.
+    void withStoreLock(append).then((saved) => {
+      if (saved) void flushRefractSync();
+    });
+  } else if (append()) {
+    void flushRefractSync();
+  }
 }
+
 class Unmatched extends Error {}
 class Superseded extends Error {}
 async function push(key: string, job: Job): Promise<void> {
@@ -221,68 +284,76 @@ export async function flushRefractSync(): Promise<void> {
     return;
   }
   if (!refractEnabled() || !activeProfileIsPrimary()) return;
+  // Only the regular application window may send HTTP writes. Companion windows
+  // enqueue under the shared lock and notify via the storage event.
+  if (typeof document !== "undefined" && !started) return;
   const key = getRefractKey();
   if (!key) return;
   running = true;
   try {
-    for (let count = 0; count < 16; count++) {
-      if (getRefractKey() !== key || !refractEnabled() || !activeProfileIsPrimary()) break;
-      const s = read();
-      const job = s.pending.find((x) => x.nextAt <= Date.now());
-      if (!job) break;
-      try {
-        await push(key, job);
-        if (getRefractKey() !== key) break;
-        const current = read();
-        // A disconnect/reconnect with the same key can reset the queue during the write.
-        if (!current.pending.some((x) => x.id === job.id)) continue;
-        current.pending = current.pending.filter((x) => x.id !== job.id);
-        current.recent[keyOf(job)] = Date.now();
-        current.synced++;
-        // Keep a rejected bulk action visible when an unrelated pending watch succeeds.
-        current.message = current.failed.some((failure) => failure.reason === QUEUE_FULL)
-          ? QUEUE_FULL
-          : "Last watched item sent successfully";
-        save(current);
-      } catch (error) {
-        if (error instanceof Superseded || getRefractKey() !== key) break;
-        const current = read();
-        const pending = current.pending.find((x) => x.id === job.id);
-        if (!pending) continue;
-        if (
-          error instanceof Unmatched ||
-          (error instanceof RefractApiError &&
-            error.status >= 400 &&
-            error.status < 500 &&
-            ![401, 403, 409, 429].includes(error.status))
-        ) {
-          current.pending = current.pending.filter((x) => x.id !== job.id);
-          current.failed.push({
-            sourceId: job.sourceId,
-            season: job.season,
-            episode: job.episode,
-            reason: error instanceof Error ? error.message : "Unknown error",
+    await withDrainLock(async () => {
+      for (let count = 0; count < 16; count++) {
+        if (getRefractKey() !== key || !refractEnabled() || !activeProfileIsPrimary()) break;
+        const s = read();
+        const job = s.pending.find((x) => x.nextAt <= Date.now());
+        if (!job) break;
+        try {
+          await push(key, job);
+          if (getRefractKey() !== key) break;
+          await withStoreLock(() => {
+            const current = read();
+            // Reset or another window may already have removed this job.
+            if (!current.pending.some((x) => x.id === job.id)) return;
+            current.pending = current.pending.filter((x) => x.id !== job.id);
+            current.recent[keyOf(job)] = Date.now();
+            current.synced++;
+            current.message = current.failed.some((failure) => failure.reason === QUEUE_FULL)
+              ? QUEUE_FULL
+              : "Last watched item sent successfully";
+            save(current);
           });
-          current.message = "Some items could not be matched or sent";
-        } else {
-          pending.attempts++;
-          const status = error instanceof RefractApiError ? error.status : 0;
-          pending.nextAt =
-            Date.now() +
-            (status === 401 || status === 403
-              ? 60 * 60_000
-              : Math.max(
-                  error instanceof RefractApiError ? error.retryAfterMs : 0,
-                  Math.min(60 * 60_000, 5000 * 2 ** Math.min(pending.attempts, 8)),
-                ));
-          current.message =
-            status === 401 || status === 403
-              ? "Refract denied access; check key and permissions"
-              : "Network error; retry scheduled";
+        } catch (error) {
+          if (error instanceof Superseded || getRefractKey() !== key) break;
+          await withStoreLock(() => {
+            const current = read();
+            const pending = current.pending.find((x) => x.id === job.id);
+            if (!pending) return;
+            if (
+              error instanceof Unmatched ||
+              (error instanceof RefractApiError &&
+                error.status >= 400 &&
+                error.status < 500 &&
+                ![401, 403, 409, 429].includes(error.status))
+            ) {
+              current.pending = current.pending.filter((x) => x.id !== job.id);
+              current.failed.push({
+                sourceId: job.sourceId,
+                season: job.season,
+                episode: job.episode,
+                reason: error instanceof Error ? error.message : "Unknown error",
+              });
+              current.message = "Some items could not be matched or sent";
+            } else {
+              pending.attempts++;
+              const status = error instanceof RefractApiError ? error.status : 0;
+              pending.nextAt =
+                Date.now() +
+                (status === 401 || status === 403
+                  ? 60 * 60_000
+                  : Math.max(
+                      error instanceof RefractApiError ? error.retryAfterMs : 0,
+                      Math.min(60 * 60_000, 5000 * 2 ** Math.min(pending.attempts, 8)),
+                    ));
+              current.message =
+                status === 401 || status === 403
+                  ? "Refract denied access; check key and permissions"
+                  : "Network error; retry scheduled";
+            }
+            save(current);
+          });
         }
-        save(current);
       }
-    }
+    });
   } finally {
     running = false;
     if (flushRequested) {
@@ -292,10 +363,13 @@ export async function flushRefractSync(): Promise<void> {
   }
 }
 export function retryRefractSync(): void {
-  const s = read();
-  for (const job of s.pending) job.nextAt = Date.now();
-  save(s);
-  void flushRefractSync();
+  const epoch = read().epoch;
+  void withStoreLock(() => {
+    const s = read();
+    if (s.epoch !== epoch) return;
+    for (const job of s.pending) job.nextAt = Date.now();
+    save(s);
+  }).then(() => void flushRefractSync());
 }
 export function startRefractSync(): void {
   if (started) {
@@ -305,6 +379,9 @@ export function startRefractSync(): void {
   started = true;
   const poll = () => void flushRefractSync();
   window.addEventListener("online", poll);
+  window.addEventListener("storage", (event: StorageEvent) => {
+    if (event.key === STORE_KEY) poll();
+  });
   window.setInterval(poll, 60_000);
   poll();
 }
