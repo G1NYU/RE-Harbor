@@ -264,6 +264,122 @@ test("watchlist does not reset a title when Refract protects its library state",
   assert.equal(h.calls.length, 2);
 });
 
+test("watchlist retries transient CONFLICT failures, preserving the final operation", async () => {
+  let writes = 0;
+  const h = harness((_url, init) => {
+    if (init.method === "GET")
+      return new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }));
+    writes++;
+    return writes < 3
+      ? new Response(JSON.stringify({ code: "CONFLICT" }), { status: 409 })
+      : new Response("{}", { status: 201 });
+  });
+  const oldWindow = globalThis.window;
+  globalThis.window = new EventTarget();
+  try {
+    const result = await h.client.syncRefractWatchlist(
+      "rfk_fixture",
+      { id: "tt100", type: "series" },
+      true,
+      () => {},
+    );
+    assert.equal(result, undefined);
+    assert.equal(writes, 3);
+    assert.deepEqual(
+      h.calls.map((call) => call.init.method),
+      ["GET", "PUT", "PUT", "PUT"],
+    );
+  } finally {
+    globalThis.window = oldWindow;
+  }
+});
+
+test("watchlist also retries a temporary lookup network failure", async () => {
+  let lookups = 0;
+  const h = harness((_url, init) => {
+    if (init.method === "GET") {
+      lookups++;
+      if (lookups === 1) throw new TypeError("Temporary network failure");
+      return new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }));
+    }
+    return new Response("{}", { status: 201 });
+  });
+  const oldWindow = globalThis.window;
+  globalThis.window = new EventTarget();
+  try {
+    assert.equal(
+      await h.client.syncRefractWatchlist(
+        "rfk_fixture",
+        { id: "tt100", type: "series" },
+        true,
+        () => {},
+      ),
+      undefined,
+    );
+    assert.equal(lookups, 2);
+    assert.deepEqual(
+      h.calls.map((call) => call.init.method),
+      ["GET", "GET", "PUT"],
+    );
+  } finally {
+    globalThis.window = oldWindow;
+  }
+});
+
+test("watchlist does not retry permanent permission failures", async () => {
+  const h = harness((_url, init) =>
+    init.method === "GET"
+      ? new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }))
+      : new Response("{}", { status: 403 }),
+  );
+  const oldWindow = globalThis.window;
+  globalThis.window = new EventTarget();
+  try {
+    const result = await h.client.syncRefractWatchlist(
+      "rfk_fixture",
+      { id: "tt100", type: "series" },
+      true,
+      () => {},
+    );
+    assert.match(result, /library:write/);
+    assert.deepEqual(
+      h.calls.map((call) => call.init.method),
+      ["GET", "PUT"],
+    );
+  } finally {
+    globalThis.window = oldWindow;
+  }
+});
+
+test("watchlist cancels a scheduled retry when the account changes", async () => {
+  let writes = 0;
+  const h = harness((_url, init) => {
+    if (init.method === "GET")
+      return new Response(JSON.stringify({ data: [{ type: "show", ids: { refract: "show-1" } }] }));
+    writes++;
+    return new Response(JSON.stringify({ code: "CONFLICT" }), { status: 409 });
+  });
+  const oldWindow = globalThis.window;
+  globalThis.window = new EventTarget();
+  let current = true;
+  try {
+    const pending = h.client.syncRefractWatchlist(
+      "rfk_fixture",
+      { id: "tt100", type: "series" },
+      true,
+      () => {
+        if (!current) throw new Error("Account replaced");
+      },
+    );
+    while (writes === 0) await new Promise((resolve) => setImmediate(resolve));
+    current = false;
+    await assert.rejects(pending, /Account replaced/);
+    assert.equal(writes, 1);
+  } finally {
+    globalThis.window = oldWindow;
+  }
+});
+
 test("watchlist action hooks both acknowledged and legacy paths", () => {
   const provider = readFileSync(
     new URL("../src/lib/media-provider-actions.ts", import.meta.url),

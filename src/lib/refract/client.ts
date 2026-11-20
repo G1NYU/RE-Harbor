@@ -237,6 +237,35 @@ export function clearRefractWatchlistStatus(): void {
   reportWatchlist("");
 }
 
+/** Retry transient lookup and membership failures, without breaking per-account write ordering. */
+async function retryRefractWatchlistRequest<T>(
+  action: () => Promise<T>,
+  assertCurrent: () => void,
+): Promise<T> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    assertCurrent();
+    try {
+      const result = await action();
+      assertCurrent();
+      return result;
+    } catch (error) {
+      assertCurrent();
+      const retryable =
+        !(error instanceof RefractApiError) ||
+        error.status === 409 ||
+        error.status === 429 ||
+        error.status >= 500;
+      if (!retryable || attempt === 2) throw error;
+      const delay = Math.max(
+        error instanceof RefractApiError ? error.retryAfterMs : 0,
+        250 * 2 ** attempt,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error("Refract watchlist request retry limit reached");
+}
+
 /** Account/profile guards are rechecked after lookup, before writing membership. */
 async function runRefractWatchlistSync(
   key: string,
@@ -252,7 +281,10 @@ async function runRefractWatchlistSync(
       reportWatchlist(reason);
       return reason;
     }
-    const matches = await lookupRefract(key, identity.idType, identity.id, identity.type);
+    const matches = await retryRefractWatchlistRequest(
+      () => lookupRefract(key, identity.idType, identity.id, identity.type),
+      assertCurrent,
+    );
     assertCurrent();
     const ids = [
       ...new Set(
@@ -266,7 +298,10 @@ async function runRefractWatchlistSync(
       reportWatchlist(reason);
       return reason;
     }
-    const result = await writeRefractWatchlist(key, ids[0], on);
+    const result = await retryRefractWatchlistRequest(
+      () => writeRefractWatchlist(key, ids[0], on),
+      assertCurrent,
+    );
     assertCurrent();
     if (result === "protected") {
       reportWatchlist("Refract preserved an existing library entry or viewing history.");
