@@ -2,7 +2,7 @@ name: VOID Native + Refract Validation
 
 on:
   push:
-    branches: [feature/void-refract-preview, feature/harbor-music-polish]
+    branches: [feature/void-refract-preview, feature/harbor-music-polish, feature/void-refract-2026-11-preview]
   workflow_dispatch:
 
 permissions:
@@ -45,4 +45,4 @@ jobs:
       - name: Windows sidecar extraction regression
         run: node --test tests/music-sidecar-extraction.test.mjs
       - name: Refract API, identity, and sync tests
-        run: node --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-identity.test.mjs tests/refract-bulk-account.test.mjs
+        run: node --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-identity.test.mjs tests/refract-bulk-account.test.mjs tests/refract-library-removal.test.mjs tests/refract-void-preview.test.mjs

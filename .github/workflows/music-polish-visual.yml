@@ -1,7 +1,7 @@
 name: Harbor Music UI visual smoke
 on:
   push:
-    branches: [feature/harbor-music-polish]
+    branches: [feature/harbor-music-polish, feature/void-refract-2026-11-preview]
     paths:
       - ".github/workflows/music-polish-visual.yml"
       - "tests/music-polish-browser.mjs"

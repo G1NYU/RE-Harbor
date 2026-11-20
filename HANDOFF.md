@@ -143,3 +143,11 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - Added a `data-music-track` discriminator and CSS-only 320px maximum artwork/two-column hero. At narrow container widths, art and controls stack vertically with proper spacing. The existing square `Poster` and playback actions are reused; no extra media, filters, timers, observers or dependencies.
 - Source-level and browser geometry regressions check the art's square aspect, title/action alignment, and stacked narrow layout. Do not treat browser fixture validation as native provider playback testing.
 - Patch prepared against `feature/harbor-music-polish` at `740c4b3bee6f8028e7ee8f2328b9a55d673e1459`; branch not yet modified pending push approval.
+
+## VOID + upstream Refract isolated test build — 2026-11-20
+- Baseline: `feature/harbor-music-polish` at `13e6f2f8`; preserved without modification.
+- Preview branch: `feature/void-refract-2026-11-preview`, incorporating only Refract PR #103 behavior changes, the authentic 512px official Refract PNG, and Library removal synchronization. No full upstream merge: it conflicts with dozens of VOID Music/UI files and would risk undoing the approved design.
+- New Windows portable preview uses existing isolated Tauri identifier `app.harbor.voidnativepreview`; does not install over normal Harbor.
+- The preview excludes separate post-merge reliability follow-ups #7 and #9. Tests and live Refract/Windows playback need verification before claiming release quality.
+- Workflows: `music-void-ui.yml` (typecheck and Refract/music regressions), `music-polish-visual.yml` (Edge layout), `music-windows-preview.yml` (portable Windows artifact). No deployment, release, or production application identifier changes.
+- Next: verify all three workflow conclusions, inspect the Windows artifact metadata/contents, run `harbor.exe` in a fresh extracted folder and test watchlist additions/removals + movies/series early watched sync, Music/Now Playing, official branding, and account separation. Report exact run IDs and commit hashes after CI.
