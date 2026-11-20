@@ -28,6 +28,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git switch --detach c5f1eeff840e31d0bccd1fdba6c1f37d9196499c
+          git switch --detach 8f808b14eb7a3069160064cf75cd83c5f4c68f5e
           vp run typecheck
           node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-library-removal.test.mjs tests/refract-identity.test.mjs tests/refract-bulk-account.test.mjs tests/refract-locales.test.mjs tests/watchlist-history.test.ts
