@@ -158,3 +158,12 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - Per-user install location: `%LOCALAPPDATA%\\Programs\\Harbor VOID`; desktop/start-menu shortcuts and HKCU uninstall entry. Uninstall preserves profile settings. Tauri identity remains `app.harbor.voidnativepreview` and updater is disabled.
 - Automated Windows installer workflow validates original/installed executable and media-sidecar hashes, installer registration and silent removal before publishing a GitHub Actions artifact.
 - Next: verify workflow run and artifact, inspect failed steps if any. Test normal UI launch and user-profile persistence on actual Windows; no code signing or installer auto-updates are claimed.
+
+
+### Verified Windows installer delivery (2026-11-20)
+- Workflow: https://github.com/G1NYU/RE-Harbor/actions/runs/44761502098 — **completed/success** on commit `92dbc3619a622a89b9f8d375bd1524e54e22d873`.
+- Artifact: https://github.com/G1NYU/RE-Harbor/actions/runs/44761502098/artifacts/14642350533 (`harbor-void-refract-setup-windows-x64`, artifact ZIP compressed size 375,732,829 bytes; artifact SHA-256 `761c290eac08cda2fde2dcc66e89c416e13b4e95f394ca2ece2482a528f3acc5`).
+- Verified app executable SHA-256: `A351E0143E7AED520DB9FB90BD4390F2E6F6C9A619EB311D9788DC07C9456D8D`. The Windows CI installed app hash matches the original portable app hash, and also matched `mpv.exe`, `ffmpeg.exe`, `ffprobe.exe`, `yt-dlp.exe`, and `libmpv-2.dll` byte for byte.
+- The CI performed a successful per-user silent installation, verified Start Menu/Desktop shortcuts and the HKCU uninstall entry, and silently uninstalled it again, confirming executable, shortcuts and registry cleanup.
+- NSIS used ordinary zlib compression to avoid long solid-LZMA runtime. The application contents were not recompressed or altered individually.
+- Remaining manual verification: a normal interactive install and GUI first launch on the user's actual Windows PC; live Refract and Music are user-tested in the original portable build, not re-tested interactively from the installer inside CI. The setup executable is unsigned and has no auto-update channel; downloading the artifact requires GitHub account access when GitHub enforces it.
