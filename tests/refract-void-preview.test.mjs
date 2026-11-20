@@ -21,5 +21,11 @@ test("VOID uses the real Refract 512px transparent press-kit icon everywhere", (
     new URL("../src/views/settings/licenses-panel.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(licenses, /name: "Refract".*getrefract\\.app.*refractLogo/);
+  const trackers = licenses.slice(
+    licenses.indexOf("const TRACKERS: Credit[] = ["),
+    licenses.indexOf("const SUBTITLES: Credit[] = ["),
+  );
+  assert.ok(trackers.includes('name: "Refract"'));
+  assert.ok(trackers.includes("https://getrefract.app"));
+  assert.ok(trackers.includes("logo: refractLogo"));
 });

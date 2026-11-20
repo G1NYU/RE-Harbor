@@ -116,8 +116,12 @@ test("VOID Library Stremio removals dispatch Refract after successful provider w
   const localStart = source.indexOf("const handleRemoveLocal");
   const remove = source.slice(removeStart, localStart);
   const local = source.slice(localStart, source.indexOf("useEffect(() => {", localStart));
-  assert.equal((remove.match(/prepareRefractLibraryRemoval\\(/g) || []).length, 1);
-  assert.equal((remove.match(/syncRefractRemoval\\(\\)/g) || []).length, 1);
-  assert.match(remove, /for \\(const l of twins\\) removeFromWatchlist\\(l.id\\);\\s*syncRefractRemoval\\(\\)/);
-  assert.match(local, /toggleWatchlist\\(/);
+  assert.equal(remove.split("prepareRefractLibraryRemoval(").length - 1, 1);
+  assert.equal(remove.split("syncRefractRemoval()").length - 1, 1);
+  assert.ok(
+    remove.includes("for (const l of twins) removeFromWatchlist(l.id);"),
+    "Stremio twin removal must precede Refract dispatch",
+  );
+  assert.ok(remove.indexOf("syncRefractRemoval()") > remove.indexOf("for (const l of twins)"));
+  assert.ok(local.includes("toggleWatchlist("), "local removals retain the existing sync path");
 });
