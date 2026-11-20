@@ -1,4 +1,4 @@
-name: Refract upstream merge candidate
+name: Refract targeted regression validation
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
       - validation/refract-library-formatter
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  merge-candidate:
-    name: Resolve known translation conflicts and validate
+  focused:
+    name: Verify Library removal and History paths
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
@@ -24,69 +24,13 @@ jobs:
           run-install: |
             args:
               - --frozen-lockfile
-      - name: Merge upstream in a detached working tree
+      - name: Validate exact PR head
         shell: bash
         run: |
           set -euo pipefail
-          expected_head=868dbf848aa9362c40cfb695224d64c30d5e8b5c
-          expected_beta=95e0b1b7c0fbf9f0869af6bcbcca502ceee34c9e
-          git remote add upstream https://github.com/Harborofficial/Harbor.git
-          git fetch --no-tags upstream +refs/heads/beta-branch:refs/remotes/upstream/beta-branch
-          test "$(git rev-parse upstream/beta-branch)" = "$expected_beta"
-          git switch --detach "$expected_head"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          set +e
-          git merge --no-commit --no-ff upstream/beta-branch > /tmp/merge-output.txt 2>&1
-          status=$?
-          set -e
-          test "$status" -eq 1
-          python3 - <<'PY'
-          import pathlib, re, subprocess
-          expected = sorted(
-              f"src/lib/i18n/locales/{lang}.ts"
-              for lang in "ar de es fr hi id it ja ko pl pt ru tr vi zh".split()
-          )
-          actual = sorted(
-              subprocess.check_output(
-                  ["git", "diff", "--name-only", "--diff-filter=U"], text=True
-              ).splitlines()
-          )
-          if actual != expected:
-              raise SystemExit(f"Unexpected merge conflicts: {actual}")
-          pattern = re.compile(
-              r"^<<<<<<< HEAD\n(.*?)^=======\n(.*?)^>>>>>>> upstream/beta-branch\n",
-              re.MULTILINE | re.DOTALL,
-          )
-          for filename in expected:
-              path = pathlib.Path(filename)
-              source = path.read_text(encoding="utf-8")
-              def resolve(match):
-                  ours, theirs = match.group(1), match.group(2)
-                  if '"Refract sync":' not in ours or theirs.strip() != "...seekSteps,":
-                      raise ValueError(f"Unexpected conflict content in {filename}")
-                  return theirs + ours
-              updated, count = pattern.subn(resolve, source)
-              if count != 1 or "<<<<<<<" in updated or ">>>>>>>" in updated:
-                  raise SystemExit(f"Could not safely resolve {filename}: {count}")
-              if updated.count('"Refract sync":') != 1 or updated.count("...seekSteps,") != 1:
-                  raise SystemExit(f"Lost locale entries in {filename}")
-              path.write_text(updated, encoding="utf-8")
-          print("PROBE_RESOLVED_FILES:", len(expected))
-          PY
-          locale_files=(src/lib/i18n/locales/{ar,de,es,fr,hi,id,it,ja,ko,pl,pt,ru,tr,vi,zh}.ts)
-          git add "${locale_files[@]}"
-          test -z "$(git diff --name-only --diff-filter=U)"
-          vp fmt "${locale_files[@]}"
-          git add "${locale_files[@]}"
-          vp fmt --check "${locale_files[@]}" tests/refract-library-removal.test.mjs
-          git diff --cached --check
+          git fetch origin feature/refract-upstream
+          test "$(git rev-parse FETCH_HEAD)" = "24eadc5fc7391144625ef8d91342bde8e7666af3"
+          git switch --detach FETCH_HEAD
+          vp fmt --check tests/watchlist-history.test.ts tests/refract-library-removal.test.mjs
           vp run typecheck
-          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-library-removal.test.mjs tests/refract-api.test.mjs tests/refract-bulk-account.test.mjs tests/refract-sync.test.mjs
-          git commit -m "merge: reconcile Refract translations with upstream beta"
-          test "$(git rev-parse HEAD^1)" = "$expected_head"
-          test "$(git rev-parse HEAD^2)" = "$expected_beta"
-          echo "MERGE_CANDIDATE_COMMIT=$(git rev-parse HEAD)"
-          echo "MERGE_CANDIDATE_PARENT_1=$(git rev-parse HEAD^1)"
-          echo "MERGE_CANDIDATE_PARENT_2=$(git rev-parse HEAD^2)"
-          git push origin HEAD:refs/heads/validation/refract-upstream-merge-candidate
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/watchlist-history.test.ts tests/refract-library-removal.test.mjs
