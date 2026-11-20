@@ -699,6 +699,8 @@ export const DEFAULT: Settings = {
     showRatingsOnPosters: true,
     listRefs: [],
   },
+  refractSyncEnabled: true,
+  refractAutoThreshold: 70,
   adSkipEnabled: false,
   adReportAlwaysShow: false,
   adReportFirstSeen: false,

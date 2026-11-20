@@ -1,9 +1,8 @@
 import { safeFetch } from "@/lib/safe-fetch";
 import { readSharedSecret, writeSharedSecret } from "@/lib/secret-store";
+import { loadEffective, persistEffective, readActiveSource } from "@/lib/settings/profile-store";
 
 const KEY = "harbor.refract.key.v1";
-const ENABLED_KEY = "harbor.refract.enabled.v1";
-const AUTO_THRESHOLD_KEY = "harbor.refract.auto-threshold.v1";
 export const REFRACT_AUTO_THRESHOLDS = ["3m", "5m", "10m", 50, 60, 70, 80, 85] as const;
 export type RefractAutoThreshold = (typeof REFRACT_AUTO_THRESHOLDS)[number];
 const DEFAULT_AUTO_THRESHOLD: RefractAutoThreshold = 70;
@@ -37,27 +36,38 @@ export function saveRefractKey(value: string | null): void {
   writeSharedSecret(KEY, value?.trim() || null);
   window.dispatchEvent(new Event("harbor:refract-auth-changed"));
 }
+/** Persist tracker options in the normal profile-aware Settings store. */
+function readRefractSettings() {
+  const { profileId, linked } = readActiveSource();
+  return loadEffective(profileId, linked);
+}
+function writeRefractSettings(
+  patch: Partial<Pick<ReturnType<typeof readRefractSettings>, "refractSyncEnabled" | "refractAutoThreshold">>,
+): void {
+  const { profileId, linked } = readActiveSource();
+  persistEffective({ ...loadEffective(profileId, linked), ...patch }, profileId, linked);
+}
 export function refractEnabled(): boolean {
   try {
-    return getRefractKey() !== null && localStorage.getItem(ENABLED_KEY) !== "0";
+    return getRefractKey() !== null && readRefractSettings().refractSyncEnabled !== false;
   } catch {
     return false;
   }
 }
 export function setRefractEnabled(enabled: boolean): void {
-  localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
+  writeRefractSettings({ refractSyncEnabled: enabled });
 }
 export function getRefractAutoThreshold(): RefractAutoThreshold {
   try {
-    const raw = localStorage.getItem(AUTO_THRESHOLD_KEY);
-    return REFRACT_AUTO_THRESHOLDS.find((value) => String(value) === raw) ?? DEFAULT_AUTO_THRESHOLD;
+    const saved = readRefractSettings().refractAutoThreshold;
+    return REFRACT_AUTO_THRESHOLDS.find((value) => value === saved) ?? DEFAULT_AUTO_THRESHOLD;
   } catch {
     return DEFAULT_AUTO_THRESHOLD;
   }
 }
 export function setRefractAutoThreshold(value: number | string): void {
-  if (REFRACT_AUTO_THRESHOLDS.some((allowed) => String(allowed) === String(value)))
-    localStorage.setItem(AUTO_THRESHOLD_KEY, String(value));
+  const selected = REFRACT_AUTO_THRESHOLDS.find((allowed) => String(allowed) === String(value));
+  if (selected !== undefined) writeRefractSettings({ refractAutoThreshold: selected });
 }
 /** Use the media position, not wall-clock time. Seeking may cross the threshold. */
 export function refractPlaybackReached(positionSec: number, durationSec: number): boolean {

@@ -10,7 +10,13 @@ function harness(responder = () => new Response("{}", { status: 200 })) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const module = { exports: {} };
+  const preferences = { refractSyncEnabled: true, refractAutoThreshold: 70 };
   const imports = {
+    "@/lib/settings/profile-store": {
+      readActiveSource: () => ({ profileId: "default", linked: true }),
+      loadEffective: () => ({ ...preferences }),
+      persistEffective: (settings) => Object.assign(preferences, settings),
+    },
     "@/lib/safe-fetch": {
       safeFetch: (url, init) => {
         calls.push({ url, init });

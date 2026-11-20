@@ -869,6 +869,9 @@ export type Settings = {
   translateTitles: boolean;
   translateDescriptions: boolean;
   letterboxd: LetterboxdSettings;
+  /** Outbound tracker preferences; API credentials remain in the native secret store. */
+  refractSyncEnabled: boolean;
+  refractAutoThreshold: "3m" | "5m" | "10m" | 50 | 60 | 70 | 80 | 85;
   adSkipEnabled: boolean;
   adReportAlwaysShow: boolean;
   adReportFirstSeen: boolean;

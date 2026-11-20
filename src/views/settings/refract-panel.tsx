@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createRefractAttemptGuard } from "@/lib/refract/identity";
 import { useT } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
 import {
   getRefractKey,
   clearRefractWatchlistStatus,
@@ -26,6 +27,7 @@ import { ROW_ACTION_PRIMARY, ROW_DESC } from "./kit";
 
 export function RefractPanel() {
   const t = useT();
+  const { update: updateSettings } = useSettings();
   const [connected, setConnected] = useState(() => getRefractKey() !== null);
   const [enabled, setEnabled] = useState(() => refractEnabled());
   const [threshold, setThreshold] = useState(getRefractAutoThreshold);
@@ -71,6 +73,7 @@ export function RefractPanel() {
       clearRefractWatchlistStatus();
       saveRefractKey(key);
       setRefractEnabled(true);
+      updateSettings({ refractSyncEnabled: true });
       setConnected(true);
       setEnabled(true);
       setInput("");
@@ -91,6 +94,7 @@ export function RefractPanel() {
   const disconnect = async () => {
     attemptGuard.current.invalidate();
     setRefractEnabled(false);
+    updateSettings({ refractSyncEnabled: false });
     await resetRefractSync();
     saveRefractKey(null);
     clearRefractWatchlistStatus();
@@ -148,6 +152,7 @@ export function RefractPanel() {
             value={enabled}
             onChange={(value) => {
               setRefractEnabled(value);
+              updateSettings({ refractSyncEnabled: value });
               setEnabled(value);
               if (value) {
                 retryRefractSync();
@@ -168,6 +173,7 @@ export function RefractPanel() {
                 );
                 if (value === undefined) return;
                 setRefractAutoThreshold(value);
+                updateSettings({ refractAutoThreshold: value });
                 setThreshold(value);
               }}
               className="h-11 w-48 rounded-[10px] border border-edge bg-elevated px-3 text-ink"

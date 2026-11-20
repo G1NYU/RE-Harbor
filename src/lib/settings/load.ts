@@ -46,6 +46,23 @@ import { sanitizeDisplaySelection } from "@/lib/monitors";
 import { migratePublicRelayUrl } from "@/lib/together/relay-version";
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
+const REFRACT_THRESHOLD_CHOICES = ["3m", "5m", "10m", 50, 60, 70, 80, 85] as const;
+function readLegacyRefractPreferences(): Pick<Settings, "refractSyncEnabled" | "refractAutoThreshold"> {
+  try {
+    const enabled = localStorage.getItem("harbor.refract.enabled.v1");
+    const threshold = localStorage.getItem("harbor.refract.auto-threshold.v1");
+    return {
+      refractSyncEnabled: enabled !== "0",
+      refractAutoThreshold:
+        REFRACT_THRESHOLD_CHOICES.find((option) => String(option) === threshold) ?? 70,
+    };
+  } catch {
+    return { refractSyncEnabled: true, refractAutoThreshold: 70 };
+  }
+}
+function normalizeRefractThreshold(value: unknown): Settings["refractAutoThreshold"] {
+  return REFRACT_THRESHOLD_CHOICES.find((option) => option === value) ?? 70;
+}
 
 export function sanitizeHarborCursorScale(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT.harborCursorScale;
@@ -184,6 +201,7 @@ export function parseStoredSettings(raw: string | null): {
     return {
       settings: {
         ...DEFAULT,
+        ...readLegacyRefractPreferences(),
         seekBackStepSec: sanitizeSeekStep(legacySeekStep("back"), DEFAULT.seekBackStepSec),
         seekForwardStepSec: sanitizeSeekStep(legacySeekStep("forward"), DEFAULT.seekForwardStepSec),
       },
@@ -435,9 +453,17 @@ export function parseStoredSettings(raw: string | null): {
     const legacySyncIndicator =
       typeof parsed.syncIndicator === "boolean" ? parsed.syncIndicator : undefined;
     delete parsed.syncIndicator;
+    const legacyRefract = readLegacyRefractPreferences();
     const settings: Settings = {
       ...DEFAULT,
       ...parsed,
+      refractSyncEnabled:
+        typeof parsed.refractSyncEnabled === "boolean"
+          ? parsed.refractSyncEnabled
+          : legacyRefract.refractSyncEnabled,
+      refractAutoThreshold: normalizeRefractThreshold(
+        parsed.refractAutoThreshold ?? legacyRefract.refractAutoThreshold,
+      ),
       harborCursor: parsed.harborCursor === true,
       harborCursorScale: sanitizeHarborCursorScale(parsed.harborCursorScale),
       anilistSyncIndicator:
