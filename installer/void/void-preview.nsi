@@ -14,7 +14,7 @@ InstallDir "$LOCALAPPDATA\Programs\Harbor VOID"
 RequestExecutionLevel user
 ShowInstDetails show
 ShowUninstDetails show
-SetCompressor /SOLID lzma
+SetCompressor zlib
 BrandingText "Harbor VOID — personal preview edition"
 
 !define MUI_ABORTWARNING
