@@ -1,4 +1,4 @@
-name: Refract upstream merge probe
+name: Refract upstream merge candidate
 
 on:
   push:
@@ -6,48 +6,87 @@ on:
       - validation/refract-library-formatter
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  merge-probe:
-    name: Identify conflicts without changing any branch
+  merge-candidate:
+    name: Resolve known translation conflicts and validate
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Simulate current beta merge read-only
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          version: 1.5.1
+          node-version: 24
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Merge upstream in a detached working tree
         shell: bash
         run: |
+          set -euo pipefail
+          expected_head=868dbf848aa9362c40cfb695224d64c30d5e8b5c
+          expected_beta=95e0b1b7c0fbf9f0869af6bcbcca502ceee34c9e
           git remote add upstream https://github.com/Harborofficial/Harbor.git
           git fetch --no-tags upstream +refs/heads/beta-branch:refs/remotes/upstream/beta-branch
-          git config user.name "Read-only merge probe"
-          git config user.email "probe@users.noreply.github.com"
-          echo "PROBE_HEAD=$(git rev-parse HEAD)"
-          echo "PROBE_BETA=$(git rev-parse upstream/beta-branch)"
-          echo "PROBE_BASE=$(git merge-base HEAD upstream/beta-branch)"
+          test "$(git rev-parse upstream/beta-branch)" = "$expected_beta"
+          git switch --detach "$expected_head"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           set +e
-          git merge --no-commit --no-ff upstream/beta-branch > merge-output.txt 2>&1
-          result=$?
+          git merge --no-commit --no-ff upstream/beta-branch > /tmp/merge-output.txt 2>&1
+          status=$?
           set -e
-          echo "PROBE_MERGE_EXIT=$result"
-          sed -n '1,100p' merge-output.txt
-          echo PROBE_CONFLICTS_START
-          git diff --name-only --diff-filter=U
-          echo PROBE_CONFLICTS_END
-          echo PROBE_CONFLICT_COUNTS_START
-          while IFS= read -r conflict; do
-            printf '%s: ' "$conflict"
-            grep -c '^<<<<<<< ' "$conflict" || true
-          done < <(git diff --name-only --diff-filter=U)
-          echo PROBE_CONFLICT_COUNTS_END
-          for lang in ar fr ja; do
-            path="src/lib/i18n/locales/$lang.ts"
-            echo "PROBE_LOCALE_HUNKS_BEGIN $lang"
-            awk '/^<<<<<<< / { active = 1 } active { print } /^>>>>>>> / { active = 0 }' "$path"
-            echo "PROBE_LOCALE_HUNKS_END $lang"
-          done
-          if [ "$result" -ne 0 ]; then
-            git merge --abort || true
-          fi
+          test "$status" -eq 1
+          python3 - <<'PY'
+          import pathlib, re, subprocess
+          expected = sorted(
+              f"src/lib/i18n/locales/{lang}.ts"
+              for lang in "ar de es fr hi id it ja ko pl pt ru tr vi zh".split()
+          )
+          actual = sorted(
+              subprocess.check_output(
+                  ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+              ).splitlines()
+          )
+          if actual != expected:
+              raise SystemExit(f"Unexpected merge conflicts: {actual}")
+          pattern = re.compile(
+              r"^<<<<<<< HEAD\n(.*?)^=======\n(.*?)^>>>>>>> upstream/beta-branch\n",
+              re.MULTILINE | re.DOTALL,
+          )
+          for filename in expected:
+              path = pathlib.Path(filename)
+              source = path.read_text(encoding="utf-8")
+              def resolve(match):
+                  ours, theirs = match.group(1), match.group(2)
+                  if '"Refract sync":' not in ours or theirs.strip() != "...seekSteps,":
+                      raise ValueError(f"Unexpected conflict content in {filename}")
+                  return theirs + ours
+              updated, count = pattern.subn(resolve, source)
+              if count != 1 or "<<<<<<<" in updated or ">>>>>>>" in updated:
+                  raise SystemExit(f"Could not safely resolve {filename}: {count}")
+              if updated.count('"Refract sync":') != 1 or updated.count("...seekSteps,") != 1:
+                  raise SystemExit(f"Lost locale entries in {filename}")
+              path.write_text(updated, encoding="utf-8")
+          print("PROBE_RESOLVED_FILES:", len(expected))
+          PY
+          locale_files=(src/lib/i18n/locales/{ar,de,es,fr,hi,id,it,ja,ko,pl,pt,ru,tr,vi,zh}.ts)
+          git add "${locale_files[@]}"
+          test -z "$(git diff --name-only --diff-filter=U)"
+          vp fmt "${locale_files[@]}"
+          git add "${locale_files[@]}"
+          vp fmt --check "${locale_files[@]}" tests/refract-library-removal.test.mjs
+          git diff --cached --check
+          vp run typecheck
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-library-removal.test.mjs tests/refract-api.test.mjs tests/refract-bulk-account.test.mjs tests/refract-sync.test.mjs
+          git commit -m "merge: reconcile Refract translations with upstream beta"
+          test "$(git rev-parse HEAD^1)" = "$expected_head"
+          test "$(git rev-parse HEAD^2)" = "$expected_beta"
+          echo "MERGE_CANDIDATE_COMMIT=$(git rev-parse HEAD)"
+          echo "MERGE_CANDIDATE_PARENT_1=$(git rev-parse HEAD^1)"
+          echo "MERGE_CANDIDATE_PARENT_2=$(git rev-parse HEAD^2)"
+          git push origin HEAD:refs/heads/validation/refract-upstream-merge-candidate
