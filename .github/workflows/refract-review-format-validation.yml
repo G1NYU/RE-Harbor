@@ -1,4 +1,4 @@
-name: Refract review formatter validation
+name: Refract review focused tests
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
       - validation/refract-review-formatter
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  format:
-    name: Apply exact pinned formatter to isolated candidate
+  focused:
+    name: Verify the exact follow-up PR head
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v6
         with:
@@ -24,34 +24,10 @@ jobs:
           run-install: |
             args:
               - --frozen-lockfile
-      - name: Format only the reviewed Refract files
+      - name: Typecheck and focused Refract regressions
         shell: bash
         run: |
           set -euo pipefail
-          expected_head=1a90faefb16f6a9997b6874e8c6a30d0b6ad25cc
-          git switch --detach "$expected_head"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          files=(
-            src/lib/backup.ts
-            src/lib/refract/client.ts
-            src/lib/refract/sync.ts
-            src/lib/settings/defaults.ts
-            src/lib/settings/load.ts
-            src/lib/settings/types.ts
-            src/lib/watchlist.ts
-            src/views/settings/refract-panel.tsx
-            tests/refract-api.test.mjs
-            tests/refract-library-removal.test.mjs
-            tests/refract-sync.test.mjs
-            docs/refract.md
-          )
-          vp fmt "${files[@]}"
-          vp fmt --check "${files[@]}"
-          git diff --check
-          git add "${files[@]}"
-          if ! git diff --cached --quiet; then
-            git commit -m "style(refract): apply pinned formatter to review follow-up"
-          fi
-          echo "FORMATTED_REF=$(git rev-parse HEAD)"
-          git push origin HEAD:refs/heads/validation/refract-review-formatted-output
+          git switch --detach c5f1eeff840e31d0bccd1fdba6c1f37d9196499c
+          vp run typecheck
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-api.test.mjs tests/refract-sync.test.mjs tests/refract-library-removal.test.mjs tests/refract-identity.test.mjs tests/refract-bulk-account.test.mjs tests/refract-locales.test.mjs tests/watchlist-history.test.ts
