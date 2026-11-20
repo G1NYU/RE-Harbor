@@ -556,6 +556,12 @@ test("two windows serialize queue appends and only the main window drains", asyn
   const db = new Map();
   const calls = [];
   const locks = new Map();
+  let holdFirstWrite = false;
+  let releaseFirstWrite;
+  let firstWriteStarted;
+  const firstWrite = new Promise((resolve) => {
+    firstWriteStarted = resolve;
+  });
   const storage = {
     getItem: (key) => db.get(key) ?? null,
     setItem: (key, value) => db.set(key, value),
@@ -591,6 +597,12 @@ test("two windows serialize queue appends and only the main window drains", asyn
       lookupRefract: async () => [{ ids: { refract: "movie-ref" } }],
       writeRefractMovie: async (...args) => {
         calls.push(args);
+        if (holdFirstWrite && calls.length === 1) {
+          firstWriteStarted();
+          await new Promise((resolve) => {
+            releaseFirstWrite = resolve;
+          });
+        }
       },
       writeRefractEpisode: async () => {},
       RefractApiError: class RefractApiError extends Error {},
@@ -618,11 +630,21 @@ test("two windows serialize queue appends and only the main window drains", asyn
     assert.equal(queued.pending.length, 2, "one window must not overwrite the other's enqueue");
     assert.equal(calls.length, 0, "companion windows must not send HTTP writes");
 
+    holdFirstWrite = true;
     main.startRefractSync();
-    for (let i = 0; i < 15; i++) await tick();
+    await firstWrite;
+    companion.enqueueRefractWatch(movieEvent("tmdb:movie:57"));
+    for (let i = 0; i < 10; i++) await tick();
+    assert.equal(
+      JSON.parse(db.get("harbor.refract.sync.v1")).pending.length,
+      3,
+      "an enqueue during an in-flight write must remain in the shared queue",
+    );
+    releaseFirstWrite();
+    for (let i = 0; i < 30; i++) await tick();
     assert.equal(main.refractStatus().pending, 0);
-    assert.equal(main.refractStatus().synced, 2);
-    assert.equal(calls.length, 2);
+    assert.equal(main.refractStatus().synced, 3);
+    assert.equal(calls.length, 3);
   } finally {
     globalThis.localStorage = prior.storage;
     globalThis.window = prior.window;
