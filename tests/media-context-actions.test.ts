@@ -48,6 +48,7 @@ function harness() {
     },
     "./membership-operations": { captureMembershipProfile: () => profile },
     "./auth": { readActiveStremioAuthKey: () => "fixture-auth" },
+    "./refract/identity": { refractMappedEpisodes: () => undefined },
     "./stremio": { ANIME_CLOUD_ID: /^(kitsu|mal|anilist|anidb):/ },
     "./watchlist": {
       setLocalWatchlistAcknowledged: step("local-watchlist"),
