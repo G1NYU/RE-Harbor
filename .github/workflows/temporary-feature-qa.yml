@@ -1,0 +1,52 @@
+name: Temporary focused feature validation
+
+on:
+  push:
+    branches:
+      - validation/format-harbor-upstream
+      - validation/format-vk-music
+
+permissions:
+  contents: read
+
+jobs:
+  feature:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: TypeScript validation
+        run: vp run typecheck
+      - name: Music and Refract focused regressions
+        if: github.ref_name == 'validation/format-harbor-upstream'
+        run: |
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
+            tests/music-audio-meter.test.ts \
+            tests/music-lastfm-integration.test.ts \
+            tests/music-player-source-recovery.test.ts \
+            tests/music-player-selection.test.ts \
+            tests/music-source-consent.test.ts \
+            tests/music-source-version.test.ts \
+            tests/music-queue-source.test.ts \
+            tests/refract-api.test.mjs \
+            tests/refract-bulk-account.test.mjs \
+            tests/refract-identity.test.mjs \
+            tests/refract-sync.test.mjs
+      - name: VK-adjacent music source regressions
+        if: github.ref_name == 'validation/format-vk-music'
+        run: |
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
+            tests/music-player-source-recovery.test.ts \
+            tests/music-player-selection.test.ts \
+            tests/music-source-consent.test.ts \
+            tests/music-source-version.test.ts \
+            tests/music-queue-source.test.ts
