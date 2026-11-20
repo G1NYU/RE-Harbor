@@ -1,0 +1,55 @@
+name: Refract review formatter validation
+
+on:
+  push:
+    branches:
+      - validation/refract-review-formatter
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    name: Apply exact pinned formatter to isolated candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          version: 1.5.1
+          node-version: 24
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Format only the reviewed Refract files
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head=1a90faefb16f6a9997b6874e8c6a30d0b6ad25cc
+          git switch --detach "$expected_head"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          files=(
+            src/lib/backup.ts
+            src/lib/refract/client.ts
+            src/lib/refract/sync.ts
+            src/lib/settings/defaults.ts
+            src/lib/settings/load.ts
+            src/lib/settings/types.ts
+            src/lib/watchlist.ts
+            src/views/settings/refract-panel.tsx
+            tests/refract-api.test.mjs
+            tests/refract-library-removal.test.mjs
+            tests/refract-sync.test.mjs
+            docs/refract.md
+          )
+          vp fmt "${files[@]}"
+          vp fmt --check "${files[@]}"
+          git diff --check
+          git add "${files[@]}"
+          if ! git diff --cached --quiet; then
+            git commit -m "style(refract): apply pinned formatter to review follow-up"
+          fi
+          echo "FORMATTED_REF=$(git rev-parse HEAD)"
+          git push origin HEAD:refs/heads/validation/refract-review-formatted-output
