@@ -16,6 +16,7 @@ import {
   evictWatchlistAggregate,
   readLocalEntries,
   removeFromWatchlist,
+  prepareRefractLibraryRemoval,
   subscribeWatchlist,
   toggleWatchlist,
   type LocalEntry,
@@ -100,6 +101,13 @@ export function WatchlistTab({
       guardSeq.current += 1;
       pendingRemovals.current += 1;
       const allLocals = readLocalEntries();
+      const localMatch = allLocals.find((entry) => entry.id === stremioId || entry.imdbId === stremioId);
+      const stremioMatch = stremio.find((entry) => entry._id === stremioId);
+      const syncRefractRemoval = prepareRefractLibraryRemoval({
+        id: stremioId,
+        type: localMatch?.type ?? stremioMatch?.type,
+        imdbId: localMatch?.imdbId ?? null,
+      });
       const closure = filmClosure([stremioId], allLocals, trakt);
       evictWatchlistAggregate(closure);
       const twins = allLocals.filter((l) => closure.has(l.id));
@@ -133,6 +141,7 @@ export function WatchlistTab({
         if (results.some((result) => result.status === "rejected"))
           throw new Error("Watchlist removal failed");
         for (const l of twins) removeFromWatchlist(l.id);
+        syncRefractRemoval();
       } catch {
         setLocalEntries(readLocalEntries());
       } finally {

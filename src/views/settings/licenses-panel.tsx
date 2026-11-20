@@ -28,6 +28,7 @@ import gestdownLogo from "@/assets/service-logos/gestdown.png";
 import wyzieLogo from "@/assets/wyzie.png";
 import traktLogo from "@/assets/trakt.svg";
 import simklLogo from "@/assets/simkl.png";
+import refractLogo from "@/assets/refract.png";
 import anilistLogo from "@/assets/anilist.png";
 import malLogo from "@/assets/mal.png";
 import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
@@ -281,6 +282,7 @@ const METADATA: Credit[] = [
 const TRACKERS: Credit[] = [
   { name: "Trakt", blurb: "Account sign-in, watched history, scrobbling, watchlists and comments.", url: "https://trakt.tv", logo: traktLogo },
   { name: "Simkl", blurb: "Account sign-in, watch history and scrobbling, including anime.", url: "https://simkl.com", logo: simklLogo },
+  { name: "Refract", blurb: "Movie and episode watch history, automatic playback logging and Plan to Watch updates.", url: "https://getrefract.app", logo: refractLogo },
   { name: "AniList", blurb: "Anime and manga list management and progress synchronisation.", url: "https://anilist.co", logo: anilistLogo },
   { name: "MyAnimeList", blurb: "Anime and manga list management and progress synchronisation.", url: "https://myanimelist.net", logo: malLogo },
   { name: "Letterboxd", blurb: "Film diary and watchlist import.", url: "https://letterboxd.com", logo: letterboxdLogo },

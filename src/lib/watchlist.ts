@@ -331,6 +331,24 @@ export function clearWatchlistAggregate(input: WatchlistInput): void {
   for (const listener of subs) listener();
 }
 
+/** Capture the Refract account before Library removals perform async provider writes. */
+export function prepareRefractLibraryRemoval(input: WatchlistInput): () => void {
+  const key = getRefractKey();
+  if (!key || !refractEnabled() || !activeProfileIsPrimary()) return () => {};
+  const profile = currentHarborProfileId();
+  const isCurrent = () =>
+    getRefractKey() === key &&
+    refractEnabled() &&
+    activeProfileIsPrimary() &&
+    currentHarborProfileId() === profile;
+  return () => {
+    if (!isCurrent()) return;
+    void syncRefractWatchlist(key, input, false, () => {
+      if (!isCurrent()) throw new Error("The Refract account or profile changed.");
+    }).catch(() => {});
+  };
+}
+
 export function toggleWatchlist(input: string | WatchlistInput): boolean {
   const map = read();
   const id = typeof input === "string" ? input : input.id;

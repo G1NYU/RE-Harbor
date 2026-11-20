@@ -5,7 +5,7 @@ import simklLogo from "@/assets/simkl.png";
 import traktLogo from "@/assets/trakt.png";
 import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
 import publicmetadbLogo from "@/assets/publicmetadb.svg";
-import refractLogo from "@/assets/refract.svg";
+import refractLogo from "@/assets/refract.png";
 import { getRefractKey } from "@/lib/refract/client";
 import { useAnilist } from "@/lib/anilist/provider";
 import { useMal } from "@/lib/mal/provider";
