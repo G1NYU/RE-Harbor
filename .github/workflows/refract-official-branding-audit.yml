@@ -1,4 +1,4 @@
-name: Refract official branding audit
+name: Refract official brand asset extraction
 
 on:
   push:
@@ -6,28 +6,43 @@ on:
       - validation/refract-official-branding
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect-brand:
-    name: Inspect official press kit and Refract logo usage
+  prepare-asset:
+    name: Import official 512px transparent Refract icon
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - name: Inspect public Refract brand assets and source usages
+        with:
+          fetch-depth: 0
+      - name: Extract a verified public press-kit asset
         shell: bash
         run: |
           set -euo pipefail
-          echo BRAND_USAGE_START
-          git grep -nEi 'refract\\.svg|refractLogo|refract-logo' -- src tests || true
-          echo BRAND_USAGE_END
+          expected_head=9069b9d495637164bdf9551f416243abdaf13521
+          expected_target=validation/refract-brand-asset
+          git switch --detach "$expected_head"
           curl --retry 2 --retry-delay 2 --fail --location --silent --show-error --max-time 45 -o /tmp/refract-press-kit.zip https://getrefract.app/assets/press/refract-press-kit.zip
-          echo PRESS_KIT_FILES_START
-          unzip -Z1 /tmp/refract-press-kit.zip | head -n 120
-          echo PRESS_KIT_FILES_END
-          echo IMAGE_METADATA_START
-          unzip -Z1 /tmp/refract-press-kit.zip | grep -Ei '\\.(png|svg|webp)$' | head -n 60 | while IFS= read -r entry; do
-            unzip -p /tmp/refract-press-kit.zip "$entry" | file - | sed "s@^/dev/stdin:@$entry:@"
-          done
-          echo IMAGE_METADATA_END
+          unzip -p /tmp/refract-press-kit.zip refract-press-kit/logos/refract-logo-transparent-512.png > src/assets/refract.png
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          p = Path("src/assets/refract.png")
+          data = p.read_bytes()
+          assert len(data) > 1024 and len(data) < 1_000_000, "Unexpected official logo size"
+          assert data[:8] == b"\\x89PNG\\r\\n\\x1a\\n", "Not PNG"
+          assert data[12:16] == b"IHDR", "Missing PNG header"
+          width, height = struct.unpack(">II", data[16:24])
+          assert (width, height) == (512, 512), f"Unexpected dimensions: {width}x{height}"
+          print(f"OFFICIAL_LOGO_VERIFIED {width}x{height} bytes={len(data)} color_type={data[25]}")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/assets/refract.png
+          test "$(git diff --cached --name-only)" = "src/assets/refract.png"
+          git commit -m "assets(refract): import official transparent prism logo from press kit"
+          echo "OFFICIAL_ASSET_COMMIT=$(git rev-parse HEAD)"
+          echo "OFFICIAL_ASSET_SHA256=$(sha256sum src/assets/refract.png)"
+          git push origin HEAD:refs/heads/"$expected_target"
