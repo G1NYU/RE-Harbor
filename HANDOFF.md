@@ -167,3 +167,12 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - The CI performed a successful per-user silent installation, verified Start Menu/Desktop shortcuts and the HKCU uninstall entry, and silently uninstalled it again, confirming executable, shortcuts and registry cleanup.
 - NSIS used ordinary zlib compression to avoid long solid-LZMA runtime. The application contents were not recompressed or altered individually.
 - Remaining manual verification: a normal interactive install and GUI first launch on the user's actual Windows PC; live Refract and Music are user-tested in the original portable build, not re-tested interactively from the installer inside CI. The setup executable is unsigned and has no auto-update channel; downloading the artifact requires GitHub account access when GitHub enforces it.
+
+
+## RE-Harbor README and VOID identity (2026-11-21)
+- Documentation-only brand/README overhaul for the fork landing page and the VOID + Refract installer branch; no production code, build scripts, dependencies, or workflow files changed.
+- New artwork: `docs/media/reharbor/cover.svg` and `brand-board.svg` (flat near-black, Mocha surfaces, restrained signal blue, negative space); user-provided UI screenshots optimized to WebP for `music-home.webp`, `now-playing.webp`, and `media-home.webp`.
+- New `docs/VOID-BRAND.md` records palette, typography, spacing, imagery, accessibility and performance direction. The README focuses on the listening room while retaining technical stack, install/build instructions, outbound-only Refract scope, upstream credit, license and no-content policy.
+- Custom branch: `feature/void-refract-2026-11-installer`. Fork default: `beta-branch`. The two README copies intentionally link the separate preview branch; docs changes must not be interpreted as an upstream sync or a new installer build.
+- Validation performed before commit: screenshot decode, SVG XML parse and visual raster previews, README internal asset paths and Markdown code fences. GitHub rendering and checks should be verified after push.
+- Next: separately rehearse upstream beta merge in an isolated branch before touching the custom implementation; then run builds and Windows UI testing. The existing verified installer remains the recovery artifact.
