@@ -1,0 +1,59 @@
+name: Temporary Refract mock compatibility QA
+
+on:
+  push:
+    branches:
+      - validation/refract-mock-compat
+
+permissions:
+  contents: write
+
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Format and check updated test fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          vp fmt \
+            tests/watchlist-identity.test.mjs \
+            tests/media-provider-actions.test.ts \
+            tests/context-watched-cancellation.test.ts \
+            tests/media-context-actions.test.ts \
+            tests/publicmetadb-context-actions.test.ts \
+            tests/helpers/playback-persistence-harness.ts
+          git diff --check
+      - name: Typecheck
+        run: vp run typecheck
+      - name: Run formerly failing test fixture suites
+        run: |
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
+            tests/watchlist-identity.test.mjs \
+            tests/media-provider-actions.test.ts \
+            tests/context-watched-cancellation.test.ts \
+            tests/media-context-actions.test.ts \
+            tests/publicmetadb-context-actions.test.ts \
+            tests/resume-autosave-session.test.ts
+      - name: Commit only formatter output to temporary validation ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" == "validation/refract-mock-compat" ]]
+          git add -u -- tests/
+          if git diff --cached --quiet; then exit 0; fi
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git diff --cached --stat
+          git commit -m "style: format Refract test mocks on validation branch"
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"

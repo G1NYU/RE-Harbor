@@ -49,6 +49,11 @@ export function playbackPersistenceHarness(kind: "local" | "cloud" = "local") {
     profileFromMeta: () => ({}), trackEvent: noop, isExternalPlaylistId: () => false,
     clearLocalCw: noop, localCwEntry: () => null, saveLocalCw: (v: any, owner: any) => { localCw.push(v); localOwners.push(owner); },
     recordWatchEvent: (v: any) => watchEvents.push(v), isLocalUrl: () => false,
+    // These sessions intentionally have no connected Refract account.
+    recordRefractWatch: noop, refractEnabled: () => false,
+    refractPlaybackReached: () => false,
+    parseRefractHistoryId: () => null, refractMappedEpisodes: () => undefined,
+    activeScopedProfileId: () => profileId, activeProfileIsPrimary: () => true,
     isManuallyWatched: (id: string, s: number, e: number) => watched.some(v => v[0] === id && v[1] === s && v[2] === e),
     recordManualWatchedMeta: noop, setManualWatched: (...args: any[]) => watched.push(args),
     savePlayback: (...args: any[]) => history.push(args),

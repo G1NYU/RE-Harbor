@@ -41,6 +41,12 @@ function harness() {
   const shared = {
     "./cinemeta": { meta: async () => meta },
     "./auth": { readActiveStremioAuthKey: () => null },
+    "./active-profile-id": { activeProfileIsPrimary: () => true },
+    "./refract/client": {
+      getRefractKey: () => null,
+      refractEnabled: () => false,
+      syncRefractWatchlist: async () => {},
+    },
     "./stremio": { ANIME_CLOUD_ID: /^(kitsu|mal|anilist|anidb):/ },
     "./trakt/session": {
       isAuthenticated: () => true,
