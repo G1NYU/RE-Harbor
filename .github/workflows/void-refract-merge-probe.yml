@@ -1,0 +1,47 @@
+name: VOID + Refract merge assessment
+
+on:
+  push:
+    branches:
+      - validation/void-refract-merge-probe
+
+permissions:
+  contents: read
+
+jobs:
+  assess:
+    name: Inspect merge conflicts without writing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Probe upstream Refract integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "VOID_BASE=$(git rev-parse HEAD^)"
+          git fetch origin +refs/heads/feature/refract-upstream:refs/remotes/origin/feature/refract-upstream
+          target=$(git rev-parse origin/feature/refract-upstream)
+          test "$target" = "1b72d2887ffa08520ac5b11a78ec5a56beabd890"
+          echo "UPSTREAM_TARGET=$target"
+          echo "MERGE_BASE=$(git merge-base HEAD^ "$target")"
+          git config user.name "Read-only merge probe"
+          git config user.email "probe@users.noreply.github.com"
+          git switch --detach HEAD^
+          set +e
+          git merge --no-ff --no-commit "$target" > /tmp/merge-output.txt 2>&1
+          status=$?
+          set -e
+          echo "MERGE_EXIT=$status"
+          cat /tmp/merge-output.txt | head -n 100
+          echo CONFLICT_FILES_START
+          git diff --name-only --diff-filter=U
+          echo CONFLICT_FILES_END
+          echo CHANGED_FILES_START
+          git status --short | head -n 240
+          echo CHANGED_FILES_END
+          if [ "$status" -ne 0 ]; then
+            git merge --abort || true
+          fi
