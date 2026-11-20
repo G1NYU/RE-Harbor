@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { activeScopedProfileId as currentHarborProfileId, activeProfileIsPrimary } from "@/lib/active-profile-id";
+import {
+  activeScopedProfileId as currentHarborProfileId,
+  activeProfileIsPrimary,
+} from "@/lib/active-profile-id";
 import { getRefractKey, refractEnabled, syncRefractWatchlist } from "@/lib/refract/client";
 import {
   addToWatchlist as traktAdd,

@@ -1,5 +1,9 @@
 import { compatibleVocalVersion, shouldResolvePreferredSource } from "./source-version";
-import { cancelMusicQueueAutomation, markMusicQueueAutomationStarted, ownsMusicQueueAutomation } from "./queue-automation";
+import {
+  cancelMusicQueueAutomation,
+  markMusicQueueAutomationStarted,
+  ownsMusicQueueAutomation,
+} from "./queue-automation";
 import { activeProfileId, activeProfileIsPrimary } from "@/lib/active-profile-id";
 import { hydrateListeningAffinity, observeMusicListening } from "./listening-affinity";
 import { filterBlockedTracks, hydrateArtistBlockStore } from "./artist-blocks";
@@ -30,7 +34,11 @@ import { musicAdvance, musicPrevious, musicWarmTargets, resetMusicOrder } from "
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
-import { readMusicPreference, readStoredMusicPreference, writeMusicPreference } from "./preferences";
+import {
+  readMusicPreference,
+  readStoredMusicPreference,
+  writeMusicPreference,
+} from "./preferences";
 import {
   clampMusicVolume,
   initializeMusicAudioSettings,
@@ -43,7 +51,11 @@ import {
   writeCheckpointToDb,
   type MusicCheckpoint,
 } from "./session-checkpoint";
-import { beginMusicQueue, getMusicPlaybackOrigin, restoreMusicPlaybackOrigin } from "./playback-origin";
+import {
+  beginMusicQueue,
+  getMusicPlaybackOrigin,
+  restoreMusicPlaybackOrigin,
+} from "./playback-origin";
 import { hydrateMusicContextTracks, hydrateMusicRecentContexts } from "./recent-context";
 import { hydrateMusicDestinations } from "./recent-destinations";
 import { hydratePinnedMusicPlaylists } from "./pinned-playlists";
@@ -188,7 +200,11 @@ function warmBeforeEnd(): void {
   if (state.current.connectorId === "spotify") {
     // librespot plays a preloaded track without a load gap; stream URLs are warmed below.
     const next = musicWarmTargets(state.queue, state.queueIndex, 1)[0];
-    if (next && musicPlaybackSourceAllowed(next) && queueTrackKey(next) !== queueTrackKey(state.current))
+    if (
+      next &&
+      musicPlaybackSourceAllowed(next) &&
+      queueTrackKey(next) !== queueTrackKey(state.current)
+    )
       void invoke("music_spotify_preload", { track: next }).catch(() => {});
   }
   warmNeighbours();
@@ -417,14 +433,11 @@ export function initializeMusic(): Promise<void> {
       // the checkpoint itself carries the track. With no usable checkpoint at all, the most
       // recent track is the honest fallback: the queue top is arbitrary and would resume a song
       // the listener did not choose, which is how one miss became a permanent wrong resume.
-      const recovered =
-        restoredIndex < 0 ? (saved?.track ?? bootstrap.recents[0] ?? null) : null;
+      const recovered = restoredIndex < 0 ? (saved?.track ?? bootstrap.recents[0] ?? null) : null;
       const queue = recovered
         ? [
             recovered,
-            ...bootstrap.queue.filter(
-              (track) => queueTrackKey(track) !== queueTrackKey(recovered),
-            ),
+            ...bootstrap.queue.filter((track) => queueTrackKey(track) !== queueTrackKey(recovered)),
           ]
         : bootstrap.queue;
       const index = restoredIndex >= 0 ? restoredIndex : 0;
@@ -870,7 +883,12 @@ export async function playMusic(
     (track.connectorId === "catalog" && !track.playbackUrl) ||
     (sourceBlocked && track.mediaKind !== "video");
   const preferredSource = readMusicPreference("harbor.music.preferred-source.v1");
-  const resolvePreferred = shouldResolvePreferredSource(track, preferredSource, explicitSource !== null, failedAttempts.size > 0);
+  const resolvePreferred = shouldResolvePreferredSource(
+    track,
+    preferredSource,
+    explicitSource !== null,
+    failedAttempts.size > 0,
+  );
   const workingSource = state.current?.connectorId;
   let alternatives: MusicTrack[] = [];
   let searchedAlternatives = catalog || resolvePreferred;
@@ -898,9 +916,16 @@ export async function playMusic(
   });
   try {
     if (catalog || resolvePreferred) {
-      const candidates = await sourcesFor(track).catch(error => {
+      const candidates = await sourcesFor(track).catch((error) => {
         if (catalog) throw error;
-        return [{ connectorId: track.connectorId ?? "", connectorName: "", health: "healthy" as const, track }];
+        return [
+          {
+            connectorId: track.connectorId ?? "",
+            connectorName: "",
+            health: "healthy" as const,
+            track,
+          },
+        ];
       });
       if (!ownsRequest()) return;
       const playable = candidates.filter(
@@ -909,8 +934,19 @@ export async function playMusic(
           candidate.track.connectorId !== "catalog" &&
           !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
       );
-      if (!catalog && !playable.some(candidate => candidate.track.connectorId === track.connectorId && candidate.track.id === track.id)) {
-        playable.push({ connectorId: track.connectorId ?? "", connectorName: "", health: "healthy", track });
+      if (
+        !catalog &&
+        !playable.some(
+          (candidate) =>
+            candidate.track.connectorId === track.connectorId && candidate.track.id === track.id,
+        )
+      ) {
+        playable.push({
+          connectorId: track.connectorId ?? "",
+          connectorName: "",
+          health: "healthy",
+          track,
+        });
       }
       const preferred = readMusicPreference("harbor.music.preferred-source.v1");
       const ranked = rankByExplicitness(playable, explicitnessOf(track));
@@ -1002,9 +1038,15 @@ export async function playMusic(
           position > 0 &&
           position < duration - 2 &&
           !attemptTrack.playbackUrl &&
-          ["youtube", "youtube_music", "soundcloud", "plex", "jellyfin", "subsonic", "navidrome"].includes(
-            attemptTrack.connectorId ?? "",
-          ) &&
+          [
+            "youtube",
+            "youtube_music",
+            "soundcloud",
+            "plex",
+            "jellyfin",
+            "subsonic",
+            "navidrome",
+          ].includes(attemptTrack.connectorId ?? "") &&
           musicPlaybackSourceAllowed(attemptTrack) &&
           !failedAttempts.has(attemptKey) &&
           failedAttempts.size < SOURCE_ATTEMPT_CEILING;
@@ -1021,8 +1063,16 @@ export async function playMusic(
           if (canReconnect) {
             // Renew a native source once per failed recording before trying another provider.
             resumeAt = { key: queueTrackKey(attemptTrack), position };
-            await playMusic(attemptTrack, state.queue, failedAttempts, true, skipUnavailable, false, undefined, true)
-              .catch(() => {});
+            await playMusic(
+              attemptTrack,
+              state.queue,
+              failedAttempts,
+              true,
+              skipUnavailable,
+              false,
+              undefined,
+              true,
+            ).catch(() => {});
             return;
           }
           const candidates =
@@ -1075,11 +1125,12 @@ export async function playMusic(
       };
       try {
         if (target && !returningToComputer) await loadMusicOnSpeaker(track, target);
-        else await invoke("music_play_track", {
-          track,
-          volume: state.volume,
-          ...(refreshStream && attempt === 0 ? { refreshStream: true } : {}),
-        });
+        else
+          await invoke("music_play_track", {
+            track,
+            volume: state.volume,
+            ...(refreshStream && attempt === 0 ? { refreshStream: true } : {}),
+          });
         break;
       } catch (error) {
         if (!ownsRequest()) return;

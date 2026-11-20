@@ -106,7 +106,9 @@ export function RefractPanel() {
       {!connected ? (
         <form onSubmit={connect} className="flex max-w-xl flex-col gap-3">
           <p className={ROW_DESC}>
-            {t("Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.")}
+            {t(
+              "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.",
+            )}
           </p>
           <label htmlFor="refract-api-key" className="text-[14px] font-medium text-ink">
             {t("Refract personal API key")}
@@ -180,13 +182,19 @@ export function RefractPanel() {
               ))}
             </select>
             <p className={ROW_DESC}>
-              {t("Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.")}
+              {t(
+                "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.",
+              )}
             </p>
           </div>
           <div className="flex flex-col gap-1">
-            <p className="text-[14px] font-medium text-ink">{t("Harbor → Refract Plan to Watch")}</p>
+            <p className="text-[14px] font-medium text-ink">
+              {t("Harbor → Refract Plan to Watch")}
+            </p>
             <p className={ROW_DESC}>
-              {t("New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.")}
+              {t(
+                "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.",
+              )}
             </p>
             {watchlist && (
               <p role="status" className={ROW_DESC}>
@@ -215,7 +223,8 @@ export function RefractPanel() {
                     failure.season != null ? ` S${failure.season}E${failure.episode}` : "";
                   return (
                     <li key={i}>
-                      {failure.sourceId}{episode}: {reason}
+                      {failure.sourceId}
+                      {episode}: {reason}
                     </li>
                   );
                 })}

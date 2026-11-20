@@ -127,7 +127,10 @@ export async function markMetaWatched(
       const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : (tmdbId ?? undefined);
       recordRefractWatch(
         { id: meta.id, type: "series", name: meta.name, poster: meta.poster, at: Date.now() },
-        { externalId: resolvedImdb ?? (tmdb != null ? `tmdb:tv:${tmdb}` : undefined), episodes: eps },
+        {
+          externalId: resolvedImdb ?? (tmdb != null ? `tmdb:tv:${tmdb}` : undefined),
+          episodes: eps,
+        },
       );
     }
   }
