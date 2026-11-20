@@ -1,4 +1,4 @@
-name: Refract Library formatter validation
+name: Refract upstream merge probe
 
 on:
   push:
@@ -9,24 +9,33 @@ permissions:
   contents: read
 
 jobs:
-  format:
-    name: Generate the exact pinned formatter output
+  merge-probe:
+    name: Identify conflicts without changing any branch
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - uses: voidzero-dev/setup-vp@v1
         with:
-          version: 1.5.1
-          node-version: 24
-          run-install: |
-            args:
-              - --frozen-lockfile
-      - name: Format and emit public regression test
+          fetch-depth: 0
+      - name: Simulate current beta merge read-only
         shell: bash
         run: |
-          vp fmt tests/refract-library-removal.test.mjs
-          echo REFRACT_FORMAT_START
-          base64 -w0 tests/refract-library-removal.test.mjs
-          echo
-          echo REFRACT_FORMAT_END
+          git remote add upstream https://github.com/Harborofficial/Harbor.git
+          git fetch --no-tags upstream +refs/heads/beta-branch:refs/remotes/upstream/beta-branch
+          git config user.name "Read-only merge probe"
+          git config user.email "probe@users.noreply.github.com"
+          echo "PROBE_HEAD=$(git rev-parse HEAD)"
+          echo "PROBE_BETA=$(git rev-parse upstream/beta-branch)"
+          echo "PROBE_BASE=$(git merge-base HEAD upstream/beta-branch)"
+          set +e
+          git merge --no-commit --no-ff upstream/beta-branch > merge-output.txt 2>&1
+          result=$?
+          set -e
+          echo "PROBE_MERGE_EXIT=$result"
+          sed -n '1,100p' merge-output.txt
+          echo PROBE_CONFLICTS_START
+          git diff --name-only --diff-filter=U
+          echo PROBE_CONFLICTS_END
+          if [ "$result" -ne 0 ]; then
+            git merge --abort || true
+          fi
