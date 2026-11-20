@@ -1,0 +1,158 @@
+name: VOID installer from user-tested executable
+
+on:
+  push:
+    branches:
+      - validation/void-installer-from-tested-binary
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    name: Bundle existing validated Windows executable
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch the exact user-tested portable binary
+        uses: actions/download-artifact@v4
+        with:
+          name: harbor-void-refract-2026-11-windows-x64
+          run-id: 44737578800
+          github-token: ${{ github.token }}
+          path: accepted-portable
+
+      - name: Restore accepted executable and signed-source dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $input = 'accepted-portable'
+          $copies = @(
+            @('harbor.exe', 'src-tauri/target/release/harbor.exe'),
+            @('libmpv-2.dll', 'src-tauri/libmpv/libmpv-2.dll'),
+            @('mpv.exe', 'src-tauri/binaries/mpv-x86_64-pc-windows-msvc.exe'),
+            @('ffmpeg.exe', 'src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe'),
+            @('ffprobe.exe', 'src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe'),
+            @('yt-dlp.exe', 'src-tauri/binaries/yt-dlp-x86_64-pc-windows-msvc.exe')
+          )
+          foreach ($pair in $copies) {
+            $src = Join-Path $input $pair[0]
+            $dest = $pair[1]
+            if (-not (Test-Path -LiteralPath $src)) { throw "Accepted portable is missing: $src" }
+            New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
+            Copy-Item -LiteralPath $src -Destination $dest -Force
+          }
+          if (-not (Test-Path -LiteralPath "$input/fonts")) { throw 'Accepted portable font bundle missing' }
+          New-Item -ItemType Directory -Force -Path 'src-tauri/fonts' | Out-Null
+          Copy-Item -Path "$input/fonts/*" -Destination 'src-tauri/fonts' -Recurse -Force
+          Write-Host "USER_TESTED_BINARY_SHA256=$((Get-FileHash 'src-tauri/target/release/harbor.exe' -Algorithm SHA256).Hash)"
+
+      - name: Bundle installed app without recompiling the user-tested executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm tauri bundle --bundles nsis --config src-tauri/tauri.music-preview.conf.json --config src-tauri/tauri.windows.conf.json --config src-tauri/tauri.void-installer.conf.json
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS bundling of accepted executable failed' }
+
+      - name: Stage and verify the setup executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setups = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis' -Filter '*-setup.exe' -File)
+          if ($setups.Count -ne 1) { throw "Expected one NSIS setup executable, got $($setups.Count)" }
+          $exe = $setups[0]
+          if ($exe.Length -lt 50MB) { throw 'Installer is unexpectedly small; bundled dependencies may be missing' }
+          $rootExe = 'src-tauri/target/release/harbor.exe'
+          if (-not (Test-Path -LiteralPath $rootExe)) { throw 'Compiled harbor.exe is missing' }
+          foreach ($binary in @(
+            'src-tauri/libmpv/libmpv-2.dll',
+            'src-tauri/binaries/mpv-x86_64-pc-windows-msvc.exe',
+            'src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe',
+            'src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe',
+            'src-tauri/binaries/yt-dlp-x86_64-pc-windows-msvc.exe'
+          )) {
+            if (-not (Test-Path -LiteralPath $binary)) { throw "Missing sidecar input: $binary" }
+          }
+          $output = 'void-installer-artifact'
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          $dest = Join-Path $output 'Harbor-VOID-Refract-Setup-x64.exe'
+          Copy-Item -LiteralPath $exe.FullName -Destination $dest -Force
+          $sha = (Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash
+          "SHA256 $sha  Harbor-VOID-Refract-Setup-x64.exe" | Set-Content -LiteralPath (Join-Path $output 'SHA256.txt') -Encoding UTF8
+          @'
+          HARBOR VOID + REFRACT — WINDOWS INSTALLER (x64)
+          =================================================
+          1. Double-click Harbor-VOID-Refract-Setup-x64.exe.
+          2. Install for the current Windows user; administrator rights are not required.
+          3. Launch Harbor VOID from the Start menu or installed shortcut.
+          4. To uninstall, use Windows Settings > Apps > Installed apps.
+
+          The installer uses the same app identifier as the previously tested
+          portable VOID preview: app.harbor.voidnativepreview.
+          It does NOT replace the official Harbor installation or take over
+          default video file associations or stock Harbor deep-link schemes.
+          Automatic updates are disabled for this personal build.
+          Your tested VOID music and Refract application code is unchanged.
+
+          This is an unsigned independent build. Windows SmartScreen may show a
+          publisher warning. Only run it if you trust this GitHub Actions build.
+          Android extension support and the Pokemon engine remain absent,
+          matching the prior portable preview.
+          '@ | Set-Content -LiteralPath (Join-Path $output 'INSTALL-INSTRUCTIONS.txt') -Encoding UTF8
+          Write-Host "VERIFIED_INSTALLER=$dest"
+          Write-Host "INSTALLER_BYTES=$($exe.Length)"
+          Write-Host "INSTALLER_SHA256=$sha"
+
+      - name: Confirm setup installs to an isolated per-user location
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = (Resolve-Path 'void-installer-artifact/Harbor-VOID-Refract-Setup-x64.exe').Path
+          $before = @(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -eq 'Harbor VOID' })
+          if ($before.Count) { throw 'A previous Harbor VOID installation is present on the test runner' }
+          $install = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Silent NSIS install failed: $($install.ExitCode)" }
+          $entries = @(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -eq 'Harbor VOID' })
+          if ($entries.Count -ne 1) { throw "Expected an isolated Harbor VOID uninstall registration, found $($entries.Count)" }
+          $location = $entries[0].InstallLocation
+          if (-not $location) { $location = Join-Path $env:LOCALAPPDATA 'Harbor VOID' }
+          if (-not (Test-Path -LiteralPath (Join-Path $location 'harbor.exe'))) {
+            throw "Installed Harbor executable missing at $location"
+          }
+          $uninstaller = Join-Path $location 'uninstall.exe'
+          if (-not (Test-Path -LiteralPath $uninstaller)) { throw 'Windows uninstall executable is missing' }
+          $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Harbor VOID.lnk'
+          if (-not (Test-Path -LiteralPath $startMenu)) { throw 'Harbor VOID Start menu shortcut is missing' }
+          Write-Host "INSTALLED_APP_PATH=$location"
+          Write-Host "UNINSTALL_REGISTERED=true"
+          Write-Host "START_MENU_SHORTCUT=true"
+          $remove = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw "Silent NSIS uninstall failed: $($remove.ExitCode)" }
+          Write-Host 'PER_USER_INSTALL_AND_UNINSTALL_VERIFIED=true'
+
+
+      - name: Upload verified installer from user-tested binary
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-void-refract-tested-binary-installer-x64
+          path: void-installer-artifact/
+          if-no-files-found: error
+          retention-days: 14
