@@ -1,4 +1,4 @@
-name: Refract official branding formatter
+name: Refract official branding verification
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
       - validation/refract-official-branding
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  format:
-    name: Apply pinned formatter to brand regression test
+  verify:
+    name: Verify the exact official logo integration
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v6
         with:
@@ -24,19 +24,13 @@ jobs:
           run-install: |
             args:
               - --frozen-lockfile
-      - name: Format only the Refract branding regression
+      - name: Formatting, TypeScript, and Refract tests
         shell: bash
         run: |
           set -euo pipefail
-          expected_head=9de52c651ed8ea8128b9f772419de79b2dffa0db
+          expected_head=1b72d2887ffa08520ac5b11a78ec5a56beabd890
           git switch --detach "$expected_head"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          vp fmt tests/refract-api.test.mjs
-          vp fmt --check tests/refract-api.test.mjs
+          vp fmt --check src/views/settings/licenses-panel.tsx src/views/settings/trackers-panel.tsx src/views/settings/tab-registry.ts tests/refract-api.test.mjs docs/refract.md
           git diff --check
-          git add tests/refract-api.test.mjs
-          test "$(git diff --cached --name-only)" = "tests/refract-api.test.mjs"
-          git commit -m "style(refract): format official branding regression"
-          echo "FORMATTED_BRAND_COMMIT=$(git rev-parse HEAD)"
-          git push origin HEAD:refs/heads/validation/refract-brand-asset
+          vp run typecheck
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/refract-api.test.mjs tests/refract-library-removal.test.mjs tests/refract-sync.test.mjs tests/refract-locales.test.mjs
