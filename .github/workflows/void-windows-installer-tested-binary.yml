@@ -131,10 +131,18 @@ jobs:
           if ($install.ExitCode -ne 0) { throw "Silent NSIS install failed: $($install.ExitCode)" }
           $entries = @(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -eq 'Harbor VOID' })
           if ($entries.Count -ne 1) { throw "Expected an isolated Harbor VOID uninstall registration, found $($entries.Count)" }
-          $location = $entries[0].InstallLocation
+          Write-Host "INSTALL_LOCATION_REGISTRY=$($entries[0].InstallLocation)"
+          # Tauri NSIS includes wrapping quotes in the InstallLocation registry value.
+          $location = ([string]$entries[0].InstallLocation).Trim().Trim([char]34)
           if (-not $location) { $location = Join-Path $env:LOCALAPPDATA 'Harbor VOID' }
           if (-not (Test-Path -LiteralPath (Join-Path $location 'harbor.exe'))) {
+            Get-ChildItem -LiteralPath $location -ErrorAction SilentlyContinue | Select-Object Name, Length | Format-Table | Out-String | Write-Host
             throw "Installed Harbor executable missing at $location"
+          }
+          foreach ($sidecar in @('libmpv-2.dll', 'mpv.exe', 'ffmpeg.exe', 'ffprobe.exe', 'yt-dlp.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $location $sidecar))) {
+              throw "Installed music dependency is missing: $sidecar"
+            }
           }
           $uninstaller = Join-Path $location 'uninstall.exe'
           if (-not (Test-Path -LiteralPath $uninstaller)) { throw 'Windows uninstall executable is missing' }
