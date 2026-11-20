@@ -50,7 +50,7 @@ function harness() {
   const module = { exports: {} };
   new Function("require", "module", "exports", output)(
     (id) => {
-      if (id === "@/lib/active-profile-id") return { activeProfileIsPrimary: () => primary };
+      if (id === "@/lib/active-profile-id") return { activeProfileIsPrimary: () => primary, activeScopedProfileId: () => "fixture" };
       if (id === "./client") return client;
       if (id === "./identity") return { parseRefractHistoryId };
       throw new Error(`Unexpected import: ${id}`);

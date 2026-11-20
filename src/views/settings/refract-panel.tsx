@@ -66,7 +66,8 @@ export function RefractPanel() {
       const identity = await verifyRefractKey(key);
       if (!isCurrent()) return;
       // Never replay watches from another Refract account after replacing a key.
-      resetRefractSync();
+      await resetRefractSync();
+      if (!isCurrent()) return;
       clearRefractWatchlistStatus();
       saveRefractKey(key);
       setRefractEnabled(true);
@@ -87,11 +88,11 @@ export function RefractPanel() {
     }
   };
 
-  const disconnect = () => {
+  const disconnect = async () => {
     attemptGuard.current.invalidate();
     setRefractEnabled(false);
+    await resetRefractSync();
     saveRefractKey(null);
-    resetRefractSync();
     clearRefractWatchlistStatus();
     setConnected(false);
     setEnabled(false);

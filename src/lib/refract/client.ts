@@ -152,7 +152,7 @@ export async function writeRefractMovie(
     "/history/movies",
     "POST",
     {
-      movie_id: movieId,
+      movie_id: String(movieId),
       watched_at: new Date(watchedAt).toISOString(),
     },
     requestId,
