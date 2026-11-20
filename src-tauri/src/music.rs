@@ -190,6 +190,8 @@ pub fn initialize(app: &tauri::AppHandle) -> Result<(), String> {
         .engine
         .initialize_audio(directory.join("music-audio.json"));
     state.spotify.initialize(app, directory.join("spotify"));
+    // Optional: no token means no VK searches, and a storage failure cannot prevent Harbor startup.
+    let _ = connectors::vk::hydrate(app);
     worker::initialize(app)
 }
 
