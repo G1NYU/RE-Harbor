@@ -1,0 +1,94 @@
+name: Publish archived VOID + Refract Windows installer
+
+on:
+  push:
+    branches: [beta-branch]
+    paths:
+      - ".github/workflows/publish-void-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-void-refract-preview
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish the existing Windows setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Fetch the exact tested installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: G1NYU/RE-Harbor
+          run-id: 44761502098
+          name: harbor-void-refract-setup-windows-x64
+          github-token: ${{ github.token }}
+          path: release
+
+      - name: Verify the setup before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          src='release/harbor-void-refract-setup-x64.exe'
+          dst='release/RE-Harbor-VOID-Refract-Setup-Windows-x64.exe'
+          test -s "$src"
+          echo '69896AA30633664671632FA4E0B789AA1ECCDBCD2D2B5A059BD026834697D5CF  release/harbor-void-refract-setup-x64.exe' | sha256sum --check
+          mv "$src" "$dst"
+          (cd release && sha256sum RE-Harbor-VOID-Refract-Setup-Windows-x64.exe > SHA256SUMS.txt)
+
+      - name: Confirm this is a new, source-pinned release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: reharbor-void-refract-2026-11-20
+          SOURCE_SHA: b81ee522fbb931be0c1d3b63691c7bcb37b030ef
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${SOURCE_SHA}" --jq '.sha' | grep -Fx "$SOURCE_SHA"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite it.' >&2
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo 'Tag already exists; refusing to reuse it.' >&2
+            exit 1
+          fi
+
+      - name: Publish preview on the RE-Harbor Releases page
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: reharbor-void-refract-2026-11-20
+          SOURCE_SHA: b81ee522fbb931be0c1d3b63691c7bcb37b030ef
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE_NOTES.md <<'NOTES'
+          ## RE-Harbor — VOID + Refract Windows preview
+
+          This archived **Windows x64 installer** is the exact unsigned setup produced by the successful [installer workflow run #44761502098](https://github.com/G1NYU/RE-Harbor/actions/runs/44761502098) on November 20, 2026. Its installer bytes have not been rebuilt or modified.
+
+          - **VOID:** Custom nocturnal interface and redesigned music experience.
+          - **Refract:** Optional native outbound watch and watchlist tracking. Reverse Refract-to-Harbor synchronization is not included.
+          - **Installation:** Per-user installer for `%LOCALAPPDATA%\Programs\Harbor VOID`; separate from normal Harbor installations. No automatic updates.
+          - **Verification:** Windows CI validated silent install/uninstall, shortcuts and binary/sidecar integrity. Interactive installation on individual machines remains unverified.
+          - **Security:** Unsigned preview; Windows SmartScreen may show a publisher warning. Only run software from sources you trust.
+
+          **Exact installer SHA-256:** `69896AA30633664671632FA4E0B789AA1ECCDBCD2D2B5A059BD026834697D5CF` (also provided in `SHA256SUMS.txt`).
+
+          This is a preservation release of the previously verified preview, **not** a new build from the latest official Harbor source. The release tag points to the preserved custom branch state; the packaged application uses the existing tested portable payload.
+
+          Built on Harbor. This independent fork is not an official release of Harbor or Refract. No media or content addons are bundled.
+          NOTES
+          gh release create "$RELEASE_TAG" \
+            'release/RE-Harbor-VOID-Refract-Setup-Windows-x64.exe' \
+            'release/SHA256SUMS.txt' \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title 'RE-Harbor VOID + Refract — Windows preview (Nov 2026)' \
+            --notes-file release/RELEASE_NOTES.md \
+            --prerelease
