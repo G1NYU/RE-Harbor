@@ -61,6 +61,25 @@ export function musicMeterMatchesTrack(
   );
 }
 
+export type MusicVisualizerStatus = "loading" | "on" | "inactive" | "unavailable";
+
+/** A paused player, a silent sample, and an unavailable tap are distinct. */
+export function musicVisualizerStatus(
+  state: MusicAudioMeterState,
+  track: MusicTrack | null | undefined,
+  playing: boolean,
+  reducedMotion = false,
+): MusicVisualizerStatus {
+  if (!playing) return "inactive";
+  if (reducedMotion) return "unavailable";
+  if (state.status === "off" || state.status === "loading") return "loading";
+  if (state.status === "unavailable") return "unavailable";
+  if (!musicMeterMatchesTrack(state.data, track)) return "loading";
+  if (!state.data?.active) return "inactive";
+  if (state.data.spectrumDb?.some((db) => db > -119)) return "on";
+  return state.data.channels.some((channel) => channel.rmsDb > -90) ? "unavailable" : "inactive";
+}
+
 /** Decibel scale: silence and stopped playback stay empty; never synthesize movement. */
 export function musicMeterFraction(db: number, active = true): number {
   return active && Number.isFinite(db) ? Math.max(0, Math.min(1, (db + 60) / 60)) : 0;
@@ -181,12 +200,15 @@ export function acquireMusicMeter(listener: (state: MusicAudioMeterState) => voi
     release();
   };
 }
+const offSnapshot = () => OFF;
+
 export function useMusicAudioMeter(
   track: MusicTrack | null | undefined,
   enabled = false,
 ): MusicAudioMeterState {
-  const state = useSyncExternalStore(monitor.subscribe, monitor.getSnapshot, monitor.getSnapshot);
   const allowed = enabled && !!track;
+  const snapshot = allowed ? monitor.getSnapshot : offSnapshot;
+  const state = useSyncExternalStore(monitor.subscribe, snapshot, snapshot);
   useEffect(() => {
     if (!allowed) return;
     let release: (() => void) | undefined;

@@ -65,7 +65,7 @@ impl MusicDeck {
 
         let mpv = core_setup::create_core(DECK_LABELS[self.index])?;
         core_setup::apply_stream_headers(&mpv, &request.stream)?;
-        core_setup::apply_network_cache(&mpv);
+        core_setup::apply_network_cache(&mpv, &url);
         let settings = request.settings;
         let wanted = request.device.unwrap_or(settings.device.as_str());
         let available = core_setup::read_music_audio_devices(&mpv).unwrap_or_default();

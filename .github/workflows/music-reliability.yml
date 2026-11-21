@@ -1,0 +1,95 @@
+name: Music reliability
+
+on:
+  push:
+    branches: [feature/music-reliability]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: music-reliability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Typecheck
+        run: vp run typecheck
+      - name: Playback reliability regressions (required)
+        run: |
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
+            tests/music-player-source-recovery.test.ts \
+            tests/music-player-selection.test.ts \
+            tests/music-source-consent.test.ts \
+            tests/music-source-version.test.ts \
+            tests/music-queue-source.test.ts
+
+  full-music-suite:
+    name: Full music suite — baseline diagnostics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 24
+          cache: true
+          run-install: |
+            args:
+              - --frozen-lockfile
+      - name: Full music suite (track existing failures)
+        id: baseline
+        continue-on-error: true
+        run: node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test tests/music-*.test.ts
+      - name: Report diagnostic result
+        if: always()
+        env:
+          SUITE_RESULT: ${{ steps.baseline.outcome }}
+        run: |
+          if [[ "$SUITE_RESULT" == "failure" ]]; then
+            echo "::warning title=Full music suite has failures::See the full-music-suite job for failing test names. This diagnostic is non-blocking but not hidden."
+            echo "### Full music suite: FAILED (diagnostic)" >> "$GITHUB_STEP_SUMMARY"
+            echo "The complete music suite still contains failures. Check this job's logs before claiming the branch is regression-free." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Full music suite: $SUITE_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libayatana-appindicator3-dev libgtk-3-dev libmpv-dev librsvg2-dev libssl-dev libudev-dev libwebkit2gtk-4.1-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+      - name: Native music tests
+        env:
+          TAURI_CONFIG: '{"bundle":{"externalBin":[],"resources":[]}}'
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml network_audio_cache_has_bounded_lookahead_and_rebuffer_threshold
+          cargo test --manifest-path src-tauri/Cargo.toml music::commands::search::tests

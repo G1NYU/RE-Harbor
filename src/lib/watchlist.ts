@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  activeScopedProfileId as currentHarborProfileId,
+  activeProfileIsPrimary,
+} from "@/lib/active-profile-id";
+import { getRefractKey, refractEnabled, syncRefractWatchlist } from "@/lib/refract/client";
+import {
   addToWatchlist as traktAdd,
   removeFromWatchlist as traktRemove,
 } from "@/lib/trakt/watchlist";
@@ -367,6 +372,20 @@ export function toggleWatchlist(input: string | WatchlistInput): boolean {
   void syncWithTrakt(id, !has);
   void syncWithSimkl(id, !has);
   void syncWithStremio(input, !has);
+  const refractKey = getRefractKey();
+  if (refractKey && refractEnabled() && activeProfileIsPrimary()) {
+    const profile = currentHarborProfileId();
+    const target = typeof input === "string" ? { id } : input;
+    void syncRefractWatchlist(refractKey, target, !has, () => {
+      if (
+        getRefractKey() !== refractKey ||
+        !refractEnabled() ||
+        !activeProfileIsPrimary() ||
+        currentHarborProfileId() !== profile
+      )
+        throw new Error("The Refract account or profile changed.");
+    }).catch(() => {});
+  }
   return !has;
 }
 

@@ -1,5 +1,9 @@
 import { compatibleVocalVersion, shouldResolvePreferredSource } from "./source-version";
-import { cancelMusicQueueAutomation, markMusicQueueAutomationStarted, ownsMusicQueueAutomation } from "./queue-automation";
+import {
+  cancelMusicQueueAutomation,
+  markMusicQueueAutomationStarted,
+  ownsMusicQueueAutomation,
+} from "./queue-automation";
 import { activeProfileId, activeProfileIsPrimary } from "@/lib/active-profile-id";
 import { hydrateListeningAffinity, observeMusicListening } from "./listening-affinity";
 import { filterBlockedTracks, hydrateArtistBlockStore } from "./artist-blocks";
@@ -30,7 +34,11 @@ import { musicAdvance, musicPrevious, musicWarmTargets, resetMusicOrder } from "
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
-import { readMusicPreference, readStoredMusicPreference, writeMusicPreference } from "./preferences";
+import {
+  readMusicPreference,
+  readStoredMusicPreference,
+  writeMusicPreference,
+} from "./preferences";
 import {
   clampMusicVolume,
   initializeMusicAudioSettings,
@@ -43,7 +51,11 @@ import {
   writeCheckpointToDb,
   type MusicCheckpoint,
 } from "./session-checkpoint";
-import { beginMusicQueue, getMusicPlaybackOrigin, restoreMusicPlaybackOrigin } from "./playback-origin";
+import {
+  beginMusicQueue,
+  getMusicPlaybackOrigin,
+  restoreMusicPlaybackOrigin,
+} from "./playback-origin";
 import { hydrateMusicContextTracks, hydrateMusicRecentContexts } from "./recent-context";
 import { hydrateMusicDestinations } from "./recent-destinations";
 import { hydratePinnedMusicPlaylists } from "./pinned-playlists";
@@ -123,7 +135,7 @@ function sourcesFor(
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error("music.source.none")), 12000);
   });
-  const promise = Promise.race([
+  const promise: Promise<MusicSourceCandidate[]> = Promise.race([
     invoke<MusicSourceCandidate[]>("music_source_candidates", { track }),
     timeout,
   ])
@@ -135,7 +147,9 @@ function sourcesFor(
       ),
     )
     .catch((error) => {
-      queuedSources.delete(key);
+      // A fresh lookup may have replaced this one while it was in flight.
+      // An older rejection must never evict the newer result.
+      if (queuedSources.get(key)?.promise === promise) queuedSources.delete(key);
       throw error;
     })
     .finally(() => clearTimeout(timer));
@@ -186,7 +200,11 @@ function warmBeforeEnd(): void {
   if (state.current.connectorId === "spotify") {
     // librespot plays a preloaded track without a load gap; stream URLs are warmed below.
     const next = musicWarmTargets(state.queue, state.queueIndex, 1)[0];
-    if (next && musicPlaybackSourceAllowed(next) && queueTrackKey(next) !== queueTrackKey(state.current))
+    if (
+      next &&
+      musicPlaybackSourceAllowed(next) &&
+      queueTrackKey(next) !== queueTrackKey(state.current)
+    )
       void invoke("music_spotify_preload", { track: next }).catch(() => {});
   }
   warmNeighbours();
@@ -415,14 +433,11 @@ export function initializeMusic(): Promise<void> {
       // the checkpoint itself carries the track. With no usable checkpoint at all, the most
       // recent track is the honest fallback: the queue top is arbitrary and would resume a song
       // the listener did not choose, which is how one miss became a permanent wrong resume.
-      const recovered =
-        restoredIndex < 0 ? (saved?.track ?? bootstrap.recents[0] ?? null) : null;
+      const recovered = restoredIndex < 0 ? (saved?.track ?? bootstrap.recents[0] ?? null) : null;
       const queue = recovered
         ? [
             recovered,
-            ...bootstrap.queue.filter(
-              (track) => queueTrackKey(track) !== queueTrackKey(recovered),
-            ),
+            ...bootstrap.queue.filter((track) => queueTrackKey(track) !== queueTrackKey(recovered)),
           ]
         : bootstrap.queue;
       const index = restoredIndex >= 0 ? restoredIndex : 0;
@@ -795,10 +810,22 @@ const SOURCE_ATTEMPT_CEILING = 6;
 // than quietly playing something else under the same name.
 let explicitSource: string | null = null;
 
-async function recoverySources(track: MusicTrack): Promise<MusicSourceCandidate[]> {
-  const cached = await sourcesFor(track).catch(() => null);
-  if (cached && cached.length > 0) return cached;
-  return await sourcesFor(track, SOURCE_TTL_MS, true).catch(() => []);
+async function recoverySources(
+  track: MusicTrack,
+  failedAttempts: Set<string>,
+): Promise<MusicSourceCandidate[]> {
+  const usable = (candidates: MusicSourceCandidate[]) =>
+    candidates.filter(
+      (candidate) =>
+        candidate.health !== "offline" &&
+        candidate.track.connectorId !== "catalog" &&
+        musicPlaybackSourceAllowed(candidate.track) &&
+        !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
+    );
+  const cached = usable(await sourcesFor(track).catch(() => []));
+  if (cached.length > 0) return cached;
+  // A nonempty but exhausted cache is not evidence that no source is available.
+  return usable(await sourcesFor(track, SOURCE_TTL_MS, true).catch(() => []));
 }
 
 async function nextPlayableSource(
@@ -807,7 +834,7 @@ async function nextPlayableSource(
 ): Promise<MusicTrack | null> {
   if (attemptTrack.mediaKind === "video") return null;
   if (failedAttempts.size >= SOURCE_ATTEMPT_CEILING) return null;
-  const candidates = await recoverySources(attemptTrack);
+  const candidates = await recoverySources(attemptTrack, failedAttempts);
   const usable = candidates.filter(
     (candidate) =>
       candidate.health !== "offline" &&
@@ -826,6 +853,7 @@ export async function playMusic(
   skipUnavailable = false,
   explicit = false,
   automationOwner?: symbol,
+  refreshStream = false,
 ): Promise<void> {
   if (automationOwner && !ownsMusicQueueAutomation(automationOwner)) return;
   if (!continuing && !failedAttempts.size && !automationOwner) cancelMusicQueueAutomation();
@@ -846,6 +874,7 @@ export async function playMusic(
     resumeAt = null;
     autoSkipped.clear();
   }
+  if (resumeAt && resumeAt.key !== queueTrackKey(track)) resumeAt = null;
   recoverPlayback = null;
   // A track from a source the listener turned off is resolved like a catalog entry:
   // find an enabled source for the same recording, or report that none can play it.
@@ -854,7 +883,12 @@ export async function playMusic(
     (track.connectorId === "catalog" && !track.playbackUrl) ||
     (sourceBlocked && track.mediaKind !== "video");
   const preferredSource = readMusicPreference("harbor.music.preferred-source.v1");
-  const resolvePreferred = shouldResolvePreferredSource(track, preferredSource, explicitSource !== null, failedAttempts.size > 0);
+  const resolvePreferred = shouldResolvePreferredSource(
+    track,
+    preferredSource,
+    explicitSource !== null,
+    failedAttempts.size > 0,
+  );
   const workingSource = state.current?.connectorId;
   let alternatives: MusicTrack[] = [];
   let searchedAlternatives = catalog || resolvePreferred;
@@ -882,9 +916,16 @@ export async function playMusic(
   });
   try {
     if (catalog || resolvePreferred) {
-      const candidates = await sourcesFor(track).catch(error => {
+      const candidates = await sourcesFor(track).catch((error) => {
         if (catalog) throw error;
-        return [{ connectorId: track.connectorId ?? "", connectorName: "", health: "healthy" as const, track }];
+        return [
+          {
+            connectorId: track.connectorId ?? "",
+            connectorName: "",
+            health: "healthy" as const,
+            track,
+          },
+        ];
       });
       if (!ownsRequest()) return;
       const playable = candidates.filter(
@@ -893,8 +934,19 @@ export async function playMusic(
           candidate.track.connectorId !== "catalog" &&
           !failedAttempts.has(`${candidate.track.connectorId}:${candidate.track.id}`),
       );
-      if (!catalog && !playable.some(candidate => candidate.track.connectorId === track.connectorId && candidate.track.id === track.id)) {
-        playable.push({ connectorId: track.connectorId ?? "", connectorName: "", health: "healthy", track });
+      if (
+        !catalog &&
+        !playable.some(
+          (candidate) =>
+            candidate.track.connectorId === track.connectorId && candidate.track.id === track.id,
+        )
+      ) {
+        playable.push({
+          connectorId: track.connectorId ?? "",
+          connectorName: "",
+          health: "healthy",
+          track,
+        });
       }
       const preferred = readMusicPreference("harbor.music.preferred-source.v1");
       const ranked = rankByExplicitness(playable, explicitnessOf(track));
@@ -968,13 +1020,65 @@ export async function playMusic(
       recoverPlayback = (message) => {
         if (recovering || !ownsRequest()) return;
         recovering = true;
-        failedAttempts.add(`${attemptTrack.connectorId}:${attemptTrack.id}`);
+        // Capture progress before any later events or lookups change the player state.
+        const position =
+          !target &&
+          attemptTrack.mediaKind !== "video" &&
+          (state.phase === "playing" || state.phase === "paused") &&
+          Number.isFinite(state.currentTime) &&
+          state.currentTime > 2
+            ? state.currentTime
+            : 0;
+        const duration = state.duration;
+        const attemptKey = `${attemptTrack.connectorId}:${attemptTrack.id}`;
+        const stopUnconfirmed = /STOP_UNCONFIRMED|stopUnconfirmed/i.test(message ?? "");
+        const canReconnect =
+          !stopUnconfirmed &&
+          !target &&
+          position > 0 &&
+          position < duration - 2 &&
+          !attemptTrack.playbackUrl &&
+          [
+            "youtube",
+            "youtube_music",
+            "soundcloud",
+            "plex",
+            "jellyfin",
+            "subsonic",
+            "navidrome",
+          ].includes(attemptTrack.connectorId ?? "") &&
+          musicPlaybackSourceAllowed(attemptTrack) &&
+          !failedAttempts.has(attemptKey) &&
+          failedAttempts.size < SOURCE_ATTEMPT_CEILING;
+        failedAttempts.add(attemptKey);
+        if (stopUnconfirmed) {
+          enginePrimed = false;
+          resumeAt = null;
+          recoverPlayback = null;
+          publish({ phase: "error", error: message });
+          return;
+        }
         publish({ phase: "resolving", error: null });
         void (async () => {
+          if (canReconnect) {
+            // Renew a native source once per failed recording before trying another provider.
+            resumeAt = { key: queueTrackKey(attemptTrack), position };
+            await playMusic(
+              attemptTrack,
+              state.queue,
+              failedAttempts,
+              true,
+              skipUnavailable,
+              false,
+              undefined,
+              true,
+            ).catch(() => {});
+            return;
+          }
           const candidates =
             chosenByHand || attemptTrack.mediaKind === "video"
               ? []
-              : await recoverySources(attemptTrack);
+              : await recoverySources(attemptTrack, failedAttempts);
           if (!ownsRequest()) return;
           const usable = candidates.filter(
             (candidate) =>
@@ -989,6 +1093,7 @@ export async function playMusic(
               : undefined;
           if (!replacement) {
             enginePrimed = false;
+            resumeAt = null;
             recoverPlayback = null;
             if (skipUnavailable && skipUnavailableTrack(attemptTrack, queue)) return;
             publish({ phase: "error", error: message ?? "music.source.none" });
@@ -997,6 +1102,14 @@ export async function playMusic(
             return;
           }
           const next = adoptRequestedIdentity(replacement, attemptTrack);
+          // Do not seek across materially different recordings or past the new end.
+          resumeAt =
+            position > 0 &&
+            Number.isFinite(duration) &&
+            Math.abs(duration - next.durationSeconds) <= 3 &&
+            position < Math.min(duration, next.durationSeconds) - 2
+              ? { key: queueTrackKey(next), position }
+              : null;
           await playMusic(
             next,
             state.queue.map((item) =>
@@ -1012,7 +1125,12 @@ export async function playMusic(
       };
       try {
         if (target && !returningToComputer) await loadMusicOnSpeaker(track, target);
-        else await invoke("music_play_track", { track, volume: state.volume });
+        else
+          await invoke("music_play_track", {
+            track,
+            volume: state.volume,
+            ...(refreshStream && attempt === 0 ? { refreshStream: true } : {}),
+          });
         break;
       } catch (error) {
         if (!ownsRequest()) return;
@@ -1023,7 +1141,7 @@ export async function playMusic(
         if (!searchedAlternatives && track.mediaKind !== "video") {
           searchedAlternatives = true;
           const failedTrack = track;
-          const candidates = await sourcesFor(track).catch(() => []);
+          const candidates = await recoverySources(track, failedAttempts);
           if (!ownsRequest()) return;
           alternatives = candidates
             .filter(
@@ -1043,6 +1161,12 @@ export async function playMusic(
         if (!alternative) throw error;
         const previous = track;
         track = alternative;
+        if (
+          resumeAt?.key === queueTrackKey(previous) &&
+          (Math.abs(previous.durationSeconds - track.durationSeconds) > 3 ||
+            resumeAt.position >= track.durationSeconds - 2)
+        )
+          resumeAt = null;
         queue = state.queue.map((item) =>
           item.id === previous.id && item.connectorId === previous.connectorId ? track : item,
         );
@@ -1093,12 +1217,16 @@ export async function playMusic(
         : error instanceof Error
           ? error.message
           : String(error);
-    if (
-      skipUnavailable &&
-      !/STOP_UNCONFIRMED|stopUnconfirmed/i.test(message) &&
-      skipUnavailableTrack(track, queue)
-    )
-      return;
+    // The previous session may still own the audio engine. Do not retry, switch
+    // providers, or advance the queue until the listener can safely stop it.
+    const stopUnconfirmed = /STOP_UNCONFIRMED|stopUnconfirmed/i.test(message);
+    if (stopUnconfirmed) {
+      resumeAt = null;
+      recoverPlayback = null;
+      publish({ phase: "error", error: message });
+      throw error instanceof Error ? error : new Error(message);
+    }
+    if (skipUnavailable && skipUnavailableTrack(track, queue)) return;
     const attemptKey = `${track.connectorId}:${track.id}`;
     if (!chosenByHand && !skipUnavailable && !failedAttempts.has(attemptKey)) {
       failedAttempts.add(attemptKey);
@@ -1107,12 +1235,14 @@ export async function playMusic(
         await playMusic(track, queue, failedAttempts, true, skipUnavailable);
         return;
       } catch {
-        /* the retry failed too; fall through to another source */
+        // The child request owns its own recovery and error state.
+        if (!ownsRequest()) throw error instanceof Error ? error : new Error(message);
       }
     }
     if (!chosenByHand && !skipUnavailable) {
       const next = await nextPlayableSource(track, failedAttempts);
-      if (next && ownsRequest()) {
+      if (!ownsRequest()) return;
+      if (next) {
         publish({ phase: "resolving", error: null });
         try {
           await playMusic(
@@ -1124,10 +1254,12 @@ export async function playMusic(
           );
           return;
         } catch {
-          /* exhausted; the picker below is the last resort */
+          // A superseding request (including the child attempt) owns the UI.
+          if (!ownsRequest()) throw error instanceof Error ? error : new Error(message);
         }
       }
     }
+    resumeAt = null;
     publish({ phase: "error", error: message });
     if (!skipUnavailable && searchedAlternatives && typeof window !== "undefined")
       window.dispatchEvent(new Event("harbor:music-playback-source-required"));
@@ -1309,6 +1441,7 @@ export function clearMusicError(): void {
 export async function closeMusicPlayer(): Promise<void> {
   cancelMusicQueueAutomation();
   const request = ++playRequest;
+  resumeAt = null;
   recoverPlayback = null;
   speakerTransfer = true;
   try {

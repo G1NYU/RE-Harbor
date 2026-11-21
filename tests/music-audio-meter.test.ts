@@ -4,6 +4,7 @@ import {
   createMusicMeterMonitor,
   musicMeterFraction,
   musicMeterMatchesTrack,
+  musicVisualizerStatus,
   normalizeMusicMeter,
   type MusicMeterSnapshot,
 } from "../src/lib/music/audio-meter.ts";
@@ -198,4 +199,44 @@ test("slow enable followed by close cannot leave native analysis enabled", async
   await flush();
   assert.deepEqual(enabled, [true, false]);
   assert.equal(monitor.getSnapshot().status, "off");
+});
+
+test("visualizer caption distinguishes pause, missing spectrum, and live activity", () => {
+  const track = { id: "one", connectorId: "local" } as MusicTrack;
+  const ready = (data: MusicMeterSnapshot) => ({ status: "ready" as const, data });
+  assert.equal(musicVisualizerStatus({ status: "off", data: null }, track, false), "inactive");
+  assert.equal(musicVisualizerStatus({ status: "loading", data: null }, track, true), "loading");
+  assert.equal(
+    musicVisualizerStatus({ status: "unavailable", data: null }, track, true),
+    "unavailable",
+  );
+  assert.equal(
+    musicVisualizerStatus(ready({ ...measured, spectrumDb: Array(8).fill(-32) }), track, true),
+    "on",
+  );
+  assert.equal(
+    musicVisualizerStatus(ready({ ...measured, spectrumDb: Array(8).fill(-120) }), track, true),
+    "unavailable",
+  );
+  assert.equal(
+    musicVisualizerStatus(ready({ ...measured, active: false }), track, true),
+    "inactive",
+  );
+  assert.equal(
+    musicVisualizerStatus(
+      ready({ ...measured, spectrumDb: Array(8).fill(-32) }),
+      track,
+      true,
+      true,
+    ),
+    "unavailable",
+  );
+  assert.equal(
+    musicVisualizerStatus(
+      ready({ ...measured, spectrumDb: Array(8).fill(-32) }),
+      { id: "other", connectorId: "local" } as MusicTrack,
+      true,
+    ),
+    "loading",
+  );
 });

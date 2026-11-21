@@ -44,6 +44,12 @@ function harness() {
   const mocks: Record<string, unknown> = {
     "./cinemeta": { meta: async () => null },
     "./auth": { readActiveStremioAuthKey: () => null },
+    "./active-profile-id": { activeProfileIsPrimary: () => true },
+    "./refract/client": {
+      getRefractKey: () => null,
+      refractEnabled: () => false,
+      syncRefractWatchlist: async () => {},
+    },
     "./stremio": { ANIME_CLOUD_ID: /^(kitsu|mal|anilist|anidb):/ },
     "./stremio-item-lock": {},
     "./stremio-watched-sync": {},

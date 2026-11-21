@@ -103,6 +103,15 @@ function watchlist() {
         persistableVideos: () => undefined,
       },
       "@/lib/auth": { readActiveStremioAuthKey: () => null },
+      "@/lib/active-profile-id": {
+        activeScopedProfileId: () => "default",
+        activeProfileIsPrimary: () => true,
+      },
+      "@/lib/refract/client": {
+        getRefractKey: () => null,
+        refractEnabled: () => false,
+        syncRefractWatchlist: async () => {},
+      },
       "@/lib/trakt/ids": { stremioIdToTraktTarget: () => ({ ok: false }) },
       "@/lib/simkl/session": { isAuthenticated: () => false },
     },

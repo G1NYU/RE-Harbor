@@ -11,7 +11,8 @@ import { stremioIdToPmdbTarget } from "@/lib/publicmetadb/ids";
 import { setMovieWatchedLocal } from "@/lib/movie-watched";
 import { recordManualWatchedMeta, setManualWatchedMany } from "@/lib/manual-watched";
 import { setWatchedFlag } from "@/lib/watched-flag";
-import { recordWatchEvent } from "@/lib/watch-events";
+import { recordRefractWatch, recordWatchEvent } from "@/lib/watch-events";
+import { getRefractKey } from "@/lib/refract/client";
 import { readActiveStremioAuthKey } from "@/lib/auth";
 import { cloudWriteId } from "@/lib/stremio";
 import { markMovieWatchedStremio } from "@/lib/stremio-watched-sync";
@@ -26,15 +27,12 @@ export async function markMovieWatched(
 ): Promise<void> {
   setMovieWatchedLocal(meta.id, true);
   savePlayback(meta.id, { title: meta.name, parsedTitle: meta.name });
-  recordWatchEvent({
-    id: meta.id,
-    type: "movie",
-    name: meta.name,
-    poster: meta.poster,
-    at: Date.now(),
-  });
   const imdb = imdbId ?? (meta.id.startsWith("tt") ? meta.id : undefined);
   const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : (tmdbId ?? undefined);
+  recordWatchEvent(
+    { id: meta.id, type: "movie", name: meta.name, poster: meta.poster, at: Date.now() },
+    { externalId: imdb ?? (tmdb != null ? `tmdb:movie:${tmdb}` : undefined) },
+  );
   const authKey = readActiveStremioAuthKey();
   const cid = authKey ? cloudWriteId(meta.id, imdb ?? null, !!imdb) : null;
   const writes: Promise<unknown>[] = [];
@@ -113,10 +111,29 @@ export async function markMetaWatched(
   });
   const ownerProfile = activeProfileId();
   const ownerSession = getTraktSession();
+  const ownerRefractKey = getRefractKey();
   const resolvedImdb = resolveSeriesImdb(meta, imdbId);
   const eps = await releasedEpisodes(meta, resolvedImdb);
   if (activeProfileId() !== ownerProfile) return;
-  if (eps.length > 0) setManualWatchedMany(meta.id, eps, true);
+  if (eps.length > 0) {
+    setManualWatchedMany(meta.id, eps, true);
+    // Never reinterpret native anime episode numbers without verified episode mappings.
+    if (
+      ownerRefractKey !== null &&
+      getRefractKey() === ownerRefractKey &&
+      !/^(kitsu|mal|anilist|anidb):/.test(meta.id) &&
+      meta.type !== "anime"
+    ) {
+      const tmdb = typeof tmdbId === "string" ? Number(tmdbId) || undefined : (tmdbId ?? undefined);
+      recordRefractWatch(
+        { id: meta.id, type: "series", name: meta.name, poster: meta.poster, at: Date.now() },
+        {
+          externalId: resolvedImdb ?? (tmdb != null ? `tmdb:tv:${tmdb}` : undefined),
+          episodes: eps,
+        },
+      );
+    }
+  }
   void syncSeriesWatchedToStremio(meta, resolvedImdb);
   const isAnime = /^(kitsu|mal|anilist|anidb):/.test(meta.id);
   const imdb = resolvedImdb ?? (meta.id.startsWith("tt") ? meta.id : undefined);

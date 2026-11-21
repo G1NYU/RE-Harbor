@@ -241,6 +241,10 @@ async function mount() {
   if (!isHdrOverlay && !isModal && !isCaptions && !isDjDeck) void initSubtitleCache();
   if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck)
     startTaskbarProgress();
+  // Keep the optional Refract retry queue in the main window, not overlays.
+  if (!isHdrOverlay && !isModal && !isCaptions && !isPip && !isVideoPip && !isDjDeck && !isRemote) {
+    void import("@/lib/refract/sync").then(({ startRefractSync }) => startRefractSync());
+  }
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       {isHdrOverlay ? (

@@ -2,7 +2,7 @@ use super::super::engine::MusicDeckState;
 use super::super::{
     library, m3u, MusicState, MusicTrack, ACTIVE_NONE, ACTIVE_SPOTIFY, ACTIVE_STREAM,
 };
-use super::search::resolve_track;
+use super::search::{resolve_track, resolve_track_with_refresh};
 
 #[tauri::command]
 pub async fn music_play_track(
@@ -10,6 +10,7 @@ pub async fn music_play_track(
     state: tauri::State<'_, MusicState>,
     track: MusicTrack,
     volume: Option<f64>,
+    refresh_stream: Option<bool>,
 ) -> Result<(), String> {
     let request = state.begin_play_request();
     let volume = volume.unwrap_or(0.82);
@@ -26,7 +27,9 @@ pub async fn music_play_track(
         state.set_active_engine(ACTIVE_SPOTIFY);
         return Ok(());
     }
-    let stream = resolve_track(&app, state.inner(), &track).await;
+    let stream =
+        resolve_track_with_refresh(&app, state.inner(), &track, refresh_stream.unwrap_or(false))
+            .await;
     if !state.is_current_play_request(request) {
         return Ok(());
     }
@@ -285,7 +288,7 @@ pub async fn music_deck_play(
     volume: Option<f64>,
 ) -> Result<(), String> {
     if deck == 0 {
-        return music_play_track(app, state, track, volume).await;
+        return music_play_track(app, state, track, volume, None).await;
     }
     if track.connector_id.as_deref() == Some("spotify") {
         return Err("Spotify plays on the main deck only".to_string());

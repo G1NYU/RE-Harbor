@@ -3,7 +3,13 @@ import { markAnimeWatching, syncAnimeProgress } from "@/lib/anilist/sync";
 import { markMalWatching, syncMalProgress } from "@/lib/mal/sync";
 import { getSession as getAnilistSession } from "@/lib/anilist/session";
 import { getSession as getMalSession } from "@/lib/mal/session";
-import { activeProfileId } from "@/lib/active-profile-id";
+import {
+  activeProfileId,
+  activeProfileIsPrimary,
+  activeScopedProfileId,
+} from "@/lib/active-profile-id";
+import { refractEnabled, refractPlaybackReached } from "@/lib/refract/client";
+import { parseRefractHistoryId, refractMappedEpisodes } from "@/lib/refract/identity";
 import { animeIdentityEligible, resolveAnimeIdentity } from "@/lib/streams/anime-identity";
 import { resolveTrackerAnimeEntry } from "@/lib/anime-tracker-entry";
 import {
@@ -16,7 +22,7 @@ import { profileFromMeta } from "@/lib/discover/profile";
 import { trackEvent } from "@/lib/discover/store";
 import { isExternalPlaylistId } from "@/lib/iptv/vod";
 import { clearLocalCw, localCwEntry, saveLocalCw } from "@/lib/local-cw";
-import { recordWatchEvent } from "@/lib/watch-events";
+import { recordWatchEvent, recordRefractWatch } from "@/lib/watch-events";
 import { isLocalUrl } from "@/lib/player/local-url";
 import { isManuallyWatched, recordManualWatchedMeta, setManualWatched } from "@/lib/manual-watched";
 import { savePlayback } from "@/lib/playback-history";
@@ -74,6 +80,7 @@ type ResumeSession = {
   ready: boolean;
   position: number;
   lastSaved: number;
+  refractViewing: { completed: boolean };
 };
 
 export function useResumeAutosave(params: ResumeAutosaveParams) {
@@ -93,9 +100,14 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
   // Cleanup must retain the outgoing source, duration and position together.
   // A new episode can render before the bridge publishes its loading reset.
   const sourceIdentity = playerLoadIdentity(src, src.url, season, episode);
+  // Keep one Refract viewing across source retries for the same title/episode.
+  const refractViewing = useMemo(
+    () => ({ completed: false }),
+    [ownerId, src.meta.id, season, episode],
+  );
   const session = useMemo<ResumeSession>(
-    () => ({ latest: null, ready: false, position: 0, lastSaved: 0, ownerId }),
-    [sourceIdentity, ownerId],
+    () => ({ latest: null, ready: false, position: 0, lastSaved: 0, ownerId, refractViewing }),
+    [sourceIdentity, ownerId, refractViewing],
   );
   const activeSessionRef = useRef(session);
   activeSessionRef.current = session;
@@ -149,8 +161,12 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
   const record = (current: ResumeSession): void => {
     if (!current.ready || !current.latest) return;
     const {
-      src: s, snap: sn, season: se, episode: ep,
-      resolvedImdbId: rid, resolvedImdbVerified: rv,
+      src: s,
+      snap: sn,
+      season: se,
+      episode: ep,
+      resolvedImdbId: rid,
+      resolvedImdbVerified: rv,
     } = current.latest;
     const id = s.meta.id;
     if (!id || id.startsWith("iptv:")) return;
@@ -189,8 +205,14 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
         );
     } else {
       saveResumeMs(
-        id, pos * 1000, se, ep, displaySeasonFor(s, se, cs, seasonForeign),
-        undefined, undefined, current.ownerId,
+        id,
+        pos * 1000,
+        se,
+        ep,
+        displaySeasonFor(s, se, cs, seasonForeign),
+        undefined,
+        undefined,
+        current.ownerId,
       );
     }
     if (typeof cs === "number") setViewedSeason(id, cs);
@@ -232,6 +254,51 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
         at: Date.now(),
       });
     }
+    // Early Refract diary logging does not change Harbor's watched state.
+    const refractKind = s.meta.type === "movie" ? "movie" : "episode";
+    const externalId = rv && rid && parseRefractHistoryId(rid, refractKind) ? rid : undefined;
+    const nativeNumbering = ANIME_CLOUD_ID.test(id) || !!s.episode?.kitsuStreamId;
+    const mapped = refractMappedEpisodes(s.episode ? [s.episode] : []);
+    if (
+      !current.refractViewing.completed &&
+      !!parseRefractHistoryId(externalId ?? id, refractKind) &&
+      (refractKind === "movie" || !nativeNumbering || (!!externalId && !!mapped)) &&
+      activeScopedProfileId() === (current.ownerId ?? "default") &&
+      activeProfileIsPrimary() &&
+      refractEnabled() &&
+      (finished || refractPlaybackReached(pos, sn.durationSec))
+    ) {
+      current.refractViewing.completed = true;
+      recordRefractWatch(
+        {
+          id,
+          type: s.meta.type === "movie" ? "movie" : "series",
+          name: s.meta.name,
+          poster: s.meta.poster,
+          season: cs,
+          episode: ep,
+          at: Date.now(),
+        },
+        {
+          externalId,
+          episodes:
+            s.meta.type === "movie"
+              ? undefined
+              : (covered.length ? covered : [ep])
+                  .filter(
+                    (value): value is number =>
+                      typeof value === "number" && Number.isInteger(value),
+                  )
+                  .map((value) => ({
+                    season: rv && s.episode?.imdbSeason != null ? s.episode.imdbSeason : (cs ?? -1),
+                    episode:
+                      rv && s.episode?.imdbEpisode != null && typeof ep === "number"
+                        ? s.episode.imdbEpisode + value - ep
+                        : value,
+                  })),
+        },
+      );
+    }
     const animeLocal = ANIME_CLOUD_ID.test(id);
     const ttAnimeUnmapped =
       id.startsWith("tt") &&
@@ -250,7 +317,10 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
       (movieWasWatched || localCwEntry(id, true, current.ownerId) !== null);
     if (rewatchMovie && movieWasWatched) setMovieWatchedLocal(id, false);
     if (
-      (s.meta.type === "series" || s.meta.type === "movie" || s.meta.type === "anime" || animeLocal) &&
+      (s.meta.type === "series" ||
+        s.meta.type === "movie" ||
+        s.meta.type === "anime" ||
+        animeLocal) &&
       !(s.meta.type === "movie" && finished)
     ) {
       saveLocalCw(
@@ -260,7 +330,8 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
           name: s.meta.name,
           poster: s.meta.poster,
           background: s.meta.background,
-          isAnime: animeLocal || s.meta.type === "anime" || !!s.isAnime || !!s.episode?.kitsuStreamId,
+          isAnime:
+            animeLocal || s.meta.type === "anime" || !!s.isAnime || !!s.episode?.kitsuStreamId,
           source: CLOUD_OK.test(id) && !isLocalUrl(s.url) ? "library" : "local",
           season: cs,
           episode: ep,
@@ -281,14 +352,16 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
     const syncReady = finished || (sn.durationSec > 0 && pos / sn.durationSec >= SYNC_RATIO);
     const fireTrackers = (tid: string, tep: number | undefined): void => {
       // Resolution may finish after a profile switch or tracker reconnect.
-      if (activeProfileId() !== profile || activeSessionRef.current.ownerId !== current.ownerId) return;
+      if (activeProfileId() !== profile || activeSessionRef.current.ownerId !== current.ownerId)
+        return;
       if (anilistAutoSyncRef.current && getAnilistSession() === anilistSession) {
         if (syncReady)
           void syncAnimeProgress(tid, tep, s.meta.name, cs, anilistCountRewatchesRef.current);
         else void markAnimeWatching(tid, s.meta.name);
       }
       if (malAutoSyncRef.current && getMalSession() === malSession) {
-        if (syncReady) void syncMalProgress(tid, tep, s.meta.name, cs, malCountRewatchesRef.current);
+        if (syncReady)
+          void syncMalProgress(tid, tep, s.meta.name, cs, malCountRewatchesRef.current);
         else void markMalWatching(tid, s.meta.name);
       }
     };
@@ -363,7 +436,8 @@ export function useResumeAutosave(params: ResumeAutosaveParams) {
 
   const persistNow = (force: boolean): void => {
     const current = activeSessionRef.current;
-    if (!current.ready || !current.latest || current.latest.src.meta.id?.startsWith("iptv:")) return;
+    if (!current.ready || !current.latest || current.latest.src.meta.id?.startsWith("iptv:"))
+      return;
     const pos = getPlaybackPosition() || current.position;
     if (pos < MIN_POSITION_SEC) return;
     const ms = pos * 1000;
