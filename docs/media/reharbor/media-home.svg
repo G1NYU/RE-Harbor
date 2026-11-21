@@ -1,2 +1,472 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<svg baseProfile="full" height="900" version="1.1" viewBox="0 0 1600 900" width="1600" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><title>RE-Harbor VOID — Media Home</title><desc>Original editable vector interpretation of the RE-Harbor interface. Flat nocturnal color system; not an application screenshot.</desc><defs /><rect fill="#101019" height="900" rx="18" ry="18" stroke="none" stroke-width="1" width="1600" x="0" y="0" /><rect fill="#0c0d16" height="900" rx="0" ry="0" stroke="none" stroke-width="1" width="56" x="0" y="0" /><text fill="#cbd7f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="27" font-weight="800" text-anchor="middle" x="22" y="39">V</text><rect fill="#1c1e30" height="32" rx="10" ry="10" stroke="#292b3e" stroke-width="1" width="34" x="11" y="72" /><path d="M 21 88 L 21 80 L 28 74 L 35 80 L 35 88 Z" fill="none" stroke="#e1e4f6" stroke-width="1.5" /><circle cx="28" cy="121" fill="none" r="6" stroke="#858ba4" /><line opacity="1" stroke="#858ba4" stroke-width="1.6" x1="28" x2="33" y1="121" y2="116" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="154" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="154" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="163" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="163" /><rect fill="none" height="12" rx="2" ry="2" stroke="#858ba4" stroke-width="1.5" width="16" x="20" y="192" /><line opacity="1" stroke="#858ba4" stroke-width="1.5" x1="26" x2="30" y1="206" y2="206" /><path d="M 21 244 L 21 236 L 28 230 L 35 236 L 35 244 Z" fill="none" stroke="#858ba4" stroke-width="1.5" /><circle cx="28" cy="277" fill="none" r="6" stroke="#858ba4" /><line opacity="1" stroke="#858ba4" stroke-width="1.6" x1="28" x2="33" y1="277" y2="272" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="310" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="310" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="319" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="319" /><rect fill="none" height="12" rx="2" ry="2" stroke="#858ba4" stroke-width="1.5" width="16" x="20" y="349" /><line opacity="1" stroke="#858ba4" stroke-width="1.5" x1="26" x2="30" y1="363" y2="363" /><path d="M 21 402 L 21 394 L 28 388 L 35 394 L 35 402 Z" fill="none" stroke="#858ba4" stroke-width="1.5" /><circle cx="28" cy="436" fill="none" r="6" stroke="#858ba4" /><line opacity="1" stroke="#858ba4" stroke-width="1.6" x1="28" x2="33" y1="436" y2="431" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="470" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="470" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="479" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="479" /><rect fill="none" height="12" rx="2" ry="2" stroke="#858ba4" stroke-width="1.5" width="16" x="20" y="509" /><line opacity="1" stroke="#858ba4" stroke-width="1.5" x1="26" x2="30" y1="523" y2="523" /><path d="M 21 562 L 21 554 L 28 548 L 35 554 L 35 562 Z" fill="none" stroke="#858ba4" stroke-width="1.5" /><circle cx="28" cy="596" fill="none" r="6" stroke="#858ba4" /><line opacity="1" stroke="#858ba4" stroke-width="1.6" x1="28" x2="33" y1="596" y2="591" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="630" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="630" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="21" y="639" /><rect fill="#858ba4" height="6" rx="1" ry="1" stroke="none" stroke-width="1" width="6" x="30" y="639" /><rect fill="none" height="12" rx="2" ry="2" stroke="#858ba4" stroke-width="1.5" width="16" x="20" y="669" /><line opacity="1" stroke="#858ba4" stroke-width="1.5" x1="26" x2="30" y1="683" y2="683" /><path d="M 21 722 L 21 714 L 28 708 L 35 714 L 35 722 Z" fill="none" stroke="#858ba4" stroke-width="1.5" /><circle cx="28" cy="756" fill="none" r="6" stroke="#858ba4" /><line opacity="1" stroke="#858ba4" stroke-width="1.6" x1="28" x2="33" y1="756" y2="751" /><rect fill="#0d0e18" height="55" rx="0" ry="0" stroke="none" stroke-width="1" width="1544" x="56" y="0" /><rect fill="#161724" height="30" rx="9" ry="9" stroke="#292b3e" stroke-width="1" width="315" x="647" y="12" /><circle cx="667" cy="27" fill="none" r="6" stroke="#9297b0" /><line opacity="1" stroke="#9297b0" stroke-width="1.5" x1="671" x2="678" y1="31" y2="37" /><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="500" x="690" y="31">Search movies, shows, people…</text><rect fill="none" height="12" rx="3" ry="3" stroke="#9297b0" stroke-width="1" width="13" x="1417" y="22" /><rect fill="none" height="12" rx="3" ry="3" stroke="#9297b0" stroke-width="1" width="13" x="1450" y="22" /><rect fill="none" height="12" rx="3" ry="3" stroke="#9297b0" stroke-width="1" width="13" x="1483" y="22" /><circle cx="1540" cy="28" fill="#2c446c" r="14" stroke="#89b4fa" /><circle cx="1540" cy="25" fill="#c8d6ed" r="5" stroke="none" /><path d="M 1529 37 Q 1540 25 1551 37" fill="#7faedc" stroke="none" stroke-width="1" /><rect fill="#111523" height="396" rx="0" ry="0" stroke="none" stroke-width="1" width="1544" x="56" y="56" /><path d="M 782 56 L 1600 56 L 1600 452 L 866 452 Q 955 242 782 56 Z" fill="#151d2b" stroke="none" stroke-width="1" /><path d="M 1060 452 Q 1150 312 1140 176 Q 1200 70 1315 98 Q 1470 68 1600 168 L 1600 452 Z" fill="#22202b" opacity="0.85" stroke="none" stroke-width="1" /><path d="M 1350 452 L 1405 285 Q 1455 210 1420 158 Q 1480 208 1493 282 L 1510 452 Z" fill="#2d2b31" stroke="none" stroke-width="1" /><circle cx="1460" cy="278" fill="#7c3e22" opacity="0.6" r="52" stroke="none" /><path d="M 1122 453 Q 1185 328 1226 281 L 1297 213 Q 1352 274 1371 452 Z" fill="#131722" stroke="none" stroke-width="1" /><path d="M 1186 218 L 1248 193 L 1266 272 L 1249 348 L 1208 309 Z" fill="#11131e" stroke="none" stroke-width="1" /><path d="M 1229 211 Q 1270 170 1303 213 Q 1315 271 1270 287 L 1229 269 Z" fill="#28272a" stroke="none" stroke-width="1" /><path d="M 1122 453 L 1371 453" fill="none" opacity="0.48" stroke="#b26b40" stroke-width="3" /><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" letter-spacing="1.2px" x="100" y="188">#1 IN MOVIES TODAY</text><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="56" font-weight="900" letter-spacing="6px" x="94" y="258">THE</text><text fill="#96afd9" font-family="Inter, Arial, Helvetica, sans-serif" font-size="73" font-weight="900" letter-spacing="2px" x="92" y="327">ODYSSEY</text><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="500" x="98" y="361">After the Trojan War, Odysseus faces a dangerous voyage</text><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="500" x="98" y="384">back to Ithaca through monsters, legends and the unknown.</text><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="600" x="98" y="412">2026     •     IMDb 8.4     •     173 min</text><rect fill="#c9cce0" height="40" rx="11" ry="11" stroke="none" stroke-width="1" width="104" x="98" y="427" /><text fill="#10121c" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" text-anchor="middle" x="150.0" y="453">▶  Play</text><rect fill="#161724" height="40" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="165" x="213" y="427" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" text-anchor="middle" x="295.5" y="453">＋  Add to watchlist</text><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="21" font-weight="800" x="80" y="527">Continue Watching</text><rect fill="#14233b" height="125" rx="13" ry="13" stroke="none" stroke-width="1" width="232" x="80" y="552" /><svg height="125" overflow="hidden" viewBox="0 0 240 126" width="232" x="80" y="552"><defs /><circle cx="178" cy="42" fill="#dfd0ac" r="37" stroke="none" /><path d="M 0 110 L 55 65 L 104 94 L 143 60 L 204 108 L 240 83 L 240 126 L 0 126 Z" fill="#263e50" stroke="none" stroke-width="1" /><text fill="#faf6e9" font-family="Inter, Arial, Helvetica, sans-serif" font-size="27" font-weight="900" letter-spacing="1px" text-anchor="middle" x="115" y="63">HAIL MARY</text></svg><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" x="80" y="701">Project Hail Mary</text><rect fill="#262920" height="125" rx="13" ry="13" stroke="none" stroke-width="1" width="232" x="334" y="552" /><svg height="125" overflow="hidden" viewBox="0 0 240 126" width="232" x="334" y="552"><defs /><rect fill="#3b3e31" height="126" rx="0" ry="0" stroke="none" stroke-width="1" width="19" x="17" y="0" /><rect fill="#3b3e31" height="126" rx="0" ry="0" stroke="none" stroke-width="1" width="19" x="72" y="0" /><rect fill="#3b3e31" height="126" rx="0" ry="0" stroke="none" stroke-width="1" width="19" x="131" y="0" /><rect fill="#3b3e31" height="126" rx="0" ry="0" stroke="none" stroke-width="1" width="19" x="192" y="0" /><text fill="#e4c962" font-family="Inter, Arial, Helvetica, sans-serif" font-size="28" font-weight="900" letter-spacing="1px" text-anchor="middle" x="120" y="72">GENTLEMEN</text></svg><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" x="334" y="701">The Gentlemen</text><rect fill="#191a24" height="125" rx="13" ry="13" stroke="none" stroke-width="1" width="232" x="588" y="552" /><svg height="125" overflow="hidden" viewBox="0 0 240 126" width="232" x="588" y="552"><defs /><circle cx="137" cy="61" fill="#d3d9d5" r="53" stroke="none" /><circle cx="160" cy="46" fill="#191a24" r="50" stroke="none" /><text fill="#e7e2e4" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="middle" x="120" y="105">MOON KNIGHT</text></svg><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" x="588" y="701">Moon Knight</text><rect fill="#1b2b25" height="125" rx="13" ry="13" stroke="none" stroke-width="1" width="232" x="842" y="552" /><svg height="125" overflow="hidden" viewBox="0 0 240 126" width="232" x="842" y="552"><defs /><path d="M 5 126 L 30 12" fill="none" stroke="#4b7151" stroke-width="12" /><path d="M 49 126 L 74 12" fill="none" stroke="#4b7151" stroke-width="12" /><path d="M 93 126 L 118 12" fill="none" stroke="#4b7151" stroke-width="12" /><path d="M 137 126 L 162 12" fill="none" stroke="#4b7151" stroke-width="12" /><path d="M 181 126 L 206 12" fill="none" stroke="#4b7151" stroke-width="12" /><path d="M 225 126 L 250 12" fill="none" stroke="#4b7151" stroke-width="12" /><text fill="#e7e3d3" font-family="Inter, Arial, Helvetica, sans-serif" font-size="18" font-weight="600" text-anchor="middle" x="120" y="69">THE LAST</text><text fill="#e7e3d3" font-family="Inter, Arial, Helvetica, sans-serif" font-size="17" font-weight="500" text-anchor="middle" x="120" y="90">OF THE MOHICANS</text></svg><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" x="842" y="701">The Last of the Mohicans</text><rect fill="#153424" height="125" rx="13" ry="13" stroke="none" stroke-width="1" width="232" x="1096" y="552" /><svg height="125" overflow="hidden" viewBox="0 0 240 126" width="232" x="1096" y="552"><defs /><path d="M 68 20 Q 110 38 116 118 Q 140 38 180 20" fill="none" stroke="#c0b277" stroke-width="16" /><text fill="#b4d3a5" font-family="Inter, Arial, Helvetica, sans-serif" font-size="50" font-weight="900" letter-spacing="3px" text-anchor="middle" x="120" y="85">LOKI</text></svg><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" x="1096" y="701">Loki</text><rect fill="#38485a" height="125" rx="13" ry="13" stroke="none" stroke-width="1" width="232" x="1350" y="552" /><svg height="125" overflow="hidden" viewBox="0 0 240 126" width="232" x="1350" y="552"><defs /><rect fill="#b7a4aa" height="126" rx="0" ry="0" stroke="none" stroke-width="1" width="240" x="0" y="0" /><path d="M 15 126 Q 52 43 90 80 Q 105 13 140 56 Q 198 30 242 126" fill="#425773" stroke="none" stroke-width="1" /><text fill="#65c5e1" font-family="Inter, Arial, Helvetica, sans-serif" font-size="42" font-weight="900" text-anchor="middle" x="120" y="91">90210</text></svg><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="13" font-weight="700" x="1350" y="701">Beverly Hills, 90210</text><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="20" font-weight="800" x="80" y="750">Your Streaming</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="80" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="158" y="801">NETFLIX</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="249" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="327" y="801">Disney+</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="418" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="496" y="801">hulu</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="587" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="665" y="801">prime video</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="756" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="834" y="801">Apple TV</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="925" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="1003" y="801">max</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="1094" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="1172" y="801">Paramount+</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="1263" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="1341" y="801">peacock</text><rect fill="#161724" height="48" rx="11" ry="11" stroke="#292b3e" stroke-width="1" width="157" x="1432" y="770" /><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle" x="1510" y="801">Crunchyroll</text><rect fill="#0d0e17" height="50" rx="0" ry="0" stroke="none" stroke-width="1" width="1600" x="0" y="850" /><line opacity="1" stroke="#454761" stroke-width="2" x1="0" x2="1600" y1="849" y2="849" /><rect fill="#89b4fa" height="3" rx="0" ry="0" stroke="none" stroke-width="1" width="260" x="0" y="848" /><svg height="34" overflow="hidden" viewBox="0 0 300 300" width="34" x="32" y="858"><defs /><rect fill="#e7ebf7" height="300" rx="0" ry="0" stroke="none" stroke-width="1" width="300" x="0" y="0" /><rect fill="#f2b9d1" height="300" rx="0" ry="0" stroke="none" stroke-width="1" width="45" x="0" y="0" /><rect fill="#08a5bf" height="300" rx="0" ry="0" stroke="none" stroke-width="1" width="47" x="45" y="0" /><rect fill="#2464a7" height="300" rx="0" ry="0" stroke="none" stroke-width="1" width="39" x="92" y="0" /><rect fill="#fff023" height="13" rx="0" ry="0" stroke="none" stroke-width="1" width="90" x="0" y="0" /><rect fill="#f6fbff" height="82" rx="0" ry="0" stroke="#a9b5d5" stroke-width="1" width="152" x="138" y="10" /><text fill="#225ba0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="15" font-weight="800" x="148" y="30">MACROSS 82-99</text><text fill="#225ba0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="25" font-weight="900" x="148" y="63">82.99 F.M.</text><text fill="#5586bb" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="700" x="148" y="80">A MILLION MILES AWAY</text><rect fill="#f4b4d7" height="206" rx="0" ry="0" stroke="none" stroke-width="1" width="153" x="137" y="94" /><circle cx="162" cy="122" fill="#f4ef23" r="10" stroke="none" /><path d="M 170 128 C 205 92 270 94 298 143 L 302 300 L 174 300 Q 197 215 170 128 Z" fill="#101728" stroke="none" stroke-width="1" /><path d="M 200 137 Q 242 103 284 138 Q 302 180 306 244 L 304 300 L 239 300 Q 248 242 219 218 Z" fill="#0aabc7" stroke="none" stroke-width="1" /><path d="M 170 166 Q 199 154 233 184 L 231 236 Q 214 267 185 265 Q 168 233 170 166 Z" fill="#f8eef1" stroke="none" stroke-width="1" /><path d="M 168 172 Q 172 137 204 126 Q 214 164 239 164 Q 218 185 172 192 Z" fill="#131627" stroke="none" stroke-width="1" /><path d="M 218 122 Q 250 111 273 140 Q 249 182 239 216 L 229 204 Q 228 162 218 122 Z" fill="#05aac9" stroke="none" stroke-width="1" /><path d="M 159 203 Q 181 197 195 203" fill="none" stroke="#111827" stroke-width="3" /><path d="M 212 205 Q 224 202 233 206" fill="none" stroke="#111827" stroke-width="3" /><circle cx="187" cy="207" fill="#2389cc" r="3" stroke="none" /><circle cx="223" cy="208" fill="#2389cc" r="3" stroke="none" /><path d="M 191 235 Q 209 241 220 228" fill="none" stroke="#527b9b" stroke-width="2" /><path d="M 195 265 Q 193 283 186 300 L 251 300 Q 223 280 218 263" fill="#f5fbff" stroke="none" stroke-width="1" /><rect fill="#0f1524" height="24" opacity="0.78" rx="0" ry="0" stroke="none" stroke-width="1" width="300" x="0" y="276" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="13" y="284" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="48" y="284" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="83" y="284" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="118" y="284" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="153" y="284" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="188" y="284" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="223" y="284" /><rect fill="#a4bddf" height="9" rx="1" ry="1" stroke="none" stroke-width="1" width="29" x="258" y="284" /></svg><text fill="#e1e4f6" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="700" x="78" y="871">82.99 F.M.</text><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="500" x="78" y="885">Macross 82-99</text><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="18" font-weight="500" x="182" y="881">♡</text><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="14" font-weight="500" x="720" y="880">⤨</text><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="500" x="756" y="880">◂</text><rect fill="#d0d5ed" height="32" rx="8" ry="8" stroke="none" stroke-width="1" width="36" x="791" y="860" /><rect fill="#17192a" height="14" rx="1" ry="1" stroke="none" stroke-width="1" width="4" x="802" y="869" /><rect fill="#17192a" height="14" rx="1" ry="1" stroke="none" stroke-width="1" width="4" x="812" y="869" /><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="500" x="840" y="881">▸</text><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="16" font-weight="500" x="886" y="881">▢</text><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" font-weight="500" x="1362" y="880">0:20 / 2:30</text><line opacity="1" stroke="#585e77" stroke-width="3" x1="1460" x2="1535" y1="876" y2="876" /><line opacity="1" stroke="#e1e4f6" stroke-width="3" x1="1460" x2="1496" y1="876" y2="876" /><circle cx="1496" cy="876" fill="#e1e4f6" r="4" stroke="none" /><text fill="#9297b0" font-family="Inter, Arial, Helvetica, sans-serif" font-size="18" font-weight="500" x="1560" y="882">×</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080" role="img" aria-labelledby="media-title media-description">
+<title id="media-title">RE-Harbor VOID — Media Home</title>
+<desc id="media-description">Clean original vector product mockup of RE-Harbor's cinematic home. Individually drawn navigation icons, editorial Odyssey hero, six distinct continue-watching covers, nine streaming services, nine miniature poster designs, and a full-width music dock. This is a mockup, not a software screenshot.</desc>
+<defs>
+  <clipPath id="viewport"><rect width="1600" height="1080" rx="18"/></clipPath>
+  <clipPath id="hero-clip"><rect x="56" y="56" width="1544" height="365"/></clipPath>
+
+  <clipPath id="continue-0"><rect x="90" y="498" width="224" height="141" rx="12"/></clipPath>
+  <clipPath id="continue-1"><rect x="332" y="498" width="224" height="141" rx="12"/></clipPath>
+  <clipPath id="continue-2"><rect x="574" y="498" width="224" height="141" rx="12"/></clipPath>
+  <clipPath id="continue-3"><rect x="816" y="498" width="224" height="141" rx="12"/></clipPath>
+  <clipPath id="continue-4"><rect x="1058" y="498" width="224" height="141" rx="12"/></clipPath>
+  <clipPath id="continue-5"><rect x="1300" y="498" width="224" height="141" rx="12"/></clipPath>
+  <clipPath id="poster-0"><rect x="90" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-1"><rect x="248" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-2"><rect x="406" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-3"><rect x="564" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-4"><rect x="722" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-5"><rect x="880" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-6"><rect x="1038" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-7"><rect x="1196" y="852" width="144" height="147" rx="12"/></clipPath>
+  <clipPath id="poster-8"><rect x="1354" y="852" width="144" height="147" rx="12"/></clipPath>
+</defs>
+<g clip-path="url(#viewport)">
+<rect x="0" y="0" width="1600" height="1080" rx="0" fill="#101019" />
+<rect x="0" y="0" width="56" height="1080" rx="0" fill="#0b0c15" />
+<text x="28" y="38" fill="#cbd7f6" font-size="27" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >V</text>
+<line x1="12" y1="60" x2="44" y2="60" stroke="#313245" stroke-width="1"/>
+<rect x="10" y="72" width="36" height="36" rx="10" fill="#1c2032" stroke="#293149" stroke-width="1" />
+<g transform="translate(17 79) scale(0.93)">
+<path data-icon="home" d="M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3z" stroke="#e7e9f8" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 119) scale(0.93)">
+<path data-icon="discover" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm3.2 6.8-2.1 4.4-4.3 2 2-4.3z" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 159) scale(0.93)">
+<path data-icon="grid" d="M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 199) scale(0.93)">
+<path data-icon="movies" d="M3 9h18v12H3z M3 9l-1-5 18-3 1 6-18 3z M8 3l4 5 M15 2l4 5" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 239) scale(0.93)">
+<path data-icon="shows" d="M4 5h16v12H4z M9 21h6 M12 17v4" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 279) scale(0.93)">
+<path data-icon="anime" d="M12 1l2.2 7.2L22 11l-7.8 2.8L12 21l-2.2-7.2L2 11l7.8-2.8z M20 19l1 2.2L23 22l-2 .8L20 25l-1-2.2-2-.8 2-.8z" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 319) scale(0.93)">
+<path data-icon="live" d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z M12 14v8 M7 6a9 9 0 0 0 0 12 M17 6a9 9 0 0 1 0 12 M4 3a13 13 0 0 0 0 18 M20 3a13 13 0 0 1 0 18" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 359) scale(0.93)">
+<path data-icon="trophy" d="M7 3h10v7c0 3-2 5-5 5s-5-2-5-5z M7 6H3v2c0 3 2 5 5 5 M17 6h4v2c0 3-2 5-5 5 M12 15v4 M7 21h10" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 399) scale(0.93)">
+<path data-icon="books" d="M3 5q4-2 9 1q5-3 9-1v15q-4-2-9 1q-5-3-9-1z M12 6v15" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 439) scale(0.93)">
+<path data-icon="music" d="M10 19V5l10-2v14 M10 8l10-2 M6 18a3 2 0 1 0 4 2 M16 17a3 2 0 1 0 4 2" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 479) scale(0.93)">
+<path data-icon="games" d="M7 8h10c3 0 4 2 5 7l1 4c.5 3-2 4-4 2l-4-4H9l-4 4c-2 2-4.5 1-4-2l1-4c1-5 2-7 5-7z M8 11v6 M5 14h6 M17 12h.01 M19 15h.01" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 519) scale(0.93)">
+<path data-icon="library" d="M5 4v16 M9 4v16 M13 6v14 M18 3l4 16 M4 21h18" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 575) scale(0.93)">
+<path data-icon="downloads" d="M12 2v13 M7 10l5 5 5-5 M4 18v4h16v-4" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 617) scale(0.93)">
+<path data-icon="calendar" d="M4 5h16v16H4z M4 10h16 M8 2v6 M16 2v6 M8 14h3 M14 14h3 M8 18h3" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 659) scale(0.93)">
+<path data-icon="bookmark" d="M6 3h12v19l-6-4-6 4z" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 701) scale(0.93)">
+<path data-icon="cube" d="M12 2l9 5v10l-9 5-9-5V7z M3 7l9 5 9-5 M12 12v10" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(17 743) scale(0.93)">
+<path data-icon="settings" d="M9 2h6l.8 3.1 2.3 1.3 3.1-.9 3 5.2-2.3 2.3v2.6l2.3 2.3-3 5.2-3.1-.9-2.3 1.3L15 26H9l-.8-3.1-2.3-1.3-3.1.9-3-5.2 2.3-2.3v-2.6L-.2 10.7l3-5.2 3.1.9 2.3-1.3z M12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" stroke="#a1a7be" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<line x1="12" y1="792" x2="44" y2="792" stroke="#313245" stroke-width="1"/>
+<g transform="translate(13 947)">
+<path d="M4 12 3 3l8 5a22 22 0 0 1 10 0l8-5-1 9c6 5 6 14 1 19-4 5-21 6-27 0-5-6-4-14 2-19z" fill="#151a2e" stroke="#495877" stroke-width="1.2" />
+<path d="M6 18q-2-5 2-7l5 4z M25 15l5-4q4 5 1 7z" fill="#89b4fa" />
+<circle cx="11" cy="23" r="2.4" fill="#a6e3ff"/>
+<circle cx="25" cy="23" r="2.4" fill="#a6e3ff"/>
+<path d="M15 29q3 3 6 0" fill="none" stroke="#a6e3ff" stroke-width="1.3" />
+</g>
+<rect x="56" y="0" width="1544" height="55" rx="0" fill="#0d0e17" />
+<rect x="644" y="12" width="324" height="31" rx="9" fill="#191b29" stroke="#313245" stroke-width="1" />
+<circle cx="665" cy="27" r="6" fill="none" stroke="#737b96" stroke-width="1.5"/>
+<line x1="670" y1="32" x2="678" y2="39" stroke="#737b96" stroke-width="1.6"/>
+<text x="689" y="31" fill="#737b96" font-size="11" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" >Search movies, shows, people…</text>
+<rect x="1367" y="16" width="30" height="26" rx="8" fill="none" />
+<rect x="1411" y="16" width="30" height="26" rx="8" fill="none" />
+<rect x="1455" y="16" width="30" height="26" rx="8" fill="none" />
+<g transform="translate(1373 19)">
+<circle cx="6" cy="5" r="3" fill="none" stroke="#a1a7be" stroke-width="1.3"/>
+<circle cx="15" cy="9" r="2.5" fill="none" stroke="#a1a7be" stroke-width="1.3"/>
+<path d="M0 19v-3c0-6 12-6 12 0v3 M12 18v-3q2-4 7 0v3" fill="none" stroke="#a1a7be" stroke-width="1.2" />
+</g>
+<g transform="translate(1419 18)">
+<rect x="0" y="2" width="18" height="14" rx="3" fill="none" stroke="#a1a7be" stroke-width="1.4" />
+<path d="M5 20h8 M9 16v4" fill="none" stroke="#a1a7be" stroke-width="1.4" />
+</g>
+<g transform="translate(1464 18)">
+<rect x="1" y="2" width="18" height="17" rx="3" fill="none" stroke="#a1a7be" stroke-width="1.4" />
+<line x1="8" y1="3" x2="8" y2="18" stroke="#a1a7be" stroke-width="1.2"/>
+<path d="M12 8l4 3-4 3" fill="none" stroke="#a1a7be" stroke-width="1.4" />
+</g>
+<circle cx="1533" cy="27" r="15" fill="#2b4165" stroke="#8fbafd" stroke-width="1.5"/>
+<circle cx="1533" cy="26" r="10" fill="#edc0b4"/>
+<path d="M1523 24q9-17 20 0l-3 3q-5-8-14 1z" fill="#1d2341" />
+<text x="1574" y="31" fill="#737b96" font-size="20" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >×</text>
+<rect x="56" y="55" width="1544" height="367" rx="0" fill="#111523" />
+<g clip-path="url(#hero-clip)">
+<rect x="770" y="55" width="830" height="367" rx="0" fill="#151c2d" />
+<circle cx="1354" cy="178" r="132" fill="#253348" opacity=".48"/>
+<circle cx="1354" cy="178" r="93" fill="#3b4b5c" opacity=".35"/>
+<circle cx="1354" cy="178" r="59" fill="#a5a9a8" opacity=".31"/>
+<path d="M764 319 854 243 934 300 1015 214 1105 302 1168 245 1255 311 1376 208 1465 299 1600 241 1600 427 764 427Z" fill="#111c30" />
+<path d="M825 355 945 303 1042 350 1154 282 1265 331 1350 285 1465 344 1600 310 1600 427 825 427Z" fill="#19263a" />
+<path d="M908 385q135-23 255 0t237 0q83-12 200-8v50H908Z" fill="#0e1828" />
+<path d="M1242 282q98 23 209 0l-35 22h-139Z" fill="#070c18" />
+<line x1="1340" y1="169" x2="1340" y2="283" stroke="#070c18" stroke-width="4"/>
+<path d="M1342 174 1426 252 1342 252z" fill="#0a111f" />
+<path d="M1336 184 1274 260 1336 260z" fill="#111929" />
+<path d="M1338 171 1345 278" fill="none" stroke="#33425d" stroke-width="1" />
+<circle cx="1287" cy="272" r="4" fill="#080e19"/>
+<circle cx="1306" cy="272" r="4" fill="#080e19"/>
+<circle cx="1391" cy="272" r="4" fill="#080e19"/>
+<circle cx="1405" cy="272" r="4" fill="#080e19"/>
+<path d="M1001 425q-6-111 58-154 54-45 87-10 43 33 31 164z" fill="#0c1423" />
+<path d="M1044 265q-13-41 22-65 29-20 65-9 25 12 18 42l-12 13-38-9-27 31z" fill="#111b2a" />
+<path d="M1060 208q36-29 75 0l3 15-88-1Z" fill="#263246" />
+<path d="M1051 222l-16 18 18 14 34-13z" fill="#192535" />
+<path d="M1143 213l26 21-24 13-29-14z" fill="#1b2839" />
+<path d="M1094 244q29 8 37 18l-17 39-35-10-19-22z" fill="#283346" />
+<path d="M1061 263q12 33 2 72l-28 90h-42q19-91 46-143z" fill="#171f31" />
+<path d="M1145 268q64 77 63 157h-49l-44-120z" fill="#1d2b3d" />
+<path d="M1143 276q12 26 26 60" fill="none" stroke="#9e7756" stroke-width="4" opacity=".52" />
+<path d="M1550 319q-32-37-8-56-1 26 18 16 24 37-6 49z" fill="#ca7848" opacity=".65" />
+<circle cx="1550" cy="305" r="15" fill="#e1a25b" opacity=".32"/>
+<path d="M56 55H725 C818 64 820 180 866 264 C906 335 906 397 938 422H56Z" fill="#10121f" />
+<path d="M710 55 C795 92 827 184 862 257 C903 333 916 388 954 422 H910 C880 377 869 324 839 271 C797 186 777 110 690 55Z" fill="#10121f" opacity=".23" />
+</g>
+<text x="98" y="133" fill="#89b4fa" font-size="10" font-weight="750" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="3" >FEATURED   /   CINEMA</text>
+<text x="95" y="203" fill="#cdd6f4" font-size="57" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="9" >THE</text>
+<text x="95" y="271" fill="#cdd6f4" font-size="73" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="3" >ODYSSEY</text>
+<text x="98" y="309" fill="#a1a7be" font-size="15" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" >After the Trojan War, Odysseus begins a dangerous journey</text>
+<text x="98" y="332" fill="#a1a7be" font-size="15" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" >across the sea — through myth, monsters, and the unknown.</text>
+<text x="98" y="358" fill="#a1a7be" font-size="12" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" >2026</text>
+<rect x="146" y="346" width="45" height="19" rx="4" fill="#e7c04e" />
+<text x="169" y="359" fill="#171520" font-size="9" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >IMDb</text>
+<text x="200" y="359" fill="#e7e9f8" font-size="12" font-weight="700" font-family="Inter, Arial, Helvetica, sans-serif" >8.4</text>
+<text x="235" y="359" fill="#a1a7be" font-size="12" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" >173 min</text>
+<rect x="98" y="379" width="102" height="34" rx="9" fill="#cdd6f4" />
+<path d="M113 389v14l12-7z" fill="#171b2b" />
+<text x="138" y="400" fill="#171b2b" font-size="12" font-weight="760" font-family="Inter, Arial, Helvetica, sans-serif" >Play</text>
+<rect x="211" y="379" width="160" height="34" rx="9" fill="#151827" stroke="#313245" stroke-width="1" />
+<path d="M230 391v12 M224 397h12" fill="none" stroke="#cdd6f4" stroke-width="1.7" />
+<text x="246" y="400" fill="#cdd6f4" font-size="11" font-weight="640" font-family="Inter, Arial, Helvetica, sans-serif" >Add to watchlist</text>
+<rect x="744" y="438" width="27" height="4" rx="3" fill="#cdd6f4" />
+<rect x="777" y="438" width="21" height="4" rx="3" fill="#555a74" />
+<rect x="810" y="438" width="21" height="4" rx="3" fill="#555a74" />
+<rect x="843" y="438" width="21" height="4" rx="3" fill="#555a74" />
+<text x="92" y="474" fill="#e7e9f8" font-size="18" font-weight="740" font-family="Inter, Arial, Helvetica, sans-serif" >Continue Watching</text>
+<text x="1497" y="474" fill="#737b96" font-size="11" font-weight="600" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="end" >View all  ›</text>
+<g clip-path="url(#continue-0)">
+<rect x="90" y="498" width="224" height="141" rx="0" fill="#151a2a" />
+<circle cx="246" cy="522" r="60" fill="#566379" opacity=".37"/>
+<circle cx="248" cy="523" r="41" fill="#d1a069" opacity=".35"/>
+<path d="M90 615q77-35 224 15v20H90z" fill="#080e18" />
+<path d="M164 636q-5-58 20-70 29-3 28 32l18 42z" fill="#101b29" />
+<circle cx="192" cy="560" r="16" fill="#aebccc"/>
+<circle cx="192" cy="560" r="12" fill="#1e2f45"/>
+<circle cx="109" cy="527" r="1.8" fill="#c8d6ed" opacity=".7"/>
+<circle cx="133" cy="544" r="1.8" fill="#c8d6ed" opacity=".7"/>
+<circle cx="279" cy="584" r="1.8" fill="#c8d6ed" opacity=".7"/>
+<circle cx="268" cy="517" r="1.8" fill="#c8d6ed" opacity=".7"/>
+<circle cx="154" cy="513" r="1.8" fill="#c8d6ed" opacity=".7"/>
+<text x="202" y="603" fill="#e6e8ed" font-size="21" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1" text-anchor="middle" >HAIL MARY</text>
+</g>
+<g clip-path="url(#continue-1)">
+<rect x="332" y="498" width="224" height="141" rx="0" fill="#29312e" />
+<rect x="355" y="510" width="178" height="115" rx="0" fill="#494c40" />
+<rect x="366" y="519" width="27" height="92" rx="0" fill="#86826b" />
+<rect x="374" y="519" width="11" height="91" rx="0" fill="#b1aa8b" opacity=".43" />
+<rect x="407" y="519" width="27" height="92" rx="0" fill="#86826b" />
+<rect x="415" y="519" width="11" height="91" rx="0" fill="#b1aa8b" opacity=".43" />
+<rect x="448" y="519" width="27" height="92" rx="0" fill="#86826b" />
+<rect x="456" y="519" width="11" height="91" rx="0" fill="#b1aa8b" opacity=".43" />
+<rect x="489" y="519" width="27" height="92" rx="0" fill="#86826b" />
+<rect x="497" y="519" width="11" height="91" rx="0" fill="#b1aa8b" opacity=".43" />
+<path d="M435 560q24-19 34 8l-13 68h-42z" fill="#1c2026" />
+<circle cx="441" cy="551" r="16" fill="#c2af8d"/>
+<path d="M421 546q21-24 40 0z" fill="#25282b" />
+<text x="445" y="602" fill="#e5c565" font-size="18" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1" text-anchor="middle" >GENTLEMEN</text>
+</g>
+<g clip-path="url(#continue-2)">
+<rect x="574" y="498" width="224" height="141" rx="0" fill="#1c2132" />
+<circle cx="691" cy="557" r="65" fill="#d3d5d9" opacity=".22"/>
+<circle cx="691" cy="557" r="44" fill="#e3e3d7" opacity=".27"/>
+<path d="M639 639q-5-57 29-74l21-26 22 25q38 28 32 75z" fill="#dddfe2" />
+<path d="M670 569q13-19 26-9l12 29-17 28-17-19z" fill="#596272" />
+<path d="M674 582l10 3 M702 582l-9 3" fill="none" stroke="#b8d5ea" stroke-width="3" />
+<text x="690" y="615" fill="#e2e8ee" font-size="15" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1" text-anchor="middle" >MOON KNIGHT</text>
+</g>
+<g clip-path="url(#continue-3)">
+<rect x="816" y="498" width="224" height="141" rx="0" fill="#523d38" />
+<circle cx="969" cy="536" r="42" fill="#ce8669" opacity=".68"/>
+<path d="M816 605 874 541 930 603 971 559 1040 622v17H816z" fill="#222f2d" />
+<path d="M848 540v94 M828 595l20-42 19 42 M834 574l14-35 14 35" fill="none" stroke="#1c2a2a" stroke-width="4" />
+<path d="M891 554v94 M871 609l20-42 19 42 M877 588l14-35 14 35" fill="none" stroke="#1c2a2a" stroke-width="4" />
+<path d="M991 547v94 M971 602l20-42 19 42 M977 581l14-35 14 35" fill="none" stroke="#1c2a2a" stroke-width="4" />
+<path d="M1021 553v94 M1001 608l20-42 19 42 M1007 587l14-35 14 35" fill="none" stroke="#1c2a2a" stroke-width="4" />
+<text x="927" y="590" fill="#e8dfd3" font-size="13" font-weight="600" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="3" text-anchor="middle" >THE LAST</text>
+<text x="927" y="611" fill="#e8dfd3" font-size="16" font-weight="750" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1" text-anchor="middle" >OF THE MOHICANS</text>
+</g>
+<g clip-path="url(#continue-4)">
+<rect x="1058" y="498" width="224" height="141" rx="0" fill="#152c22" />
+<line x1="1057" y1="498" x2="1057" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1087" y1="498" x2="1077" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1117" y1="498" x2="1097" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1147" y1="498" x2="1117" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1177" y1="498" x2="1137" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1207" y1="498" x2="1157" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1237" y1="498" x2="1177" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1267" y1="498" x2="1197" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<line x1="1297" y1="498" x2="1217" y2="639" stroke="#365643" stroke-width="2" opacity=".28"/>
+<path d="M1124 548q31-35 61 7 28-27 55 0l-22 35h-74z" fill="none" stroke="#8a9069" stroke-width="4" />
+<path d="M1156 562l-12 40 26-15 17 20 16-38" fill="none" stroke="#d3c59a" stroke-width="5" />
+<text x="1170" y="610" fill="#d4cda8" font-size="30" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="4" text-anchor="middle" >LOKI</text>
+</g>
+<g clip-path="url(#continue-5)">
+<rect x="1300" y="498" width="224" height="141" rx="0" fill="#6c5964" />
+<circle cx="1459" cy="537" r="49" fill="#eba48a" opacity=".65"/>
+<path d="M1300 609q50-22 110 0t114-3v33h-224z" fill="#403f59" />
+<path d="M1366 639v-46 M1356 601q10-15 20 0 M1365 599l-19-13 M1365 595l21-13" fill="none" stroke="#293748" stroke-width="3" />
+<text x="1412" y="593" fill="#ebd6d3" font-size="11" font-weight="700" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="2" text-anchor="middle" >BEVERLY HILLS</text>
+<text x="1412" y="616" fill="#ebd6d3" font-size="29" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="2" text-anchor="middle" >90210</text>
+</g>
+<rect x="90" y="498" width="224" height="141" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="97" y="624" width="210" height="3" rx="2" fill="#45495c" />
+<rect x="97" y="624" width="89" height="3" rx="2" fill="#a0b6ef" />
+<text x="92" y="658" fill="#e7e9f8" font-size="12" font-weight="580" font-family="Inter, Arial, Helvetica, sans-serif" >Project Hail Mary</text>
+<rect x="332" y="498" width="224" height="141" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="339" y="624" width="210" height="3" rx="2" fill="#45495c" />
+<rect x="339" y="624" width="31" height="3" rx="2" fill="#a0b6ef" />
+<text x="334" y="658" fill="#e7e9f8" font-size="12" font-weight="580" font-family="Inter, Arial, Helvetica, sans-serif" >The Gentlemen</text>
+<rect x="574" y="498" width="224" height="141" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="581" y="624" width="210" height="3" rx="2" fill="#45495c" />
+<rect x="581" y="624" width="76" height="3" rx="2" fill="#a0b6ef" />
+<text x="576" y="658" fill="#e7e9f8" font-size="12" font-weight="580" font-family="Inter, Arial, Helvetica, sans-serif" >Moon Knight</text>
+<rect x="816" y="498" width="224" height="141" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="823" y="624" width="210" height="3" rx="2" fill="#45495c" />
+<rect x="823" y="624" width="108" height="3" rx="2" fill="#a0b6ef" />
+<text x="818" y="658" fill="#e7e9f8" font-size="12" font-weight="580" font-family="Inter, Arial, Helvetica, sans-serif" >The Last of the Mohicans</text>
+<rect x="1058" y="498" width="224" height="141" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="1065" y="624" width="210" height="3" rx="2" fill="#45495c" />
+<rect x="1065" y="624" width="149" height="3" rx="2" fill="#a0b6ef" />
+<text x="1060" y="658" fill="#e7e9f8" font-size="12" font-weight="580" font-family="Inter, Arial, Helvetica, sans-serif" >Loki</text>
+<rect x="1300" y="498" width="224" height="141" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="1307" y="624" width="210" height="3" rx="2" fill="#45495c" />
+<rect x="1307" y="624" width="58" height="3" rx="2" fill="#a0b6ef" />
+<text x="1302" y="658" fill="#e7e9f8" font-size="12" font-weight="580" font-family="Inter, Arial, Helvetica, sans-serif" >Beverly Hills, 90210</text>
+<text x="92" y="710" fill="#e7e9f8" font-size="18" font-weight="740" font-family="Inter, Arial, Helvetica, sans-serif" >Your Streaming</text>
+<text x="1497" y="710" fill="#737b96" font-size="11" font-weight="600" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="end" >Manage sources  ›</text>
+<rect x="90" y="729" width="144" height="54" rx="11" fill="#181925" />
+<rect x="97" y="739" width="3" height="35" rx="2" fill="#c73646" />
+<text x="162" y="762" fill="#f4f4fa" font-size="20" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="-0.4" text-anchor="middle" >NETFLIX</text>
+<rect x="248" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="320" y="762" fill="#f4f4fa" font-size="19" font-weight="670" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="-0.4" text-anchor="middle" >Disney+</text>
+<rect x="406" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="478" y="762" fill="#f4f4fa" font-size="23" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="-0.4" text-anchor="middle" >hulu</text>
+<rect x="564" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="636" y="762" fill="#f4f4fa" font-size="16" font-weight="670" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="-0.4" text-anchor="middle" >prime video</text>
+<rect x="722" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="794" y="762" fill="#f4f4fa" font-size="17" font-weight="670" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="-0.4" text-anchor="middle" >Apple TV</text>
+<rect x="880" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="952" y="762" fill="#f4f4fa" font-size="25" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="-0.4" text-anchor="middle" >max</text>
+<rect x="1038" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="1110" y="762" fill="#f4f4fa" font-size="14" font-weight="670" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="0" text-anchor="middle" >Paramount+</text>
+<rect x="1196" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="1268" y="762" fill="#f4f4fa" font-size="18" font-weight="670" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="0" text-anchor="middle" >peacock</text>
+<rect x="1354" y="729" width="144" height="54" rx="11" fill="#181925" />
+<text x="1426" y="762" fill="#f4f4fa" font-size="15" font-weight="670" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="0" text-anchor="middle" >crunchyroll</text>
+<text x="92" y="823" fill="#e7e9f8" font-size="18" font-weight="740" font-family="Inter, Arial, Helvetica, sans-serif" >Top 10 Trending This Week</text>
+<text x="1497" y="823" fill="#737b96" font-size="11" font-weight="600" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="end" >Discover more  ›</text>
+<g clip-path="url(#poster-0)">
+<rect x="90" y="852" width="144" height="147" rx="0" fill="#553e39" />
+<circle cx="182" cy="893" r="46" fill="#b56e4a" opacity=".6"/>
+<path d="M97 967q72-19 130 0v32H90z" fill="#172231" />
+<path d="M127 940q32 9 73 0l-15 10h-43z" fill="#0f1825" />
+<line x1="160" y1="885" x2="160" y2="942" stroke="#111927" stroke-width="2.5"/>
+<path d="M162 890l37 38h-37z" fill="#1a2331" />
+<text x="162" y="985" fill="#efe0d5" font-size="14" font-weight="780" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1.5" text-anchor="middle" >ODYSSEY</text>
+</g>
+<rect x="90" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="211" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="220.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >1</text>
+<text x="91" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >The Odyssey</text>
+<g clip-path="url(#poster-1)">
+<rect x="248" y="852" width="144" height="147" rx="0" fill="#273b4d" />
+<circle cx="347" cy="888" r="35" fill="#a6b0bd" opacity=".4"/>
+<path d="M248 970l39-61 33 29 22-45 51 84v34H248z" fill="#182634" />
+<line x1="318" y1="906" x2="321" y2="986" stroke="#dfba78" stroke-width="1.2"/>
+<path d="M320 906q-11-8-12-5 M320 908q12-8 12-5" fill="none" stroke="#ddbc77" stroke-width="1" />
+<line x1="318" y1="920" x2="321" y2="986" stroke="#dfba78" stroke-width="1.2"/>
+<path d="M320 920q-11-8-12-5 M320 922q12-8 12-5" fill="none" stroke="#ddbc77" stroke-width="1" />
+<line x1="318" y1="934" x2="321" y2="986" stroke="#dfba78" stroke-width="1.2"/>
+<path d="M320 934q-11-8-12-5 M320 936q12-8 12-5" fill="none" stroke="#ddbc77" stroke-width="1" />
+<line x1="318" y1="948" x2="321" y2="986" stroke="#dfba78" stroke-width="1.2"/>
+<path d="M320 948q-11-8-12-5 M320 950q12-8 12-5" fill="none" stroke="#ddbc77" stroke-width="1" />
+<line x1="318" y1="962" x2="321" y2="986" stroke="#dfba78" stroke-width="1.2"/>
+<path d="M320 962q-11-8-12-5 M320 964q12-8 12-5" fill="none" stroke="#ddbc77" stroke-width="1" />
+<text x="320" y="984" fill="#e6ddd1" font-size="12" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1.4" text-anchor="middle" >THE GAMES</text>
+</g>
+<rect x="248" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="369" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="378.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >2</text>
+<text x="249" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >Hunger Games</text>
+<g clip-path="url(#poster-2)">
+<rect x="406" y="852" width="144" height="147" rx="0" fill="#183127" />
+<rect x="417" y="857" width="2" height="138" rx="0" fill="#59825a" opacity=".23" />
+<rect x="448" y="857" width="2" height="138" rx="0" fill="#59825a" opacity=".23" />
+<rect x="479" y="857" width="2" height="138" rx="0" fill="#59825a" opacity=".23" />
+<rect x="510" y="857" width="2" height="138" rx="0" fill="#59825a" opacity=".23" />
+<circle cx="478" cy="908" r="43" fill="#425c3b" opacity=".78"/>
+<path d="M453 887l24-17 25 17-11 38H464z" fill="#13271f" stroke="#a4a787" stroke-width="1.3" />
+<path d="M463 913l13 9 15-9 M459 899l15-3 15 3" fill="none" stroke="#c0ba8e" stroke-width="2.2" />
+<text x="478" y="981" fill="#d0c8ab" font-size="13" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >DOOMSDAY</text>
+</g>
+<rect x="406" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="527" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="536.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >3</text>
+<text x="407" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >Avengers: Doomsday</text>
+<g clip-path="url(#poster-3)">
+<rect x="564" y="852" width="144" height="147" rx="0" fill="#603126" />
+<rect x="566" y="914" width="142" height="85" rx="0" fill="#2b2627" />
+<rect x="567" y="896" width="20" height="104" rx="0" fill="#1b2430" />
+<rect x="572" y="921" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="572" y="940" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="572" y="961" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="589" y="880" width="13" height="104" rx="0" fill="#1b2430" />
+<rect x="594" y="921" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="594" y="940" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="594" y="961" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="611" y="864" width="22" height="104" rx="0" fill="#1b2430" />
+<rect x="616" y="921" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="616" y="940" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="616" y="961" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="633" y="896" width="18" height="104" rx="0" fill="#1b2430" />
+<rect x="638" y="921" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="638" y="940" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="638" y="961" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="655" y="880" width="16" height="104" rx="0" fill="#1b2430" />
+<rect x="660" y="921" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="660" y="940" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="660" y="961" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="677" y="864" width="20" height="104" rx="0" fill="#1b2430" />
+<rect x="682" y="921" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="682" y="940" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="682" y="961" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="699" y="896" width="19" height="104" rx="0" fill="#1b2430" />
+<rect x="704" y="921" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="704" y="940" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<rect x="704" y="961" width="4" height="7" rx="0" fill="#cc734e" opacity=".8" />
+<path d="M584 954q49-73 108-22" fill="none" stroke="#ee8558" stroke-width="8" opacity=".56" />
+<text x="636" y="985" fill="#f3d9d4" font-size="15" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >THE BEAST</text>
+</g>
+<rect x="564" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="685" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="694.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >4</text>
+<text x="565" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >The Beast</text>
+<g clip-path="url(#poster-4)">
+<rect x="722" y="852" width="144" height="147" rx="0" fill="#456478" />
+<circle cx="818" cy="881" r="40" fill="#d0dedb" opacity=".78"/>
+<path d="M722 957q55-38 144-7v56H722z" fill="#223847" />
+<path d="M760 956q10-28 22-25 16 3 20 30l-9 37h-35z" fill="#152532" />
+<path d="M816 966q10-33 23-25 15 10 12 42l-27 15z" fill="#182e3a" />
+<text x="794" y="982" fill="#f2ede1" font-size="13" font-weight="750" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >GUARDING</text>
+</g>
+<rect x="722" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="843" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="852.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >5</text>
+<text x="723" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >Guarding Stars</text>
+<g clip-path="url(#poster-5)">
+<rect x="880" y="852" width="144" height="147" rx="0" fill="#526875" />
+<path d="M880 880q72 45 144 0v119H880z" fill="#13232e" />
+<path d="M887 899q66 54 130 0" fill="none" stroke="#b4c0bf" stroke-width="5" />
+<path d="M888 923q65 51 130 0" fill="none" stroke="#647779" stroke-width="4" />
+<rect x="887" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="901" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="915" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="929" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="943" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="957" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="971" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="985" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="999" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<rect x="1013" y="860" width="6" height="9" rx="0" fill="#c5ced5" opacity=".7" />
+<text x="952" y="976" fill="#f1f0e2" font-size="22" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1" text-anchor="middle" >MADDEN</text>
+</g>
+<rect x="880" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="1001" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="1010.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >6</text>
+<text x="881" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >Madden</text>
+<g clip-path="url(#poster-6)">
+<rect x="1038" y="852" width="144" height="147" rx="0" fill="#32325c" />
+<circle cx="1110" cy="924" r="43" fill="#4966a3" opacity=".42"/>
+<path d="M1072 938q38-100 75 0-45 51-75 0z" fill="none" stroke="#a4d1f9" stroke-width="4" />
+<path d="M1094 880q63 63 0 100" fill="none" stroke="#d8a4c9" stroke-width="5" />
+<text x="1110" y="984" fill="#e4e6f4" font-size="21" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="2" text-anchor="middle" >STEPS</text>
+</g>
+<rect x="1038" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="1159" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="1168.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >7</text>
+<text x="1039" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >Steps</text>
+<g clip-path="url(#poster-7)">
+<rect x="1196" y="852" width="144" height="147" rx="0" fill="#541e2d" />
+<rect x="1236" y="862" width="64" height="126" rx="0" fill="#a13439" stroke="#cb4e4b" stroke-width="2" />
+<rect x="1248" y="872" width="40" height="107" rx="0" fill="#2e1724" />
+<circle cx="1268" cy="906" r="12" fill="#170d19"/>
+<path d="M1248 987q-2-59 20-59 25 0 20 59z" fill="#120d18" />
+<text x="1268" y="981" fill="#f7dde1" font-size="12" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >OTHER MOMMY</text>
+</g>
+<rect x="1196" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="1317" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="1326.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >8</text>
+<text x="1197" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >Other Mommy</text>
+<g clip-path="url(#poster-8)">
+<rect x="1354" y="852" width="144" height="147" rx="0" fill="#2b4959" />
+<circle cx="1458" cy="884" r="43" fill="#7ab2bc" opacity=".34"/>
+<path d="M1354 966q35-25 74-11t70-3v47H1354z" fill="#142a32" />
+<path d="M1397 964l8-34 10 8 12-47 15 15 7-14 14 43 14 17-15-1-10 29z" fill="#0d1d2c" />
+<path d="M1416 900l7-21 13 22 M1443 907l10-19" fill="none" stroke="#a4d8e6" stroke-width="3" opacity=".8" />
+<text x="1426" y="982" fill="#e5f1f5" font-size="15" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" letter-spacing="1" text-anchor="middle" >GODZILLA</text>
+</g>
+<rect x="1354" y="852" width="144" height="147" rx="12" fill="none" stroke="#393a4c" stroke-width="0.8" />
+<rect x="1475" y="977" width="19" height="18" rx="5" fill="#161825" />
+<text x="1484.5" y="990" fill="#d7dcf3" font-size="10" font-weight="730" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >9</text>
+<text x="1355" y="1015" fill="#e7e9f8" font-size="10" font-weight="560" font-family="Inter, Arial, Helvetica, sans-serif" >Godzilla Minus Zero</text>
+<rect x="1512" y="852" width="144" height="147" rx="12" fill="#303245" />
+<circle cx="1584" cy="913" r="49" fill="#6a6882" opacity=".46"/>
+<path d="M1520 973l51-92 35 91z" fill="#151b2d" />
+<text x="1546" y="981" fill="#e4e6f4" font-size="14" font-weight="800" font-family="Inter, Arial, Helvetica, sans-serif" >10</text>
+<rect x="0" y="1035" width="1600" height="45" rx="0" fill="#0e101c" />
+<line x1="0" y1="1035" x2="1600" y2="1035" stroke="#505068" stroke-width="1.4"/>
+<rect x="8" y="1045" width="28" height="27" rx="5" fill="#08a5bf" />
+<rect x="8" y="1045" width="9" height="27" rx="3" fill="#e9b5ce" />
+<rect x="18" y="1045" width="7" height="27" rx="0" fill="#467ec2" />
+<text x="43" y="1053" fill="#eff0ff" font-size="11" font-weight="700" font-family="Inter, Arial, Helvetica, sans-serif" >『82.99 F.M.』</text>
+<text x="43" y="1067" fill="#737b96" font-size="9" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" >Macross 82-99</text>
+<path d="M174 1050c-6-6-14 2-7 9l7 6 7-6c7-7-1-15-7-9z" fill="none" stroke="#a1a7be" stroke-width="1.5" />
+<path d="M697 1051l6 0 6 8 6 0 M697 1065l6 0 6-8 6 0 M711 1054l4 5-4 4" fill="none" stroke="#737b96" stroke-width="1.5" />
+<path d="M747 1050v16 M762 1050l-11 8 11 8z" fill="none" stroke="#e7e9f8" stroke-width="1.3" />
+<rect x="785" y="1043" width="40" height="31" rx="11" fill="#ccd5ee" />
+<rect x="800" y="1051" width="4" height="15" rx="2" fill="#1d2131" />
+<rect x="807" y="1051" width="4" height="15" rx="2" fill="#1d2131" />
+<path d="M846 1050v16 M831 1050l11 8-11 8z" fill="none" stroke="#e7e9f8" stroke-width="1.3" />
+<path d="M880 1051h13v13h-13z M883 1048l5-5 5 5" fill="none" stroke="#737b96" stroke-width="1.2" />
+<circle cx="1310" cy="1057" r="6" fill="#fa4579"/>
+<text x="1326" y="1061" fill="#a1a7be" font-size="10" font-weight="600" font-family="Inter, Arial, Helvetica, sans-serif" >0:20 / 2:30</text>
+<path d="M1430 1055h6l7-5v16l-7-5h-6z M1448 1052q6 5 0 11" fill="none" stroke="#737b96" stroke-width="1.4" />
+<line x1="1462" y1="1057" x2="1516" y2="1057" stroke="#393a4c" stroke-width="3"/>
+<line x1="1462" y1="1057" x2="1487" y2="1057" stroke="#cdd6f4" stroke-width="3"/>
+<circle cx="1487" cy="1057" r="4" fill="#cdd6f4"/>
+<path d="M1545 1049h14v11h-14z M1548 1064h8" fill="none" stroke="#737b96" stroke-width="1.2" />
+<text x="1581" y="1062" fill="#737b96" font-size="17" font-weight="500" font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="middle" >×</text>
+</g>
+</svg>
