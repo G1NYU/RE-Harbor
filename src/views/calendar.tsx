@@ -12,7 +12,7 @@ import {
   todayLocalISO,
   type CalendarFilter,
   type CalendarItem,
-} from "@/lib/calendar";
+} from "@/lib/calendar-core";
 import { CalendarSkeleton } from "./calendar/calendar-skeleton";
 import { CalendarConfigRail } from "./calendar/config/config-rail";
 import { buildActiveCount } from "./calendar/config/rail-sources";
@@ -23,6 +23,7 @@ import { useSettings } from "@/lib/settings";
 import { useTrakt } from "@/lib/trakt/provider";
 import { useSimkl } from "@/lib/simkl/provider";
 import { useScrollMemory, useView } from "@/lib/view";
+import { useSessionState } from "@/lib/session-state";
 import { useT } from "@/lib/i18n";
 import { AuthModal } from "@/components/auth-modal";
 import { RemindersManagerButton } from "@/components/reminders-manager";
@@ -44,20 +45,26 @@ import {
   normalizeName,
 } from "./calendar/utils";
 
-export function CalendarView({ active = true, gamesAllowed = true }: { active?: boolean; gamesAllowed?: boolean }) {
+export function CalendarView({
+  active = true,
+  gamesAllowed = true,
+}: {
+  active?: boolean;
+  gamesAllowed?: boolean;
+}) {
   const t = useT();
   const { settings, update } = useSettings();
   const { authKey } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const { openSettings, openMeta } = useView();
   const today = useMemo(() => new Date(), []);
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
-  const [filter, setFilter] = useState<CalendarFilter>("all");
-  const [watchlistOnly, setWatchlistOnly] = useState(false);
-  const [animeDub, setAnimeDub] = useState(false);
+  const [year, setYear] = useSessionState("calendar.year", today.getFullYear());
+  const [month, setMonth] = useSessionState("calendar.month", today.getMonth());
+  const [filter, setFilter] = useSessionState<CalendarFilter>("calendar.filter", "all");
+  const [watchlistOnly, setWatchlistOnly] = useSessionState("calendar.watchlistOnly", false);
+  const [animeDub, setAnimeDub] = useSessionState("calendar.animeDub", false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  useScrollMemory("calendar", scrollRef);
+  useScrollMemory("calendar", scrollRef, active);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState(() => {
@@ -95,7 +102,8 @@ export function CalendarView({ active = true, gamesAllowed = true }: { active?: 
     clearUnseenReminders();
   }, []);
 
-  const source = settings.calendarSource === "games" && !gamesAllowed ? "library" : settings.calendarSource;
+  const source =
+    settings.calendarSource === "games" && !gamesAllowed ? "library" : settings.calendarSource;
   const { isConnected: traktConnected } = useTrakt();
   const { isConnected: simklConnected } = useSimkl();
 
@@ -193,7 +201,14 @@ export function CalendarView({ active = true, gamesAllowed = true }: { active?: 
 
   let body: React.ReactNode;
   if (source === "games") {
-    body = <GameCalendarPanel year={year} month={month} weekStartsMonday={settings.weekStartsMonday} active={active}/>;
+    body = (
+      <GameCalendarPanel
+        year={year}
+        month={month}
+        weekStartsMonday={settings.weekStartsMonday}
+        active={active}
+      />
+    );
   } else if (source === "library" && !authKey) {
     body = <NotSignedInState onSignIn={() => setShowAuth(true)} />;
   } else if (source === "all" && !settings.tmdbKey) {
@@ -226,7 +241,10 @@ export function CalendarView({ active = true, gamesAllowed = true }: { active?: 
   }
 
   return (
-    <main data-tv-chrome-offset className={`flex h-full flex-col overflow-hidden${source === "games" ? " calendar-games-view" : ""}`}>
+    <main
+      data-tv-chrome-offset
+      className={`flex h-full flex-col overflow-hidden${source === "games" ? " calendar-games-view" : ""}`}
+    >
       <header className="shrink-0 border-b border-edge-soft px-12 pb-5 pt-24">
         <div className="flex items-end justify-between gap-6">
           <div className="flex flex-col gap-1.5">
@@ -243,7 +261,13 @@ export function CalendarView({ active = true, gamesAllowed = true }: { active?: 
               className="flex h-10 w-10 items-center justify-center rounded-full border border-edge-soft text-ink-muted transition-colors hover:border-edge hover:text-ink"
               aria-label={t("Previous month")}
             >
-              {source === "games" ? <span className="dir-icon"><NavChevron dir="left" size={16}/></span> : <ChevronLeft size={16} strokeWidth={2.2} className="dir-icon" />}
+              {source === "games" ? (
+                <span className="dir-icon">
+                  <NavChevron dir="left" size={16} />
+                </span>
+              ) : (
+                <ChevronLeft size={16} strokeWidth={2.2} className="dir-icon" />
+              )}
             </button>
             <button
               onClick={goToday}
@@ -260,14 +284,24 @@ export function CalendarView({ active = true, gamesAllowed = true }: { active?: 
               className="flex h-10 w-10 items-center justify-center rounded-full border border-edge-soft text-ink-muted transition-colors hover:border-edge hover:text-ink"
               aria-label={t("Next month")}
             >
-              {source === "games" ? <span className="dir-icon"><NavChevron dir="right" size={16}/></span> : <ChevronRight size={16} strokeWidth={2.2} className="dir-icon" />}
+              {source === "games" ? (
+                <span className="dir-icon">
+                  <NavChevron dir="right" size={16} />
+                </span>
+              ) : (
+                <ChevronRight size={16} strokeWidth={2.2} className="dir-icon" />
+              )}
             </button>
-            {source !== "games" && <><span className="mx-1 h-5 w-px bg-edge-soft" />
-            <RemindersManagerButton
-              onOpenItem={(r) =>
-                openMeta({ id: r.id, type: "series", name: r.name, poster: r.poster })
-              }
-            /></>}
+            {source !== "games" && (
+              <>
+                <span className="mx-1 h-5 w-px bg-edge-soft" />
+                <RemindersManagerButton
+                  onOpenItem={(r) =>
+                    openMeta({ id: r.id, type: "series", name: r.name, poster: r.poster })
+                  }
+                />
+              </>
+            )}
           </div>
         </div>
         <nav className="mt-6 flex flex-wrap items-center gap-3">
@@ -309,25 +343,27 @@ export function CalendarView({ active = true, gamesAllowed = true }: { active?: 
           >
             {t("Start week on Monday")}
           </button>
-          {source !== "games" && <div className="flex items-center gap-1 rounded-full border border-edge-soft bg-elevated/30 p-1">
-            {CALENDAR_POSTER_SIZES.map(({ value, label }) => {
-              const active = settings.calendarPosterSize === value;
-              return (
-                <button
-                  key={value}
-                  onClick={() => update({ calendarPosterSize: value })}
-                  aria-pressed={active}
-                  className={`rounded-full px-4 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                    active
-                      ? "bg-ink text-canvas"
-                      : "text-ink-muted hover:bg-raised/60 hover:text-ink"
-                  }`}
-                >
-                  {t(label)}
-                </button>
-              );
-            })}
-          </div>}
+          {source !== "games" && (
+            <div className="flex items-center gap-1 rounded-full border border-edge-soft bg-elevated/30 p-1">
+              {CALENDAR_POSTER_SIZES.map(({ value, label }) => {
+                const active = settings.calendarPosterSize === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => update({ calendarPosterSize: value })}
+                    aria-pressed={active}
+                    className={`rounded-full px-4 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                      active
+                        ? "bg-ink text-canvas"
+                        : "text-ink-muted hover:bg-raised/60 hover:text-ink"
+                    }`}
+                  >
+                    {t(label)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {source === "custom" && railOverlay && (
             <button
               type="button"
@@ -437,7 +473,10 @@ export function CalendarView({ active = true, gamesAllowed = true }: { active?: 
       </header>
 
       <div ref={railHostRef} className="relative flex min-h-0 flex-1">
-        <div ref={scrollRef} className="calendar-body-scroll min-w-0 flex-1 overflow-y-auto px-12 py-8">
+        <div
+          ref={scrollRef}
+          className="calendar-body-scroll min-w-0 flex-1 overflow-y-auto px-12 py-8"
+        >
           {body}
         </div>
         {source === "custom" && (

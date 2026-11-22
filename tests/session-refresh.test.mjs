@@ -82,6 +82,12 @@ function fixture(options = {}) {
   const modules = {
     "@/lib/config/endpoints": { HARBOR_API_BASE: "https://example.invalid" },
     "@/lib/safe-fetch": { safeFetch: transport },
+    "@/lib/storage-recovery": {
+      persistCritical(key, value) {
+        storage.set(key, value);
+        return true;
+      },
+    },
   };
   function load(path) {
     const source = ts.transpileModule(readFileSync(path, "utf8"), {

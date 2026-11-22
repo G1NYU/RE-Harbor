@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
+import type { LiveScrobbleResolution } from "@/lib/identity/use-live-scrobble";
 import { useSimkl } from "./provider";
 import { simklScrobble, buildBody, type ScrobbleInfo } from "./scrobble";
+import { animeIdentity } from "./scrobble-body";
 import { recordPendingWatch } from "./pending-sync";
 import { recordWatchedFallback } from "./record-watched";
 import { getPlaybackPosition } from "@/lib/player/playback-clock";
@@ -27,6 +29,30 @@ type LastAction = "start" | "pause" | "stop" | null;
 const STUB_MAX_SEC = 150;
 const WATCHED_MARK_PCT = SIMKL_WATCHED_RATIO * 100;
 
+/** Persist native ownership so retries cannot target the parent catalog row. */
+function queueWatch(
+  metaId: string,
+  episode: PlayerSrc["episode"],
+  info: ScrobbleInfo | undefined,
+  verifiedOnly: boolean,
+): void {
+  if (!verifiedOnly) {
+    recordPendingWatch(metaId, episode, info?.imdb);
+    return;
+  }
+  const owner = animeIdentity(episode);
+  if (!owner || !Number.isSafeInteger(owner.number) || owner.number! < 1) return;
+  const nativeId = `${owner.scheme}:${owner.id}`;
+  recordPendingWatch(nativeId, {
+    season: 1,
+    episode: owner.number!,
+    sourceMetaId: nativeId,
+    ...(episode?.kitsuStreamId?.startsWith(`${nativeId}:`)
+      ? { kitsuStreamId: episode.kitsuStreamId }
+      : {}),
+  });
+}
+
 function srcInfo(src: PlayerSrc): ScrobbleInfo {
   const raw = src.meta.releaseInfo ? String(src.meta.releaseInfo).slice(0, 4) : "";
   const year = raw ? Number(raw) : NaN;
@@ -37,10 +63,14 @@ function srcInfo(src: PlayerSrc): ScrobbleInfo {
   };
 }
 
-export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }): void {
+export function useSimklScrobble({
+  src, snap, liveScrobble = { phase: "off", proof: null },
+}: { src: PlayerSrc; snap: Snap; liveScrobble?: LiveScrobbleResolution }): void {
   const { isConnected } = useSimkl();
   const { settings } = useSettings();
-  const enabled = isConnected && settings.simklScrobbleEnabled;
+  const enabled = isConnected && settings.simklScrobbleEnabled &&
+    liveScrobble.phase !== "resolving";
+  const verifiedOnly = liveScrobble.proof != null;
   const lastActionRef = useRef<LastAction>(null);
   const lastKeyRef = useRef<string | null>(null);
   const infoRef = useRef<ScrobbleInfo>(srcInfo(src));
@@ -49,6 +79,8 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
     metaId: src.meta.id,
     episode: src.episode,
     info: infoRef.current,
+    verifiedOnly,
+    enabled,
   });
   const progressRef = useRef(0);
   const loadResetSeenRef = useRef(true);
@@ -56,10 +88,18 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
   const metaId = src.meta.id;
   const season = src.episode?.season;
   const episode = src.episode?.episode;
-  const key = `${metaId}|${season ?? ""}|${episode ?? ""}`;
+  const episodeKey = `${metaId}|${season ?? ""}|${episode ?? ""}`;
+  // The native proof is a session dimension even when catalog coordinates
+  // stay unchanged. Close the previous owner before opening another one.
+  const proofKey = liveScrobble.phase === "resolving" ? "resolving"
+    : liveScrobble.proof
+      ? `${liveScrobble.proof.work.entryId}:${liveScrobble.proof.work.entryEpisode}`
+      : liveScrobble.phase;
+  const key = `${episodeKey}|${proofKey}`;
+  const prevEpisodeKeyRef = useRef(episodeKey);
 
-  const stopArgsRef = useRef({ metaId, episode: src.episode, snap, info: infoRef.current });
-  stopArgsRef.current = { metaId, episode: src.episode, snap, info: infoRef.current };
+  const stopArgsRef = useRef({ metaId, episode: src.episode, snap, info: infoRef.current, verifiedOnly });
+  stopArgsRef.current = { metaId, episode: src.episode, snap, info: infoRef.current, verifiedOnly };
 
   useEffect(() => {
     if (!enabled) return;
@@ -72,7 +112,7 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
       const action = progress >= WATCHED_MARK_PCT ? "stop" : "pause";
       sendBeacon(a.metaId, a.episode, action === "stop" ? 100 : progress, action, a.info);
       if (action === "stop") {
-        recordPendingWatch(a.metaId, a.episode, a.info?.imdb);
+        queueWatch(a.metaId, a.episode, a.info, a.verifiedOnly);
       }
       lastActionRef.current = action;
     };
@@ -84,23 +124,30 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
     if (lastKeyRef.current && lastKeyRef.current !== key) {
       const prev = prevIdentityRef.current;
       const prevProgress = progressRef.current;
-      if (enabled && lastActionRef.current !== "stop") {
+      // Closing the previous episode must still happen while Stage 1 is
+      // resolving the next episode (which temporarily disables new writes).
+      if (prev.enabled && lastActionRef.current !== "stop") {
         if (prevProgress >= WATCHED_MARK_PCT) {
           sendBeacon(prev.metaId, prev.episode, 100, "stop", prev.info);
-          void recordWatchedFallback(prev.metaId, prev.episode, prev.info).then((ok) => {
-            if (!ok) recordPendingWatch(prev.metaId, prev.episode, prev.info?.imdb);
+          void recordWatchedFallback(
+            prev.metaId, prev.episode, prev.info, prev.verifiedOnly,
+          ).then((ok) => {
+            if (!ok) queueWatch(prev.metaId, prev.episode, prev.info, prev.verifiedOnly);
           });
-        } else if (prevProgress > 0) {
-          void simklScrobble("pause", prev.metaId, prev.episode, prevProgress, prev.info);
+        } else if (prevProgress > 0 || lastActionRef.current === "start" ||
+                   lastActionRef.current === "pause") {
+          void simklScrobble("pause", prev.metaId, prev.episode, prevProgress, prev.info, prev.verifiedOnly);
         }
       }
       lastActionRef.current = null;
       progressRef.current = 0;
-      loadResetSeenRef.current = false;
+      // Re-verifying the same episode does not trigger a player load event.
+      loadResetSeenRef.current = prevEpisodeKeyRef.current === episodeKey;
     }
     lastKeyRef.current = key;
-    prevIdentityRef.current = { metaId, episode: src.episode, info: infoRef.current };
-  }, [enabled, key, metaId, src.episode]);
+    prevEpisodeKeyRef.current = episodeKey;
+    prevIdentityRef.current = { metaId, episode: src.episode, info: infoRef.current, verifiedOnly, enabled };
+  }, [enabled, key, episodeKey, metaId, src.episode]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -120,8 +167,8 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
         if (endPct >= WATCHED_MARK_PCT) {
           const ep = src.episode;
           const info = infoRef.current;
-          void recordWatchedFallback(metaId, ep, info).then((ok) => {
-            if (!ok) recordPendingWatch(metaId, ep, info?.imdb);
+          void recordWatchedFallback(metaId, ep, info, verifiedOnly).then((ok) => {
+            if (!ok) queueWatch(metaId, ep, info, verifiedOnly);
           });
         }
         lastActionRef.current = "stop";
@@ -139,10 +186,10 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
     if (lastActionRef.current === "stop") return;
 
     if (snap.status === "playing" && lastActionRef.current !== "start") {
-      void simklScrobble("start", metaId, src.episode, progress, infoRef.current);
+      void simklScrobble("start", metaId, src.episode, progress, infoRef.current, verifiedOnly);
       lastActionRef.current = "start";
     } else if (snap.status === "paused" && lastActionRef.current === "start") {
-      void simklScrobble("pause", metaId, src.episode, progress, infoRef.current);
+      void simklScrobble("pause", metaId, src.episode, progress, infoRef.current, verifiedOnly);
       lastActionRef.current = "pause";
     }
   }, [enabled, metaId, src.episode, snap.status, snap.durationSec]);
@@ -166,7 +213,7 @@ export function useSimklScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
         const action = progress >= WATCHED_MARK_PCT ? "stop" : "pause";
         sendBeacon(a.metaId, a.episode, action === "stop" ? 100 : progress, action, a.info);
         if (action === "stop") {
-          recordPendingWatch(a.metaId, a.episode, a.info?.imdb);
+          queueWatch(a.metaId, a.episode, a.info, a.verifiedOnly);
         }
         lastActionRef.current = action;
       } else {

@@ -20,6 +20,13 @@ export type MusicAudioMeterState = {
 };
 const OFF: MusicAudioMeterState = { status: "off", data: null };
 
+/**
+ * Native snapshots carry 50 ms windows. Reading them at 100 ms samples every other window and
+ * halves the IPC a live meter costs; the widget transitions between readings, so the meter and
+ * the visualizer read the same value either way.
+ */
+const POLL_MS = 100;
+
 export function normalizeMusicMeter(value: MusicMeterSnapshot | null): MusicMeterSnapshot | null {
   if (!value || typeof value.trackId !== "string" || !Array.isArray(value.channels)) return null;
   const channels = value.channels
@@ -106,7 +113,7 @@ export function createMusicMeterMonitor(call: NativeInvoke = invoke) {
   const poll = async (ticket: number) => {
     if (!users || ticket !== generation) return;
     const started = performance.now();
-    let delay = 50;
+    let delay = POLL_MS;
     try {
       if (!attached) {
         const enabling = changes.then(async () => {
@@ -136,10 +143,9 @@ export function createMusicMeterMonitor(call: NativeInvoke = invoke) {
       if (changedTrack || ((!data?.channels.length || missingSpectrum) && Date.now() >= repairAt))
         attached = false;
       publish({ status: data?.channels.length ? "ready" : "unavailable", data });
-      // The native analysis produces 50 ms windows. Include IPC time in that
-      // cadence instead of adding another 50 ms after every completed read.
-      // Reads remain serial, with breathing room when the native call is slow.
-      delay = Math.max(8, 50 - (performance.now() - started));
+      // Include IPC time in the poll cadence instead of adding the full interval after every
+      // completed read. Reads remain serial, with breathing room when the native call is slow.
+      delay = Math.max(8, POLL_MS - (performance.now() - started));
     } catch {
       if (!users || ticket !== generation) return;
       attached = false;

@@ -1,6 +1,13 @@
+import { addonOnlyMetadata, useTmdbTopMatch } from "@/lib/metadata-policy";
 import { animeCatalogRequest } from "./providers/anime-catalog-client";
 import { effectiveTmdbLanguage, get } from "@/lib/providers/tmdb/tmdb-client";
-import { movieMeta, seriesMeta, type Page, type RawMovie, type RawSeries } from "@/lib/providers/tmdb/tmdb-meta-mappers";
+import {
+  movieMeta,
+  seriesMeta,
+  type Page,
+  type RawMovie,
+  type RawSeries,
+} from "@/lib/providers/tmdb/tmdb-meta-mappers";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/feed/tags";
 import type { Meta } from "@/lib/cinemeta";
 import type { AddonResultGroup } from "@/lib/search-addons";
@@ -11,6 +18,7 @@ import { arabicAwareMatch } from "@/lib/iptv/rtl";
 import { loadStoredSettings } from "@/lib/settings/load";
 import { safeFetch } from "@/lib/safe-fetch";
 import { anilistAnimeSearch } from "@/lib/anilist/browse";
+import { settleSearchSource } from "./search-request-guard";
 import type { MangaSummary } from "@/lib/manga/model";
 import type { CharacterHit } from "@/lib/anilist/character";
 import type { EBook } from "@/lib/ebook/api";
@@ -71,7 +79,14 @@ export type AnimeHit = {
 
 export type SearchResults = {
   query: string;
-  topMatch: { kind: "movie" | "series"; meta: Meta; popularity: number; backdrop?: string; overview?: string; voteAverage?: number } | null;
+  topMatch: {
+    kind: "movie" | "series";
+    meta: Meta;
+    popularity: number;
+    backdrop?: string;
+    overview?: string;
+    voteAverage?: number;
+  } | null;
   people: SearchPerson[];
   movies: Meta[];
   series: Meta[];
@@ -138,11 +153,18 @@ type JikanAnime = {
   score?: number;
 };
 
-async function jikanAnimeSearch(query: string, limit: number): Promise<AnimeHit[]> {
+async function jikanAnimeSearch(
+  query: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<AnimeHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   try {
-    const data = await animeCatalogRequest<JikanAnime[]>(`/anime?q=${encodeURIComponent(q)}&order_by=popularity&sort=asc&limit=${limit}&sfw=true`);
+    const data = await animeCatalogRequest<JikanAnime[]>(
+      `/anime?q=${encodeURIComponent(q)}&order_by=popularity&sort=asc&limit=${limit}&sfw=true`,
+      signal,
+    );
     return (data.data ?? []).map((a) => {
       const year = a.year ?? (a.aired?.from ? Number(a.aired.from.slice(0, 4)) : null);
       const name = a.title_english?.trim() || a.title?.trim() || "Untitled";
@@ -176,12 +198,16 @@ type KitsuSearchDatum = {
   };
 };
 
-async function kitsuAnimeSearch(query: string, limit: number): Promise<AnimeHit[]> {
+async function kitsuAnimeSearch(
+  query: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<AnimeHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   try {
     const url = `https://kitsu.io/api/edge/anime?filter%5Btext%5D=${encodeURIComponent(q)}&page%5Blimit%5D=${limit}&sort=-userCount`;
-    const res = await safeFetch(url, { headers: { Accept: "application/vnd.api+json" } });
+    const res = await safeFetch(url, { headers: { Accept: "application/vnd.api+json" }, signal });
     if (!res.ok) return [];
     const data = (await res.json()) as { data?: KitsuSearchDatum[] };
     return (data.data ?? []).map((a) => {
@@ -203,17 +229,19 @@ async function kitsuAnimeSearch(query: string, limit: number): Promise<AnimeHit[
   }
 }
 
-function withSearchTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-}
-
-export async function searchAnime(query: string, limit = 8): Promise<AnimeHit[]> {
+export async function searchAnime(
+  query: string,
+  limit = 8,
+  signal?: AbortSignal,
+): Promise<AnimeHit[]> {
+  signal?.throwIfAborted();
+  if (addonOnlyMetadata()) return [];
   const q = query.trim();
   if (q.length < 2) return [];
   const [anilist, jikan, kitsu] = await Promise.all([
-    withSearchTimeout(anilistAnimeSearch(q, limit).catch(() => []), 1500, []),
-    withSearchTimeout(jikanAnimeSearch(q, limit).catch(() => []), 1200, []),
-    withSearchTimeout(kitsuAnimeSearch(q, limit).catch(() => []), 3000, []),
+    settleSearchSource(anilistAnimeSearch(q, limit, signal), [], 1500, signal),
+    settleSearchSource(jikanAnimeSearch(q, limit, signal), [], 1200, signal),
+    settleSearchSource(kitsuAnimeSearch(q, limit, signal), [], 3000, signal),
   ]);
   const out: AnimeHit[] = [];
   const seenMal = new Set<number>();
@@ -245,12 +273,19 @@ export async function searchAnime(query: string, limit = 8): Promise<AnimeHit[]>
   return out.slice(0, limit);
 }
 
-export async function searchCinemeta(query: string): Promise<{ movies: Meta[]; series: Meta[] }> {
+export async function searchCinemeta(
+  query: string,
+  signal?: AbortSignal,
+): Promise<{ movies: Meta[]; series: Meta[] }> {
+  signal?.throwIfAborted();
+  if (addonOnlyMetadata()) return { movies: [], series: [] };
   const q = query.trim();
   if (q.length < 2) return { movies: [], series: [] };
   const fetchKind = async (type: "movie" | "series"): Promise<Meta[]> => {
     const url = `https://v3-cinemeta.strem.io/catalog/${type}/top/search=${encodeURIComponent(q)}.json`;
-    const res = await safeFetch(url, { headers: { Accept: "application/json" } }).catch(() => null);
+    const res = await safeFetch(url, { headers: { Accept: "application/json" }, signal }).catch(
+      () => null,
+    );
     if (!res || !res.ok) return [];
     const data = (await res.json().catch(() => null)) as { metas?: Meta[] } | null;
     return (data?.metas ?? []).slice(0, 12);
@@ -262,21 +297,76 @@ export async function searchCinemeta(query: string): Promise<{ movies: Meta[]; s
 export async function searchAll(
   key: string,
   query: string,
-  opts: { excludeGenres?: number[] } = {},
+  opts: { excludeGenres?: number[]; topMatchOnly?: boolean; signal?: AbortSignal } = {},
 ): Promise<SearchResults> {
+  const { signal } = opts;
+  signal?.throwIfAborted();
   const trimmed = query.trim();
   if (!trimmed) {
-    return { query: "", topMatch: null, people: [], movies: [], series: [], liveTv: [], anime: [], manga: [], music: [], ebooks: [], sports: [], characters: [], addonGroups: [], addons: [], intent: null };
+    return {
+      query: "",
+      topMatch: null,
+      people: [],
+      movies: [],
+      series: [],
+      liveTv: [],
+      anime: [],
+      manga: [],
+      music: [],
+      ebooks: [],
+      sports: [],
+      characters: [],
+      addonGroups: [],
+      addons: [],
+      intent: null,
+    };
   }
-  if (!key) {
-    return { query: trimmed, topMatch: null, people: [], movies: [], series: [], liveTv: [], anime: [], manga: [], music: [], ebooks: [], sports: [], characters: [], addonGroups: [], addons: [], intent: detectIntent(trimmed) };
+  const topMatchOnly = opts.topMatchOnly === true && useTmdbTopMatch();
+  if (!key || (addonOnlyMetadata() && !topMatchOnly)) {
+    return {
+      query: trimmed,
+      topMatch: null,
+      people: [],
+      movies: [],
+      series: [],
+      liveTv: [],
+      anime: [],
+      manga: [],
+      music: [],
+      ebooks: [],
+      sports: [],
+      characters: [],
+      addonGroups: [],
+      addons: [],
+      intent: detectIntent(trimmed),
+    };
   }
 
-  const data = await get<Page<MultiItem>>(key, "search/multi", {
-    query: trimmed,
-    include_adult: "false",
-    ...(loadStoredSettings().translateTitles ? {} : { language: "en-US" }),
-  });
+  const language = effectiveTmdbLanguage();
+  const metaBase = language.split("-")[0]?.toLowerCase() ?? "";
+  const metadataLanguage = language || "en";
+  const translateTitles = loadStoredSettings().translateTitles;
+  const params = { query: trimmed, include_adult: "false" };
+  const localized = get<Page<MultiItem>>(
+    key,
+    "search/multi",
+    {
+      ...params,
+      ...(translateTitles ? {} : { language: "en-US" }),
+    },
+    { searchTopMatch: topMatchOnly, signal },
+  );
+  const english =
+    translateTitles && metaBase && metaBase !== "en"
+      ? get<Page<MultiItem>>(
+          key,
+          "search/multi",
+          { ...params, language: "en-US" },
+          { searchTopMatch: topMatchOnly, signal },
+        ).catch(() => null)
+      : null;
+  const data = await localized;
+  signal?.throwIfAborted();
   if (!data) {
     return {
       query: trimmed,
@@ -294,22 +384,13 @@ export async function searchAll(
       addonGroups: [],
       addons: [],
       intent: detectIntent(trimmed),
-      tmdbUnavailable: true,
+      tmdbUnavailable: !topMatchOnly,
     };
   }
-  const metaBase = effectiveTmdbLanguage().split("-")[0]?.toLowerCase() ?? "";
   let enNameById: Map<number, string> | null = null;
-  if (
-    loadStoredSettings().translateTitles &&
-    metaBase !== "" &&
-    metaBase !== "en" &&
-    metaBase !== "ja"
-  ) {
-    const en = await get<Page<MultiItem>>(key, "search/multi", {
-      query: trimmed,
-      include_adult: "false",
-      language: "en-US",
-    });
+  if (english) {
+    const en = await english;
+    signal?.throwIfAborted();
     if (en?.results) {
       enNameById = new Map();
       for (const r of en.results) {
@@ -337,14 +418,14 @@ export async function searchAll(
 
   for (const r of results) {
     if (r.media_type === "movie" && r.poster_path) {
-      movies.push(movieMeta(r, enNameById?.get(r.id)));
+      movies.push(movieMeta(r, enNameById?.get(r.id), metadataLanguage));
       const pop = r.popularity ?? 0;
       if (pop > topPop) {
         topRaw = r;
         topPop = pop;
       }
     } else if (r.media_type === "tv" && r.poster_path) {
-      series.push(seriesMeta(r, enNameById?.get(r.id)));
+      series.push(seriesMeta(r, enNameById?.get(r.id), metadataLanguage));
       const pop = r.popularity ?? 0;
       if (pop > topPop) {
         topRaw = r;
@@ -352,7 +433,10 @@ export async function searchAll(
       }
     } else if (r.media_type === "person") {
       const known = (r.known_for ?? [])
-        .map((k) => (k as { title?: string; name?: string }).title ?? (k as { name?: string }).name ?? "")
+        .map(
+          (k) =>
+            (k as { title?: string; name?: string }).title ?? (k as { name?: string }).name ?? "",
+        )
         .filter(Boolean)
         .slice(0, 2)
         .join(", ");
@@ -367,10 +451,11 @@ export async function searchAll(
   }
 
   if (
+    !topMatchOnly &&
     trimmed.split(/\s+/).length >= 2 &&
     (people.length >= 1 || (movies.length === 0 && series.length === 0))
   ) {
-    await fuzzyPeopleFallback(key, trimmed, people);
+    await fuzzyPeopleFallback(key, trimmed, people, signal);
   }
 
   people.sort((a, b) => b.popularity - a.popularity);
@@ -382,10 +467,12 @@ export async function searchAll(
     topMatch = {
       kind: isMovie ? "movie" : "series",
       meta: isMovie
-        ? movieMeta(winner as RawMovie, enNameById?.get(winner.id))
-        : seriesMeta(winner as RawSeries, enNameById?.get(winner.id)),
+        ? movieMeta(winner as RawMovie, enNameById?.get(winner.id), metadataLanguage)
+        : seriesMeta(winner as RawSeries, enNameById?.get(winner.id), metadataLanguage),
       popularity: winner.popularity ?? 0,
-      backdrop: winner.backdrop_path ? `https://image.tmdb.org/t/p/w1280${winner.backdrop_path}` : undefined,
+      backdrop: winner.backdrop_path
+        ? `https://image.tmdb.org/t/p/w1280${winner.backdrop_path}`
+        : undefined,
       overview: winner.overview,
       voteAverage: winner.vote_average,
     };
@@ -394,9 +481,9 @@ export async function searchAll(
   return {
     query: trimmed,
     topMatch,
-    people: people.slice(0, 10),
-    movies: movies.slice(0, 12),
-    series: series.slice(0, 12),
+    people: topMatchOnly ? [] : people.slice(0, 10),
+    movies: topMatchOnly ? [] : movies.slice(0, 12),
+    series: topMatchOnly ? [] : series.slice(0, 12),
     liveTv: [],
     anime: [],
     manga: [],
@@ -440,24 +527,29 @@ async function fuzzyPeopleFallback(
   key: string,
   query: string,
   people: SearchPerson[],
+  signal?: AbortSignal,
 ): Promise<void> {
   const token = query
     .split(/\s+/)
     .filter((t) => t.length >= 3)
     .sort((a, b) => b.length - a.length)[0];
   if (!token) return;
-  const extra = await get<Page<RawPerson>>(key, "search/person", {
-    query: token,
-    include_adult: "false",
-    language: "en-US",
-  }).catch(() => null);
+  const extra = await get<Page<RawPerson>>(
+    key,
+    "search/person",
+    { query: token, include_adult: "false", language: "en-US" },
+    { signal },
+  ).catch(() => null);
   if (!extra?.results) return;
   const seen = new Set(people.map((p) => p.id));
   for (const r of extra.results) {
     if (seen.has(r.id) || !nameCloseTo(r.name, query)) continue;
     seen.add(r.id);
     const known = (r.known_for ?? [])
-      .map((k) => (k as { title?: string; name?: string }).title ?? (k as { name?: string }).name ?? "")
+      .map(
+        (k) =>
+          (k as { title?: string; name?: string }).title ?? (k as { name?: string }).name ?? "",
+      )
       .filter(Boolean)
       .slice(0, 2)
       .join(", ");

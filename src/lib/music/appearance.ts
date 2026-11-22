@@ -19,6 +19,7 @@ type Appearance = {
   gifTiming: GifTiming;
   visualizerMotion: boolean;
   immersive: boolean;
+  theatre: boolean;
 };
 function read(): Appearance {
   try {
@@ -32,13 +33,17 @@ function read(): Appearance {
       gifVisualizer: value.gifVisualizer === true,
       gifId: typeof value.gifId === "string" ? value.gifId : null,
       gifName: typeof value.gifName === "string" ? value.gifName : "",
-      gifSize: typeof value.gifSize === "number" && Number.isFinite(value.gifSize) ? Math.max(64, Math.min(220, value.gifSize)) : 126,
+      gifSize:
+        typeof value.gifSize === "number" && Number.isFinite(value.gifSize)
+          ? Math.max(64, Math.min(220, value.gifSize))
+          : 126,
       gifTiming: normalizeGifTiming(value.gifTiming),
       visualizerMotion: value.visualizerMotion === true,
       immersive: value.immersive === true,
+      theatre: value.theatre === true,
     };
   } catch {
-    return { artworkColors: true, levels: true, dockVisualizer: false, mikuVisualizer: false, mikuModel: DEFAULT_MIKU_MODEL, gifVisualizer: false, gifId: null, gifName: "", gifSize: 126, gifTiming: "auto", visualizerMotion: false, immersive: false };
+    return { artworkColors: true, levels: true, dockVisualizer: false, mikuVisualizer: false, mikuModel: DEFAULT_MIKU_MODEL, gifVisualizer: false, gifId: null, gifName: "", gifSize: 126, gifTiming: "auto", visualizerMotion: false, immersive: false, theatre: false };
   }
 }
 let appearance = read();
@@ -46,7 +51,11 @@ const listeners = new Set<() => void>();
 const APPEARANCE_CHANNEL = "harbor://music-appearance";
 
 subscribeWindowState<Appearance>(APPEARANCE_CHANNEL, (value) => {
-  appearance = { ...appearance, ...value, mikuModel: normalizeMikuModel(value?.mikuModel ?? appearance.mikuModel) };
+  appearance = {
+    ...appearance,
+    ...value,
+    mikuModel: normalizeMikuModel(value?.mikuModel ?? appearance.mikuModel),
+  };
   listeners.forEach((listener) => listener());
 });
 

@@ -66,11 +66,18 @@ export const TOP_GROUPS: TopGroup[] = [
     children: ["hotkeys", "controllers", "remotes", "tv", "bigPicture"],
   },
   {
+    id: "notifications",
+    section: "NOTIFICATIONS",
+    label: "Notifications",
+    sub: "Choose how Harbor lets you know about messages and upcoming releases.",
+    children: ["dmNotifications", "webhooks"],
+  },
+  {
     id: "system",
     section: "SYSTEM",
     label: "System",
     sub: "Storage, automation, and the settings most people never need.",
-    children: ["storage", "webhooks", "advanced"],
+    children: ["storage", "advanced"],
   },
   {
     id: "help",

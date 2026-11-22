@@ -391,6 +391,8 @@ const surfaces: Record<string, string> = {
   "Jump to spread": "Перейти к развороту",
   "Jump to page": "Перейти к странице",
   "Go to pages {pages}": "Перейти к страницам {pages}",
+  "Episode pages": "Страницы эпизодов",
+  "Go to page": "Перейти к странице",
   "Go to page {page}": "Перейти к странице {page}",
   "Zoom controls, {percent} percent": "Управление масштабом, {percent} процентов",
   "Close zoom controls": "Закрыть управление масштабом",

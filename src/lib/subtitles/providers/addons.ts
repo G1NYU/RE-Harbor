@@ -1,3 +1,4 @@
+import { addonBaseUrl, addonResourceUrl } from "@/lib/addon-url";
 import { addonAccepts, type Addon } from "@/lib/addons";
 import { isLocalNetworkUrl } from "@/lib/local-network";
 import { safeFetch as fetch, safeFetchLocal } from "@/lib/safe-fetch";
@@ -33,7 +34,7 @@ type RawAddonSub = ProviderSubtitleFlags & {
 };
 
 function transportBase(transportUrl: string): string {
-  return transportUrl.replace(/\/manifest\.json$/i, "").replace(/\/$/, "");
+  return addonBaseUrl(transportUrl);
 }
 
 function contentId(q: SubSearchQuery): string | null {
@@ -118,7 +119,7 @@ async function callOne(
   timeoutMs: number,
 ): Promise<RawAddonSub[]> {
   const base = transportBase(addon.transportUrl);
-  const url = `${base}/subtitles/${type}/${id}${extra}.json`;
+  const url = addonResourceUrl(base, `subtitles/${type}/${id}${extra}.json`);
   // A self-hosted addon lives on loopback, which the guarded bridge fetch
   // rejects outright ("blocked internal target"). Only a URL the user installed
   // themselves opts into local networking, so public addons keep the
@@ -140,7 +141,7 @@ async function callOne(
 
     const elapsed = Date.now() - startedAt;
     const remaining = Math.max(1_000, timeoutMs - elapsed);
-    const bareUrl = `${base}/subtitles/${type}/${id}.json`;
+    const bareUrl = addonResourceUrl(base, `subtitles/${type}/${id}.json`);
     dlog(`[addons] ${addon.manifest.name} retrying without stream hints`);
     return await withSubtitleTimeout(
       fetchAddonSubtitles(bareUrl, addon.manifest.name, doFetch),
@@ -166,7 +167,7 @@ export async function searchAddons(
     return [];
   }
 
-  const type = q.type ?? (q.season != null && q.episode != null ? "series" : "movie");
+  const type = q.episode != null ? "series" : (q.type ?? "movie");
   dlog(
     `[addons] Candidate IDs: ${(q.candidateIds ?? []).join(", ") || "(none)"}, fallback: ${fallbackId}, Type: ${type}`,
   );
@@ -193,8 +194,29 @@ export async function searchAddons(
   const extra = extraSegment(q);
   const settled = await Promise.all(
     targets.map(async ({ addon, id }) => {
+      // Broad manifests often accept Kitsu even though the server only indexes
+      // IMDb. An empty first response must not hide the mapped episode fallback.
+      const alternatives = [...new Set([id, ...(q.candidateIds ?? [])])]
+        .filter(
+          (candidate) => candidate === id || addonAccepts(addon, "subtitles", type, candidate),
+        )
+        .sort(
+          (a, b) =>
+            (a === id ? -1 : a.startsWith("tt") ? 0 : 1) -
+            (b === id ? -1 : b.startsWith("tt") ? 0 : 1),
+        )
+        .slice(0, 3);
+      const deadline = Date.now() + timeoutMs;
       const result = await withSubtitleTimeout(
-        callOne(addon, type, id, extra, timeoutMs),
+        (async () => {
+          for (const candidate of alternatives) {
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) break;
+            const subtitles = await callOne(addon, type, candidate, extra, remaining);
+            if (subtitles.length > 0) return subtitles;
+          }
+          return [];
+        })(),
         timeoutMs,
         [],
       );

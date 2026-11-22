@@ -6,25 +6,30 @@ import { SeekBarVisual } from "@/components/player/transport/seek-bar-visual";
 import { useSettings, type Settings } from "@/lib/settings";
 import { ColorPopoverTrigger } from "../color-picker";
 import { ROW_ACTION, SettingGroup, SettingRow } from "../kit";
-import { ToggleRow } from "../shared";
+import { ToggleRow, ExtLink, KeyField } from "../shared";
 import { ChoiceBlock } from "./choice";
 import { SeekImageUpload, openSeekImageDialog } from "./seek-image-upload";
 import { useT } from "@/lib/i18n";
 import { PreviewImage } from "../preview-image";
 
-const STYLES: Array<{ id: "flat" | "glass" | "pinstripe" | "rainbow"; label: string; sub: string }> = [
+const STYLES: Array<{
+  id: "flat" | "glass" | "pinstripe" | "rainbow";
+  label: string;
+  sub: string;
+}> = [
   { id: "flat", label: "Flat", sub: "Solid fill, no texture. Cleanest baseline." },
   { id: "glass", label: "Glass", sub: "Subtle Apple-like sheen on the filled portion." },
   { id: "pinstripe", label: "Pinstripe", sub: "Diagonal stripes across the fill, retro vibe." },
   { id: "rainbow", label: "Rainbow", sub: "Six horizontal stripes. Pairs with nyan cat dot." },
 ];
 
-const SHAPES: Array<{ id: "circle" | "square" | "image" | "hidden"; label: string; sub: string }> = [
-  { id: "circle", label: "Circle", sub: "The default round dot." },
-  { id: "square", label: "Square", sub: "Rounded square in the same color." },
-  { id: "image", label: "Custom image", sub: "PNG, GIF, WebP, or SVG. Animated GIFs play." },
-  { id: "hidden", label: "Hidden", sub: "No dot, just the bar." },
-];
+const SHAPES: Array<{ id: "circle" | "square" | "image" | "hidden"; label: string; sub: string }> =
+  [
+    { id: "circle", label: "Circle", sub: "The default round dot." },
+    { id: "square", label: "Square", sub: "Rounded square in the same color." },
+    { id: "image", label: "Custom image", sub: "PNG, GIF, WebP, or SVG. Animated GIFs play." },
+    { id: "hidden", label: "Hidden", sub: "No dot, just the bar." },
+  ];
 
 const PRESET_COLORS = [
   "",
@@ -45,6 +50,7 @@ const SLIDER_VALUE = "w-[64px] shrink-0 text-end text-[15.5px] tabular-nums text
 export function SeekBarPanel() {
   const t = useT();
   const { settings, update } = useSettings();
+  const [seekrDraft, setSeekrDraft] = useState(settings.seekrApiKey);
 
   const heightVal = settings.seekBarHeight ?? 6;
   const dotVal = settings.seekDotSize ?? 16;
@@ -62,6 +68,23 @@ export function SeekBarPanel() {
         )}
         value={settings.seekPreviewEnabled}
         onChange={(v) => update({ seekPreviewEnabled: v })}
+      />
+
+      <KeyField
+        label={t("Seekr · preview thumbnails")}
+        placeholder={t("sk_live_…")}
+        value={seekrDraft}
+        onChange={setSeekrDraft}
+        onSave={() => update({ seekrApiKey: seekrDraft.trim() })}
+        saved={Boolean(settings.seekrApiKey)}
+        help={
+          <>
+            {t(
+              "Optional. Paste your own free Seekr API key to show Seekr's preview thumbnails first and fall back to local FFmpeg trickplay when Seekr has no match. Leave it blank to use local previews only.",
+            )}{" "}
+            <ExtLink href="https://seekr.tv/join">{t("Get a key at seekr.tv")}</ExtLink>.
+          </>
+        }
       />
 
       <Preview settings={settings} />

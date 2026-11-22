@@ -9,8 +9,13 @@ import { sameMusicTrack } from "../src/lib/music/track-identity";
 import type { MusicTrack } from "../src/lib/music/types";
 
 const spotify: MusicTrack = {
-  id: "spotify:track:one", connectorId: "spotify", title: "One", artist: "Artist",
-  artwork: "", durationSeconds: 180, durationLabel: "3:00",
+  id: "spotify:track:one",
+  connectorId: "spotify",
+  title: "One",
+  artist: "Artist",
+  artwork: "",
+  durationSeconds: 180,
+  durationLabel: "3:00",
 };
 const alternative: MusicTrack = { ...spotify, id: "soundcloud:one", connectorId: "soundcloud" };
 
@@ -36,12 +41,24 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
   const refreshes: boolean[] = [];
   let lookups = 0;
   const scope = {
-    state, queueTrackKey, shouldResolvePreferredSource, adoptRequestedIdentity, sameMusicTrack,
-    initializeMusic: async () => {}, cancelMusicQueueAutomation: () => {},
+    state,
+    queueTrackKey,
+    shouldResolvePreferredSource,
+    adoptRequestedIdentity,
+    sameMusicTrack,
+    initializeMusic: async () => {},
+    cancelMusicQueueAutomation: () => {},
+    musicPlayerWasClosed: () => false,
+    setMusicPlayerClosed: () => {},
     publish: (patch: unknown) => Object.assign(state, patch),
-    beginMusicQueue: () => {}, resetMusicOrder: () => {},
-    pinSourceFor: () => {}, peekPinnedSource: () => null,
-    rankByExplicitness: (candidates: unknown[]) => candidates, explicitnessOf: () => 0,
+    clearSpotifyStartupWatchdog: () => {},
+    armSpotifyStartupWatchdog: () => {},
+    beginMusicQueue: () => {},
+    resetMusicOrder: () => {},
+    pinSourceFor: () => {},
+    peekPinnedSource: () => null,
+    rankByExplicitness: (candidates: unknown[]) => candidates,
+    explicitnessOf: () => 0,
     musicPlaybackSourceAllowed: () => true,
     readMusicPreference: () => null, clampMusicVolume: (volume: number) => volume,
     sourcesFor: async (_track: MusicTrack, _ttl?: number, refresh?: boolean) => {
@@ -69,7 +86,10 @@ function fixture(failImmediately = false, exhaustedCache = false, failure = "Spo
 
 test("an explicitly selected Spotify source reports immediate failure without switching providers", async () => {
   const h = fixture(true);
-  await assert.rejects(h.play(spotify, [spotify], undefined, false, false, true), /Spotify unavailable/);
+  await assert.rejects(
+    h.play(spotify, [spotify], undefined, false, false, true),
+    /Spotify unavailable/,
+  );
   assert.deepEqual(h.attempts, [spotify]);
   assert.equal(h.lookups(), 0);
   assert.equal(h.state.current?.connectorId, "spotify");
@@ -82,7 +102,7 @@ test("an explicitly selected source also stays selected when its engine fails la
   const h = fixture();
   await h.play(spotify, [spotify], undefined, false, false, true);
   h.failLater("Spotify session ended");
-  await new Promise(resolve => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(h.attempts, [spotify]);
   assert.equal(h.lookups(), 0);
   assert.equal(h.state.phase, "error");
@@ -93,7 +113,10 @@ test("automatic playback still recovers and a new request clears the manual sour
   const h = fixture(true);
   await assert.rejects(h.play(spotify, [spotify], undefined, false, false, true));
   await h.play(spotify);
-  assert.deepEqual(h.attempts.map(track => track.connectorId), ["spotify", "spotify", "soundcloud"]);
+  assert.deepEqual(
+    h.attempts.map((track) => track.connectorId),
+    ["spotify", "spotify", "soundcloud"],
+  );
   assert.equal(h.lookups(), 1);
   assert.equal(h.state.current?.connectorId, "soundcloud");
   assert.equal(h.state.error, null);

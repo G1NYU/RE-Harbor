@@ -22,6 +22,7 @@ function load(path: string, mocks: Record<string, unknown>) {
 test("the top-match warm resolves only anime-looking catalog metas", async () => {
   const calls: string[] = [];
   const { warmAnimeResolution } = load("src/lib/anime-detect.ts", {
+    "@/lib/render-cause": { noteNotify() {} },
     react: { useSyncExternalStore: () => 0 },
     "@/lib/cinemeta": { meta: async () => null },
     "@/lib/providers/anime-mapping": {
@@ -41,6 +42,10 @@ test("the top-match warm resolves only anime-looking catalog metas", async () =>
       },
     },
     "@/lib/storage-recovery": { setItemWithRecovery: () => {} },
+    "@/lib/providers/tmdb/tmdb-imdb-resolve": {
+      tmdbImdbCached: () => null,
+      tmdbImdbId: async () => null,
+    },
   });
   warmAnimeResolution({
     id: "tmdb:tv:45790",
@@ -69,7 +74,9 @@ test("the detail page seeds detection from the recorded mapping", () => {
   const detail = readFileSync(new URL("../src/views/detail.tsx", import.meta.url), "utf8");
   assert.ok(detail.includes("getAnimeCanonicalId(meta.id)"));
   assert.ok(detail.includes("recordedKitsu !== failedKitsu.current ? recordedKitsu : null"));
-  assert.ok(detail.includes("await resolveDetailAnimeEntry(k, meta, detail)"));
+  assert.ok(
+    detail.includes("await resolveDetailAnimeEntry(k, meta, detail, prioritizeMetadataAddons)"),
+  );
   const overlay = readFileSync(
     new URL("../src/components/search/search-overlay.tsx", import.meta.url),
     "utf8",

@@ -19,10 +19,7 @@ import { useT } from "@/lib/i18n";
 import { adoptRequestedIdentity } from "@/lib/music/queue-source";
 import { playMusic } from "@/lib/music/player";
 import { MUSIC_SOURCE_REQUIRED, resolveAndPlayMusicTrack } from "@/lib/music/play-track";
-import {
-  getMusicSourceCandidates,
-  getSpotifyStatus,
-} from "@/lib/music/sources";
+import { getMusicSourceCandidates, getSpotifyStatus } from "@/lib/music/sources";
 import { musicProviderSearch, musicRecoveryKey, musicSourceName } from "@/lib/music/recovery";
 import { openUrl } from "@/lib/window";
 import type { MusicSourceCandidate, MusicTrack, SpotifyStatus } from "@/lib/music/types";
@@ -51,14 +48,18 @@ type MusicSourcePickerContextValue = {
 
 const MusicSourcePickerContext = createContext<MusicSourcePickerContextValue | null>(null);
 
-export function MusicSourcePickerProvider({ children, active = true }: { children: ReactNode; active?: boolean }) {
+export function MusicSourcePickerProvider({
+  children,
+  active = true,
+}: {
+  children: ReactNode;
+  active?: boolean;
+}) {
   // Nesting a second provider renders a second dialog over the first. A view that sits inside one
   // already has a working picker, so the inner provider passes straight through.
   const outer = useContext(MusicSourcePickerContext);
   if (outer) return <>{children}</>;
-  return (
-    <MusicSourcePickerRoot active={active}>{children}</MusicSourcePickerRoot>
-  );
+  return <MusicSourcePickerRoot active={active}>{children}</MusicSourcePickerRoot>;
 }
 
 function MusicSourcePickerRoot({ children, active }: { children: ReactNode; active: boolean }) {
@@ -310,8 +311,7 @@ export function MusicSourcePicker({
       });
   };
 
-  const select = (candidate: MusicSourceCandidate) =>
-    start(candidate.track, candidate.connectorId);
+  const select = (candidate: MusicSourceCandidate) => start(candidate.track, candidate.connectorId);
 
   const connect = () => {
     onClose();
@@ -374,7 +374,7 @@ export function MusicSourcePicker({
             )}
           </section>
         )}
-        {!loading && !spotify?.connected && (
+        {!loading && !spotify?.playbackReady && (
           <button
             type="button"
             onClick={connect}
@@ -386,7 +386,11 @@ export function MusicSourcePicker({
             <span>
               <strong className="block text-[13px] text-ink">{t("music.spotify.connect")}</strong>
               <small className="mt-1 block text-[10px] text-ink-muted">
-                {t("music.recovery.spotifySetup")}
+                {t(
+                  spotify?.connected
+                    ? "music.spotify.playbackUnavailableHint"
+                    : "music.recovery.spotifySetup",
+                )}
               </small>
             </span>
             <span className="rounded-full bg-ink px-4 py-2 text-[11px] font-semibold text-canvas">
@@ -399,15 +403,27 @@ export function MusicSourcePicker({
           <div className="mx-2 flex items-center justify-between border-b border-edge-soft py-3 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-subtle">
             <span className="inline-flex items-center gap-2">
               <MusicServiceLogo source="spotify" size={13} fallback={<Check size={12} />} />{" "}
-              {t("music.spotify.connectedAs", { username: spotify.username ?? "Spotify" })}
+              {t("music.spotify.connectedAs", { username: spotify.displayName ?? "Spotify" })}
             </span>
-            <span>{t("music.spotify.premium")}</span>
+            <span>
+              {t(
+                spotify.playbackReady
+                  ? spotify.premium
+                    ? "music.spotify.premium"
+                    : "music.spotify.playbackReady"
+                  : "music.spotify.playbackUnavailable",
+              )}
+            </span>
           </div>
         )}
 
         {loading ? (
-          <div className="flex min-h-36 items-center justify-center gap-3 text-sm text-ink-muted" role="status">
-            <MusicSourceSearchMotion /><span>{t("music.source.loading")}</span>
+          <div
+            className="flex min-h-36 items-center justify-center gap-3 text-sm text-ink-muted"
+            role="status"
+          >
+            <MusicSourceSearchMotion />
+            <span>{t("music.source.loading")}</span>
           </div>
         ) : (
           ordered.map((candidate) => (

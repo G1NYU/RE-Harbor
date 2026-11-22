@@ -1,3 +1,4 @@
+import { PlayedLastBadge } from "./played-last-badge";
 import { ChevronDown, Download, ExternalLink, Loader2, Zap } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import { useEffect, useMemo, useState } from "react";
@@ -9,9 +10,11 @@ import { HostMatchChip } from "@/components/host-match-chip";
 import { useT } from "@/lib/i18n";
 import { useDebridClients } from "@/lib/debrid/registry";
 import { useSettings } from "@/lib/settings";
+import { sortStreams } from "@/lib/streams/source-sort";
 import type { ScoredStream } from "@/lib/streams/types";
 import type { PlayEpisode } from "@/lib/view";
 import { EditionChip } from "./edition-chip";
+import { SourceSortMenu } from "./source-sort-menu";
 import {
   addonInstanceKey,
   anyStreamCached,
@@ -29,6 +32,7 @@ export function SourceDrawer({
   addonCount,
   usedAddons,
   streams,
+  lastPlayedStream,
   debrids,
   getAddonLogo,
   matchFor,
@@ -44,6 +48,7 @@ export function SourceDrawer({
   addonCount: number;
   usedAddons: Array<{ id: string; name: string; logo: string | null }>;
   streams: ScoredStream[];
+  lastPlayedStream?: ScoredStream | null;
   debrids: ReturnType<typeof useDebridClients>;
   getAddonLogo: (addonId: string) => string | null;
   matchFor?: (s: ScoredStream) => "same" | "close" | null;
@@ -54,13 +59,16 @@ export function SourceDrawer({
   absoluteEpisode?: number | null;
 }) {
   const t = useT();
+  const { settings, update } = useSettings();
+  const sourceSort = settings.sourceSort;
+  const [sortOpen, setSortOpen] = useState(false);
   const [addonFilter, setAddonFilter] = useState("all");
   const addonOptions = useMemo(() => buildAddonOptions(streams), [streams]);
-  const shown = useMemo(
-    () =>
-      addonFilter === "all" ? streams : streams.filter((s) => addonInstanceKey(s) === addonFilter),
-    [streams, addonFilter],
-  );
+  const shown = useMemo(() => {
+    const filtered =
+      addonFilter === "all" ? streams : streams.filter((s) => addonInstanceKey(s) === addonFilter);
+    return sortStreams(filtered, sourceSort);
+  }, [streams, addonFilter, sourceSort]);
   useEffect(() => {
     if (addonFilter !== "all" && !addonOptions.some((o) => o.id === addonFilter))
       setAddonFilter("all");
@@ -87,23 +95,37 @@ export function SourceDrawer({
           </span>
         )}
       </button>
-      {open && addonOptions.length > 1 && (
+      {open && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <AddonPill
-            active={addonFilter === "all"}
-            onClick={() => setAddonFilter("all")}
-            label={t("All")}
-            count={streams.length}
+          <SourceSortMenu
+            value={sourceSort}
+            open={sortOpen}
+            onToggle={() => setSortOpen((v) => !v)}
+            onClose={() => setSortOpen(false)}
+            onPick={(value) => {
+              update({ sourceSort: value });
+              setSortOpen(false);
+            }}
           />
-          {addonOptions.map((o) => (
-            <AddonPill
-              key={o.id}
-              active={addonFilter === o.id}
-              onClick={() => setAddonFilter(o.id)}
-              label={o.name}
-              count={o.count}
-            />
-          ))}
+          {addonOptions.length > 1 && (
+            <>
+              <AddonPill
+                active={addonFilter === "all"}
+                onClick={() => setAddonFilter("all")}
+                label={t("All")}
+                count={streams.length}
+              />
+              {addonOptions.map((o) => (
+                <AddonPill
+                  key={o.id}
+                  active={addonFilter === o.id}
+                  onClick={() => setAddonFilter(o.id)}
+                  label={o.name}
+                  count={o.count}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
       {open && (
@@ -112,6 +134,7 @@ export function SourceDrawer({
             <SourceRow
               key={`${s.addonId}-${s.infoHash ?? s.url ?? i}`}
               stream={s}
+              playedLast={s === lastPlayedStream}
               debrids={debrids}
               addonLogo={getAddonLogo(s.addonId)}
               match={matchFor ? matchFor(s) : null}
@@ -160,6 +183,7 @@ function SourceRow({
   debrids,
   addonLogo,
   match,
+  playedLast,
   onPlay,
   resolving,
   divider,
@@ -170,6 +194,7 @@ function SourceRow({
   stream: ScoredStream;
   debrids: ReturnType<typeof useDebridClients>;
   addonLogo: string | null;
+  playedLast: boolean;
   match: "same" | "close" | null;
   onPlay: () => void;
   resolving: boolean;
@@ -206,9 +231,10 @@ function SourceRow({
       <button
         onClick={onPlay}
         disabled={resolving}
-        className="group flex w-full items-start gap-4 px-5 py-4 text-start transition-colors hover:bg-ink/5 disabled:cursor-wait disabled:opacity-60"
+        className={`group flex w-full items-start gap-4 px-5 py-4 text-start transition-colors hover:bg-ink/5 disabled:cursor-wait disabled:opacity-60 ${playedLast ? "bg-accent/10 ring-1 ring-inset ring-accent/70" : ""}`}
       >
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {playedLast && <PlayedLastBadge />}
           <div className="flex min-w-0 items-center gap-2">
             <p className="min-w-0 truncate font-mono text-[14px] text-ink">{title}</p>
             <EditionChip stream={stream} />
@@ -263,7 +289,7 @@ function SourceRow({
                 <Zap size={11} strokeWidth={2} />
                 {t("Cached")}
               </span>
-            ) : !stream.url && !stream.infoHash && (stream.externalUrl || stream.ytId) ? (
+            ) : !stream.url && !stream.infoHash && stream.externalUrl ? (
               <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
                 <ExternalLink size={11} strokeWidth={2.2} />
                 {t("External")}
@@ -276,7 +302,7 @@ function SourceRow({
             ) : null}
             {resolving ? (
               <Loader2 size={16} className="animate-spin text-ink-muted" />
-            ) : !stream.url && !stream.infoHash && (stream.externalUrl || stream.ytId) ? (
+            ) : !stream.url && !stream.infoHash && stream.externalUrl ? (
               <ExternalLink
                 size={14}
                 strokeWidth={2.2}

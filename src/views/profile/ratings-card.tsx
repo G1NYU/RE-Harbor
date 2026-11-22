@@ -4,18 +4,21 @@ import { useProfileTitle } from "./use-profile-title";
 import { useT } from "@/lib/i18n";
 import { ArrowedScrollRow } from "@/components/arrowed-scroll-row";
 import { RatingPoster } from "@/components/ratings/rating-poster";
+import { MutualMatchBadge } from "@/components/ratings/mutual-match-badge";
 import type { RatingsSummary } from "@/lib/ratings/types";
 import { profileMediaMeta } from "@/lib/social/profile-media-meta";
 
 export function RatingsCard({
   ratings,
   isOwner,
+  mutualHandle,
   onViewAll,
   onImport,
   onOpenMeta,
 }: {
   ratings?: RatingsSummary;
   isOwner: boolean;
+  mutualHandle?: string;
   onViewAll: () => void;
   onImport?: () => void;
   onOpenMeta?: (metaId: string, kind?: string, hint?: { name?: string; poster?: string }) => void;
@@ -26,9 +29,12 @@ export function RatingsCard({
 
   return (
     <section aria-label={t("Ratings")} className="rounded-lg bg-surface p-5 ring-1 ring-edge-soft">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
-          <Star size={20} /> {t("Ratings")}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
+            <Star size={20} /> {t("Ratings")}
+          </span>
+          <MutualMatchBadge handle={mutualHandle} lazy />
         </div>
         <div className="flex shrink-0 items-center gap-4">
           {isOwner && onImport && (

@@ -21,6 +21,8 @@ function load(path: string, mocks: Record<string, unknown>) {
   }).outputText;
   const exports: Record<string, any> = {};
   new Function("require", "exports", compiled)((id: string) => {
+    if (id === "@/lib/metadata-policy" || id === "./metadata-policy")
+      return { addonOnlyMetadata: () => false };
     assert.ok(id in mocks, `Unexpected dependency: ${id}`);
     return mocks[id];
   }, exports);
@@ -327,13 +329,13 @@ test("both order caches and the TVDB response cache reject stale data", () => {
     "utf8",
   );
   assert.ok(persisted.includes("isStaleTvdbOrder(s.bySeason)"));
-  assert.ok(persisted.includes('const PREFIX = "harbor.tvdbo.v8."'));
+  assert.ok(persisted.includes('const PREFIX = "harbor.tvdbo.v9."'));
   const order = readFileSync(
     new URL("../src/lib/providers/tvdb-order.ts", import.meta.url),
     "utf8",
   );
-  assert.ok(order.includes("isStaleTvdbOrder(cached.order.bySeason)"));
-  assert.ok(order.includes("ORDER_CACHE_TTL_MS"));
+  assert.ok(order.includes("loadOrderCache("));
+  assert.ok(order.includes("persistOrderCache("));
   const tvdb = readFileSync(new URL("../src/lib/providers/tvdb.ts", import.meta.url), "utf8");
   assert.ok(tvdb.includes("RESPONSE_TTL_MS"));
 });

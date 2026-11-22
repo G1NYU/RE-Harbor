@@ -1,5 +1,6 @@
+import { streamKey } from "./identity";
 import type { Addon } from "@/lib/addons";
-import { dlog } from "@/lib/debug";
+import { dlog, dwarn } from "@/lib/debug";
 import type { DebridStore } from "@/lib/debrid/types";
 import {
   fetchAddonStreams,
@@ -87,7 +88,13 @@ function applyAnimeEpisodeFilter(
   for (const a of input.animeEpisodeAliases ?? []) {
     if (Number.isFinite(a) && a >= 1) validNums.add(a);
   }
-  const { keep, drop } = partitionByExactAnimeEpisode(parsed, validNums);
+  const { keep, drop } = partitionByExactAnimeEpisode(
+    parsed,
+    validNums,
+    input.animeEpisodeCoordinates,
+    input.animeSplitPart,
+    input.trust?.expectedTitles,
+  );
   return {
     kept: keep,
     extraRejected: drop.map((stream) => ({
@@ -107,10 +114,14 @@ export type PipelineInput = {
   isAnime?: boolean;
   animeAbsoluteEpisode?: number | null;
   animeEpisodeAliases?: Set<number> | null;
+  animeEpisodeCoordinates?: Array<[number, number]>;
+  animeSplitPart?: number;
   presetStreams?: Stream[];
   addonTimeoutMs?: number;
   addonRanks?: AddonRankFn | null;
   forcedAddonBases?: Array<{ base: string; id: string }>;
+  /** Remembered source preference; each addon retains its own playback candidates. */
+  preferredAddonId?: string | null;
 };
 
 export type DebridError = { slug: string; name: string; code: string };
@@ -139,6 +150,7 @@ export async function runPipeline(
   let latestAddonStreams: Stream[] = [];
   const debridErrors: DebridError[] = [];
   let addonErrors: AddonFailure[] = [];
+  let latestAddonProgress: AddonProgress | null = null;
   const priorityActive = input.addonRanks != null;
 
   // Debrid verification runs alongside the addon fetch instead of after it, so
@@ -247,10 +259,12 @@ export async function runPipeline(
   const emitPartialNow = (): void => {
     if (!onProgress || signal.aborted || !acceptPartials) return;
     const revision = ++partialRevision;
+    const progress = latestAddonProgress;
     void buildPartial(latestAddonStreams)
       .then((result) => {
         if (signal.aborted || !acceptPartials || revision !== partialRevision) return;
         onProgress(result);
+        if (progress) onAddonProgress?.(progress);
       })
       .catch(() => {
         /* swallow */
@@ -292,7 +306,11 @@ export async function runPipeline(
   const handleAddonProgress = (progress: AddonProgress): void => {
     if (signal.aborted || !acceptPartials) return;
     addonErrors = progress.failures ?? [];
-    onAddonProgress?.(progress);
+    latestAddonProgress = progress;
+    // Pending requests are visible immediately. Settlement must travel with a
+    // processed candidate snapshot, never ahead of asynchronous parsing.
+    if (progress.settledAddonIds.length === 0) onAddonProgress?.(progress);
+    else emitPartialNow();
   };
 
   // Library listings do not depend on the addon responses, so start them with the
@@ -349,6 +367,9 @@ export async function runPipeline(
   stopPartials();
   signal.removeEventListener("abort", stopPartials);
   if (librarySettled.status === "fulfilled") library = librarySettled.value;
+  if (addonSettled.status !== "fulfilled") {
+    dwarn("[pipeline] addon batch failed, no addon streams this round", addonSettled.reason);
+  }
   const addonStreams = addonSettled.status === "fulfilled" ? addonSettled.value : [];
   const merged = mergeAndDedupe(library, addonStreams);
   await cacheCheckInFlight;
@@ -470,34 +491,19 @@ async function runCorePipeline(
 }
 
 function mergeAndDedupe(library: Stream[], addons: Stream[]): Stream[] {
-  const seen = new Map<string, Stream>();
-  const addContributor = (target: Stream, id: string, name: string) => {
-    const list = target.contributors ?? [{ id: target.addonId, name: target.addonName }];
-    if (!list.some((c) => c.id === id)) list.push({ id, name });
-    target.contributors = list;
-  };
-  for (const s of library) {
-    seen.set(streamKey(s), { ...s, contributors: [{ id: s.addonId, name: s.addonName }] });
-  }
-  for (const s of addons) {
-    const key = streamKey(s);
+  const seen = new Map<string | Stream, Stream>();
+  for (const s of [...library, ...addons]) {
+    const identity = streamKey(s);
+    // Addon tabs filter by the owning installation. Sharing a playback endpoint
+    // must not remove either installation's row, metadata, or native ordering.
+    const key =
+      typeof identity === "string" ? JSON.stringify([s.addonUrl, s.addonId, identity]) : identity;
     const prior = seen.get(key);
     if (!prior) {
       seen.set(key, { ...s, contributors: [{ id: s.addonId, name: s.addonName }] });
-      continue;
+    } else if (s.sources?.length) {
+      prior.sources = [...new Set([...(prior.sources ?? []), ...s.sources])];
     }
-    addContributor(prior, s.addonId, s.addonName);
-    if (s.sources && s.sources.length > 0) {
-      const merged = new Set([...(prior.sources ?? []), ...s.sources]);
-      prior.sources = [...merged];
-    }
-    if (!prior.url && s.url) prior.url = s.url;
   }
   return [...seen.values()];
-}
-
-function streamKey(s: Stream): string {
-  if (s.infoHash) return `hash:${s.infoHash.toLowerCase()}:${s.fileIdx ?? ""}`;
-  if (s.url) return `url:${s.url}`;
-  return `n:${s.name ?? ""}:${s.title ?? ""}`;
 }

@@ -1,7 +1,10 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Waiting for {name}…": "{name} を待っています…",
+  "Keeping the source you were watching.": "視聴していたソースを維持しています。",
   "Sound descriptions": "音の説明",
   "Hide sound effects and speaker names": "効果音と話者名を隠す",
-  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "再生中の字幕から [ドアがきしむ] のような角かっこの説明や、JOHN: のような大文字の話者名を取り除きます。SDH 字幕しか同梱されていないリリースでも、通常のせりふとして読めます。歌詞、通常の丸かっこ、ラテン文字以外の文字はそのまま残ります。強制字幕と画像字幕には適用されません。",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
+    "再生中の字幕から [ドアがきしむ] のような角かっこの説明や、JOHN: のような大文字の話者名を取り除きます。SDH 字幕しか同梱されていないリリースでも、通常のせりふとして読めます。歌詞、通常の丸かっこ、ラテン文字以外の文字はそのまま残ります。強制字幕と画像字幕には適用されません。",
   "Play from": "再生開始位置",
   end: "末尾",
   "m:ss": "m:ss",
@@ -905,6 +908,18 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "NYT Books APIキー",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Harborが直接およびdebridソース、P2Pトレントのどちらを優先するか、または両方を表示するかを選択します。",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

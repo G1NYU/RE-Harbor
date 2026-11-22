@@ -45,7 +45,7 @@ const settingsFill: Record<string, string> = {
   "Check the shared database first. When this exact subtitle has already been synced by someone else, yours snaps into place with no analysis.":
     "Сначала проверять общую базу. Если эти же субтитры уже кто-то синхронизировал, ваши встанут на место без анализа.",
   "Community sync server": "Сервер синхронизации сообщества",
-  "https://sync.harbor.site": "https://sync.harbor.site",
+  "https://sync.harborcommunity.site": "https://sync.harborcommunity.site",
   "Leave blank to use Harbor's own community server. Enter a URL to point at your own server instead. Private mode below stops all contact either way.":
     "Оставьте пустым, чтобы использовать сервер сообщества самого Harbor. Укажите URL, чтобы обращаться к своему серверу. Приватный режим ниже в любом случае отключает все обращения.",
   "Private mode": "Приватный режим",
@@ -278,7 +278,8 @@ const settingsFill: Record<string, string> = {
     "Медленным дополнениям и P2P-источникам часто нужно больше 10 секунд на старт. Увеличьте значение, если потоки пропускаются, не успев запуститься.",
   "{n} sec": "{n} сек",
   "Only start the P2P engine when needed": "Запускать P2P-движок только при необходимости",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Обычно Harbor запускает P2P-движок при старте, чтобы первый P2P-поток подключался быстрее. Из-за этого узел DHT работает и обменивается данными с сетью, даже когда вы ничего не смотрите. Включите, если у вас лимитное или ограниченное подключение: тогда движок запустится при первом реальном воспроизведении P2P-потока. Применится при следующем запуске.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Обычно Harbor запускает P2P-движок при старте, чтобы первый P2P-поток подключался быстрее. Из-за этого узел DHT работает и обменивается данными с сетью, даже когда вы ничего не смотрите. Включите, если у вас лимитное или ограниченное подключение: тогда движок запустится при первом реальном воспроизведении P2P-потока. Применится при следующем запуске.",
   "What fullscreen does": "Что делает полноэкранный режим",
   "True fullscreen covers the whole screen and hides the taskbar. Maximize fills the screen but keeps the taskbar and title bar, so you can still switch apps.":
     "Настоящий полноэкранный режим занимает весь экран и скрывает панель задач. Режим «Развернуть» заполняет экран, но оставляет панель задач и заголовок окна, поэтому можно переключаться между приложениями.",

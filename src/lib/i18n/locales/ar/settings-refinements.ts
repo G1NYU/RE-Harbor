@@ -1,8 +1,10 @@
 const settingsRefinements: Record<string, string> = {
   "Prefer IMDb IDs for anime": "تفضيل معرّفات IMDb للأنمي",
-  "Use IMDb IDs for anime stream searches when a verified mapping is available. Otherwise, use the usual anime IDs.": "استخدم معرّفات IMDb للبحث عن بث الأنمي عند توفر ربط موثّق. وإلا، استخدم معرّفات الأنمي المعتادة.",
+  "Use IMDb IDs for anime stream searches when a verified mapping is available. Otherwise, use the usual anime IDs.":
+    "استخدم معرّفات IMDb للبحث عن بث الأنمي عند توفر ربط موثّق. وإلا، استخدم معرّفات الأنمي المعتادة.",
   "Playback cache folder": "مجلد التخزين المؤقت للتشغيل",
-  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.": "تخزين مؤقت للفيديو، بما في ذلك بث ديبريد. يُطبّق عند إعادة بدء التشغيل؛ تبقى الملفات الموجودة في مجلدها الحالي.",
+  "Temporary video buffering, including debrid streams. Applies when playback restarts; existing files stay in their current folder.":
+    "تخزين مؤقت للفيديو، بما في ذلك بث ديبريد. يُطبّق عند إعادة بدء التشغيل؛ تبقى الملفات الموجودة في مجلدها الحالي.",
   "Skipped: {reason}": "تم التخطي: {reason}",
   "1 option formatted correctly": "تم تنسيق خيار واحد بشكل صحيح",
   "1. Open Movies\n2. Select a title\n3. Press Play\n4. Describe what happens":
@@ -435,7 +437,7 @@ const settingsRefinements: Record<string, string> = {
     "تحقّق من البيانات التي أدخلتها وحاول مجددًا.",
   "Please choose a different name.": "يرجى اختيار اسم آخر.",
   "Please sign in again to continue.": "سجّل الدخول مجددًا للمتابعة.",
-  "Poster cards": "بطاقات الملصقات",
+  Cards: "بطاقات",
   "Prepares cached debrid sources while you browse the picker so Play can start sooner. May create or update transfers on your debrid account before you press Play. P2P sources are excluded.":
     "يجهّز مصادر debrid المخزّنة مؤقتًا أثناء تصفح قائمة الاختيار لبدء التشغيل أسرع. قد ينشئ عمليات نقل أو يحدّثها في حساب debrid قبل الضغط على تشغيل. لا يشمل مصادر P2P.",
   "Preparing {name}…": "جارٍ تجهيز {name}…",
@@ -523,8 +525,15 @@ const settingsRefinements: Record<string, string> = {
     "اعرض شارة ومعدل الإطارات أثناء تشغيل Anime4K.",
   "Show a green dot on the player's subtitle button when subtitles are active.":
     "اعرض نقطة خضراء على زر الترجمة في المشغّل عند تفعيل الترجمات.",
-  "Show a laurel tab on award-winning titles. Choose its position below.":
-    "اعرض علامة إكليل على العناوين الحائزة على جوائز. اختر موضعها أدناه.",
+  "Choose how award wins appear on cards. TV award tabs are always shown at the top.":
+    "اختر طريقة ظهور الجوائز على البطاقات. تظهر علامات تبويب التلفزيون دائماً في الأعلى.",
+  "Choose how award wins appear on cards. You can position award tabs below.":
+    "اختر طريقة ظهور الجوائز على البطاقات. يمكنك تحديد موضع علامات التبويب أدناه.",
+  "Award tabs": "علامات تبويب الجوائز",
+  "Award badge": "شارة الجوائز",
+  "No award": "بدون جوائز",
+  "The New, In Cinema, Rerun. Turn off for a cleaner grid. Score chips are separate, below.":
+    'شارات "جديد" و"في السينما" و"إعادة عرض". عطّلها للحصول على شبكة أنظف. شارات التقييم منفصلة، في الأسفل.',
   "Show all results returned by addons, including releases that do not match or may be suspicious.":
     "اعرض جميع نتائج الإضافات، بما فيها الإصدارات غير المطابقة أو التي قد تكون مشبوهة.",
   "Show complete addon descriptions in the Stremio picker, downloads, and Big Picture.":
@@ -798,6 +807,9 @@ const settingsRefinements: Record<string, string> = {
   GIF: "GIF",
   "{kind} · In use": "{kind} · قيد الاستخدام",
   Use: "استخدام",
+  "Poster cards": "بطاقات الملصقات",
+  "Show a laurel tab on award-winning titles. Choose its position below.":
+    "أظهر تبويب الغار في العناوين الحائزة على جوائز. اختر موضعه أدناه.",
 };
 
 export default settingsRefinements;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { withVoidDefaultNavOrder } from "../src/chrome/void-sidebar-order.ts";
 import * as backIntercept from "../src/lib/back-intercept.ts";
 import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
@@ -75,6 +76,7 @@ test("root Refresh and the original File menu reload the same window without nav
   };
   const parental = { locked: false, hiddenTabs: {} };
   const dependencies = {
+    "./void-sidebar-order": { withVoidDefaultNavOrder },
     react: React,
     "react/jsx-runtime": jsxRuntime,
     "react-dom": ReactDOM,
@@ -201,6 +203,7 @@ test("person and eBook page sharing follows the captured page and preserves navi
     theme: { preset: "fixture" },
   };
   const page = load("src/chrome/context-page-navigation.tsx", {
+    "./void-sidebar-order": { withVoidDefaultNavOrder },
     react: React,
     "react/jsx-runtime": jsxRuntime,
     "lucide-react": icons,

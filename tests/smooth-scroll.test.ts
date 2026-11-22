@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { loadModule, readSource } from "../scripts/benchmark-discover.mjs";
 
-function fixture({ baseline = false, enabled = true, reduced = false, rounded = false } = {}) {
+function fixture({ enabled = true, reduced = false, rounded = false } = {}) {
   let now = 0;
   let id = 0;
   const frames = new Map();
   const listeners = new Map();
   const globalListeners = new Map();
   const mediaListeners = new Map();
+  const observed = new Set();
+  let onResize;
+  let onChildList;
   const media = {
     matches: reduced,
     addEventListener: (name, fn) => mediaListeners.set(name, fn),
@@ -19,6 +22,7 @@ function fixture({ baseline = false, enabled = true, reduced = false, rounded = 
     scrollHeight = 3000;
     clientHeight = 800;
     parentElement = null;
+    children = [];
     overflowY = "visible";
     get scrollTop() {
       return this.position;
@@ -37,7 +41,7 @@ function fixture({ baseline = false, enabled = true, reduced = false, rounded = 
   const el = new Element();
   let cleanup;
   const { useSmoothWheel } = loadModule(
-    readSource("src/lib/smooth-scroll.ts", baseline),
+    readSource("src/lib/smooth-scroll.ts"),
     {
       react: {
         useEffect: (fn) => {
@@ -46,7 +50,30 @@ function fixture({ baseline = false, enabled = true, reduced = false, rounded = 
       },
     },
     {
-      HTMLElement: Element,
+      Element,
+      ResizeObserver: class {
+        constructor(callback) {
+          onResize = callback;
+        }
+        observe(node) {
+          observed.add(node);
+        }
+        unobserve(node) {
+          observed.delete(node);
+        }
+        disconnect() {
+          observed.clear();
+        }
+      },
+      MutationObserver: class {
+        constructor(callback) {
+          onChildList = callback;
+        }
+        observe() {}
+        disconnect() {
+          onChildList = undefined;
+        }
+      },
       getComputedStyle: (node) => ({ overflowY: node.overflowY }),
       performance: { now: () => now },
       window: {
@@ -101,29 +128,30 @@ function fixture({ baseline = false, enabled = true, reduced = false, rounded = 
     globalListeners,
     media,
     mediaListeners,
+    observed,
+    resize: (node = el) => {
+      if (observed.has(node)) onResize();
+    },
+    replaceChildren: (...children) => {
+      el.children = children;
+      onChildList();
+    },
     cleanup: () => cleanup?.(),
   };
 }
 
 test("scroll duration stays consistent across monitor refresh rates", () => {
-  const before = [];
-  const after = [];
+  const durations = [];
   for (const hz of [60, 120, 144]) {
-    for (const [baseline, results] of [
-      [true, before],
-      [false, after],
-    ]) {
-      const f = fixture({ baseline });
-      f.wheel();
-      const result = f.settle(hz);
-      assert.equal(result.position, 120);
-      assert.equal(result.pending, 0);
-      results.push({ hz, ...result });
-      f.cleanup();
-    }
+    const f = fixture();
+    f.wheel();
+    const result = f.settle(hz);
+    assert.equal(result.position, 120);
+    assert.equal(result.pending, 0);
+    durations.push(result.ms);
+    f.cleanup();
   }
-  assert.ok(Math.max(...after.map((r) => r.ms)) - Math.min(...after.map((r) => r.ms)) <= 25);
-  console.log("Synthetic RAF timing, 120px wheel input:", JSON.stringify({ before, after }));
+  assert.ok(Math.max(...durations) - Math.min(...durations) <= 25);
 });
 
 test("opposite wheel input reverses immediately instead of continuing old momentum", () => {
@@ -153,6 +181,7 @@ test("shrinking content and rounded scroll positions cannot leave an endless ani
   f.wheel({ deltaY: 1000 });
   f.step();
   f.el.scrollHeight = 900;
+  f.resize();
   assert.equal(f.settle().pending, 0);
   assert.equal(f.el.scrollTop, 100);
   f.cleanup();
@@ -191,6 +220,51 @@ test("disabled/reduced motion and native input paths are not intercepted", () =>
   nested.overflowY = "auto";
   nested.parentElement = f.el;
   assert.equal(f.wheel({ target: nested }).defaultPrevented, false);
+  f.cleanup();
+});
+
+test("a sibling catalog can grow during an active gesture and a replacement is observed", () => {
+  const f = fixture();
+  const hero = new f.Element();
+  const catalog = new f.Element();
+  f.el.scrollHeight = 900;
+  f.replaceChildren(hero, catalog);
+  f.wheel({ deltaY: 80 });
+  f.step();
+  f.el.scrollHeight = 2400;
+  f.resize(catalog);
+  f.wheel({ deltaY: 600 });
+  assert.equal(f.settle().position, 680);
+
+  const replacement = new f.Element();
+  f.replaceChildren(hero, replacement);
+  assert.equal(f.observed.has(catalog), false);
+  assert.equal(f.observed.has(replacement), true);
+  f.cleanup();
+  assert.equal(f.observed.size, 0);
+});
+
+test("a new gesture reads the actual scroll position and range before resize delivery", () => {
+  const f = fixture();
+  f.el.scrollHeight = 900;
+  f.resize();
+  f.el.scrollHeight = 2400;
+  f.el.scrollTop = 350;
+  f.wheel();
+  assert.equal(f.settle().position, 470);
+  f.cleanup();
+});
+
+test("a nested pane that becomes scrollable takes the wheel", () => {
+  const f = fixture();
+  const nested = new f.Element();
+  nested.parentElement = f.el;
+  assert.equal(f.wheel({ target: nested }).defaultPrevented, true);
+  f.settle();
+  nested.overflowY = "auto";
+  assert.equal(f.wheel({ target: nested }).defaultPrevented, false);
+  nested.overflowY = "hidden";
+  assert.equal(f.wheel({ target: nested }).defaultPrevented, true);
   f.cleanup();
 });
 

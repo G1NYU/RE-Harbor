@@ -1,4 +1,6 @@
 const coverage: Record<string, string> = {
+  "Waiting for {name}…": "Oczekiwanie na {name}…",
+  "Keeping the source you were watching.": "Zachowuję źródło, które właśnie oglądasz.",
   "Sound descriptions": "Opisy dźwięków",
   "Hide sound effects and speaker names": "Ukryj efekty dźwiękowe i imiona mówiących",
   "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
@@ -97,9 +99,11 @@ const coverage: Record<string, string> = {
   "Reveal comments": "Pokaż komentarze",
   "Comments are hidden": "Komentarze są ukryte",
   "Hosted elsewhere": "Hostowane gdzie indziej",
-  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.": "Te plany prowadzi podmiot zewnętrzny. Harbor nie jest z nim powiązany i nic nie otrzymuje za rejestrację. Aktualne ceny i warunki są na ich stronie.",
+  "A third party runs these plans. Harbor is not affiliated with them and receives nothing from a signup. Current pricing and terms are on their site.":
+    "Te plany prowadzi podmiot zewnętrzny. Harbor nie jest z nim powiązany i nic nie otrzymuje za rejestrację. Aktualne ceny i warunki są na ich stronie.",
   "{name} can run on a hosted instance": "{name} może działać na hostowanej instancji",
-  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.": "Prowadzi to podmiot zewnętrzny. Harbor nie jest z nim powiązany, nie odsprzedaje usługi i nic nie otrzymuje, jeśli się zapiszesz. Cena i zakres są na ich stronie.",
+  "A third party operates this. Harbor is not affiliated with them, does not resell it, and receives nothing if you sign up. Whatever it costs and whatever it includes is on their site.":
+    "Prowadzi to podmiot zewnętrzny. Harbor nie jest z nim powiązany, nie odsprzedaje usługi i nic nie otrzymuje, jeśli się zapiszesz. Cena i zakres są na ich stronie.",
   "Show comments": "Pokaż komentarze",
   "Hide comments": "Ukryj komentarze",
   "You haven't commented yet": "Nie masz jeszcze żadnych komentarzy",
@@ -1060,6 +1064,34 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "Klucz API NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Wybierz, czy Harbor ma preferować źródła bezpośrednie i debrid, torrenty peer-to-peer, czy wyświetlać oba typy.",
+  "Largest first": "Największe najpierw",
+  "Smallest first": "Najmniejsze najpierw",
+  "Default order": "Domyślna kolejność",
+  "Sort sources: {value}": "Sortuj źródła: {value}",
+  "Show keyboard shortcuts": "Pokaż skróty klawiaturowe",
+  "Show or hide the list of player shortcuts.": "Pokazuje lub ukrywa listę skrótów odtwarzacza.",
+  "Press {key} to close. Change these in Settings.":
+    "Naciśnij {key}, aby zamknąć. Zmienisz je w Ustawieniach.",
+  "Cycle audio tracks": "Przełącz ścieżkę audio",
+  "Switch to the next available audio track.": "Przełącza na następną dostępną ścieżkę audio.",
+  "Smaller subtitles": "Mniejsze napisy",
+  "Decrease the subtitle text size.": "Zmniejsza rozmiar tekstu napisów.",
+  "Larger subtitles": "Większe napisy",
+  "Increase the subtitle text size.": "Zwiększa rozmiar tekstu napisów.",
+  "Audio: {name}": "Audio: {name}",
+  "Subtitle size: {size}": "Rozmiar napisów: {size}",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

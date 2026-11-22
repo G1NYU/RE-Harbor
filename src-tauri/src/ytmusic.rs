@@ -20,6 +20,9 @@ const YTM_LABEL: &str = "harbor-ytmusic";
 const YTM_URL: &str = "https://music.youtube.com/";
 #[cfg(windows)]
 const YTM_EMBED_LABEL: &str = "harbor-ytmusic-embed";
+/// A short-lived hidden window that reads the persisted cookie jar when no music window is open.
+const YTM_PROBE_LABEL: &str = "harbor-ytmusic-session";
+const YTM_BLANK_URL: &str = "about:blank";
 
 #[tauri::command]
 pub async fn ytmusic_open(app: AppHandle) -> Result<(), String> {
@@ -110,6 +113,158 @@ pub async fn ytmusic_close(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn ytmusic_is_open(app: AppHandle) -> bool {
     app.get_webview_window(YTM_LABEL).is_some()
+}
+
+/// A cookie borrowed from the signed-in YouTube Music webview.
+#[derive(Debug, Clone)]
+pub struct AccountCookie {
+    pub domain: String,
+    pub path: String,
+    pub secure: bool,
+    pub name: String,
+    pub value: String,
+}
+
+/// Google auth cookies are set on `.google.com`, but this app has no business reading the
+/// rest of that jar (Mail, Calendar, other accounts), so only the sign-in names cross over.
+const GOOGLE_AUTH_COOKIES: &[&str] = &[
+    "SID",
+    "HSID",
+    "SSID",
+    "APISID",
+    "SAPISID",
+    "__Secure-1PSID",
+    "__Secure-3PSID",
+    "__Secure-1PAPISID",
+    "__Secure-3PAPISID",
+    "LOGIN_INFO",
+];
+
+fn wanted_cookie(domain: &str, name: &str) -> bool {
+    let domain = domain.trim_start_matches('.');
+    let youtube = domain == "youtube.com" || domain.ends_with(".youtube.com");
+    let google = domain == "google.com" || domain.ends_with(".google.com");
+    youtube || (google && GOOGLE_AUTH_COOKIES.contains(&name))
+}
+
+/// Cookies for music.youtube.com from whichever YouTube Music window is open. Reading the
+/// native cookie store is the only way to see the HttpOnly sign-in cookies; page JavaScript
+/// cannot. Nothing is persisted here: the webview profile already owns the session.
+pub async fn account_cookies(app: &AppHandle) -> Result<Vec<AccountCookie>, String> {
+    if let Some(window) = session_window(app) {
+        let cookies = read_cookies(window).await?;
+        return Ok(account_cookies_from(cookies));
+    }
+    // No YouTube Music window is open, but its profile still holds the signed-in cookie jar.
+    // Borrow it through a short-lived hidden window so a restart resumes the session instead of
+    // making the listener open YouTube Music and sign in again.
+    let _guard = probe_lock().lock().await;
+    if let Some(window) = session_window(app) {
+        let cookies = read_cookies(window).await?;
+        return Ok(account_cookies_from(cookies));
+    }
+    let window = probe_window(app).await?;
+    let cookies = read_cookies(window.clone()).await;
+    let _ = window.close();
+    Ok(account_cookies_from(cookies?))
+}
+
+/// The listener's YouTube Music window, if one is open.
+fn session_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+    #[cfg(windows)]
+    let window = app
+        .get_webview_window(YTM_EMBED_LABEL)
+        .or_else(|| app.get_webview_window(YTM_LABEL));
+    #[cfg(not(windows))]
+    let window = app.get_webview_window(YTM_LABEL);
+    window
+}
+
+fn account_cookies_from(cookies: Vec<tauri::webview::Cookie<'static>>) -> Vec<AccountCookie> {
+    cookies
+        .into_iter()
+        .filter_map(|cookie| {
+            let name = cookie.name().to_string();
+            let domain = cookie.domain().unwrap_or("music.youtube.com").to_string();
+            if name.is_empty() || !wanted_cookie(&domain, &name) {
+                return None;
+            }
+            Some(AccountCookie {
+                domain,
+                path: cookie.path().unwrap_or("/").to_string(),
+                secure: cookie.secure() == Some(true),
+                name,
+                value: cookie.value().to_string(),
+            })
+        })
+        .collect()
+}
+
+/// The whole store, not cookies_for_url: Google sets the sign-in family on `.google.com`, which a
+/// music.youtube.com lookup does not return. Webview2 deadlocks when its cookie store is read
+/// from the main thread.
+async fn read_cookies(
+    window: tauri::WebviewWindow,
+) -> Result<Vec<tauri::webview::Cookie<'static>>, String> {
+    tauri::async_runtime::spawn_blocking(move || window.cookies())
+        .await
+        .map_err(|error| format!("read YouTube Music cookies: {error}"))?
+        .map_err(|error| format!("read YouTube Music cookies: {error}"))
+}
+
+/// Probes must not race for the same label; the window exists for a few hundred milliseconds.
+fn probe_lock() -> &'static tokio::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
+}
+
+/// Builds the hidden window that borrows the persisted YouTube Music profile. A webview of the
+/// same data directory cannot be open at the same time, and `session_window` is checked first.
+async fn probe_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
+    if let Some(window) = app.get_webview_window(YTM_PROBE_LABEL) {
+        return Ok(window);
+    }
+    let data_directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("app_data_dir: {error}"))?
+        .join("ytmusic");
+    let app_for_main = app.clone();
+    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    app.run_on_main_thread(move || {
+        let parsed = match Url::parse(YTM_BLANK_URL) {
+            Ok(parsed) => parsed,
+            Err(error) => {
+                let _ = tx.send(Err(format!("parse url: {error}")));
+                return;
+            }
+        };
+        let mut builder =
+            WebviewWindowBuilder::new(&app_for_main, YTM_PROBE_LABEL, WebviewUrl::External(parsed))
+                .title("Harbor session")
+                .visible(false)
+                .skip_taskbar(true)
+                .focused(false)
+                .resizable(false)
+                .decorations(false)
+                .shadow(false);
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        {
+            builder = builder.data_directory(data_directory);
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        let _ = data_directory;
+        let result = builder
+            .build()
+            .map(|_| ())
+            .map_err(|error| format!("restore YouTube Music session: {error}"));
+        let _ = tx.send(result);
+    })
+    .map_err(|error| format!("run_on_main_thread: {error}"))?;
+    rx.recv()
+        .map_err(|error| format!("session window did not report back: {error}"))??;
+    app.get_webview_window(YTM_PROBE_LABEL)
+        .ok_or_else(|| "YouTube Music session window disappeared".to_string())
 }
 
 /// Embedding puts YouTube Music inside Harbor's own window, so the sidebar and title bar stay
@@ -241,4 +396,18 @@ pub async fn ytmusic_unembed(app: AppHandle) -> Result<(), String> {
         let _ = window.close();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wanted_cookie;
+
+    #[test]
+    fn only_youtube_and_sign_in_google_cookies_cross_over() {
+        assert!(wanted_cookie(".youtube.com", "PREF"));
+        assert!(wanted_cookie("music.youtube.com", "PREF"));
+        assert!(wanted_cookie(".google.com", "SAPISID"));
+        assert!(!wanted_cookie(".google.com", "NID"));
+        assert!(!wanted_cookie(".example.com", "SID"));
+    }
 }

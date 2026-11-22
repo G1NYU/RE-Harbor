@@ -1,3 +1,5 @@
+import seekSteps from "./fr/seek-steps";
+import reviews from "./fr/reviews";
 import playOrders from "./fr/play-orders";
 import gameRomLibrary from "./fr/game-rom-library";
 import gameNotes from "./fr/game-notes";
@@ -112,9 +114,12 @@ import controllers from "./fr/controllers";
 import plurals from "./fr/plurals";
 import bpSources from "./fr/bp-sources";
 import coverage from "./fr/coverage";
+import subtitles from "./fr/subtitles";
 import plugins from "./fr/plugins";
 import brands from "./fr/brands";
 import bpSports from "./fr/bp-sports";
+import queueBasket from "./fr/queue-basket";
+import liveWeb from "./fr/live-web";
 
 import nytTv from "./fr/nyt-tv";
 
@@ -328,6 +333,7 @@ const fr: Record<string, string> = {
   ...plurals,
   ...bpSources,
   ...coverage,
+  ...subtitles,
   ...settingsRefinements,
   ...plugins,
   ...brands,
@@ -407,50 +413,41 @@ const fr: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
-  "Refract sync":
-    "Synchronisation Refract",
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
+  "Refract sync": "Synchronisation Refract",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "Synchronisez l’historique de visionnage et les modifications de la liste à regarder Harbor avec Refract.",
-  "Refract personal API key":
-    "Clé API personnelle Refract",
-  "Verifying...":
-    "Vérification…",
-  "Connect Refract":
-    "Connecter Refract",
+  "Refract personal API key": "Clé API personnelle Refract",
+  "Verifying...": "Vérification…",
+  "Connect Refract": "Connecter Refract",
   "Refract key saved in Harbor's secret store":
     "Clé Refract enregistrée dans le coffre sécurisé de Harbor",
-  "Sync watched history and watchlist":
-    "Synchroniser l’historique et la liste à regarder",
+  "Sync watched history and watchlist": "Synchroniser l’historique et la liste à regarder",
   "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
     "Envoyer l’historique et les modifications de la liste à regarder de Harbor vers Refract. Seul le profil principal de Harbor est synchronisé.",
-  "Retry pending watches":
-    "Réessayer les visionnages en attente",
-  "Disconnect Refract":
-    "Déconnecter Refract",
+  "Retry pending watches": "Réessayer les visionnages en attente",
+  "Disconnect Refract": "Déconnecter Refract",
   "Connected to Refract ({identity}). Watched history sync is enabled.":
     "Connecté à Refract ({identity}). La synchronisation de l’historique est activée.",
   "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
     "Impossible de vérifier la clé via Refract /v1/me. Vérifiez les autorisations et la connexion.",
-  "Disconnected from Refract.":
-    "Déconnecté de Refract.",
+  "Disconnected from Refract.": "Déconnecté de Refract.",
   "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
     "Créez une clé API personnelle dans Refract avec profile:read, library:read, library:write et history:write. Ne partagez ni ne publiez jamais cette clé.",
-  "Automatic watch threshold":
-    "Seuil de visionnage automatique",
-  "After {count} minutes":
-    "Après {count} minutes",
-  "{count}% (default)":
-    "{count} % (par défaut)",
+  "Automatic watch threshold": "Seuil de visionnage automatique",
+  "After {count} minutes": "Après {count} minutes",
+  "{count}% (default)": "{count} % (par défaut)",
   "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
     "Enregistrer un film ou un épisode dans Refract lorsque la lecture atteint la durée ou le pourcentage choisi. Avancer au-delà du seuil compte aussi. Un enregistrement anticipé marque le contenu comme vu, et non partiellement vu. Le seuil de fin de Harbor reste inchangé.",
-  "Harbor → Refract Plan to Watch":
-    "Harbor → Refract : à regarder",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract : à regarder",
   "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
     "Les ajouts et retraits de la liste à regarder sont transmis automatiquement lorsque la synchronisation est activée. Nécessite library:write ; reconnectez-vous avec une clé mise à jour si nécessaire. L’historique Refract et les autres statuts sont conservés.",
   "{sent} sent · {pending} pending · {failed} unmatched":
     "{sent} envoyés · {pending} en attente · {failed} sans correspondance",
-  "Unmatched items":
-    "Éléments sans correspondance",
+  "Unmatched items": "Éléments sans correspondance",
   "Refract queue full; unable to save another watch":
     "File d’attente Refract pleine ; impossible d’enregistrer un autre visionnage",
   "No verified IMDb/TMDB/TVDB identity": "Aucun identifiant IMDb/TMDB/TVDB vérifié",

@@ -7,6 +7,7 @@ use super::fields::{
 };
 use super::parse::{
     artwork_of, browse_id_of, fixed_duration, flex_columns, kind_of, nav, runs, text, video_id_of,
+    video_media_kind,
 };
 use serde_json::Value;
 
@@ -44,6 +45,7 @@ pub fn catalog_item(value: &Value) -> Option<MusicCatalogItem> {
             song.duration,
         );
         built.explicit = explicit_badge(value);
+        built.media_kind = video_media_kind(value).map(str::to_string);
         return Some(MusicCatalogItem::Track(built));
     }
     let id = browse_id_of(value)?;
@@ -116,6 +118,7 @@ pub fn track_from_list_item(value: &Value) -> Option<MusicTrack> {
         seconds,
     );
     built.explicit = explicit_badge(value);
+    built.media_kind = video_media_kind(value).map(str::to_string);
     Some(built)
 }
 
@@ -146,6 +149,7 @@ pub fn track_from_panel(value: &Value) -> Option<MusicTrack> {
         seconds,
     );
     built.explicit = explicit_badge(value);
+    built.media_kind = video_media_kind(value).map(str::to_string);
     Some(built)
 }
 
@@ -209,6 +213,12 @@ pub fn track(
     seconds: u64,
 ) -> MusicTrack {
     let artist = artist.unwrap_or_else(|| "Unknown artist".to_string());
+    // Some panels omit the thumbnail; the poster is always addressable by the video id.
+    let artwork = if artwork.trim().is_empty() && video_id.len() == 11 {
+        format!("https://i.ytimg.com/vi/{video_id}/hq720.jpg")
+    } else {
+        artwork
+    };
     MusicTrack {
         explicit: None,
         version: None,

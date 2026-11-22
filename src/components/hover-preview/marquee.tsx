@@ -15,6 +15,7 @@ import {
 import { Play } from "@/components/icons/play-filled";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Meta } from "@/lib/cinemeta";
+import { FriendReviewBadges } from "@/components/ratings/friend-review-badges";
 import type { PreviewData } from "@/lib/hover-preview/preview-data";
 import { peekCachedLogo, resolveLogo } from "@/lib/logo";
 import { markMetaWatched } from "@/lib/mark-watched";
@@ -235,7 +236,7 @@ function MarqueeBlock({
           <Play size={20} fill="currentColor" strokeWidth={0} className="translate-x-[1px]" />
         </button>
         <CircleAction
-          label={inList ? t("Remove from watchlist") : t("Add to watchlist")}
+          label={inList ? t("Remove from library") : t("Save to library")}
           active={inList}
           onClick={(e) => {
             stop(e);
@@ -279,26 +280,31 @@ function MarqueeBlock({
           </CircleAction>
         </div>
       </div>
-      <div
-        data-stagger="2"
-        className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12.5px] font-medium text-ink-muted"
-      >
-        {data.contentRating && (
-          <span className="rounded-[4px] border border-edge px-1.5 py-px text-[11px] font-semibold tracking-[0.03em] text-ink-muted">
-            {data.contentRating}
-          </span>
-        )}
-        {data.rating && (
-          <span className="inline-flex items-center gap-1 text-ink">
-            <Star size={11} className="fill-amber-400 text-amber-400" />
-            {data.rating.value}
-          </span>
-        )}
-        {data.length ? (
-          <span className="tabular-nums">{titleCase(data.length)}</span>
-        ) : (
-          data.year && <span className="tabular-nums">{data.year}</span>
-        )}
+      <div data-stagger="2" className="flex min-h-7 items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[12.5px] font-medium text-ink-muted">
+          {data.contentRating && (
+            <span className="rounded-[4px] border border-edge px-1.5 py-px text-[11px] font-semibold tracking-[0.03em] text-ink-muted">
+              {data.contentRating}
+            </span>
+          )}
+          {data.rating && (
+            <span className="inline-flex items-center gap-1 text-ink">
+              <Star size={11} className="fill-amber-400 text-amber-400" />
+              {data.rating.value}
+            </span>
+          )}
+          {data.length ? (
+            <span className="tabular-nums">{titleCase(data.length)}</span>
+          ) : (
+            data.year && <span className="tabular-nums">{data.year}</span>
+          )}
+        </div>
+        <FriendReviewBadges
+          metaId={meta.id}
+          kind={meta.type}
+          className="ms-auto shrink-0 gap-1"
+          avatarSize={24}
+        />
       </div>
       <AdvisoryStrip imdbId={imdb} />
       {genres.length > 0 && (

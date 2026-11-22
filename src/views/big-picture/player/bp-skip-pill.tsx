@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronsRight, FastForward, X } from "lucide-react";
+import { ChevronsRight, FastForward } from "lucide-react";
 import { AdSkipIcon } from "@/components/icons/adskip-icon";
 import { useGamepads } from "@/lib/gamepad/store";
 import { SFX } from "@/lib/sfx";
@@ -43,6 +43,7 @@ const PILL_H = "clamp(56px,6.4vh,86px)";
 //      costs nothing. MediaTrackNext is already next-episode: do not take it.
 export function BpSkipPill({
   segment,
+  progress,
   hasNextEp,
   nextEp,
   nextEpMask,
@@ -53,9 +54,9 @@ export function BpSkipPill({
   onSkip,
   onNextEpisode,
   onCancelAutoNext,
-  onDismiss,
 }: {
   segment: SkipSegment | null;
+  progress: number;
   hasNextEp: boolean;
   nextEp: PlayEpisode | null;
   nextEpMask?: SpoilerMask;
@@ -66,7 +67,6 @@ export function BpSkipPill({
   onSkip: () => void;
   onNextEpisode: () => void;
   onCancelAutoNext?: () => void;
-  onDismiss?: () => void;
 }) {
   const t = useBpT();
   const pads = useGamepads();
@@ -94,6 +94,14 @@ export function BpSkipPill({
     const timer = window.setTimeout(() => setMounted(null), EXIT_MS);
     return () => window.clearTimeout(timer);
   }, [segment?.kind, segment?.startSec, segment?.endSec]);
+
+  // The segment clears one render before the exit fade ends. Hold the last value
+  // so the line finishes full instead of snapping back to empty while it fades.
+  const progressRef = useRef(progress);
+  useEffect(() => {
+    if (segment) progressRef.current = progress;
+  }, [segment, progress]);
+  const barProgress = segment ? progress : progressRef.current;
 
   const isOutroNext = mounted?.kind === "outro" && hasNextEp && Boolean(nextEp);
   const finalLeadSec = typeof leadSec === "number" && leadSec > 0 ? leadSec : 15;
@@ -183,7 +191,7 @@ export function BpSkipPill({
           data-bp-chip
           onKeyDown={blockSpaceActivate}
           onClick={() => fireRef.current()}
-          className="group flex shrink-0 items-center gap-[clamp(9px,0.9vw,16px)] rounded-[var(--bp-r-md)] border-2 border-[var(--bp-touch)] bg-[var(--bp-panel-2)] px-[clamp(18px,1.7vw,34px)] text-[clamp(15px,2.05vh,25px)] font-bold text-ink shadow-[0_26px_60px_-22px_rgba(0,0,0,0.9)]"
+          className="group relative flex shrink-0 items-center gap-[clamp(9px,0.9vw,16px)] overflow-hidden rounded-[var(--bp-r-md)] border-2 border-[var(--bp-touch)] bg-[var(--bp-panel-2)] px-[clamp(18px,1.7vw,34px)] text-[clamp(15px,2.05vh,25px)] font-bold text-ink shadow-[0_26px_60px_-22px_rgba(0,0,0,0.9)]"
           style={{ height: PILL_H }}
         >
           {isAd ? (
@@ -198,26 +206,20 @@ export function BpSkipPill({
           <span className="hidden items-center justify-center rounded-[var(--bp-r-xs)] border border-current px-[clamp(7px,0.6vw,12px)] py-[2px] text-[clamp(10.5px,1.35vh,15px)] font-bold uppercase tracking-[0.12em] opacity-70 group-data-[bp-focus=true]:flex">
             {pads.length > 0 ? "A" : "Enter"}
           </span>
-        </button>
-
-        {onDismiss && !isOutroNext && (
-          <button
-            type="button"
-            data-bp-focusable={focusable ? "" : undefined}
-            data-bp-chip
-            onKeyDown={blockSpaceActivate}
-            onClick={() => {
-              SFX.close();
-              onDismiss();
-            }}
-            aria-label={t("Hide this Skip button")}
-            title={t("Hide this Skip button")}
-            className="flex shrink-0 items-center justify-center rounded-[var(--bp-r-md)] border border-[var(--bp-edge-2)] bg-[var(--bp-panel-2)] text-ink-subtle"
-            style={{ width: PILL_H, height: PILL_H }}
+          {/* Flush to the button's bottom edge, inside its border and clipped by
+              the rounded corners, so the line reads as part of the box. --bp-touch
+              matches the CountdownRing stroke. */}
+          <span
+            dir="ltr"
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[clamp(3px,0.38vh,5px)] bg-[var(--bp-edge-2)]"
           >
-            <X size={24} strokeWidth={2.6} />
-          </button>
-        )}
+            <span
+              className="block h-full w-full origin-left bg-[var(--bp-touch)] transition-transform duration-200 ease-linear motion-reduce:transition-none"
+              style={{ transform: `scaleX(${barProgress})` }}
+            />
+          </span>
+        </button>
       </div>
     </div>
   );

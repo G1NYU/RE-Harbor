@@ -5,15 +5,17 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use crate::http_redirect::same_origin;
+use crate::source_challenge::is_dle_guard_page;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
+use tokio::sync::{Semaphore, SemaphorePermit};
 
 const BROWSER_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
 const MAX_CONCURRENT_FETCHES: usize = 48;
 const DEFAULT_TIMEOUT_MS: u64 = 30_000;
+const SOLVER_WAIT: Duration = Duration::from_secs(105);
 const MAX_REDIRECTS: usize = 10;
 
 fn fetch_semaphore() -> &'static Semaphore {
@@ -37,78 +39,6 @@ async fn run_with_deadline<T>(
         .unwrap_or_else(|_| Err(format!("timeout after {} ms", duration.as_millis())))
 }
 
-const THUMB_CACHE_MAX_BYTES: usize = 32 * 1024 * 1024;
-const THUMB_CACHE_MAX_ENTRIES: usize = 256;
-
-struct ThumbEntry {
-    body: String,
-    bytes: usize,
-    last_used: u64,
-}
-
-struct ThumbCache {
-    entries: HashMap<String, ThumbEntry>,
-    total_bytes: usize,
-    clock: u64,
-}
-
-impl ThumbCache {
-    fn get(&mut self, key: &str) -> Option<String> {
-        self.clock = self.clock.wrapping_add(1);
-        let tick = self.clock;
-        self.entries.get_mut(key).map(|entry| {
-            entry.last_used = tick;
-            entry.body.clone()
-        })
-    }
-
-    fn insert(&mut self, key: String, body: String) {        let bytes = body.len();
-        if bytes > THUMB_CACHE_MAX_BYTES {
-            return;
-        }
-        if let Some(previous) = self.entries.remove(&key) {
-            self.total_bytes = self.total_bytes.saturating_sub(previous.bytes);
-        }
-        while self.entries.len() >= THUMB_CACHE_MAX_ENTRIES
-            || self.total_bytes.saturating_add(bytes) > THUMB_CACHE_MAX_BYTES
-        {
-            let oldest = self
-                .entries
-                .iter()
-                .min_by_key(|(_, entry)| entry.last_used)
-                .map(|(k, _)| k.clone());
-            match oldest {
-                Some(k) => {
-                    if let Some(removed) = self.entries.remove(&k) {
-                        self.total_bytes = self.total_bytes.saturating_sub(removed.bytes);
-                    }
-                }
-                None => break,
-            }
-        }
-        self.clock = self.clock.wrapping_add(1);
-        let tick = self.clock;
-        self.total_bytes = self.total_bytes.saturating_add(bytes);
-        self.entries.insert(key, ThumbEntry { body, bytes, last_used: tick });
-    }
-
-    fn clear(&mut self) {
-        self.entries.clear();
-        self.total_bytes = 0;
-    }
-}
-
-fn thumb_cache() -> &'static Mutex<ThumbCache> {
-    static CACHE: OnceLock<Mutex<ThumbCache>> = OnceLock::new();
-    CACHE.get_or_init(|| {
-        Mutex::new(ThumbCache {
-            entries: HashMap::new(),
-            total_bytes: 0,
-            clock: 0,
-        })
-    })
-}
-
 fn make_thumb(bytes: &[u8], width: u32) -> Option<Vec<u8>> {
     if width == 0 {
         return None;
@@ -117,6 +47,13 @@ fn make_thumb(bytes: &[u8], width: u32) -> Option<Vec<u8>> {
     match format {
         image::ImageFormat::Jpeg | image::ImageFormat::Png | image::ImageFormat::WebP => {}
         _ => return None,
+    }
+    // Preserve animated images instead of flattening them to their first frame.
+    if bytes
+        .windows(4)
+        .any(|chunk| chunk == b"acTL" || chunk == b"ANIM")
+    {
+        return None;
     }
     let img = image::load_from_memory(bytes).ok()?;
     if img.width() <= width {
@@ -133,17 +70,17 @@ fn make_thumb(bytes: &[u8], width: u32) -> Option<Vec<u8>> {
         }
         image::ImageFormat::Png => {
             use image::ImageEncoder;
-            let rgb = small.to_rgb8();
+            let rgb = small.to_rgba8();
             let (w, h) = (rgb.width(), rgb.height());
             image::codecs::png::PngEncoder::new(&mut buf)
-                .write_image(rgb.as_raw(), w, h, image::ExtendedColorType::Rgb8)
+                .write_image(rgb.as_raw(), w, h, image::ExtendedColorType::Rgba8)
                 .ok()?;
         }
         _ => {
-            let rgb = small.to_rgb8();
+            let rgb = small.to_rgba8();
             let (w, h) = (rgb.width(), rgb.height());
             image::codecs::webp::WebPEncoder::new_lossless(&mut buf)
-                .encode(rgb.as_raw(), w, h, image::ExtendedColorType::Rgb8)
+                .encode(rgb.as_raw(), w, h, image::ExtendedColorType::Rgba8)
                 .ok()?;
         }
     }
@@ -157,58 +94,49 @@ async fn thumb_or_base64(
     app: &tauri::AppHandle,
     url: &str,
     width: Option<u32>,
-    bytes: &[u8],
-) -> String {
-    let encode_original = || base64::engine::general_purpose::STANDARD.encode(bytes);
-    let Some(w) = width.filter(|w| *w > 0) else {
-        return encode_original();
-    };
-    let key = format!("{w}\n{url}");
-    if let Some(hit) = thumb_cache().lock().await.get(&key) {
-        return hit;
-    }
-    let disk_app = app.clone();
-    let disk_url = url.to_string();
-    if let Some(disk) = tokio::task::spawn_blocking(move || {
-        crate::thumb_cache::read_thumb(&disk_app, &disk_url, w)
+    bytes: Vec<u8>,
+    persistence: Option<(u64, u64, Option<String>, Option<String>)>,
+    return_asset: bool,
+) -> Result<(String, Option<String>), String> {
+    let w = width.unwrap_or(0);
+    let app = app.clone();
+    let url = url.to_owned();
+    tokio::task::spawn_blocking(move || {
+        let output = make_thumb(&bytes, w).unwrap_or(bytes);
+        if let Some((lifetime, generation, etag, modified)) = persistence {
+            if let Ok(format) = image::guess_format(&output) {
+                let image = crate::thumb_cache::CachedImage {
+                    bytes: output,
+                    content_type: format.to_mime_type().to_string(),
+                    etag,
+                    modified,
+                    fresh: true,
+                    max_age: lifetime,
+                    lifetime,
+                };
+                let path =
+                    crate::thumb_cache::write_thumb(&app, &url, w, &image, lifetime, generation);
+                if let Some(path) = path.filter(|_| return_asset) {
+                    return (String::new(), Some(path.to_string_lossy().into_owned()));
+                }
+                return (
+                    base64::engine::general_purpose::STANDARD.encode(image.bytes),
+                    None,
+                );
+            }
+        }
+        (base64::engine::general_purpose::STANDARD.encode(output), None)
     })
     .await
-    .ok()
-    .flatten()
-    {
-        let body = base64::engine::general_purpose::STANDARD.encode(&disk);
-        thumb_cache().lock().await.insert(key, body.clone());
-        return body;
-    }
-    let owned = bytes.to_vec();
-    let made = tokio::task::spawn_blocking(move || make_thumb(&owned, w))
-        .await
-        .ok()
-        .flatten();
-    match made {
-        Some(buf) => {
-            let body = base64::engine::general_purpose::STANDARD.encode(&buf);
-            let write_app = app.clone();
-            let write_url = url.to_string();
-            tokio::task::spawn_blocking(move || {
-                crate::thumb_cache::write_thumb(&write_app, &write_url, w, &buf);
-            })
-            .await
-            .ok();
-            thumb_cache().lock().await.insert(key, body.clone());
-            body
-        }
-        None => encode_original(),
-    }
+    .map_err(|error| format!("image response: {error}"))
 }
 
 #[tauri::command]
 pub async fn clear_thumb_cache(app: tauri::AppHandle) -> Result<(), String> {
-    thumb_cache().lock().await.clear();
     let app = app.clone();
     tokio::task::spawn_blocking(move || crate::thumb_cache::clear_thumb_dir(&app))
         .await
-        .map_err(|error| format!("clear: {error}"))?;
+        .map_err(|error| format!("clear: {error}"))??;
     Ok(())
 }
 
@@ -217,6 +145,15 @@ pub async fn clear_thumb_cache(app: tauri::AppHandle) -> Result<(), String> {
 pub struct ThumbCacheSize {
     pub bytes: u64,
     pub files: usize,
+}
+
+#[tauri::command]
+pub async fn cached_thumb_path(app: tauri::AppHandle, url: String, width: u32) -> Option<String> {
+    let app = app.clone();
+    tokio::task::spawn_blocking(move || crate::thumb_cache::cached_path(&app, &url, width))
+        .await
+        .ok()
+        .flatten()
 }
 
 #[tauri::command]
@@ -464,7 +401,7 @@ pub(crate) async fn public_http_client(url: &reqwest::Url) -> Result<reqwest::Cl
         .map_err(|error| format!("public client: {error}"))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct HarborFetchArgs {
     pub url: String,
@@ -480,6 +417,9 @@ pub struct HarborFetchArgs {
     pub allow_local_network: Option<bool>,
     pub follow_redirects: Option<bool>,
     pub thumb_width_px: Option<u32>,
+    pub cache_image: Option<bool>,
+    pub allow_image_challenge: Option<bool>,
+    pub return_image_asset: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -488,9 +428,44 @@ pub struct HarborFetchResponse {
     pub status: u16,
     pub ok: bool,
     pub body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_path: Option<String>,
     pub content_type: Option<String>,
     pub headers: HashMap<String, String>,
     pub url: Option<String>,
+}
+
+fn cached_image_response(
+    url: &str,
+    max_response_bytes: Option<u64>,
+    image: &crate::thumb_cache::CachedImage,
+    marker: &str,
+    max_age: u64,
+) -> Result<HarborFetchResponse, String> {
+    if max_response_bytes.is_some_and(|limit| image.bytes.len() as u64 > limit) {
+        return Err("response size limit exceeded".to_string());
+    }
+    Ok(HarborFetchResponse {
+        status: 200,
+        ok: true,
+        body: base64::engine::general_purpose::STANDARD.encode(&image.bytes),
+        asset_path: None,
+        content_type: Some(image.content_type.clone()),
+        headers: HashMap::from([
+            ("content-type".to_string(), image.content_type.clone()),
+            ("x-harbor-image-cache".to_string(), marker.to_string()),
+            ("x-harbor-image-max-age".to_string(), max_age.to_string()),
+        ]),
+        url: Some(url.to_string()),
+    })
+}
+
+fn stale_image_response(
+    url: &str,
+    max_response_bytes: Option<u64>,
+    image: &crate::thumb_cache::CachedImage,
+) -> Result<HarborFetchResponse, String> {
+    cached_image_response(url, max_response_bytes, image, "stale", 300)
 }
 
 #[tauri::command]
@@ -498,16 +473,36 @@ pub async fn harbor_fetch(
     app: tauri::AppHandle,
     args: HarborFetchArgs,
 ) -> Result<HarborFetchResponse, String> {
+    let request_id = uuid::Uuid::new_v4();
+
     let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS));
+    let solver_wait = if can_open_solver(&args) {
+        SOLVER_WAIT
+    } else {
+        Duration::ZERO
+    };
+    let image_generation = crate::thumb_cache::generation();
     let _permit = acquire_fetch_permit().await?;
-    run_with_deadline(timeout, harbor_fetch_inner(app, args)).await
+    let result = run_with_deadline(
+        timeout + solver_wait,
+        harbor_fetch_inner(app, args, image_generation, false, request_id),
+    )
+    .await;
+
+    result
 }
 
 async fn harbor_fetch_inner(
     app: tauri::AppHandle,
     args: HarborFetchArgs,
+    image_generation: u64,
+    retried: bool,
+    request_id: uuid::Uuid,
 ) -> Result<HarborFetchResponse, String> {
+    let return_asset = args.return_image_asset == Some(true);
     let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS));
+    let solver_ok = can_open_solver(&args);
+    let retry_args = args.clone();
     let public_network_only = args.public_network_only.unwrap_or(false);
     let allow_local_network = args.allow_local_network.unwrap_or(false);
     let follow_redirects = args.follow_redirects.unwrap_or(true);
@@ -517,7 +512,9 @@ async fn harbor_fetch_inner(
         reqwest::Method::from_bytes(method.as_bytes()).map_err(|e| format!("method: {}", e))?;
 
     let mut current_url = reqwest::Url::parse(&args.url).map_err(|e| format!("url: {}", e))?;
-    validate_target(&current_url, allow_local_network).await?;
+    if !args.cache_image.unwrap_or(false) {
+        validate_target(&current_url, allow_local_network).await?;
+    }
 
     let mut subtitle_credential = args
         .credential_handle
@@ -527,8 +524,62 @@ async fn harbor_fetch_inner(
 
     let original_host = current_url.host_str().map(|s| s.to_string());
     let cf = current_url.host_str().and_then(crate::cf_solver::cf_cached);
+    let had_clearance = cf.is_some();
+    // Browser-only sessions and verified hosts that reqwest has rechallenged
+    // should use the matching WebView directly. Never trust the browser-session
+    // map unless the shared WebView is still on the requested hostname.
+    let verified_browser = original_host.as_deref().is_some_and(|host| {
+        crate::cf_solver::cf_browser_ready_for(&app, host)
+            || (can_recover_image(&retry_args)
+                && crate::cf_solver::cf_image_browser_ready_for(&app, host))
+    });
+    let browser_eligible = can_browser_fallback(&retry_args);
+
+    let prefer_browser = !had_clearance
+        || original_host
+            .as_deref()
+            .is_some_and(crate::cf_solver::cf_prefer_browser);
+    if should_use_verified_browser(
+        had_clearance,
+        verified_browser,
+        browser_eligible,
+        prefer_browser,
+    ) {
+        let host = original_host.as_deref().unwrap_or("");
+        if crate::cf_solver::cf_browser_cooling_down(host) {
+            return Err(format!(
+                "Cloudflare browser verification for {host} is cooling down after a failed request"
+            ));
+        }
+        match crate::cf_solver::cf_browser_fetch(&app, &retry_args, request_id).await {
+            Ok(Some(browser)) => {
+                if !retried
+                    && needs_source_login(
+                        &retry_args,
+                        browser.status,
+                        browser.content_type.as_deref(),
+                    )
+                {
+                    return login_and_retry(app, retry_args, image_generation, request_id).await;
+                }
+                if (200..300).contains(&browser.status) {
+                    crate::cf_solver::cf_clear_browser_failure(host);
+                }
+                return Ok(browser_text_response(browser, retry_args.url));
+            }
+            Err(error) => {
+                eprintln!("[cf] verified browser fetch failed for {host}: {error}");
+            }
+            Ok(None) => {}
+        }
+        crate::cf_solver::cf_note_browser_failure(host);
+        return Err(format!(
+            "Cloudflare verification for {host} did not return usable content"
+        ));
+    }
 
     let mut headers: Vec<(String, String)> = Vec::new();
+    let mut caller_cookie: Option<String> = None;
     let mut has_user_agent = false;
     let mut has_accept = false;
     let mut has_accept_language = false;
@@ -548,6 +599,10 @@ async fn harbor_fetch_inner(
                 has_user_agent = true;
             }
             if low == "cookie" && cf.is_some() {
+                caller_cookie = Some(match caller_cookie {
+                    Some(previous) if !previous.is_empty() => format!("{previous}; {v}"),
+                    _ => v,
+                });
                 continue;
             }
             if low == "accept" {
@@ -560,6 +615,10 @@ async fn harbor_fetch_inner(
         }
     }
     if let Some((cookie, ua)) = cf {
+        let cookie = match caller_cookie {
+            Some(caller) if !caller.trim().is_empty() => merge_cookie_headers(&caller, &cookie),
+            _ => cookie,
+        };
         headers.push(("Cookie".to_string(), cookie));
         headers.push(("User-Agent".to_string(), ua));
         has_user_agent = true;
@@ -577,6 +636,68 @@ async fn harbor_fetch_inner(
         headers.push(("Accept-Language".to_string(), "en-US,en;q=0.9".to_string()));
     }
 
+    let cache_image = args.cache_image.unwrap_or(false)
+        && method == "GET"
+        && args.response_type.as_deref() == Some("base64")
+        && !allow_local_network
+        && !public_network_only
+        && subtitle_credential.is_none()
+        && args.body.is_none()
+        && args.body_base64.is_none()
+        && headers.iter().all(|(name, _)| {
+            matches!(
+                name.to_ascii_lowercase().as_str(),
+                "user-agent" | "accept" | "accept-language"
+            )
+        });
+    let mut cached_image = None;
+    if cache_image {
+        let disk_app = app.clone();
+        let disk_url = args.url.clone();
+        let width = args.thumb_width_px.unwrap_or(0);
+        cached_image = tokio::task::spawn_blocking(move || {
+            crate::thumb_cache::read_thumb(&disk_app, &disk_url, width)
+        })
+        .await
+        .ok()
+        .flatten();
+        if let Some(hit) = cached_image.as_ref() {
+            if hit.fresh
+                && args
+                    .max_response_bytes
+                    .is_none_or(|limit| hit.bytes.len() as u64 <= limit)
+            {
+                return Ok(HarborFetchResponse {
+                    status: 200,
+                    ok: true,
+                    body: base64::engine::general_purpose::STANDARD.encode(&hit.bytes),
+                    asset_path: None,
+                    content_type: Some(hit.content_type.clone()),
+                    headers: HashMap::from([
+                        ("content-type".to_string(), hit.content_type.clone()),
+                        ("x-harbor-image-cache".to_string(), "hit".to_string()),
+                        (
+                            "x-harbor-image-max-age".to_string(),
+                            hit.max_age.to_string(),
+                        ),
+                    ]),
+                    url: Some(args.url.clone()),
+                });
+            }
+            if let Some(etag) = &hit.etag {
+                headers.push(("If-None-Match".to_string(), etag.clone()));
+            }
+            if let Some(modified) = &hit.modified {
+                headers.push(("If-Modified-Since".to_string(), modified.clone()));
+            }
+        }
+    }
+
+    // Cached bytes need no DNS lookup. Outbound image requests keep the same
+    // target validation as other HTTP requests, including conditional refreshes.
+    if args.cache_image.unwrap_or(false) {
+        validate_target(&current_url, allow_local_network).await?;
+    }
     let mut body = match args.body_base64 {
         Some(value) => Some(
             base64::engine::general_purpose::STANDARD
@@ -617,13 +738,23 @@ async fn harbor_fetch_inner(
             req = req.body(b.clone());
         }
 
-        let resp = req.send().await.map_err(|error| {
-            if subtitle_credential.is_some() {
-                "send: subtitle provider request failed".to_string()
-            } else {
-                format!("send: {error}")
+        let resp = match req.send().await {
+            Ok(resp) => resp,
+            Err(error) => {
+                // A previously cached image is still useful when the origin is
+                // unreachable; the old filesystem cache served it for 30 days.
+                if let Some(hit) = cached_image.as_ref() {
+                    if !hit.fresh {
+                        return stale_image_response(&args.url, args.max_response_bytes, hit);
+                    }
+                }
+                return Err(if subtitle_credential.is_some() {
+                    "send: subtitle provider request failed".to_string()
+                } else {
+                    format!("send: {error}")
+                });
             }
-        })?;
+        };
         let status = resp.status();
         if !follow_redirects || !is_followable_redirect(status) {
             break resp;
@@ -644,6 +775,8 @@ async fn harbor_fetch_inner(
         let next_url = current_url
             .join(&location)
             .map_err(|e| format!("redirect url: {}", e))?;
+        // The guard URL is only a hint; response markers determine a challenge.
+        let _guard_redirect = is_dle_guard_redirect(&current_url, &next_url);
         if next_url.scheme() != "http" && next_url.scheme() != "https" {
             return Err(format!("redirect bad scheme: {}", next_url.scheme()));
         }
@@ -679,6 +812,13 @@ async fn harbor_fetch_inner(
 
     let status = res.status().as_u16();
     let ok = res.status().is_success();
+    if cache_image && (status >= 500 || status == 429 || status == 403) {
+        if let Some(hit) = cached_image.as_ref() {
+            if !hit.fresh {
+                return stale_image_response(&args.url, args.max_response_bytes, hit);
+            }
+        }
+    }
     let cf_mitigated = res
         .headers()
         .get("cf-mitigated")
@@ -689,70 +829,310 @@ async fn harbor_fetch_inner(
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
-    let response_headers = collect_headers(res.headers());
+    let mut response_headers = collect_headers(res.headers());
+    if status == 304 {
+        if let Some(mut hit) = cached_image.take() {
+            if args
+                .max_response_bytes
+                .is_some_and(|limit| hit.bytes.len() as u64 > limit)
+            {
+                return Err("response size limit exceeded".to_string());
+            }
+            let body = base64::engine::general_purpose::STANDARD.encode(&hit.bytes);
+            hit.etag = response_headers.get("etag").cloned().or(hit.etag);
+            hit.modified = response_headers
+                .get("last-modified")
+                .cloned()
+                .or(hit.modified);
+            let content_type = hit.content_type.clone();
+            let freshness =
+                hit.revalidated_lifetime(response_headers.get("cache-control").map(String::as_str));
+            if let Some(lifetime) = freshness {
+                let app = app.clone();
+                let url = args.url.clone();
+                let width = args.thumb_width_px.unwrap_or(0);
+                let _ = tokio::task::spawn_blocking(move || {
+                    crate::thumb_cache::write_thumb(
+                        &app,
+                        &url,
+                        width,
+                        &hit,
+                        lifetime,
+                        image_generation,
+                    )
+                })
+                .await;
+            } else {
+                let app = app.clone();
+                let url = args.url.clone();
+                let width = args.thumb_width_px.unwrap_or(0);
+                let _ = tokio::task::spawn_blocking(move || {
+                    crate::thumb_cache::remove_thumb(&app, &url, width, image_generation)
+                })
+                .await;
+            }
+            return Ok(HarborFetchResponse {
+                status: 200,
+                ok: true,
+                body,
+                asset_path: None,
+                content_type: Some(content_type.clone()),
+                headers: HashMap::from([
+                    ("content-type".to_string(), content_type),
+                    (
+                        "x-harbor-image-cache".to_string(),
+                        "revalidated".to_string(),
+                    ),
+                    (
+                        "x-harbor-image-max-age".to_string(),
+                        freshness.unwrap_or(0).to_string(),
+                    ),
+                ]),
+                url: Some(args.url.clone()),
+            });
+        }
+    }
+    let persistence = if cache_image
+        && ok
+        && content_type
+            .as_deref()
+            .is_some_and(|kind| kind.starts_with("image/"))
+    {
+        crate::thumb_cache::image_lifetime(
+            response_headers.get("cache-control").map(String::as_str),
+        )
+        .map(|lifetime| {
+            (
+                lifetime,
+                image_generation,
+                response_headers.get("etag").cloned(),
+                response_headers.get("last-modified").cloned(),
+            )
+        })
+    } else {
+        None
+    };
+    if cache_image {
+        response_headers.insert("x-harbor-image-cache".to_string(), "miss".to_string());
+        if let Some((lifetime, ..)) = persistence.as_ref() {
+            response_headers.insert("x-harbor-image-max-age".to_string(), lifetime.to_string());
+        }
+    }
     let final_url = res.url().to_string();
-    let body = if let Some(max_bytes) = args.max_response_bytes {
+    let (body, asset_path) = if let Some(max_bytes) = args.max_response_bytes {
         if res.content_length().is_some_and(|size| size > max_bytes) {
+            if let Some(hit) = cached_image.as_ref() {
+                if !hit.fresh {
+                    return stale_image_response(&args.url, args.max_response_bytes, hit);
+                }
+            }
             return Err("response size limit exceeded".to_string());
         }
         let mut bytes = Vec::new();
-        while let Some(chunk) = res
-            .chunk()
-            .await
-            .map_err(|error| format!("read: {error}"))?
-        {
-            if (bytes.len() as u64).saturating_add(chunk.len() as u64) > max_bytes {
-                return Err("response size limit exceeded".to_string());
+        loop {
+            match res.chunk().await {
+                Ok(Some(chunk)) => {
+                    if (bytes.len() as u64).saturating_add(chunk.len() as u64) > max_bytes {
+                        if let Some(hit) = cached_image.as_ref() {
+                            if !hit.fresh {
+                                return stale_image_response(
+                                    &args.url,
+                                    args.max_response_bytes,
+                                    hit,
+                                );
+                            }
+                        }
+                        return Err("response size limit exceeded".to_string());
+                    }
+                    bytes.extend_from_slice(&chunk);
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    if let Some(hit) = cached_image.as_ref() {
+                        if !hit.fresh {
+                            return stale_image_response(&args.url, args.max_response_bytes, hit);
+                        }
+                    }
+                    return Err(format!("read: {error}"));
+                }
             }
-            bytes.extend_from_slice(&chunk);
         }
         if args.response_type.as_deref() == Some("base64") {
-            thumb_or_base64(&app, &final_url, args.thumb_width_px, &bytes).await
+            thumb_or_base64(
+                &app,
+                &args.url,
+                args.thumb_width_px,
+                bytes,
+                persistence,
+                return_asset,
+            )
+            .await?
         } else {
-            String::from_utf8_lossy(&bytes).into_owned()
+            (String::from_utf8_lossy(&bytes).into_owned(), None)
         }
     } else if args.response_type.as_deref() == Some("base64") {
         match res.bytes().await {
-            Ok(bytes) => thumb_or_base64(&app, &final_url, args.thumb_width_px, &bytes).await,
-            Err(_) => String::new(),
+            Ok(bytes) => {
+                thumb_or_base64(
+                    &app,
+                    &args.url,
+                    args.thumb_width_px,
+                    bytes.to_vec(),
+                    persistence,
+                    return_asset,
+                )
+                .await?
+            }
+            Err(_) => {
+                if let Some(hit) = cached_image.as_ref() {
+                    if !hit.fresh {
+                        return stale_image_response(&args.url, args.max_response_bytes, hit);
+                    }
+                }
+                (String::new(), None)
+            }
         }
     } else {
-        res.text().await.unwrap_or_default()
+        (res.text().await.unwrap_or_default(), None)
     };
 
-    if is_cloudflare_challenge(status, cf_mitigated.as_deref(), &body) {
-        if let Some(h) = original_host.as_deref() {
-            crate::cf_solver::cf_invalidate(h);
-        }
-        let solver_ok = original_host
+    if !retried && needs_source_login(&retry_args, status, content_type.as_deref()) {
+        return login_and_retry(app, retry_args, image_generation, request_id).await;
+    }
+
+    // Binary responses encode even Cloudflare HTML error pages as Base64.
+    // Decode only a bounded error body; never inspect or reinterpret normal images.
+    let challenge_html = if args.response_type.as_deref() == Some("base64")
+        && matches!(status, 403 | 503)
+        && content_type.as_deref().is_some_and(|kind| kind.to_ascii_lowercase().contains("html"))
+        && body.len() <= 128 * 1024
+    {
+        base64::engine::general_purpose::STANDARD
+            .decode(body.as_bytes())
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+    } else {
+        None
+    };
+    let challenge_body = challenge_html.as_deref().unwrap_or(&body);
+    let dle_challenge = is_dle_guard_page(challenge_body);
+    let challenged =
+        dle_challenge || is_cloudflare_challenge(status, cf_mitigated.as_deref(), challenge_body);
+
+
+    if !challenged
+        && (200..300).contains(&status)
+        && content_type
             .as_deref()
-            .map(solver_host_allowed)
-            .unwrap_or(false);
-        // The solver returns text, not a byte-preserving/base64 response, and does not
-        // participate in the caller's response-size contract. Binary/capped callers
-        // must receive the original bounded response instead of bypassing those rules.
-        if solver_ok
-            && args.response_type.as_deref() != Some("base64")
-            && args.max_response_bytes.is_none()
-        {
-            eprintln!("[cf] challenge detected ({}) for {}", status, args.url);
-            if let Ok(solved) = crate::cf_solver::cf_fetch(app, args.url.clone()).await {
-                return Ok(HarborFetchResponse {
-                    status: 200,
-                    ok: true,
-                    body: solved,
-                    content_type: None,
-                    headers: HashMap::new(),
-                    url: None,
-                });
-            }
+            .is_some_and(|kind| kind.contains("text/html"))
+    {
+        if let Some(reason) = crate::cf_solver::cf_security_page_reason(&body) {
+            eprintln!("[cf] response rejected because it contains a protection page: {reason}");
+            return Err(format!("source returned a protection page: {reason}"));
         }
     }
 
+    if challenged {
+        if can_recover_image(&retry_args) && verified_browser {
+            if let Some(host) = original_host.as_deref() {
+                // A native client can be rechallenged even with the WebView's cookies.
+                crate::cf_solver::cf_note_native_rechallenge(host);
+            }
+            if let Ok(Some(image)) =
+                crate::cf_solver::cf_browser_fetch_image(&app, &retry_args, request_id).await
+            {
+                return Ok(image);
+            }
+        }
+        if had_clearance && verified_browser {
+            if let Some(host) = original_host.as_deref() {
+                crate::cf_solver::cf_note_native_rechallenge(host);
+            }
+        }
+        // Once a verified browser is accepted but the native TLS fingerprint is
+        // challenged, prefer browser requests for this host in future.
+        if verified_browser && browser_eligible {
+            let host = original_host.as_deref().unwrap_or("");
+            if !crate::cf_solver::cf_browser_cooling_down(host) {
+                match crate::cf_solver::cf_browser_fetch(&app, &retry_args, request_id).await {
+                    Ok(Some(browser)) => {
+                        if !retried
+                            && needs_source_login(
+                                &retry_args,
+                                browser.status,
+                                browser.content_type.as_deref(),
+                            )
+                        {
+                            return login_and_retry(app, retry_args, image_generation, request_id)
+                                .await;
+                        }
+                        if (200..300).contains(&browser.status) {
+                            crate::cf_solver::cf_clear_browser_failure(host);
+                        }
+                        return Ok(browser_text_response(browser, retry_args.url));
+                    }
+                    Err(error) => eprintln!("[cf] browser fallback failed for {host}: {error}"),
+                    Ok(None) => {}
+                }
+                crate::cf_solver::cf_note_browser_failure(host);
+            }
+        }
+        if had_clearance && (!verified_browser || dle_challenge) {
+            if let Some(h) = original_host.as_deref() {
+                crate::cf_solver::cf_invalidate(h);
+            }
+        }
+        // The solver is user-interactive, so it only runs for text requests that did
+        // not opt into a response-size contract. Binary/capped callers keep the
+        // original bounded response.
+        if solver_ok {
+            if retried || (verified_browser && !dle_challenge) {
+            } else {
+                let verification = if can_recover_image(&retry_args) {
+                    let referer = retry_args.headers.as_ref()
+                        .and_then(|headers| headers.iter().find(|(name, _)| name.eq_ignore_ascii_case("referer")))
+                        .map(|(_, value)| value.clone());
+                    if let Some(referer) = referer {
+                        crate::cf_solver::cf_fetch_image_session(
+                            app.clone(), args.url.clone(), referer, dle_challenge,
+                        ).await
+                    } else {
+                        Err("image source Referer unavailable".to_string())
+                    }
+                } else {
+                    crate::cf_solver::cf_fetch_session(
+                        app.clone(), args.url.clone(), dle_challenge,
+                    ).await
+                };
+                match verification {
+                    Ok(()) => {
+                        return Box::pin(harbor_fetch_inner(
+                            app,
+                            retry_args,
+                            image_generation,
+                            true,
+                            request_id,
+                        ))
+                        .await;
+                    }
+                    Err(_) => {
+                    }
+                }
+            }
+            response_headers.insert("x-harbor-challenge".to_string(), "1".to_string());
+            response_headers.insert("x-harbor-challenge-url".to_string(), args.url.clone());
+        }
+    }
+
+    // A challenge can itself be served with HTTP 200. Never advertise it as
+    // successful source data after verification/replay has failed.
+    let status = if challenged && ok { 403 } else { status };
+    let ok = ok && !challenged;
     Ok(HarborFetchResponse {
         status,
         ok,
         body,
+        asset_path,
         content_type,
         headers: response_headers,
         url: Some(final_url),
@@ -772,6 +1152,262 @@ const BACKGROUND_PROVIDER_HOSTS: &[&str] = &[
 fn solver_host_allowed(host: &str) -> bool {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     !BACKGROUND_PROVIDER_HOSTS.contains(&host.as_str())
+}
+
+fn should_use_verified_browser(
+    had_clearance: bool,
+    verified_browser: bool,
+    browser_eligible: bool,
+    prefer_browser: bool,
+) -> bool {
+    verified_browser && browser_eligible && (!had_clearance || prefer_browser)
+}
+
+fn browser_text_response(
+    browser: crate::cf_solver::BrowserTextResponse,
+    url: String,
+) -> HarborFetchResponse {
+    let mut headers = HashMap::new();
+    if let Some(content_type) = browser.content_type.as_deref() {
+        headers.insert("content-type".to_string(), content_type.to_string());
+    }
+    HarborFetchResponse {
+        status: browser.status,
+        ok: (200..300).contains(&browser.status),
+        body: browser.body,
+        asset_path: None,
+        content_type: browser.content_type,
+        headers,
+        url: Some(url),
+    }
+}
+
+
+fn needs_source_login(args: &HarborFetchArgs, status: u16, content_type: Option<&str>) -> bool {
+    status == 401
+        && can_open_solver(args)
+        && content_type.is_some_and(|kind| kind.to_ascii_lowercase().contains("text/html"))
+        && browser_request(args).is_some_and(|request| request.allows_navigation())
+}
+
+async fn login_and_retry(
+    app: tauri::AppHandle,
+    args: HarborFetchArgs,
+    image_generation: u64,
+    request_id: uuid::Uuid,
+) -> Result<HarborFetchResponse, String> {
+    crate::cf_solver::cf_login_session(app.clone(), args.url.clone()).await?;
+    Box::pin(harbor_fetch_inner(
+        app,
+        args,
+        image_generation,
+        true,
+        request_id,
+    ))
+    .await
+}
+
+fn can_browser_fallback(args: &HarborFetchArgs) -> bool {
+    browser_request(args).is_some()
+}
+
+#[derive(Serialize)]
+pub(crate) struct BrowserRequest {
+    pub method: String,
+    pub headers: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub referrer: Option<String>,
+}
+
+impl BrowserRequest {
+    #[cfg(any(desktop, test))]
+    pub fn recovers_html_status(&self, status: u16, content_type: &str) -> bool {
+        matches!(status, 401 | 403)
+            && content_type.to_ascii_lowercase().contains("text/html")
+            && self.allows_navigation()
+    }
+
+    pub fn allows_navigation(&self) -> bool {
+        self.method == "GET"
+            && self.headers.get("accept").is_none_or(|accept| {
+                let accept = accept.to_ascii_lowercase();
+                accept.contains("text/html")
+                    || (!accept.contains("json")
+                        && !accept.contains("xml")
+                        && accept.contains("*/*"))
+            })
+    }
+}
+
+pub(crate) fn browser_request(args: &HarborFetchArgs) -> Option<BrowserRequest> {
+    let target = reqwest::Url::parse(&args.url).ok()?;
+    let method = args.method.as_deref().unwrap_or("GET").to_ascii_uppercase();
+    if target.scheme() != "https"
+        || !target.username().is_empty()
+        || target.password().is_some()
+        || !matches!(method.as_str(), "GET" | "POST")
+        || (method == "GET" && args.body.is_some())
+        || args
+            .body
+            .as_ref()
+            .is_some_and(|body| body.len() > 1024 * 1024)
+        || args.body_base64.is_some()
+        || args.credential_handle.is_some()
+        || args.response_type.as_deref() == Some("base64")
+        || args.max_response_bytes.is_some()
+        || args.follow_redirects == Some(false)
+    {
+        return None;
+    }
+    let mut headers = HashMap::new();
+    let mut referrer = None;
+    for (name, value) in args.headers.iter().flatten() {
+        let name = name.to_ascii_lowercase();
+        match name.as_str() {
+            "accept" | "accept-language" => {
+                headers.insert(name, value.clone());
+            }
+            // Keep the verified browser's actual User-Agent.
+            "user-agent" => {}
+            "origin" if value == &target.origin().ascii_serialization() => {}
+            "x-requested-with" if value.eq_ignore_ascii_case("XMLHttpRequest") => {
+                headers.insert(name, value.clone());
+            }
+            "referer" => {
+                let url = reqwest::Url::parse(value).ok()?;
+                if url.origin() != target.origin()
+                    || !url.username().is_empty()
+                    || url.password().is_some()
+                {
+                    return None;
+                }
+                referrer = Some(value.clone());
+            }
+            "content-type" if method == "POST" => {
+                let kind = value.split(';').next()?.trim().to_ascii_lowercase();
+                if !matches!(
+                    kind.as_str(),
+                    "application/json" | "application/x-www-form-urlencoded" | "text/plain"
+                ) {
+                    return None;
+                }
+                headers.insert(name, value.clone());
+            }
+            _ => return None,
+        }
+    }
+    Some(BrowserRequest {
+        method,
+        headers,
+        body: args.body.clone(),
+        referrer,
+    })
+}
+
+const MAX_CHAPTER_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
+
+// This is an explicit reader-only opt-in, never a blanket binary-fetch fallback.
+// Do not use a remote page as a challenge solver for authenticated requests.
+fn can_recover_image(args: &HarborFetchArgs) -> bool {
+    if args.allow_image_challenge != Some(true)
+        || args.response_type.as_deref() != Some("base64")
+        || !matches!(args.max_response_bytes, Some(1..=MAX_CHAPTER_IMAGE_BYTES))
+        || args.method.as_deref().is_some_and(|method| !method.eq_ignore_ascii_case("GET"))
+        || args.body.is_some()
+        || args.body_base64.is_some()
+        || args.credential_handle.is_some()
+        || args.public_network_only == Some(true)
+        || args.allow_local_network == Some(true)
+        || args.follow_redirects == Some(false)
+    {
+        return false;
+    }
+    let Ok(url) = reqwest::Url::parse(&args.url) else { return false };
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || !url.host_str().is_some_and(solver_host_allowed)
+    {
+        return false;
+    }
+    let has_referrer = args.headers.iter().flatten().any(|(name, value)| {
+        name.eq_ignore_ascii_case("referer")
+            && reqwest::Url::parse(value).is_ok_and(|referer| {
+                referer.scheme() == "https" && referer.username().is_empty()
+                    && referer.password().is_none()
+            })
+    });
+    has_referrer && args.headers.iter().flatten().all(|(name, value)| {
+        match name.to_ascii_lowercase().as_str() {
+            "user-agent" | "accept" | "accept-language" => true,
+            "referer" | "origin" => reqwest::Url::parse(value).is_ok_and(|referrer| {
+                referrer.scheme() == "https"
+                    && referrer.username().is_empty()
+                    && referrer.password().is_none()
+            }),
+            _ => false,
+        }
+    })
+}
+
+fn can_open_solver(args: &HarborFetchArgs) -> bool {
+    can_recover_image(args)
+        || (args.response_type.as_deref() != Some("base64")
+            && args.max_response_bytes.is_none()
+            && reqwest::Url::parse(&args.url)
+                .ok()
+                .and_then(|url| url.host_str().map(solver_host_allowed))
+                .unwrap_or(false))
+}
+
+fn is_clearance_cookie(name: &str) -> bool {
+    name == "cf_clearance"
+        || name == "__guard_trust"
+        || name == "__cf_bm"
+        || name.starts_with("cf_chl")
+}
+
+fn is_dle_guard_redirect(from: &reqwest::Url, to: &reqwest::Url) -> bool {
+    from.scheme() == "https"
+        && same_origin(from, to)
+        && matches!(to.path().split('/').nth(1), Some("_c" | "_v"))
+}
+
+fn merge_cookie_headers(caller: &str, solver: &str) -> String {
+    let mut cookies: Vec<(String, String)> = Vec::new();
+    for pair in caller.split(';') {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
+        let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if let Some((_, current)) = cookies.iter_mut().find(|(existing, _)| existing == name) {
+            *current = value.to_string();
+        } else {
+            cookies.push((name.to_string(), value.to_string()));
+        }
+    }
+    for pair in solver.split(';') {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
+        let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if let Some((_, current)) = cookies.iter_mut().find(|(existing, _)| existing == name) {
+            if is_clearance_cookie(name) {
+                *current = value.to_string();
+            }
+        } else {
+            cookies.push((name.to_string(), value.to_string()));
+        }
+    }
+    cookies
+        .into_iter()
+        .map(|(name, value)| format!("{name}={value}"))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 fn is_cloudflare_hard_block(body: &str) -> bool {
@@ -795,6 +1431,8 @@ fn is_cloudflare_challenge(status: u16, cf_mitigated: Option<&str>, body: &str) 
         || body.contains("cf_chl_opt")
         || body.contains("challenge-form")
         || body.contains("cf-please-wait")
+        || body.contains("challenge-platform")
+        || body.contains("Enable JavaScript and cookies to continue")
 }
 
 #[derive(Debug, Deserialize)]
@@ -865,6 +1503,7 @@ async fn harbor_upload_inner(args: HarborUploadArgs) -> Result<HarborFetchRespon
         status,
         ok,
         body,
+        asset_path: None,
         content_type,
         headers,
         url,
@@ -877,11 +1516,135 @@ fn cross_origin_redirect_forwards_body(cross_origin: bool, body: &Option<Vec<u8>
 
 #[cfg(test)]
 mod tests {
+    use super::HarborFetchArgs;
     use super::{
-        apply_redirect_method, cross_origin_redirect_forwards_body, host_is_blocked_literal,
-        is_https_downgrade, is_public_network_ip, same_origin, solver_host_allowed, strip_headers,
-        validate_target,
+        apply_redirect_method, cached_image_response, cross_origin_redirect_forwards_body,
+        host_is_blocked_literal, is_cloudflare_challenge, is_https_downgrade, is_public_network_ip,
+        merge_cookie_headers, same_origin, solver_host_allowed, validate_target,
     };
+    use crate::thumb_cache::CachedImage;
+    use std::collections::HashMap;
+
+    #[test]
+    fn chapter_image_verification_requires_explicit_bounded_public_image_request() {
+        let mut request = HarborFetchArgs {
+            url: "https://pages.cdn.example/chapter/1.jpg".into(),
+            method: Some("GET".into()),
+            headers: Some(HashMap::from([
+                ("Referer".into(), "https://batcave.biz/".into()),
+                ("User-Agent".into(), "Reader".into()),
+            ])),
+            body: None,
+            body_base64: None,
+            timeout_ms: Some(30_000),
+            response_type: Some("base64".into()),
+            max_response_bytes: Some(32 * 1024 * 1024),
+            credential_handle: None,
+            public_network_only: None,
+            allow_local_network: None,
+            follow_redirects: None,
+            thumb_width_px: None,
+            cache_image: None,
+            allow_image_challenge: Some(true),
+            return_image_asset: None,
+        };
+        assert!(super::can_recover_image(&request));
+        assert!(super::can_open_solver(&request));
+        let headers = request.headers.take();
+        assert!(!super::can_recover_image(&request));
+        assert!(!super::can_open_solver(&request));
+        request.headers = headers;
+        assert!(!is_cloudflare_challenge(
+            403,
+            None,
+            "<title>Error 403 (Forbidden)!!1</title>You don't have permission to access this URL",
+        ));
+        request.allow_image_challenge = None;
+        assert!(!super::can_recover_image(&request));
+        assert!(!super::can_open_solver(&request));
+        request.allow_image_challenge = Some(true);
+        request.credential_handle = Some("secret".into());
+        assert!(!super::can_recover_image(&request));
+        request.credential_handle = None;
+        request.headers.as_mut().unwrap().insert("Cookie".into(), "private=1".into());
+        assert!(!super::can_recover_image(&request));
+        request.headers.as_mut().unwrap().remove("Cookie");
+        request.max_response_bytes = None;
+        assert!(!super::can_recover_image(&request));
+        request.max_response_bytes = Some(32 * 1024 * 1024 + 1);
+        assert!(!super::can_recover_image(&request));
+        request.max_response_bytes = Some(1024);
+        request.url = "http://pages.cdn.example/chapter/1.jpg".into();
+        assert!(!super::can_recover_image(&request));
+        request.url = "https://pages.cdn.example/chapter/1.jpg".into();
+        request.allow_local_network = Some(true);
+        assert!(!super::can_recover_image(&request));
+    }
+
+    #[test]
+    fn guard_redirect_hint_is_source_independent_and_same_origin() {
+        let source = reqwest::Url::parse("https://comics.example/api.php").unwrap();
+        for path in ["/_c", "/_v?token=fixture", "/_c/step"] {
+            assert!(super::is_dle_guard_redirect(
+                &source,
+                &source.join(path).unwrap()
+            ));
+        }
+        for address in [
+            "https://comics.example/_chapter",
+            "https://comics.example/chapter/1",
+            "https://other.example/_c",
+            "http://comics.example/_c",
+            "https://comics.example:8443/_c",
+        ] {
+            assert!(!super::is_dle_guard_redirect(
+                &source,
+                &reqwest::Url::parse(address).unwrap()
+            ));
+        }
+        let other = reqwest::Url::parse("https://other.example/api").unwrap();
+        assert!(super::is_dle_guard_redirect(
+            &other,
+            &other.join("/_c").unwrap()
+        ));
+    }
+
+    #[test]
+    fn harvested_dle_trust_overrides_stale_caller_cookie() {
+        assert_eq!(
+            merge_cookie_headers("__guard_trust=old; preference=dark", "__guard_trust=fresh"),
+            "__guard_trust=fresh; preference=dark"
+        );
+    }
+
+    #[test]
+    fn stale_cached_image_response_honors_the_size_limit() {
+        let image = CachedImage {
+            bytes: b"abc".to_vec(),
+            content_type: "image/png".to_string(),
+            etag: None,
+            modified: None,
+            fresh: false,
+            max_age: 0,
+            lifetime: 60,
+        };
+        let response =
+            cached_image_response("https://example.com/a.png", Some(10), &image, "stale", 300)
+                .expect("stale response");
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, "YWJj");
+        assert_eq!(
+            response
+                .headers
+                .get("x-harbor-image-cache")
+                .map(String::as_str),
+            Some("stale")
+        );
+        assert!(
+            cached_image_response("https://example.com/a.png", Some(2), &image, "stale", 300)
+                .is_err()
+        );
+    }
 
     #[test]
     fn background_metadata_does_not_open_cloudflare_windows() {
@@ -912,6 +1675,172 @@ mod tests {
             ));
             assert!(!solver_host_allowed(url.host_str().unwrap()));
         }
+    }
+
+    #[test]
+    fn solver_clearance_replaces_stale_cf_cookies_and_keeps_the_session() {
+        assert_eq!(
+            merge_cookie_headers(
+                "session=abc; cf_clearance=stale",
+                "session=solver; __cf_bm=fresh; cf_clearance=new"
+            ),
+            "session=abc; cf_clearance=new; __cf_bm=fresh"
+        );
+        assert_eq!(
+            merge_cookie_headers("", "session=solver; cf_clearance=new"),
+            "session=solver; cf_clearance=new"
+        );
+    }
+
+    #[test]
+    fn verified_browser_preference_suppresses_native_retries_only_for_supported_requests() {
+        // A browser-only session should bypass a second native 403 immediately
+        // after verification, even on the recursive retry path.
+        assert!(super::should_use_verified_browser(false, true, true, true));
+        assert!(super::should_use_verified_browser(true, true, true, true));
+        assert!(!super::should_use_verified_browser(true, true, true, false));
+        assert!(!super::should_use_verified_browser(
+            false, false, true, true
+        ));
+        assert!(!super::should_use_verified_browser(
+            false, true, false, true
+        ));
+    }
+
+    #[test]
+    fn browser_fallback_preserves_safe_text_requests_and_rejects_credentials() {
+        let mut request = HarborFetchArgs {
+            url: "https://example.org/catalog".into(),
+            method: Some("GET".into()),
+            headers: None,
+            body: None,
+            body_base64: None,
+            timeout_ms: None,
+            response_type: None,
+            max_response_bytes: None,
+            credential_handle: None,
+            public_network_only: None,
+            allow_local_network: None,
+            follow_redirects: None,
+            thumb_width_px: None,
+            cache_image: None,
+            allow_image_challenge: None,
+            return_image_asset: None,
+        };
+        assert!(super::needs_source_login(&request, 401, Some("text/html")));
+        assert!(!super::needs_source_login(&request, 200, Some("text/html")));
+        assert!(!super::needs_source_login(
+            &request,
+            401,
+            Some("application/json")
+        ));
+        assert!(super::can_browser_fallback(&request));
+        request.headers = Some(HashMap::from([("Accept".into(), "text/html".into())]));
+        assert!(super::can_browser_fallback(&request));
+        request.headers = Some(HashMap::from([(
+            "User-Agent".into(),
+            "Plugin browser UA".into(),
+        )]));
+        assert!(super::can_browser_fallback(&request));
+        request.headers = Some(HashMap::from([(
+            "Referer".into(),
+            "https://example.org/".into(),
+        )]));
+        assert!(super::can_browser_fallback(&request));
+        request.headers = Some(HashMap::from([(
+            "Referer".into(),
+            "https://other.example/".into(),
+        )]));
+        assert!(!super::can_browser_fallback(&request));
+        request.headers = Some(HashMap::from([("Authorization".into(), "secret".into())]));
+        assert!(!super::can_browser_fallback(&request));
+        request.headers = None;
+        request.method = Some("POST".into());
+        request.body = Some("{\"chapter\":42,\"title\":\"a'b\\\"c\"}".into());
+        request.headers = Some(HashMap::from([
+            (
+                "Content-Type".into(),
+                "application/json; charset=utf-8".into(),
+            ),
+            ("Accept".into(), "application/json, */*".into()),
+            ("Referer".into(), "https://example.org/reader".into()),
+            ("User-Agent".into(), "Plugin UA".into()),
+        ]));
+        let browser = super::browser_request(&request).unwrap();
+        assert_eq!(browser.method, "POST");
+        assert_eq!(browser.body, request.body);
+        assert_eq!(
+            browser.referrer.as_deref(),
+            Some("https://example.org/reader")
+        );
+        assert_eq!(
+            browser.headers.get("content-type").unwrap(),
+            "application/json; charset=utf-8"
+        );
+        assert!(!browser.headers.contains_key("user-agent"));
+        assert!(!browser.allows_navigation());
+        assert!(!browser.recovers_html_status(401, "text/html"));
+        let encoded = serde_json::to_value(&browser).unwrap();
+        assert_eq!(encoded["body"], request.body.as_deref().unwrap());
+        request.headers = Some(HashMap::from([(
+            "Content-Type".into(),
+            "application/x-www-form-urlencoded".into(),
+        )]));
+        request.body = Some("news_id=1&chapter_id=2".into());
+        assert_eq!(super::browser_request(&request).unwrap().body, request.body);
+        for name in ["Cookie", "Authorization", "Origin", "X-API-Key"] {
+            request.headers = Some(HashMap::from([(name.into(), "fixture".into())]));
+            assert!(!super::can_browser_fallback(&request));
+        }
+        request.headers = None;
+        request.body = None;
+        request.method = Some("GET".into());
+        request.headers = Some(HashMap::from([(
+            "Accept".into(),
+            "application/json, */*".into(),
+        )]));
+        assert!(!super::browser_request(&request)
+            .unwrap()
+            .allows_navigation());
+        assert!(!super::browser_request(&request)
+            .unwrap()
+            .recovers_html_status(401, "text/html"));
+        request.headers = Some(HashMap::from([(
+            "Accept".into(),
+            "text/html,application/json,*/*".into(),
+        )]));
+        assert!(super::browser_request(&request)
+            .unwrap()
+            .allows_navigation());
+        let browser = super::browser_request(&request).unwrap();
+        assert!(browser.recovers_html_status(401, "text/html; charset=utf-8"));
+        assert!(browser.recovers_html_status(403, "text/html"));
+        assert!(!browser.recovers_html_status(404, "text/html"));
+        assert!(!browser.recovers_html_status(401, "application/json"));
+        request.headers = None;
+        assert!(super::browser_request(&request)
+            .unwrap()
+            .allows_navigation());
+        request.follow_redirects = Some(false);
+        assert!(!super::can_browser_fallback(&request));
+        request.follow_redirects = None;
+        request.max_response_bytes = Some(2048);
+        assert!(!super::can_browser_fallback(&request));
+    }
+
+    #[test]
+    fn detects_managed_and_localized_cloudflare_challenges() {
+        assert!(is_cloudflare_challenge(200, Some("challenge"), ""));
+        assert!(is_cloudflare_challenge(
+            403,
+            None,
+            "Enable JavaScript and cookies to continue",
+        ));
+        assert!(is_cloudflare_challenge(
+            503,
+            None,
+            r#"<script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1"></script>"#,
+        ));
     }
 
     #[test]

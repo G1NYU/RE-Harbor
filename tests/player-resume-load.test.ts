@@ -7,13 +7,15 @@ function harness() {
   const loads: any[] = [];
   let plays = 0,
     pauses = 0,
-    resolves = 0;
+    resolves = 0,
+    prefetches = 0;
   let resolve = async () => ({ ms: 600000, finished: false });
   const settings = { resumePrompt: false, resumePlayback: true };
   const bridge = {
     load: async (src: any) => {
       loads.push(src);
     },
+    capabilities: () => ({ engine: "mpv", external: false }),
     play: async () => {
       plays++;
     },
@@ -37,7 +39,11 @@ function harness() {
     "@/lib/settings": { useSettings: () => ({ settings }) },
     "@/lib/stremio": { cloudWriteId: (id: string) => id },
     "./use-stremio-sync": { videoIdFor: () => "tt100:1:1" },
+    "@/lib/perf/playback-trace": { markPlaybackTrace() {} },
     "@/lib/player/resume-start": {
+      prefetchResumeStart: () => {
+        prefetches++;
+      },
       resolveStartMs: () => {
         resolves++;
         return resolve();
@@ -48,6 +54,7 @@ function harness() {
     "@/lib/player/load-identity": { playerLoadIdentity },
     "@/lib/stream-proxy": { releaseStreamProxy() {}, retainStreamProxy() {} },
     "@/lib/playback-history": { isPlaybackActorCurrent: () => true },
+    "@/lib/player/track-preferences": { initialTrackSelector: () => () => ({}) },
   });
   return {
     ...h,
@@ -59,6 +66,9 @@ function harness() {
     },
     get pauses() {
       return pauses;
+    },
+    get prefetches() {
+      return prefetches;
     },
     get resolves() {
       return resolves;
@@ -110,6 +120,7 @@ test("resume prompt waits for the user's choice", async () => {
   h.render();
   await flushPromises();
   assert.equal(h.loads[0].startAtSec, undefined);
+  assert.equal(h.loads[0].startPaused, true);
   const state = h.render();
   assert.equal(state.pendingResumeSec, 600);
   assert.equal(state.resumeReady, false);
@@ -129,7 +140,10 @@ test("live, start-over, disabled resume and room guests do not load at saved pro
     await flushPromises();
     assert.equal(h.loads[0].startAtSec, undefined, mode);
     assert.equal(h.render().pendingSeekSec, null, mode);
-    if (mode === "guest") assert.equal(h.plays, 0);
+    if (mode === "guest") {
+      assert.equal(h.plays, 0);
+      assert.equal(h.loads[0].startPaused, true);
+    }
   }
 });
 
@@ -141,7 +155,25 @@ test("explicit paused source replacement retains its position with auto-resume d
   h.render();
   await flushPromises();
   assert.equal(h.loads[0].startAtSec, 900);
+  assert.equal(h.loads[0].startPaused, true);
   assert.equal(h.plays, 0);
+});
+
+test("a replacement episode passes its current title to the reused bridge", async () => {
+  const h = harness();
+  h.args.src = { ...h.args.src, title: "Show", subtitle: "Episode 1" };
+  h.render();
+  await flushPromises();
+  assert.equal(h.loads[0].title, "Show - Episode 1");
+
+  h.args.src = {
+    ...h.args.src,
+    url: "https://fixture.test/episode-2.mkv",
+    subtitle: "Episode 2",
+  };
+  h.render();
+  await flushPromises();
+  assert.equal(h.loads[1].title, "Show - Episode 2");
 });
 
 test("unmount before resume resolution prevents any playback side effects", async () => {
@@ -159,4 +191,32 @@ test("unmount before resume resolution prevents any playback side effects", asyn
   await flushPromises();
   assert.equal(h.loads.length, 0);
   assert.equal(h.plays, 0);
+});
+
+test("resume lookup starts before the bridge is ready without loading early", async () => {
+  const h = harness();
+  h.args.bridgeReady = false;
+  h.render();
+  await flushPromises();
+  assert.equal(h.prefetches, 1);
+  assert.equal(h.resolves, 0);
+  assert.equal(h.loads.length, 0);
+  h.args.bridgeReady = true;
+  h.render();
+  await flushPromises();
+  assert.equal(h.prefetches, 1);
+  assert.equal(h.loads[0].startAtSec, 600);
+});
+
+test("explicit starts, live streams and disabled resume do not prefetch cloud progress", () => {
+  for (const mode of ["explicit", "live", "restart", "disabled"]) {
+    const h = harness();
+    h.args.bridgeReady = false;
+    if (mode === "explicit") h.args.src.startPositionMs = 1000;
+    if (mode === "live") h.args.src.live = true;
+    if (mode === "restart") h.args.src.startFromZero = true;
+    if (mode === "disabled") h.settings.resumePlayback = false;
+    h.render();
+    assert.equal(h.prefetches, 0, mode);
+  }
 });

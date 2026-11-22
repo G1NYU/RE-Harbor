@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Film, LoaderCircle, Mic2, Play, Radio, RotateCcw, Search } from "@/components/icons/music-icons";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Film,
+  LoaderCircle,
+  Mic2,
+  Play,
+  Radio,
+  RotateCcw,
+  Search,
+} from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
 import { MusicArtistLink } from "./music-artist-link";
 import { useMusicItemMenu } from "./music-item-menu";
@@ -7,12 +17,14 @@ import { useT } from "@/lib/i18n";
 import { useDragScroll } from "@/lib/use-drag-scroll";
 import {
   MUSIC_VIDEO_KIND_LABELS,
+  anchoredVideoQuery,
   musicVideoQuery,
   musicVideoUsesYoutube,
   type MusicVideoKind,
 } from "@/lib/music/video-discovery";
 import { appendMusicVideos, searchMusicVideoPage } from "@/lib/music/video-pages";
 import type { MusicTrack } from "@/lib/music/types";
+import { getMusicState } from "@/lib/music/player";
 import youtubeLogo from "@/assets/service-logos/youtube.ico";
 import "./music-video-discovery.css";
 
@@ -62,10 +74,14 @@ export function MusicVideoDiscovery({
     error: boolean;
     next: string | null;
   } | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false), [moreError, setMoreError] = useState(false);
-  const generation = useRef(0), moreRequest = useRef(false), seenCursors = useRef(new Set<string>());
+  const [loadingMore, setLoadingMore] = useState(false),
+    [moreError, setMoreError] = useState(false);
+  const generation = useRef(0),
+    moreRequest = useRef(false),
+    seenCursors = useRef(new Set<string>());
   const resultSubject = queryOverride?.base === baseQuery ? "" : filterSubject;
-  const searchKey = `${regular}:${resultSubject}:${search}`;
+  const requestQuery = anchoredVideoQuery(search, getMusicState().current);
+  const searchKey = `${regular}:${resultSubject}:${requestQuery}`;
   const [edges, setEdges] = useState({ start: true, end: true });
   const tracks = result?.tracks ?? [];
   const itemMenu = useMusicItemMenu({
@@ -80,9 +96,15 @@ export function MusicVideoDiscovery({
   useEffect(() => {
     const node = root.current;
     if (!node) return;
-    const observer = new IntersectionObserver(([entry]) => { setVisible(entry.isIntersecting); if (entry.isIntersecting) setActivated(true); }, {
-      rootMargin: "160px",
-    });
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setVisible(entry.isIntersecting);
+        if (entry.isIntersecting) setActivated(true);
+      },
+      {
+        rootMargin: "160px",
+      },
+    );
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -90,10 +112,12 @@ export function MusicVideoDiscovery({
     if (!active || !activated || !search.trim()) return;
     let cancelled = false;
     const version = ++generation.current;
-    moreRequest.current = false; seenCursors.current.clear();
-    setLoadingMore(false); setMoreError(false);
+    moreRequest.current = false;
+    seenCursors.current.clear();
+    setLoadingMore(false);
+    setMoreError(false);
     setResult(null);
-    searchMusicVideoPage(search, regular, null, retry > 0, resultSubject)
+    searchMusicVideoPage(requestQuery, regular, null, retry > 0, resultSubject)
       .then((page) => {
         if (!cancelled) setResult({ key: searchKey, ...page, error: false });
       })
@@ -104,22 +128,46 @@ export function MusicVideoDiscovery({
       cancelled = true;
       if (generation.current === version) generation.current++;
     };
-  }, [active, activated, search, retry, regular, searchKey, resultSubject]);
+  }, [active, activated, search, retry, regular, searchKey, resultSubject, requestQuery]);
   const current = result?.key === searchKey ? result : null;
   const more = useCallback(async () => {
     if (!current?.next || moreRequest.current) return;
-    const version = generation.current, cursor = current.next;
-    moreRequest.current = true; setLoadingMore(true); setMoreError(false);
+    const version = generation.current,
+      cursor = current.next;
+    moreRequest.current = true;
+    setLoadingMore(true);
+    setMoreError(false);
     try {
-      const page = await searchMusicVideoPage(search, regular, cursor, false, resultSubject);
+      const page = await searchMusicVideoPage(requestQuery, regular, cursor, false, resultSubject);
       if (generation.current !== version) return;
       seenCursors.current.add(cursor);
-      setResult(previous => previous?.key === searchKey ? { ...previous, tracks: appendMusicVideos(previous.tracks, page.tracks), next: page.next && !seenCursors.current.has(page.next) ? page.next : null } : previous);
-    } catch { if (generation.current === version) setMoreError(true); }
-    finally { if (generation.current === version) { moreRequest.current = false; setLoadingMore(false); } }
-  }, [current, search, regular, searchKey, resultSubject]);
+      setResult((previous) =>
+        previous?.key === searchKey
+          ? {
+              ...previous,
+              tracks: appendMusicVideos(previous.tracks, page.tracks),
+              next: page.next && !seenCursors.current.has(page.next) ? page.next : null,
+            }
+          : previous,
+      );
+    } catch {
+      if (generation.current === version) setMoreError(true);
+    } finally {
+      if (generation.current === version) {
+        moreRequest.current = false;
+        setLoadingMore(false);
+      }
+    }
+  }, [current, search, regular, searchKey, resultSubject, requestQuery]);
   const moreRef = useRef<(() => void) | null>(null);
-  useEffect(() => { moreRef.current = active && visible && !loadingMore && !moreError && current?.next ? () => { void more(); } : null; }, [active, visible, loadingMore, moreError, current, more]);
+  useEffect(() => {
+    moreRef.current =
+      active && visible && !loadingMore && !moreError && current?.next
+        ? () => {
+            void more();
+          }
+        : null;
+  }, [active, visible, loadingMore, moreError, current, more]);
   const railRef = rail.ref;
   const measure = useCallback(() => {
     const el = railRef.current;
@@ -174,21 +222,51 @@ export function MusicVideoDiscovery({
   ) : (
     <Film size={21} aria-hidden />
   );
-  const railControls = current && !current.error && (current.tracks.length > 0 || current.next) ? (
-    <div className="music-video-rail-controls">
-      {!controlsInHeader && moreError && <span role="alert" className="music-video-more-error">{t("music.videos.error")}</span>}
-      {current.next && <button type="button" className="music-video-more" onClick={() => { void more(); }} disabled={loadingMore}>
-        {loadingMore && <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden/>}
-        {t(moreError ? "common.retry" : "music.library.loadMore")}
-      </button>}
-      <button type="button" onClick={() => move(-1)} disabled={edges.start} aria-label={t("common.previous")}>
-        <ArrowLeft className="dir-icon" size={18} />
-      </button>
-      <button type="button" onClick={() => move(1)} disabled={edges.end} aria-label={t("common.next")}>
-        <ArrowRight className="dir-icon" size={18} />
-      </button>
-    </div>
-  ) : null;
+  const railControls =
+    current && !current.error && (current.tracks.length > 0 || current.next) ? (
+      <div className="music-video-rail-controls">
+        {!controlsInHeader && moreError && (
+          <span role="alert" className="music-video-more-error">
+            {t("music.videos.error")}
+          </span>
+        )}
+        {current.next && (
+          <button
+            type="button"
+            className="music-video-more"
+            onClick={() => {
+              void more();
+            }}
+            disabled={loadingMore}
+          >
+            {loadingMore && (
+              <LoaderCircle
+                size={16}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden
+              />
+            )}
+            {t(moreError ? "common.retry" : "music.library.loadMore")}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => move(-1)}
+          disabled={edges.start}
+          aria-label={t("common.previous")}
+        >
+          <ArrowLeft className="dir-icon" size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={() => move(1)}
+          disabled={edges.end}
+          aria-label={t("common.next")}
+        >
+          <ArrowRight className="dir-icon" size={18} />
+        </button>
+      </div>
+    ) : null;
   const searchForm = (
     <form onSubmit={submit}>
       <Search size={17} aria-hidden />
@@ -205,7 +283,12 @@ export function MusicVideoDiscovery({
     </form>
   );
   return (
-    <section ref={root} className="music-video-discovery" data-header-controls={controlsInHeader || undefined} aria-label={t(heading)}>
+    <section
+      ref={root}
+      className="music-video-discovery"
+      data-header-controls={controlsInHeader || undefined}
+      aria-label={t(heading)}
+    >
       <header>
         <div>
           <h2>
@@ -235,9 +318,20 @@ export function MusicVideoDiscovery({
             </div>
           )}
         </div>
-        {controlsInHeader ? <div className="music-video-header-tools">{railControls}{searchForm}</div> : searchForm}
+        {controlsInHeader ? (
+          <div className="music-video-header-tools">
+            {railControls}
+            {searchForm}
+          </div>
+        ) : (
+          searchForm
+        )}
       </header>
-      {controlsInHeader && moreError && <p role="alert" className="music-video-more-error music-video-header-error">{t("music.videos.error")}</p>}
+      {controlsInHeader && moreError && (
+        <p role="alert" className="music-video-more-error music-video-header-error">
+          {t("music.videos.error")}
+        </p>
+      )}
       {headerContent}
       {!current ? (
         <div className="music-video-skeleton" role="status" aria-label={t("music.videos.loading")}>

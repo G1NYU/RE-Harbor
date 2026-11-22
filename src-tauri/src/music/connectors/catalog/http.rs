@@ -4,7 +4,7 @@ use std::time::Duration;
 const AGENT: &str = concat!(
     "Harbor/",
     env!("CARGO_PKG_VERSION"),
-    " ( https://github.com/harborstremio/harbor )"
+    " ( https://github.com/HarborCommunity/Harbor )"
 );
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(6);
 
@@ -51,6 +51,6 @@ mod tests {
     #[test]
     fn the_user_agent_identifies_harbor_and_carries_a_contact() {
         assert!(AGENT.starts_with("Harbor/"));
-        assert!(AGENT.contains("https://github.com/harborstremio/harbor"));
+        assert!(AGENT.contains("https://github.com/HarborCommunity/Harbor"));
     }
 }

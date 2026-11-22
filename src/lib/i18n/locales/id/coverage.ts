@@ -1,4 +1,6 @@
 const coverage: Record<string, string> = {
+  "Waiting for {name}…": "Menunggu {name}…",
+  "Keeping the source you were watching.": "Mempertahankan sumber yang sedang Anda tonton.",
   "Sound descriptions": "Deskripsi suara",
   "Hide sound effects and speaker names": "Sembunyikan efek suara dan nama pembicara",
   "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
@@ -145,6 +147,7 @@ const coverage: Record<string, string> = {
   "70s": "70-an",
   "70s Auteurs": "Sineas 70-an",
   "8 seconds": "8 detik",
+  "10 seconds": "10 detik",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1. Separuh jumlah lintasan, lebih ringan untuk kartu yang lebih lemah.",
   "8-character key": "Kunci 8 karakter",
@@ -748,6 +751,35 @@ const coverage: Record<string, string> = {
     "Pilih apakah Harbor mengutamakan sumber langsung dan debrid, torrent peer-to-peer, atau menampilkan keduanya.",
   "Linking your Discord account also joins you to Harbor's Discord server, so the bot can send your Backup keys privately.":
     "Linking your Discord account also joins you to Harbor's Discord server, so the bot can send your Backup keys privately.",
+  "Largest first": "Terbesar dulu",
+  "Smallest first": "Terkecil dulu",
+  "Default order": "Urutan bawaan",
+  "Sort sources: {value}": "Urutkan sumber: {value}",
+  "Show keyboard shortcuts": "Tampilkan pintasan keyboard",
+  "Show or hide the list of player shortcuts.":
+    "Tampilkan atau sembunyikan daftar pintasan pemutar.",
+  "Press {key} to close. Change these in Settings.":
+    "Tekan {key} untuk menutup. Ubah di Pengaturan.",
+  "Cycle audio tracks": "Ganti trek audio",
+  "Switch to the next available audio track.": "Beralih ke trek audio berikutnya yang tersedia.",
+  "Smaller subtitles": "Subtitle lebih kecil",
+  "Decrease the subtitle text size.": "Perkecil ukuran teks subtitle.",
+  "Larger subtitles": "Subtitle lebih besar",
+  "Increase the subtitle text size.": "Perbesar ukuran teks subtitle.",
+  "Audio: {name}": "Audio: {name}",
+  "Subtitle size: {size}": "Ukuran subtitle: {size}",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

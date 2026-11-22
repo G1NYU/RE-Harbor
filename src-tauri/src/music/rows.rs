@@ -149,6 +149,23 @@ ON CONFLICT(id) DO UPDATE SET
     })
 }
 
+/// Drops cached rows so the next Home load rebuilds them. Signing a source in or out changes the
+/// shelves it contributes, and the cached copy was built from the other view.
+pub fn invalidate(database: &MusicDb, source: Option<&str>) -> Result<(), String> {
+    database.with_connection(|connection| {
+        // catalog_row_items cascades from catalog_rows, so the rows are enough to clear.
+        match source {
+            Some(source) => connection.execute(
+                "DELETE FROM catalog_rows WHERE source = ?1",
+                params![source],
+            ),
+            None => connection.execute("DELETE FROM catalog_rows", []),
+        }
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+    })
+}
+
 pub(super) fn merge_typed_results(
     results: Vec<(String, Result<MusicSearchResults, String>)>,
     limit: usize,
@@ -311,6 +328,42 @@ mod tests {
         let scoped = cached(&database, Some("spotify")).expect("read scoped rows");
         assert_eq!(scoped.len(), 1);
         assert_eq!(scoped[0].source, "spotify");
+    }
+
+    #[test]
+    fn invalidate_drops_one_source_without_touching_the_others() {
+        let database = MusicDb::in_memory();
+        store(
+            &database,
+            &[
+                row("cat:one", "catalog"),
+                row("ytm:home:liked", "youtube"),
+                row("sp:one", "spotify"),
+            ],
+        )
+        .expect("store rows");
+        invalidate(&database, Some("youtube")).expect("invalidate source");
+        let left = cached(&database, None).expect("read rows");
+        assert_eq!(
+            left.iter().map(|row| row.id.as_str()).collect::<Vec<_>>(),
+            vec!["cat:one", "sp:one"]
+        );
+        // The row's items cascade with it instead of lingering as orphans.
+        let items = database
+            .with_connection(|connection| {
+                connection
+                    .query_row(
+                        "SELECT count(*) FROM catalog_row_items WHERE row_id = 'ytm:home:liked'",
+                        [],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .map_err(|error| error.to_string())
+            })
+            .expect("count orphan items");
+        assert_eq!(items, 0);
+
+        invalidate(&database, None).expect("invalidate all");
+        assert!(cached(&database, None).expect("read rows").is_empty());
     }
 
     #[test]

@@ -48,6 +48,12 @@ export function clientFixture({ baseline = false, latency = 0, fetch } = {}) {
       },
     },
     "@/lib/request-scheduler": loadModule(readSource("src/lib/request-scheduler.ts")),
+    "@/lib/cache": loadModule(readSource("src/lib/cache.ts")),
+    "@/lib/media-cache": {
+      cachedMedia: async (_namespace, _scope, loader) => loader(),
+      metadataCacheTtl: () => 0,
+      MEDIA_TTL: { recent: 0 },
+    },
     "./tmdb-catalog-cache": catalogModule(),
   });
   return { client, requests: () => requests };
@@ -99,9 +105,22 @@ export function railFixture(source, active = true) {
         jsxs: (type, props) => ({ type, props }),
       },
       "@/components/feed-shelf": { FeedShelf: "FeedShelf" },
-      "@/components/row": { ScrollRootContext: {} },
+      "@/components/lazy-mount": { LazyMount: "LazyMount" },
+      "@/components/row": { ScrollRootContext: {}, resolveRowScrollRoot: (root) => root },
       "@/lib/i18n": { useT: () => (text) => text },
-      "@/lib/view": { useView: () => ({ openGrid: () => {} }) },
+      "@/lib/view": {
+        useView: () => ({ openGrid: () => {} }),
+        useViewActions: () => ({ openGrid: () => {} }),
+      },
+      "@/lib/visibility": {
+        observeWithin: (_element, rootMargin, callback, scrollRoot) => {
+          observer = {
+            callback: ([entry]) => callback(entry),
+            options: { root: scrollRoot, rootMargin },
+          };
+          return () => {};
+        },
+      },
     },
     {
       IntersectionObserver: class {

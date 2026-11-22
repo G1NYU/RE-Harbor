@@ -1,7 +1,7 @@
 use super::super::connectors::subsonic;
 use super::super::{
     connector, lastfm, spotify, worker, MusicSourceCandidate, MusicState, MusicTrack, ACTIVE_NONE,
-    ACTIVE_SPOTIFY,
+    ACTIVE_SPOTIFY, ACTIVE_MODULE_SPOTIFY, m3u,
 };
 use tauri::Manager;
 
@@ -15,8 +15,21 @@ pub async fn music_source_candidates(
     app: tauri::AppHandle,
     state: tauri::State<'_, MusicState>,
     track: MusicTrack,
+    connector: Option<String>,
 ) -> Result<Vec<MusicSourceCandidate>, String> {
-    let candidates = state.registry.candidates(&app, &track).await;
+    let only = connector
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let candidates = match only {
+        Some(connector_id) => {
+            state
+                .registry
+                .candidates_for(&app, &track, connector_id)
+                .await
+        }
+        None => state.registry.candidates(&app, &track).await,
+    };
     for candidate in &candidates {
         state.db.upsert_track(&candidate.track)?;
     }
@@ -29,8 +42,10 @@ pub async fn music_spotify_status(
 ) -> Result<spotify::SpotifyStatus, String> {
     let status = state.spotify.status().await?;
     if let Some(connector) = state.registry.get("spotify") {
-        connector.set_health(if status.connected {
+        connector.set_health(if status.playback_ready {
             connector::ConnectorHealth::Healthy
+        } else if status.connected || status.error.is_some() {
+            connector::ConnectorHealth::Degraded
         } else {
             connector::ConnectorHealth::Unknown
         });
@@ -102,9 +117,21 @@ pub async fn music_spotify_devices(
 
 #[tauri::command]
 pub async fn music_spotify_set_device(
+    app: tauri::AppHandle,
     state: tauri::State<'_, MusicState>,
     device: Option<String>,
 ) -> Result<(), String> {
+    // The managed Soloist is local playback, even though Spotify Connect also
+    // advertises it. Never persist it as a second, remote playback target.
+    if spotify::soloist::engine(&app) == "soloist" {
+        if let Some(selected) = device.as_deref() {
+            if let Ok(devices) = state.spotify.devices().await {
+                if spotify::soloist::selected_is_managed_soloist(selected, &devices) {
+                    return state.spotify.set_remote_device(None).await;
+                }
+            }
+        }
+    }
     state.spotify.set_remote_device(device).await
 }
 
@@ -115,6 +142,12 @@ pub fn music_spotify_device(state: tauri::State<'_, MusicState>) -> Option<Strin
 
 #[tauri::command]
 pub async fn music_spotify_disconnect(state: tauri::State<'_, MusicState>) -> Result<(), String> {
+    if state.active_engine()==ACTIVE_MODULE_SPOTIFY {
+        m3u::module_request_async(serde_json::json!({
+            "command":"spotify_disconnect"
+        })).await?;
+        state.set_active_engine(ACTIVE_NONE);
+    }
     state.spotify.disconnect().await?;
     if state.active_engine() == ACTIVE_SPOTIFY {
         state.set_active_engine(ACTIVE_NONE);

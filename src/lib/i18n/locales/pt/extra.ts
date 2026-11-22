@@ -192,7 +192,8 @@ const extra: Record<string, string> = {
   Budget: "Orçamento",
   "Buffer fill": "Preenchimento do buffer",
   "Reveal the dot on hover": "Mostrar o ponto ao passar o cursor",
-  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "O ponto fica fora do caminho e aparece quando você aponta para a barra. Desligue para mantê-lo sempre visível.",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.":
+    "O ponto fica fora do caminho e aparece quando você aponta para a barra. Desligue para mantê-lo sempre visível.",
   "Buffer fill brightness": "Brilho do preenchimento do buffer",
   Buffering: "Armazenando em buffer",
   Build: "Build",
@@ -249,7 +250,8 @@ const extra: Record<string, string> = {
     "Conecte um serviço debrid (Real-Debrid, TorBox, AllDebrid) para HD instantâneo sem espera.",
   "Connect MyAnimeList": "Conectar MyAnimeList",
   "Connect your MyAnimeList account": "Conecte sua conta do MyAnimeList",
-  "Connect your Trakt account to leave comments and reviews.": "Conecte sua conta Trakt para deixar comentários e avaliações.",
+  "Connect your Trakt account to leave comments and reviews.":
+    "Conecte sua conta Trakt para deixar comentários e avaliações.",
   "Connected as {username}": "Conectado como {username}",
   "Connected as @{user}": "Conectado como @{user}",
   "Connected as @{username}": "Conectado como @{username}",
@@ -263,7 +265,8 @@ const extra: Record<string, string> = {
   "Continue from last watched": "Continuar de onde parou",
   "Continue in your browser...": "Continue no seu navegador...",
   "Copy diagnostics": "Copiar diagnóstico",
-  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.": "Copiar diagnóstico captura o status do mecanismo e suas configurações de P2P como JSON, útil para colar em um relatório de bug. A pasta do mecanismo guarda o cache do DHT (dht.json) e os dados de transferências ativas.",
+  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.":
+    "Copiar diagnóstico captura o status do mecanismo e suas configurações de P2P como JSON, útil para colar em um relatório de bug. A pasta do mecanismo guarda o cache do DHT (dht.json) e os dados de transferências ativas.",
   "Copy your Harbor watchlist over to Trakt, or pull your Trakt watchlist into Harbor. Safe to run again, Trakt skips anything it already has.":
     "Copie sua watchlist do Harbor para o Trakt, ou importe sua watchlist do Trakt para o Harbor. Pode executar novamente com segurança, o Trakt ignora o que já existe.",
   "Corner radius": "Raio das bordas",
@@ -274,8 +277,8 @@ const extra: Record<string, string> = {
   "Couldn't connect to MyAnimeList": "Não foi possível conectar ao MyAnimeList",
   "Couldn't load this list. Check the URL and try again.":
     "Não foi possível carregar esta lista. Verifique a URL e tente novamente.",
-  "Couldn't reach harbor.site to load earlier builds. Check your connection and try again.":
-    "Não foi possível conectar ao harbor.site para carregar builds anteriores. Verifique sua conexão e tente novamente.",
+  "Couldn't reach GitHub to load earlier builds. Check your connection and try again.":
+    "Não foi possível conectar ao GitHub para carregar builds anteriores. Verifique sua conexão e tente novamente.",
   "Couldn't reach Trakt": "Não foi possível conectar ao Trakt",
   "Couldn't reach Trakt. Check your connection and try again.":
     "Não foi possível conectar ao Trakt. Verifique sua conexão e tente novamente.",
@@ -833,8 +836,8 @@ const extra: Record<string, string> = {
     "Mostra uma sobreposição rápida de volume quando você muda o volume com os controles do player ocultos, para que mudanças pelo teclado e pela roda do mouse fiquem sempre visíveis.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Mostra um botão Pular quando um anúncio injetado conhecido é reproduzido, e um pequeno botão de denúncia em lançamentos novos para você marcar anúncios para revisão.",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Mostra um botão Pular Abertura / Pular Créditos quando o Harbor detecta um. Desative para nunca mostrar. Você também pode tocar no X do botão para dispensar um errado pelo resto do episódio.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Mostra um botão Pular Abertura / Pular Créditos quando o Harbor detecta um. Desative para nunca mostrar. O botão se oculta sozinho quando a abertura ou os créditos terminam, ou após o atraso abaixo.",
   "Show an “on disk” badge on cards": "Mostrar um selo de “no disco” nos cartões",
   "Show audience score on cards": "Mostrar nota do público nos cartões",
   "Show comments on detail pages": "Mostrar comentários nas páginas de detalhes",
@@ -863,7 +866,8 @@ const extra: Record<string, string> = {
   "Show the full notes for this build": "Mostrar as notas completas desta versão",
   "Show the IMDb rating and synopsis on episodes across the list, grid, and panel layouts.":
     "Mostra a nota do IMDb e a sinopse dos episódios nos layouts de lista, grade e painel.",
-  "Show the report button on every P2P stream, not just likely new releases.": "Mostra o botão de denúncia em todo stream P2P, não só em prováveis lançamentos novos.",
+  "Show the report button on every P2P stream, not just likely new releases.":
+    "Mostra o botão de denúncia em todo stream P2P, não só em prováveis lançamentos novos.",
   "Show the Skip button": "Mostrar o botão Pular",
   "Show title": "Mostrar título",
   "Show TMDB score on cards": "Mostrar nota do TMDB nos cards",

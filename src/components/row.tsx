@@ -2,6 +2,8 @@ import {
   Children,
   createContext,
   isValidElement,
+  memo,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -11,12 +13,13 @@ import {
   type ReactNode,
 } from "react";
 import { observeResize, observeWithin } from "@/lib/visibility";
+import { isScrollActive } from "@/lib/scroll-activity";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ThreeLiquidGlassSurface } from "@/components/ThreeLiquidGlassSurface";
 import { NavChevron } from "./nav-arrow";
 import { useT, useUiLanguage, isRtl as checkRtl } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
-import { useView } from "@/lib/view";
+import { useViewActions } from "@/lib/view";
 import { resetPosterDock as resetPosterDockItems, updatePosterDock } from "@/lib/poster-dock";
 import { scrollDeltaToRevealCard } from "@/lib/poster-backdrop-expansion";
 import { RowCardExpansionProvider } from "@/components/row-card-expansion";
@@ -27,18 +30,42 @@ function columnSpan(value?: string): number {
   const span = value?.match(/span\s+(\d+)/)?.[1];
   return span ? Math.max(1, Number(span)) : 1;
 }
-const EAGER_COUNT = 6;
 const NEAR_MARGIN = "300px";
+const PAGE_MARGIN = "800px 0px";
 const FAR_RELEASE_MS = 15000;
+// Mounts and artwork updates compete for the same scroll frame. At rest the queue
+// can fill more cards at once.
+const CARD_UPDATES_DURING_SCROLL = 1;
+const CARD_UPDATES_AT_REST = 6;
+const pendingCardUpdates = new Set<() => void>();
+let cardUpdateFrame: number | undefined;
 
-export type RowShape =
-  | "portrait"
-  | "landscape"
-  | "service"
-  | "rank"
-  | "tile"
-  | "square"
-  | "cta";
+function updateQueuedCards() {
+  cardUpdateFrame = undefined;
+  const perFrame = isScrollActive() ? CARD_UPDATES_DURING_SCROLL : CARD_UPDATES_AT_REST;
+  startTransition(() => {
+    for (let i = 0; i < perFrame; i++) {
+      const update = pendingCardUpdates.values().next().value;
+      if (!update) break;
+      pendingCardUpdates.delete(update);
+      update();
+    }
+  });
+  if (pendingCardUpdates.size) cardUpdateFrame ??= requestAnimationFrame(updateQueuedCards);
+}
+
+export function queueRowCardUpdate(update: () => void): () => void {
+  pendingCardUpdates.add(update);
+  cardUpdateFrame ??= requestAnimationFrame(updateQueuedCards);
+  return () => {
+    pendingCardUpdates.delete(update);
+    if (pendingCardUpdates.size || cardUpdateFrame === undefined) return;
+    cancelAnimationFrame(cardUpdateFrame);
+    cardUpdateFrame = undefined;
+  };
+}
+
+export type RowShape = "portrait" | "landscape" | "service" | "rank" | "tile" | "square" | "cta";
 
 export const TV_CARD_MIN = 318;
 
@@ -58,17 +85,30 @@ export function usePosterRow(min = 144, kids = false): { min: number; shape: Row
 }
 
 const RowTrackContext = createContext<HTMLDivElement | null>(null);
-export const ScrollRootContext = createContext<HTMLElement | null>(null);
+export const ScrollRootContext = createContext<
+  HTMLElement | React.RefObject<HTMLElement | null> | null
+>(null);
+
+export function resolveRowScrollRoot(
+  root: React.ContextType<typeof ScrollRootContext>,
+  element: HTMLElement,
+): HTMLElement | undefined {
+  const scrollRoot = root && "current" in root ? root.current : root;
+  // A portal can inherit the page context while living outside its scroller.
+  return scrollRoot?.contains(element) ? scrollRoot : undefined;
+}
 
 function LazyChild({
   children,
   eager,
+  active,
   shape,
   span,
   expansion,
 }: {
   children: ReactNode;
   eager: boolean;
+  active: boolean;
   shape: RowShape;
   span?: string;
   expansion?: {
@@ -82,50 +122,59 @@ function LazyChild({
 }) {
   const root = useContext(RowTrackContext);
   const [visible, setVisible] = useState(eager);
+  const mounted = useRef(eager);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!root) return;
     const el = ref.current;
-    if (!el) return;
-    let hideTimer: number | null = null;
-    const stopIo = observeWithin(
+    if (!root || !el || eager) return;
+    let releaseTimer: number | undefined;
+    const cancelRelease = () => {
+      if (releaseTimer !== undefined) window.clearTimeout(releaseTimer);
+      releaseTimer = undefined;
+    };
+    const release = () => {
+      if (!mounted.current || releaseTimer !== undefined) return;
+      releaseTimer = window.setTimeout(() => {
+        releaseTimer = undefined;
+        if (el.contains(document.activeElement)) return;
+        mounted.current = false;
+        setVisible(false);
+      }, FAR_RELEASE_MS);
+    };
+    // The row's observer controls the vertical range. The track's observer then only
+    // mounts cells around the current horizontal offset, including restored offsets.
+    if (!active) {
+      release();
+      return cancelRelease;
+    }
+    let cancelMount: (() => void) | undefined;
+    const mount = () => {
+      cancelMount = undefined;
+      mounted.current = true;
+      setVisible(true);
+    };
+    const stop = observeWithin(
       el,
       NEAR_MARGIN,
       (entry) => {
-        if (entry.isIntersecting) {
-          if (hideTimer != null) {
-            window.clearTimeout(hideTimer);
-            hideTimer = null;
-          }
-          setVisible(true);
-        } else if (!eager && hideTimer == null) {
-          hideTimer = window.setTimeout(() => {
-            hideTimer = null;
-            setVisible(false);
-          }, FAR_RELEASE_MS);
+        if (!entry.isIntersecting) {
+          cancelMount?.();
+          cancelMount = undefined;
+          release();
+          return;
         }
+        cancelRelease();
+        if (!mounted.current) cancelMount ??= queueRowCardUpdate(mount);
       },
       root,
     );
-    const recheck = window.setTimeout(() => {
-      const rect = el.getBoundingClientRect();
-      const rr = root.getBoundingClientRect();
-      if (rr.width === 0 || rr.height === 0) return;
-      const near = 300;
-      const within =
-        rect.right > rr.left - near &&
-        rect.left < rr.right + near &&
-        rect.bottom > rr.top - near &&
-        rect.top < rr.bottom + near;
-      if (within) setVisible(true);
-    }, 400);
     return () => {
-      stopIo();
-      window.clearTimeout(recheck);
-      if (hideTimer != null) window.clearTimeout(hideTimer);
+      stop();
+      cancelMount?.();
+      cancelRelease();
     };
-  }, [root, eager]);
+  }, [root, eager, active]);
 
   return (
     <div
@@ -149,7 +198,7 @@ function LazyChild({
             : undefined
       }
     >
-      {visible ? (
+      {eager || visible ? (
         expansion ? (
           <RowCardExpansionProvider
             index={expansion.index}
@@ -164,7 +213,7 @@ function LazyChild({
           children
         )
       ) : (
-        <Skeleton shape={shape} />
+        <RowSkeletonCard shape={shape} />
       )}
     </div>
   );
@@ -185,7 +234,7 @@ function batchWrite(fn: () => void): void {
   });
 }
 
-function Skeleton({ shape }: { shape: RowShape }) {
+export const RowSkeletonCard = memo(function RowSkeletonCard({ shape }: { shape: RowShape }) {
   const { settings } = useSettings();
   const radius = settings.posterRadius;
   if (shape === "service") {
@@ -204,19 +253,19 @@ function Skeleton({ shape }: { shape: RowShape }) {
   }
   const aspect =
     shape === "landscape" ? "aspect-[16/9]" : shape === "square" ? "aspect-square" : "aspect-[2/3]";
-  const hideText = shape === "portrait" && settings.hidePosterTitles;
+  const hideText = shape === "landscape" || (shape === "portrait" && settings.hidePosterTitles);
   return (
     <div className="flex w-full min-w-0 flex-col gap-2.5">
       <div className={`${aspect} bg-elevated/40`} style={{ borderRadius: radius }} />
       {!hideText && (
-        <div className={`flex flex-col gap-1.5 ${shape === "landscape" ? "" : "h-9"}`}>
+        <div className="flex flex-col gap-1.5 h-9">
           <div className="h-3 w-3/5 rounded bg-elevated/35" />
           <div className="h-3 w-2/5 rounded bg-elevated/25" />
         </div>
       )}
     </div>
   );
-}
+});
 
 export function Row({
   title,
@@ -226,6 +275,7 @@ export function Row({
   min = 144,
   shape = "portrait",
   scrollKey,
+  scrollAnchorKey,
   arrowsAlways = false,
   alwaysActive = false,
   children,
@@ -246,6 +296,8 @@ export function Row({
   alwaysActive?: boolean;
   arrowsAlways?: boolean;
   scrollKey?: string;
+  /** Resets the row to its start when the head item changes. */
+  scrollAnchorKey?: string;
   children: React.ReactNode;
   onEndReached?: () => void;
   onViewAll?: () => void;
@@ -257,7 +309,8 @@ export function Row({
 }) {
   const { settings } = useSettings();
   const t = useT();
-  const { rememberRowScroll, recallRowScroll } = useView();
+  const { rememberRowScroll, recallRowScroll } = useViewActions();
+  const pageScrollRoot = useContext(ScrollRootContext);
   const lang = useUiLanguage();
   const rtl = checkRtl(lang);
   const tvCards =
@@ -268,6 +321,7 @@ export function Row({
   const dockEnabled = effShape === "portrait" && settings.posterDockMagnification;
   const posterHeightRatio = effShape === "landscape" ? 9 / 16 : effShape === "square" ? 1 : 1.5;
   const containerRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackEl, setTrackEl] = useState<HTMLDivElement | null>(null);
   const trackCb = useCallback((el: HTMLDivElement | null) => {
@@ -281,17 +335,27 @@ export function Row({
     index: number;
     widthScale: number;
   } | null>(null);
+  const hasEndCallback = onEndReached !== undefined;
   const onEndRef = useRef(onEndReached);
   useEffect(() => {
     onEndRef.current = onEndReached;
   });
 
   const [near, setNear] = useState(false);
+  const nearRef = useRef(false);
   useEffect(() => {
-    const el = containerRef.current;
+    const el = shellRef.current;
     if (!el) return;
-    return observeWithin(el, "600px", (e) => setNear(e.isIntersecting));
-  }, []);
+    return observeWithin(
+      el,
+      PAGE_MARGIN,
+      (entry) => {
+        nearRef.current = entry.isIntersecting;
+        startTransition(() => setNear(entry.isIntersecting));
+      },
+      resolveRowScrollRoot(pageScrollRoot, el),
+    );
+  }, [pageScrollRoot]);
   const measuredRef = useRef({ width: 0, effMin: 0 });
   // Width reported by the ResizeObserver for this row's container, so the measurement below does
   // not need a forced layout read.
@@ -299,7 +363,7 @@ export function Row({
   const measure = () => {
     const container = containerRef.current;
     if (!container) return;
-    const available = observedWidthRef.current || container.getBoundingClientRect().width;
+    const available = observedWidthRef.current;
     if (available <= 0) return;
     // The ResizeObserver also fires when the track's height changes, which is posters loading, not
     // a width change. Re-deriving the cell width then wrote the same value and re-laid-out the
@@ -312,13 +376,14 @@ export function Row({
     const next = (Math.ceil(raw * 64) + 1) / 64;
     batchWrite(() => setCellWidth(next));
   };
-  const measureRef = useRef(measure);
-  useLayoutEffect(() => {
-    measureRef.current = measure;
-  });
-
-  const readPos = (el: HTMLDivElement) => (rtl ? -el.scrollLeft : el.scrollLeft);
+  const lastScrollPosRef = useRef(0);
+  const readPos = (el: HTMLDivElement) => {
+    const pos = rtl ? -el.scrollLeft : el.scrollLeft;
+    lastScrollPosRef.current = pos;
+    return pos;
+  };
   const writePos = (el: HTMLDivElement, pos: number) => {
+    lastScrollPosRef.current = pos;
     el.scrollLeft = rtl ? -pos : pos;
   };
 
@@ -326,13 +391,35 @@ export function Row({
     const el = trackRef.current;
     if (!el) return;
     const pos = readPos(el);
-    const remaining = el.scrollWidth - el.clientWidth - pos;
+    const width = el.clientWidth;
+    const remaining = el.scrollWidth - width - pos;
     batchWrite(() => {
       setCanPrev(pos > 1);
       setCanNext(remaining > 1);
     });
-    if (el.clientWidth > 0 && remaining < 800) onEndRef.current?.();
+    if (width > 0 && remaining < 800 && (alwaysActive || nearRef.current)) {
+      onEndRef.current?.();
+    }
   };
+
+  const measureRef = useRef(() => {
+    measure();
+    measureScroll();
+  });
+  useLayoutEffect(() => {
+    measureRef.current = () => {
+      measure();
+      measureScroll();
+    };
+  });
+  const measureFrame = useRef<number | null>(null);
+  const scheduleMeasure = useCallback(() => {
+    if (measureFrame.current != null) return;
+    measureFrame.current = requestAnimationFrame(() => {
+      measureFrame.current = null;
+      measureRef.current();
+    });
+  }, []);
 
   const drag = useRef({
     active: false,
@@ -415,66 +502,86 @@ export function Row({
   );
 
   const childCount = Children.count(children);
+  const memoryKey =
+    scrollKey == null
+      ? undefined
+      : scrollAnchorKey != null
+        ? `${scrollKey}:${scrollAnchorKey}`
+        : scrollKey;
+  const prevAnchorRef = useRef(scrollAnchorKey);
+  const prevMemoryRef = useRef(memoryKey);
   const restoredRef = useRef(false);
   const userInteractedRef = useRef(false);
-  useLayoutEffect(() => {
-    measure();
-    measureScroll();
-  }, [childCount, trackEl, effMin, rtl]);
+  useEffect(() => {
+    scheduleMeasure();
+  }, [
+    childCount,
+    trackEl,
+    cellWidth,
+    effMin,
+    rtl,
+    near,
+    alwaysActive,
+    hasEndCallback,
+    scheduleMeasure,
+  ]);
+  useEffect(
+    () => () => {
+      if (measureFrame.current != null) cancelAnimationFrame(measureFrame.current);
+      measureFrame.current = null;
+    },
+    [],
+  );
   useLayoutEffect(() => {
     if (!trackEl || cellWidth == null) return;
-    if (scrollKey && !restoredRef.current && childCount > 0) {
-      const n = recallRowScroll(scrollKey);
-      const max = trackEl.scrollWidth - trackEl.clientWidth;
-      const target = n != null && n > 0 && max > 0 ? Math.min(n, max) : 0;
-      if (readPos(trackEl) !== target) writePos(trackEl, target);
+    if (memoryKey && !restoredRef.current && childCount > 0) {
+      const n = recallRowScroll(memoryKey);
+      // A fresh track is already at zero. Only a saved nonzero position needs
+      // synchronous geometry before paint; reading every new track forces layout.
+      if (n != null && n > 0) {
+        const max = trackEl.scrollWidth - trackEl.clientWidth;
+        const target = max > 0 ? Math.min(n, max) : 0;
+        writePos(trackEl, target);
+      }
       restoredRef.current = true;
+      // A restored position is intentional even if another page of cards arrives later.
+      userInteractedRef.current = n != null && n > 0;
       return;
     }
-    if (!userInteractedRef.current && readPos(trackEl) !== 0) {
+    if (!userInteractedRef.current && lastScrollPosRef.current !== 0) {
       writePos(trackEl, 0);
     }
-  }, [childCount, cellWidth, trackEl, scrollKey, recallRowScroll]);
+  }, [childCount, cellWidth, trackEl, memoryKey, recallRowScroll]);
 
   useEffect(() => {
     const container = containerRef.current;
     const track = trackRef.current;
     if (!container || !track) return;
-    let roRaf: number | null = null;
-    const scheduleMeasure = () => {
-      if (roRaf != null) return;
-      roRaf = requestAnimationFrame(() => {
-        roRaf = null;
-        measureRef.current();
-        measureScroll();
-      });
-    };
     // One shared ResizeObserver rather than one per row. A view mounts dozens of rows at once, so
     // each private observer was another object created during the click that switched to it — and
     // the entry already carries the width, so the measurement needs no layout read either.
     const stopContainerResize = observeResize(container, (rect) => {
-      if (container.offsetParent === null) return;
-      if (rect.width > 0) observedWidthRef.current = rect.width;
+      if (rect.width <= 0) return;
+      if (Math.abs(rect.width - observedWidthRef.current) < 0.5) return;
+      observedWidthRef.current = rect.width;
       scheduleMeasure();
     });
-    const stopTrackResize = observeResize(track, () => {
-      if (container.offsetParent === null) return;
+    let trackWidth = 0;
+    const stopTrackResize = observeResize(track, (rect) => {
+      if (rect.width <= 0) return;
+      if (Math.abs(rect.width - trackWidth) < 0.5) return;
+      trackWidth = rect.width;
       scheduleMeasure();
     });
     let saveTimer: number | null = null;
-    let scrollRaf: number | null = null;
     const onScroll = () => {
-      if (scrollRaf == null) {
-        scrollRaf = requestAnimationFrame(() => {
-          scrollRaf = null;
-          measureScroll();
-        });
-      }
-      if (!scrollKey) return;
+      readPos(track);
+      scheduleMeasure();
+      if (!memoryKey) return;
       if (saveTimer != null) window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => {
         saveTimer = null;
-        rememberRowScroll(scrollKey, readPos(track));
+        rememberRowScroll(memoryKey, readPos(track));
       }, 200);
     };
     track.addEventListener("scroll", onScroll, { passive: true });
@@ -526,7 +633,7 @@ export function Row({
           saveTimer = null;
         }
         writePos(track, 0);
-        rememberRowScroll(scrollKey, 0);
+        if (memoryKey) rememberRowScroll(memoryKey, 0);
         userInteractedRef.current = false;
       });
     };
@@ -534,8 +641,6 @@ export function Row({
     return () => {
       stopContainerResize();
       stopTrackResize();
-      if (roRaf != null) cancelAnimationFrame(roRaf);
-      if (scrollRaf != null) cancelAnimationFrame(scrollRaf);
       if (resetRaf != null) cancelAnimationFrame(resetRaf);
       track.removeEventListener("scroll", onScroll);
       track.removeEventListener("wheel", onWheel);
@@ -545,11 +650,11 @@ export function Row({
       if (saveTimer != null) window.clearTimeout(saveTimer);
       if (wheelSettle != null) window.clearTimeout(wheelSettle);
       if (rafId.current != null) cancelAnimationFrame(rafId.current);
-      if (scrollKey && readPos(track) > 0) {
-        rememberRowScroll(scrollKey, readPos(track));
+      if (memoryKey && lastScrollPosRef.current > 0) {
+        rememberRowScroll(memoryKey, lastScrollPosRef.current);
       }
     };
-  }, [scrollKey, rememberRowScroll]);
+  }, [scrollKey, memoryKey, rememberRowScroll, scheduleMeasure]);
 
   const scroll = (dir: -1 | 1) => {
     const el = trackRef.current;
@@ -652,6 +757,24 @@ export function Row({
     rafId.current = requestAnimationFrame(tick);
   };
 
+  useLayoutEffect(() => {
+    const previousAnchor = prevAnchorRef.current;
+    const previousMemory = prevMemoryRef.current;
+    prevAnchorRef.current = scrollAnchorKey;
+    prevMemoryRef.current = memoryKey;
+    if (previousAnchor === scrollAnchorKey) return;
+    // The head changing means the previous snapshot is no longer relevant.
+    // Clear it so switching back to an old head cannot restore a hidden start.
+    if (previousMemory) rememberRowScroll(previousMemory, 0);
+    const track = trackRef.current;
+    if (track) {
+      cancelGlide();
+      writePos(track, 0);
+    }
+    if (memoryKey) rememberRowScroll(memoryKey, 0);
+    userInteractedRef.current = false;
+  }, [scrollAnchorKey, memoryKey, rememberRowScroll]);
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dockPointerXRef.current = null;
     resetPosterDock();
@@ -747,6 +870,8 @@ export function Row({
 
   return (
     <div
+      ref={shellRef}
+      data-row-near={near ? "" : undefined}
       className={`harbor-row-shell flex min-w-0 flex-col gap-5 ps-[9px] ${shellRoom} ${className}`}
     >
       {hasHeader && (
@@ -821,7 +946,6 @@ export function Row({
             }}
             onClickCapture={onClickCapture}
             onDragStart={(e) => e.preventDefault()}
-            data-far={near ? undefined : ""}
             className={`harbor-row-track items-start gap-5 overflow-x-auto overflow-y-hidden ${trackPad} [scroll-snap-type:x_mandatory] [&>*]:[scroll-snap-align:start] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [overflow-anchor:none] [overscroll-behavior-x:contain] [&_img]:select-none [&_img]:[-webkit-user-drag:none] ${
               expandingCards
                 ? "harbor-expanding-card-scope harbor-expanding-row flex flex-nowrap"
@@ -851,7 +975,7 @@ export function Row({
                   : undefined;
               const viewportLimit = Math.max(
                 baseWidth,
-                (trackEl?.clientWidth ?? desiredExpandedWidth ?? baseWidth) - GAP * 2,
+                (observedWidthRef.current || measuredRef.current.width || baseWidth) - GAP * 2,
               );
               const expandedWidth =
                 desiredExpandedWidth === undefined
@@ -859,7 +983,8 @@ export function Row({
                   : Math.max(baseWidth, Math.min(desiredExpandedWidth, viewportLimit));
               return (
                 <LazyChild
-                  eager={alwaysActive || i < EAGER_COUNT}
+                  eager={alwaysActive}
+                  active={alwaysActive || near}
                   shape={effShape}
                   span={span}
                   expansion={

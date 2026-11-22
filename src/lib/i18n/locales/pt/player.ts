@@ -470,16 +470,30 @@ const player: Record<string, string> = {
   "Harbor's streaming server only runs in the desktop app.":
     "O servidor de streaming do Harbor só funciona no app para computador.",
   "Restarting the streaming server…": "Reiniciando o servidor de streaming…",
-  "Couldn't restart the streaming server.":
-    "Não foi possível reiniciar o servidor de streaming.",
-  "The streaming server didn't come back up.":
-    "O servidor de streaming não voltou a funcionar.",
+  "Couldn't restart the streaming server.": "Não foi possível reiniciar o servidor de streaming.",
+  "The streaming server didn't come back up.": "O servidor de streaming não voltou a funcionar.",
   "Streaming server restarted.": "Servidor de streaming reiniciado.",
   "Ignore this title": "Ignorar este título",
   "Never show the content advisory for this title again":
     "Nunca mais mostrar o aviso de conteúdo deste título",
   "Search audio language": "Buscar idioma de áudio",
   "No audio track in that language.": "Nenhuma faixa de áudio nesse idioma.",
+  "Largest first": "Maiores primeiro",
+  "Smallest first": "Menores primeiro",
+  "Default order": "Ordem padrão",
+  "Sort sources: {value}": "Ordenar fontes: {value}",
+  "Show keyboard shortcuts": "Mostrar atalhos de teclado",
+  "Show or hide the list of player shortcuts.": "Mostra ou oculta a lista de atalhos do player.",
+  "Press {key} to close. Change these in Settings.":
+    "Pressione {key} para fechar. Altere-os nas Configurações.",
+  "Cycle audio tracks": "Alternar faixas de áudio",
+  "Switch to the next available audio track.": "Muda para a próxima faixa de áudio disponível.",
+  "Smaller subtitles": "Legendas menores",
+  "Decrease the subtitle text size.": "Diminui o tamanho do texto das legendas.",
+  "Larger subtitles": "Legendas maiores",
+  "Increase the subtitle text size.": "Aumenta o tamanho do texto das legendas.",
+  "Audio: {name}": "Áudio: {name}",
+  "Subtitle size: {size}": "Tamanho da legenda: {size}",
 };
 
 export default player;

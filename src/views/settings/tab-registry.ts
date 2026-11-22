@@ -6,6 +6,7 @@ import letterboxdLogo from "@/assets/addon-logos/letterboxd.png";
 import publicmetadbLogo from "@/assets/publicmetadb.svg";
 import refractLogo from "@/assets/refract.png";
 import stremioLogo from "@/assets/stremio.png";
+import nuvioLogo from "@/assets/nuvio.png";
 import type { SectionId } from "./shared";
 
 export type TabEntry = { id: string; label: string; icon: string; img?: string };
@@ -15,7 +16,9 @@ export const SECTION_TABS: Partial<Record<SectionId, TabEntry[]>> = {
     { id: "you", label: "Your profile", icon: "UserRound" },
     { id: "profiles", label: "Profiles", icon: "Users" },
     { id: "harbor", label: "Harbor account", icon: "Harbor" },
+    { id: "provider", label: "Account provider", icon: "RefreshCw" },
     { id: "stremio", label: "Stremio", icon: "Play", img: stremioLogo },
+    { id: "nuvio", label: "Nuvio", icon: "Play", img: nuvioLogo },
   ],
   player: [
     { id: "play", label: "Play", icon: "PlayStart" },
@@ -37,6 +40,7 @@ export const SECTION_TABS: Partial<Record<SectionId, TabEntry[]>> = {
   ],
   shaders: [
     { id: "anime4k", label: "Anime Shaders", icon: "Sparkles" },
+    { id: "manga", label: "Manga Shaders", icon: "Wand2" },
     { id: "more", label: "More shaders", icon: "Layers" },
   ],
   anime: [

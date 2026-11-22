@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Play } from "@/components/icons/music-icons";
 import { Poster } from "@/components/poster";
 import { MusicTrackPlaybackMark } from "./music-now-playing-mark";
@@ -8,7 +9,8 @@ import { MusicMediaBadge } from "./music-media-badge";
 import { MusicTrackLabels } from "./music-track-labels";
 import { useMusicTrackContextMenu } from "./music-track-menu";
 
-export function MusicUpNextRow({
+/** Memoised: an Up-next row only redraws when its own track, queue or handlers change. */
+export const MusicUpNextRow = memo(function MusicUpNextRow({
   track,
   queue,
   onArtist,
@@ -18,7 +20,7 @@ export function MusicUpNextRow({
 }: {
   track: MusicTrack;
   queue: MusicTrack[];
-  onArtist: () => void;
+  onArtist: (track: MusicTrack) => void;
   onAlbum?: () => void;
   onAddToPlaylist?: () => void;
   onMoreLikeThis?: () => void;
@@ -29,7 +31,7 @@ export function MusicUpNextRow({
     onPlay: play,
     onAddToQueue: () => enqueueMusic(track),
     onAddToPlaylist,
-    onGoToArtist: onArtist,
+    onGoToArtist: () => onArtist(track),
     onGoToAlbum: onAlbum,
     onMoreLikeThis,
   });
@@ -48,14 +50,16 @@ export function MusicUpNextRow({
           ratio="square"
           className="w-full [--poster-radius:0px]"
           lazy
-        ><MusicTrackPlaybackMark track={track}/></Poster>
+        >
+          <MusicTrackPlaybackMark track={track} />
+        </Poster>
       </button>
       <span className="music-now-next-title">
         <button type="button" onClick={play}>
           <strong>{track.title}</strong>
         </button>
         <span className="flex items-center gap-2">
-          <button type="button" onClick={onArtist}>
+          <button type="button" onClick={() => onArtist(track)}>
             {track.artist}
           </button>
           <MusicMediaBadge kind={track.mediaKind} compact />
@@ -67,4 +71,4 @@ export function MusicUpNextRow({
       {menu.menu}
     </li>
   );
-}
+});

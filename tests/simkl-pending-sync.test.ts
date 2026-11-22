@@ -224,12 +224,12 @@ test("online arming is safe without a window", () => {
 
 test("hook queues failed stops and provider flushes on session", () => {
   const hook = readFileSync(new URL("../src/lib/simkl/scrobble-hook.ts", import.meta.url), "utf8");
-  assert.match(hook, /recordPendingWatch\(prev\.metaId, prev\.episode,/);
-  assert.match(hook, /recordPendingWatch\(a\.metaId, a\.episode,/);
+  assert.match(hook, /queueWatch\(prev\.metaId, prev\.episode, prev\.info, prev\.verifiedOnly\)/);
+  assert.match(hook, /queueWatch\(a\.metaId, a\.episode, a\.info, a\.verifiedOnly\)/);
   const provider = readFileSync(new URL("../src/lib/simkl/provider.tsx", import.meta.url), "utf8");
   assert.match(provider, /armPendingFlush\(\{/);
   assert.match(provider, /stopScrobble:/);
-  assert.match(provider, /simklScrobble\("stop", metaId, episode, 100\)/);
+  assert.match(provider, /"stop", metaId, episode, 100, undefined, Boolean\(episode\?\.sourceMetaId\)/);
   assert.match(provider, /flushPendingWatches\(\)/);
 });
 
@@ -242,4 +242,46 @@ test("the armed replay retries on a clock, not only on the next launch", () => {
   // leave the entry queued forever.
   const scrobble = readFileSync(new URL("../src/lib/simkl/scrobble.ts", import.meta.url), "utf8");
   assert.match(scrobble, /action === "stop" && e instanceof SimklApiError && e\.status === 409/);
+});
+
+
+test("verified native anime pending identity survives storage and replays only to the native owner", async () => {
+  clearPending();
+  recordPendingWatch("kitsu:49847", {
+    season: 1, episode: 1,
+    sourceMetaId: "kitsu:49847", kitsuStreamId: "kitsu:49847:1",
+  });
+  const queued = listPendingWatches();
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0]?.metaId, "kitsu:49847");
+  assert.equal(queued[0]?.episode?.sourceMetaId, "kitsu:49847");
+  assert.equal(queued[0]?.episode?.kitsuStreamId, "kitsu:49847:1");
+  const calls: Array<[string, string, string | undefined]> = [];
+  const r = await flushPendingWatches({
+    hasSession: () => true,
+    stopScrobble: async (id, episode) => {
+      calls.push(["stop", id, episode?.sourceMetaId]);
+      return true;
+    },
+    recordWatched: async (id, episode) => {
+      calls.push(["watched", id, episode?.sourceMetaId]);
+      return true;
+    },
+  });
+  assert.equal(r.remaining, 0);
+  assert.deepEqual(calls, [
+    ["stop", "kitsu:49847", "kitsu:49847"],
+    ["watched", "kitsu:49847", "kitsu:49847"],
+  ]);
+  clearPending();
+});
+
+test("mismatched stream IDs are never persisted as verified native evidence", () => {
+  clearPending();
+  recordPendingWatch("kitsu:49847", {
+    season: 1, episode: 1,
+    sourceMetaId: "kitsu:49847", kitsuStreamId: "kitsu:44294:1",
+  });
+  assert.equal(listPendingWatches()[0]?.episode?.kitsuStreamId, undefined);
+  clearPending();
 });

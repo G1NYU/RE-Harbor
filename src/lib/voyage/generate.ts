@@ -1,3 +1,4 @@
+import { addonOnlyMetadata } from "@/lib/metadata-policy";
 import { safeFetch } from "@/lib/safe-fetch";
 import { meta as fetchMeta, type Meta } from "@/lib/cinemeta";
 import { watchTitleKey } from "@/lib/playback-history";
@@ -37,9 +38,7 @@ function leadsWithGenre(m: Meta, genre?: string): boolean {
 async function curatedPool(theme: VoyageTheme, exclude?: PoolExclude): Promise<Meta[]> {
   const ids = theme.seeds ?? [];
   if (ids.length === 0) return [];
-  const got = await Promise.all(
-    ids.map((id) => fetchMeta(theme.type, id, true).catch(() => null)),
-  );
+  const got = await Promise.all(ids.map((id) => fetchMeta(theme.type, id, true).catch(() => null)));
   return got.filter((m): m is Meta => usable(m, exclude));
 }
 
@@ -52,6 +51,7 @@ function pageUrl(theme: VoyageTheme, skip: number): string {
 }
 
 async function livePage(theme: VoyageTheme, skip: number): Promise<Meta[]> {
+  if (addonOnlyMetadata()) return [];
   try {
     const res = await safeFetch(pageUrl(theme, skip));
     if (!res.ok) return [];

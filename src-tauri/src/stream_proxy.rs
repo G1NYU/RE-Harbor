@@ -30,6 +30,7 @@ use cast_audio::AudioCastState;
 #[derive(Clone)]
 struct Session {
     url: String,
+    audio_url: Option<String>,
     base_url: Option<String>,
     headers: HashMap<String, String>,
     transcode: bool,
@@ -83,6 +84,8 @@ pub struct RegisterResult {
 pub struct RegisterArgs {
     pub url: String,
     #[serde(default)]
+    pub audio_url: Option<String>,
+    #[serde(default)]
     pub headers: HashMap<String, String>,
     #[serde(default)]
     pub transcode: bool,
@@ -111,6 +114,11 @@ impl ProxyState {
             local_port: 0,
             client: reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
+                // Providers are frequently on the LAN (NzbDAV, media servers) while
+                // VPN and proxy tools export HTTP(S)_PROXY for the public internet.
+                // Every other Harbor HTTP client disables the environment proxy;
+                // without this the relay fails for exactly those sources.
+                .no_proxy()
                 .build()
                 .expect("proxy HTTP client"),
             hls: HlsState::new(),
@@ -144,6 +152,9 @@ impl ProxyState {
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .pool_idle_timeout(std::time::Duration::from_secs(60))
+            // See ProxyState::placeholder: a LAN provider must not be routed
+            // through an environment proxy meant for public traffic.
+            .no_proxy()
             .build()
             .map_err(|e| format!("client build: {}", e))?;
         let hls = HlsState::new();
@@ -224,6 +235,7 @@ impl ProxyState {
             if let Some((base, last_seg, query)) = split_playlist_url(&args.url) {
                 let session = Session {
                     url: args.url.clone(),
+                    audio_url: None,
                     base_url: Some(base),
                     headers: args.headers,
                     transcode: false,
@@ -257,6 +269,7 @@ impl ProxyState {
         };
         let session = Session {
             url: args.url.clone(),
+            audio_url: args.audio_url,
             base_url: None,
             headers: args.headers,
             transcode: args.transcode,
@@ -322,6 +335,7 @@ impl ProxyState {
         if let Some((base, last_seg, query)) = playlist_parts {
             let session = Session {
                 url: args.url.clone(),
+                audio_url: None,
                 base_url: Some(base),
                 headers: args.headers,
                 transcode: false,
@@ -340,6 +354,7 @@ impl ProxyState {
         }
         let session = Session {
             url: args.url.clone(),
+            audio_url: args.audio_url,
             base_url: None,
             headers: args.headers,
             transcode: args.transcode,
@@ -744,7 +759,7 @@ async fn fetch_prebuffer_prefix(
         }
         req = req.header(key, value);
     }
-    let upstream = crate::http_redirect::send_get(&client, req, url).await?;
+    let upstream = crate::http_redirect::send_get_playback(&client, req, url).await?;
     let status = upstream.status();
     if status != StatusCode::PARTIAL_CONTENT {
         return Err("range");
@@ -890,6 +905,7 @@ async fn handle_stream(
     if session.transcode {
         return handle_transcode(
             &session.url,
+            session.audio_url.as_deref(),
             &session.headers,
             &session.profile,
             session.burn_sub.as_ref(),
@@ -975,12 +991,13 @@ async fn forward_upstream(
         req = req.header(k, v);
     }
 
-    let upstream = match crate::http_redirect::send_get(&state.client, req, &session.url).await {
-        Ok(r) => r,
-        Err(e) => {
-            return (StatusCode::BAD_GATEWAY, format!("upstream error: {}", e)).into_response();
-        }
-    };
+    let upstream =
+        match crate::http_redirect::send_get_playback(&state.client, req, &session.url).await {
+            Ok(r) => r,
+            Err(e) => {
+                return (StatusCode::BAD_GATEWAY, format!("upstream error: {}", e)).into_response();
+            }
+        };
 
     let status =
         StatusCode::from_u16(upstream.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
@@ -1158,6 +1175,22 @@ pub async fn proxy_gc_idle(state: tauri::State<'_, ProxyState>) -> Result<usize,
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn register_args_accept_a_separate_audio_url() {
+        let args: RegisterArgs = serde_json::from_value(serde_json::json!({
+            "url": "https://media.example/video.m3u8",
+            "audioUrl": "https://media.example/audio.m3u8",
+            "headers": {},
+            "transcode": true
+        }))
+        .unwrap();
+        assert_eq!(
+            args.audio_url.as_deref(),
+            Some("https://media.example/audio.m3u8")
+        );
+        assert!(args.transcode);
+    }
 
     #[test]
     fn parses_media_byte_ranges() {

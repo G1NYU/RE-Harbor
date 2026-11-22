@@ -322,6 +322,30 @@ test("ElegantFin observes a collapse setting change while the drawer is open", (
   harness.cleanup();
 });
 
+test("ElegantFin Games list collapse and expand never open the Harbor drawer", () => {
+  const harness = mountElegantFin({});
+  const shell = harness.document.querySelector("[data-harbor-shell]")!;
+  shell.setAttribute("data-games-library", "");
+
+  // The Games list and Harbor sidebar share the saved collapsed preference.
+  harness.sidebar.setAttribute("data-collapsed", "true");
+  harness.flush();
+  assert.equal(harness.drawerOpen(), false);
+
+  harness.sidebar.setAttribute("data-collapsed", "false");
+  harness.flush();
+  assert.equal(harness.drawerOpen(), false);
+  harness.cleanup();
+});
+
+test("ElegantFin reserves its pinned rail only outside the Games workspace", () => {
+  const themeSource = readFileSync(new URL("../src/lib/theme.ts", import.meta.url), "utf8");
+  assert.match(
+    themeSource,
+    /html:not\(:has\(\[data-games-library\]\)\):has\(aside\[data-harbor-sidebar\]\[data-collapsed="true"\]:not\(\[aria-hidden="true"\]\)\) \{\s*--ef-rail-space: var\(--ef-rail-width\);/,
+  );
+});
+
 test("ElegantFin releases the scrim state when navigation unmounts the sidebar", () => {
   const harness = mountElegantFin({});
   harness.click("#ef-menu");

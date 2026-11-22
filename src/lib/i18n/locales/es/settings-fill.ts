@@ -175,7 +175,8 @@ const settingsFill: Record<string, string> = {
     "Harbor lo carga automáticamente cuando existe una pista en ese idioma. También puedes establecer o quitar la pista secundaria para un video desde el menú de subtítulos del reproductor.",
   "Harbor needs a TMDB key for artwork, rows and collections. It is free.":
     "Harbor necesita una clave de TMDB para las imágenes, las filas y las colecciones. Es gratuita.",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Harbor normalmente inicia su motor P2P al abrirse para que la primera fuente P2P se conecte más rápido. Esto mantiene un nodo DHT activo y comunicándose con la red incluso cuando no estás viendo nada. Activa esta opción si usas una conexión de uso medido o limitada: el motor se iniciará cuando reproduzcas una fuente P2P por primera vez. Se aplicará la próxima vez que abras la app.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Harbor normalmente inicia su motor P2P al abrirse para que la primera fuente P2P se conecte más rápido. Esto mantiene un nodo DHT activo y comunicándose con la red incluso cuando no estás viendo nada. Activa esta opción si usas una conexión de uso medido o limitada: el motor se iniciará cuando reproduzcas una fuente P2P por primera vez. Se aplicará la próxima vez que abras la app.",
   "Harbor on other devices": "Harbor en otros dispositivos",
   "Harbor plays IPTV from your own provider. Add a playlist and the guide fills in.":
     "Harbor reproduce IPTV de tu propio proveedor. Agrega una lista de reproducción y la guía se completará.",
@@ -205,7 +206,7 @@ const settingsFill: Record<string, string> = {
   "How episodes are grouped for shows and anime. TVDB is the default: it gives the arc, DVD, and absolute orderings anime fans expect, with no key needed. TMDB keeps the plain aired order. Either way, every episode still plays and marks watched the same.":
     "Cómo se agrupan los episodios de series y anime. TVDB es la opción predeterminada: ofrece los órdenes por arco, DVD y absoluto que esperan los fans del anime, sin requerir una clave. TMDB conserva el orden simple de emisión. En ambos casos, todos los episodios se reproducen y se marcan como vistos de la misma manera.",
   "How long to wait first": "Cuánto esperar al principio",
-  "https://sync.harbor.site": "https://sync.harbor.site",
+  "https://sync.harborcommunity.site": "https://sync.harborcommunity.site",
   "Icon packs and single-award art from the community":
     "Paquetes de íconos e ilustraciones de premios individuales de la comunidad",
   "Identity matches from content hashing and the community database always apply on their own. Timing worked out from the audio only offers a fix until it has earned trust. Turn this on to let those audio-derived fixes apply automatically too.":

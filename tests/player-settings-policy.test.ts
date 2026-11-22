@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { withVoidDefaultNavOrder } from "../src/chrome/void-sidebar-order.ts";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import * as React from "react";
@@ -57,6 +58,7 @@ test("player menu Settings retains PIN-aware navigation and discards old-session
   });
   const noop = () => {};
   const deps: Record<string, any> = {
+    "./void-sidebar-order": { withVoidDefaultNavOrder },
     react: React,
     "react/jsx-runtime": jsxRuntime,
     "lucide-react": { ArrowLeft: noop, Lock: noop, RefreshCw: noop, UserRound: noop },

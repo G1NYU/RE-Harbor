@@ -189,7 +189,8 @@ const settings: Record<string, string> = {
   "Groq API key (gsk-...)": "API-ключ Groq (gsk-...)",
   "Group Refresh on the left beside Back instead of the far right of the header.":
     "Разместить «Обновить» слева рядом с «Назад», а не у правого края шапки.",
-  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.": "Harbor не будет запускать P2P-движок, обращаться к трекерам и использовать DHT. Включите, если нужны только debrid и прямые ссылки. Отключите, чтобы вернуть P2P-потоки.",
+  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.":
+    "Harbor не будет запускать P2P-движок, обращаться к трекерам и использовать DHT. Включите, если нужны только debrid и прямые ссылки. Отключите, чтобы вернуть P2P-потоки.",
   "Hide badge": "Скрыть значок",
   "Hide manga": "Скрыть мангу",
   "Hide pack instructions": "Скрыть инструкции по пакетам",
@@ -273,6 +274,9 @@ const settings: Record<string, string> = {
   "Rich season and order panel": "Расширенная панель сезонов и порядка",
   "Rotten Tomatoes": "Rotten Tomatoes",
   Ruleset: "Набор правил",
+  "Scale TV score badges": "Масштабировать значки оценок на ТВ-карточках",
+  "Shrink the score stack when several ratings are enabled.":
+    "Уменьшать значки оценок при включении нескольких источников рейтинга.",
   "Score badges on cards": "Значки оценок на карточках",
   "Score position": "Положение оценки",
   "Search rules by name or pattern…": "Поиск правил по названию или шаблону…",
@@ -335,7 +339,8 @@ const settings: Record<string, string> = {
     "Эти значки рисуются поверх постеров при просмотре. RPDB в ключах выше это отдельный вариант, который вшивает оценки в само изображение постера.",
   "This score only appears on cards.": "Эта оценка отображается только на карточках.",
   "Top 10 ribbon": "Лента Топ-10",
-  "P2P is disabled. Uncached streams will not play unless they come from a debrid service or a direct link. To use P2P, toggle this off.": "P2P отключён. Некэшированные потоки не будут воспроизводиться, если они не из debrid-сервиса или по прямой ссылке. Чтобы использовать P2P, выключите этот параметр.",
+  "P2P is disabled. Uncached streams will not play unless they come from a debrid service or a direct link. To use P2P, toggle this off.":
+    "P2P отключён. Некэшированные потоки не будут воспроизводиться, если они не из debrid-сервиса или по прямой ссылке. Чтобы использовать P2P, выключите этот параметр.",
   "True black menus": "Абсолютно чёрные меню",
   "Try it": "Попробовать",
   "Turn off to hide the sync badge during playback.":
@@ -355,7 +360,8 @@ const settings: Record<string, string> = {
     "Перемещайте фокус по Harbor стрелками и Enter. Выключите, чтобы освободить стрелки и отключить навигацию по фокусу везде.",
   "Use your own image as the app icon": "Использовать своё изображение как значок приложения",
   "Watchlist bookmark": "Закладка списка к просмотру",
-  "When off, a P2P transfer stops the moment you close or switch the stream, so nothing keeps downloading in the background. Turn on to let it keep going after you leave; manage or pause those from the Downloads tab.": "Когда выключено, P2P-передача останавливается сразу при закрытии или смене потока, и ничего не качается в фоне. Включите, чтобы загрузка продолжалась после выхода; управлять ею и ставить на паузу можно на вкладке «Загрузки».",
+  "When off, a P2P transfer stops the moment you close or switch the stream, so nothing keeps downloading in the background. Turn on to let it keep going after you leave; manage or pause those from the Downloads tab.":
+    "Когда выключено, P2P-передача останавливается сразу при закрытии или смене потока, и ничего не качается в фоне. Включите, чтобы загрузка продолжалась после выхода; управлять ею и ставить на паузу можно на вкладке «Загрузки».",
   "Where scores appear": "Где показывать оценки",
   "Where the Refresh button sits in the picker header. Default keeps it on the right, across from Back.":
     "Где находится кнопка обновления в шапке окна выбора. По умолчанию справа, напротив «Назад».",
@@ -385,8 +391,8 @@ const settings: Record<string, string> = {
   "Stretch the featured hero edge to edge and taller, across every layout.":
     "Растянуть баннер от края до края и сделать выше во всех раскладках.",
   "Full quality hero image": "Баннер в полном качестве",
-  "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.":
-    "Загружать изображение баннера в максимальном разрешении. Расходует больше трафика.",
+  "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.":
+    "Загружать изображения в максимальном разрешении для баннера, баннера страницы с описанием и фонов выбора источников без размытия. Расходует больше трафика и видеопамяти.",
   "Display language": "Язык интерфейса",
   "Interface language": "Язык интерфейса",
   "Metadata language": "Язык метаданных",
@@ -585,8 +591,8 @@ const settings: Record<string, string> = {
   "Hero carousel, Top 10, Trending, In Theaters, per-service rails.":
     "Главная карусель, Топ-10, «В тренде», «В кинотеатрах», ряды по сервисам.",
   Updates: "Обновления",
-  "Harbor checks harbor.site for new versions and installs them in place.":
-    "Harbor проверяет новые версии на harbor.site и устанавливает их на месте.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place.":
+    "Harbor проверяет новые версии на harborcommunity.site и устанавливает их на месте.",
   "Backup & restore": "Резервная копия и восстановление",
   "Export your entire Harbor setup to a single file, then restore it on a new computer or keep it as a backup.":
     "Экспортируйте все настройки Harbor в один файл, чтобы восстановить их на новом компьютере или сохранить как резервную копию.",
@@ -659,7 +665,8 @@ const settings: Record<string, string> = {
   "Real-Debrid API token": "API-токен Real-Debrid",
   "API token": "API-токен",
   "API key": "API-ключ",
-  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.": "Быстрее и тише P2P, если у вас уже есть Usenet. Настройте на странице дополнения и вставьте полученный URL манифеста.",
+  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.":
+    "Быстрее и тише P2P, если у вас уже есть Usenet. Настройте на странице дополнения и вставьте полученный URL манифеста.",
   "Searches and streams directly off Easynews. No debrid needed. Just your Easynews login.":
     "Ищет и транслирует напрямую с Easynews. Debrid не нужен, только ваш вход в Easynews.",
   Expired: "Истёк",
@@ -1455,8 +1462,8 @@ const settings: Record<string, string> = {
   "My library": "Моя библиотека",
   Anticipated: "Ожидаемое",
   "Custom calendar": "Свой календарь",
-  "Harbor checks harbor.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
-    "Harbor проверяет harbor.site на наличие новых версий и устанавливает их на месте. Ничего не устанавливается без вашего согласия, а отклонённое обновление больше не напоминает о себе.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
+    "Harbor проверяет harborcommunity.site на наличие новых версий и устанавливает их на месте. Ничего не устанавливается без вашего согласия, а отклонённое обновление больше не напоминает о себе.",
   "Library, watch progress, and addon collection sync from this account.":
     "Библиотека, прогресс просмотра и набор Дополнений синхронизируются с этим аккаунтом.",
   "Export your entire Harbor setup to a single file, then restore it on a new computer or keep it as a backup. Everything is included except your Stremio sign-in.":
@@ -1689,10 +1696,12 @@ const settings: Record<string, string> = {
   "Run self-test": "Запустить самопроверку",
   "Running self-test": "Выполняется самопроверка",
   "Restart engine": "Перезапустить движок",
-  "Self-test is disabled while strict remote streaming is on. It downloads a small test file over peer-to-peer on this machine.": "Самопроверка отключена при строгом режиме удалённого стриминга: она скачивает небольшой тестовый файл по peer-to-peer на этом компьютере.",
+  "Self-test is disabled while strict remote streaming is on. It downloads a small test file over peer-to-peer on this machine.":
+    "Самопроверка отключена при строгом режиме удалённого стриминга: она скачивает небольшой тестовый файл по peer-to-peer на этом компьютере.",
   "Self-test": "Самопроверка",
   "Remote streaming server": "Удалённый стриминг-сервер",
-  "Point Harbor at a streaming server on another machine, like the Stremio service on a home server. P2P streams download and play from that machine instead of this one.": "Укажите Harbor стриминг-сервер на другой машине, например службу Stremio на домашнем сервере. P2P-потоки будут скачиваться и воспроизводиться с неё, а не с этого компьютера.",
+  "Point Harbor at a streaming server on another machine, like the Stremio service on a home server. P2P streams download and play from that machine instead of this one.":
+    "Укажите Harbor стриминг-сервер на другой машине, например службу Stremio на домашнем сервере. P2P-потоки будут скачиваться и воспроизводиться с неё, а не с этого компьютера.",
   "Use exclusively (never fall back to local)":
     "Использовать только его (не переключаться на локальный)",
   "If the server is unreachable, playback fails instead of streaming locally. Use this when your VPN runs on the server machine and torrent traffic must never leave this one.":
@@ -1813,7 +1822,8 @@ const settings: Record<string, string> = {
     "Обратите внимание: если Stremio тоже установлен, Windows может спросить, каким приложением открыть ссылку stremio:// в первый раз. Выберите Harbor, чтобы выбор запомнился.",
   "stremio:// links now open in the Stremio app. Harbor will only install when you trigger it from inside Harbor.":
     "Ссылки stremio:// теперь открываются в приложении Stremio. Harbor устанавливает только то, что запущено изнутри Harbor.",
-  "Checking harbor.site for a newer build.": "Проверка harbor.site на наличие новой сборки.",
+  "Checking harborcommunity.site for a newer build.":
+    "Проверка harborcommunity.site на наличие новой сборки.",
   "Downloading {pct}%": "Загрузка {pct}%",
   "Downloaded. Ready to install and restart.": "Загружено. Готово к установке и перезапуску.",
   "Installing. Harbor will restart.": "Установка. Harbor перезапустится.",
@@ -2314,9 +2324,12 @@ const settings: Record<string, string> = {
   "Restart streaming server": "Перезапустить стриминг-сервер",
   "Restart Harbor's own streaming server, then reload the stream once it is back. Desktop only.":
     "Перезапустить собственный стриминг-сервер Harbor, а когда он снова заработает, перезагрузить поток. Только в десктопном приложении.",
-  "Cached source resolution and direct download links.": "Разрешение кэшированных источников и прямые ссылки на скачивание.",
-  "Cached source resolution and cloud library access.": "Разрешение кэшированных источников и доступ к облачной библиотеке.",
-  "Both shows direct, debrid, and peer-to-peer results together. Direct/debrid keeps P2P results out of the way unless nothing else is available. P2P puts them first.": "«Оба» показывает прямые, debrid и peer-to-peer результаты вместе. «Прямые/debrid» убирает P2P-результаты на второй план, пока есть что-то ещё. «P2P» ставит их первыми.",
+  "Cached source resolution and direct download links.":
+    "Разрешение кэшированных источников и прямые ссылки на скачивание.",
+  "Cached source resolution and cloud library access.":
+    "Разрешение кэшированных источников и доступ к облачной библиотеке.",
+  "Both shows direct, debrid, and peer-to-peer results together. Direct/debrid keeps P2P results out of the way unless nothing else is available. P2P puts them first.":
+    "«Оба» показывает прямые, debrid и peer-to-peer результаты вместе. «Прямые/debrid» убирает P2P-результаты на второй план, пока есть что-то ещё. «P2P» ставит их первыми.",
 };
 
 export default settings;

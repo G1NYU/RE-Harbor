@@ -1,6 +1,7 @@
 import { currentActivitiesAll } from "./activities/gate";
 import { simklRequest } from "./client";
 import { simklTargetIds } from "./ids";
+import { readSimklStateStrict } from "./list-status";
 import type { SimklIds, SimklItem, SimklTarget } from "./types";
 
 export type RawIds = {
@@ -36,7 +37,10 @@ export function mapIds(ids: RawIds | undefined): SimklIds {
 }
 
 const WATCHLIST_TTL_MS = 25000;
-const statusCache = new Map<string, { at: number; marker: string | null; val: Promise<SimklItem[]> }>();
+const statusCache = new Map<
+  string,
+  { at: number; marker: string | null; val: Promise<SimklItem[]> }
+>();
 
 export function invalidateWatchlistCache(): void {
   statusCache.clear();
@@ -108,6 +112,12 @@ export async function addToWatchlist(target: SimklTarget): Promise<boolean> {
 
 export async function removeFromWatchlist(target: SimklTarget): Promise<boolean> {
   try {
+    // Simkl has no membership-only removal: sending a title to
+    // /sync/history/remove also deletes its watched history and rating. Only
+    // the plan-to-watch entry is safe to clear, and only when no watch history
+    // exists yet. Completed/watching titles must be managed on Simkl itself.
+    const state = await readSimklStateStrict(target);
+    if (state.status !== "plantowatch" || state.watched.size > 0) return false;
     const body =
       target.kind === "movie"
         ? { movies: [{ ids: target.ids }] }

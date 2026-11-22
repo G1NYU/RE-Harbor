@@ -1,3 +1,5 @@
+import seekSteps from "./ja/seek-steps";
+import reviews from "./ja/reviews";
 import playOrders from "./ja/play-orders";
 import gameRomLibrary from "./ja/game-rom-library";
 import gameNotes from "./ja/game-notes";
@@ -89,6 +91,7 @@ import chrome from "./ja/chrome";
 import common from "./ja/common";
 import controllers from "./ja/controllers";
 import coverage from "./ja/coverage";
+import subtitles from "./ja/subtitles";
 import detail from "./ja/detail";
 import discover from "./ja/discover";
 import downloads from "./ja/downloads";
@@ -116,6 +119,8 @@ import wired from "./ja/wired";
 import plugins from "./ja/plugins";
 import brands from "./ja/brands";
 import bpSports from "./ja/bp-sports";
+import queueBasket from "./ja/queue-basket";
+import liveWeb from "./ja/live-web";
 
 import nytTv from "./ja/nyt-tv";
 
@@ -297,6 +302,7 @@ const ja: Record<string, string> = {
 
   ...ebookSources,
   ...coverage,
+  ...subtitles,
   ...sweep,
   ...wired,
   ...gap,
@@ -408,6 +414,66 @@ const ja: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
+  "Refract sync": "Refract 同期",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "視聴履歴と Harbor のウォッチリストの変更を Refract と同期します。",
+  "Refract personal API key": "Refract 個人用 API キー",
+  "Verifying...": "確認中…",
+  "Connect Refract": "Refract に接続",
+  "Refract key saved in Harbor's secret store":
+    "Refract のキーは Harbor の安全なストレージに保存されています",
+  "Sync watched history and watchlist": "視聴履歴とウォッチリストを同期",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Harbor の視聴履歴とウォッチリストの変更を Refract に送信します。Harbor のメインプロフィールのみ同期されます。",
+  "Retry pending watches": "保留中の視聴記録を再送信",
+  "Disconnect Refract": "Refract の接続を解除",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Refract ({identity}) に接続しました。視聴履歴の同期が有効になりました。",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Refract /v1/me でキーを確認できませんでした。権限と接続を確認してください。",
+  "Disconnected from Refract.": "Refract の接続を解除しました。",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Refract で profile:read、library:read、library:write、history:write の権限を持つ個人用 API キーを作成してください。キーを共有したりコミットしたりしないでください。",
+  "Automatic watch threshold": "自動視聴記録のしきい値",
+  "After {count} minutes": "{count} 分後",
+  "{count}% (default)": "{count}%（既定）",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "再生が指定した時間または割合に達すると、映画やエピソードを Refract に記録します。シークでしきい値を超えた場合も対象です。早期の記録は部分視聴ではなく視聴済みとして扱われます。Harbor 自体の視聴完了のしきい値は変わりません。",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract 視聴予定",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "同期が有効な間、ウォッチリストへの追加や削除が自動的に送信されます。library:write が必要です。必要に応じて更新したキーで再接続してください。既存の Refract の履歴や他のライブラリの状態は保持されます。",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "送信済み {sent} 件 · 保留中 {pending} 件 · 照合不可 {failed} 件",
+  "Unmatched items": "照合できなかった項目",
+  "Refract queue full; unable to save another watch":
+    "Refract のキューがいっぱいです。これ以上視聴記録を保存できません",
+  "No verified IMDb/TMDB/TVDB identity": "確認済みの IMDb/TMDB/TVDB ID がありません",
+  "Movie not found in Refract": "Refract で映画が見つかりません",
+  "Episode not found; verify season numbering":
+    "エピソードが見つかりません。シーズン番号を確認してください",
+  "Last watched item sent successfully": "最後の視聴記録を送信しました",
+  "Unknown error": "不明なエラー",
+  "Some items could not be matched or sent": "一部の項目を照合または送信できませんでした",
+  "Refract denied access; check key and permissions":
+    "Refract がアクセスを拒否しました。キーと権限を確認してください",
+  "Network error; retry scheduled": "ネットワークエラー。再試行が予約されました",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "この作品には確認済みの IMDb/TMDB/TVDB ID がありません。",
+  "Refract could not uniquely identify this title.":
+    "Refract はこの作品を一意に特定できませんでした。",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract は既存のライブラリ項目または視聴履歴を保持しました。",
+  "Added to Refract Plan to Watch.": "Refract の視聴予定に追加しました。",
+  "Removed from Refract Plan to Watch.": "Refract の視聴予定から削除しました。",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "Refract のウォッチリストには library:write が必要です。この権限のあるキーで再接続してください。",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract はウォッチリストの変更を確認できませんでした。再試行してください。",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default ja;

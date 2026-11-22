@@ -8,7 +8,7 @@ const SHA256 = "0a81c004aae0ee7d512b9a26e38f66281f9591e84e1663215cc3a36a4bde6f6a
 const TAG = process.env.HARBOR_LIBMPV_TAG ?? "libmpv-windows-x64";
 const url =
   process.env.HARBOR_LIBMPV_URL ??
-  `https://github.com/Harborofficial/Harbor/releases/download/${TAG}/libmpv-2.dll`;
+  `https://github.com/HarborCommunity/Harbor/releases/download/${TAG}/libmpv-2.dll`;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dest = join(root, "src-tauri", "libmpv", "libmpv-2.dll");
@@ -28,7 +28,9 @@ console.log(`[libmpv] fetching ${url}`);
 const res = await fetch(url, { redirect: "follow" });
 if (!res.ok) {
   console.error(`[libmpv] download failed (${res.status} ${res.statusText})`);
-  console.error("[libmpv] set HARBOR_LIBMPV_URL to a mirror, or drop libmpv-2.dll into src-tauri/libmpv/ by hand");
+  console.error(
+    "[libmpv] set HARBOR_LIBMPV_URL to a mirror, or drop libmpv-2.dll into src-tauri/libmpv/ by hand",
+  );
   process.exit(1);
 }
 const buf = Buffer.from(await res.arrayBuffer());

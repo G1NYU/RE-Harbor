@@ -2,9 +2,11 @@ import { memo, useContext, useEffect, useRef, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import type { RailDef } from "@/lib/feed";
 import { FeedShelf } from "@/components/feed-shelf";
-import { ScrollRootContext } from "@/components/row";
+import { LazyMount } from "@/components/lazy-mount";
+import { resolveRowScrollRoot, ScrollRootContext } from "@/components/row";
 import { useT } from "@/lib/i18n";
-import { useView } from "@/lib/view";
+import { useViewActions } from "@/lib/view";
+import { observeWithin } from "@/lib/visibility";
 
 // Memoized, and it takes only its own items rather than the whole deduped map. With the map, one
 // rail finishing its load gave every rail a new prop and re-rendered all of them.
@@ -25,23 +27,21 @@ export const Rail = memo(function Rail({
   ensureLoaded?: (id: string) => void;
   titleOverride?: string;
 }) {
-  const { openGrid } = useView();
+  const { openGrid } = useViewActions();
   const t = useT();
   const root = useContext(ScrollRootContext);
   const element = useRef<HTMLDivElement>(null);
   const [near, setNear] = useState(false);
   useEffect(() => {
-    if (!active || !root || !element.current) return;
+    const el = element.current;
+    if (!active || !el) return;
+    const scrollRoot = resolveRowScrollRoot(root, el);
+    if (!scrollRoot) return;
     if (typeof IntersectionObserver === "undefined") {
       setNear(true);
       return;
     }
-    const observer = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), {
-      root,
-      rootMargin: "1000px 0px",
-    });
-    observer.observe(element.current);
-    return () => observer.disconnect();
+    return observeWithin(el, "2400px 0px", (entry) => setNear(entry.isIntersecting), scrollRoot);
   }, [active, root]);
   useEffect(() => {
     if (!active || !near) return;
@@ -68,19 +68,21 @@ export const Rail = memo(function Rail({
       className={items?.length === 0 ? "hidden" : undefined}
       onFocusCapture={() => setNear(true)}
     >
-      <FeedShelf
-        shelf={shelf}
-        items={items}
-        onEndReached={active && near && items !== null ? () => loadMore(railId) : undefined}
-        scrollKey={`discover:${railId}`}
-        onViewAll={() =>
-          openGrid({
-            title: shelf.title,
-            fetcher: (page) => def.fetch(page),
-            initial: items ?? undefined,
-          })
-        }
-      />
+      <LazyMount minHeight={340}>
+        <FeedShelf
+          shelf={shelf}
+          items={items}
+          onEndReached={active && near && items !== null ? () => loadMore(railId) : undefined}
+          scrollKey={`discover:${railId}`}
+          onViewAll={() =>
+            openGrid({
+              title: shelf.title,
+              fetcher: (page) => def.fetch(page),
+              initial: items ?? undefined,
+            })
+          }
+        />
+      </LazyMount>
     </div>
   );
 });

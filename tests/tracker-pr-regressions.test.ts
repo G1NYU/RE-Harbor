@@ -14,6 +14,12 @@ function load(path: string, mocks: Record<string, unknown>, globals: Record<stri
   const exports: any = {};
   new Function("require", "exports", ...Object.keys(globals), code)(
     (id: string) => {
+      if (id === "@/lib/tracker-progress-events") {
+        return {
+          TRACKER_PROGRESS_EVENT: "harbor:tracker-progress-updated",
+          notifyTrackerProgress: () => {},
+        };
+      }
       assert.ok(id in mocks, `Unexpected import: ${id}`);
       return mocks[id];
     },
@@ -278,6 +284,7 @@ test("Simkl preserves cached history on failure, clears it on empty success and 
   const api = load(
     "src/lib/simkl/list-status.ts",
     {
+      "@/lib/yield-to-browser": { yieldToBrowser: () => Promise.resolve() },
       "./session": { getSession: () => session, subscribeSession: (f: any) => (reset = f) },
       "@/lib/active-profile-id": { activeProfileId: () => "a" },
       "./activities/gate": { currentActivitiesAll: async () => marker },

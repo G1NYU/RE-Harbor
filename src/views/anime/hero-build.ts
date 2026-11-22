@@ -1,7 +1,12 @@
 import { findTopAward, parseAwardYear } from "@/lib/anime-awards";
 import { resolveHeroArt, type HeroArt } from "@/lib/anime-backdrop";
 import { peekAnimeArt, saveAnimeArt } from "@/lib/providers/anime-art-cache";
-import { ensureStaticHeroArt, peekStaticHeroArt, staticHeroArt } from "@/lib/providers/anime-hero-art-static";
+import { animeArtworkKind } from "@/lib/providers/anime-format";
+import {
+  ensureStaticHeroArt,
+  peekStaticHeroArt,
+  staticHeroArt,
+} from "@/lib/providers/anime-hero-art-static";
 import { animeFiltered, enrichAnimeCountry, type AnimeFilterOpts } from "@/lib/anime-filter";
 import type { Meta } from "@/lib/cinemeta";
 import { franchiseRootSync, prefetchFranchiseRoot } from "@/lib/providers/anime-franchise-root";
@@ -17,7 +22,7 @@ export function heroSourceLabel(source?: string): string {
 
 const isAnimeId = (id: string) => /^(kitsu|mal|anilist|anidb):/.test(id);
 
-const HERO_CACHE_KEY = "harbor.anime.hero.v4";
+const HERO_CACHE_KEY = "harbor.anime.hero.v5";
 const HERO_TTL_MS = 3 * 60 * 60 * 1000;
 const HERO_DESC_MAX = 320;
 
@@ -59,6 +64,7 @@ export function cacheHero(built: HeroBuilt, sig: string): void {
 }
 
 function cleanMeta(m: Meta): Meta {
+  if (animeArtworkKind(m) === "movie") return m;
   const cleaned = stripFranchiseSuffix(m.name);
   return cleaned === m.name ? m : { ...m, name: cleaned };
 }
@@ -68,7 +74,7 @@ export async function upgradeHeroArtFromStatic(built: HeroBuilt): Promise<HeroBu
   return {
     trending: built.trending,
     metas: built.metas.map((m) => {
-      const s = peekStaticHeroArt(m.id);
+      const s = peekStaticHeroArt(m.id, animeArtworkKind(m));
       if (!s) return m;
       const hiRes = !!s.bg && !s.bg.includes("anilist.co");
       const background = hiRes ? s.bg : m.background;
@@ -96,7 +102,7 @@ export function buildHeroSelection(
 ): HeroBuilt {
   const keep = (m: Meta) => !animeFiltered(m, filterOpts);
   const rng = mulberry32(seed);
-  const shuffle = <T,>(arr: T[]): T[] => {
+  const shuffle = <T>(arr: T[]): T[] => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i -= 1) {
       const j = Math.floor(rng() * (i + 1));
@@ -112,7 +118,8 @@ export function buildHeroSelection(
   for (const spec of SPECS) {
     const r = rowsByKey[spec.key];
     if (!r || !r.ready) continue;
-    for (const m of r.metas) if (m.background && keep(m) && !allWithBg.has(m.id)) allWithBg.set(m.id, m);
+    for (const m of r.metas)
+      if (m.background && keep(m) && !allWithBg.has(m.id)) allWithBg.set(m.id, m);
   }
   const isWinner = (m: Meta) => !!findTopAward(m.name, parseAwardYear(m.releaseInfo));
   const anilistWithBg = anilistTrending.filter((m) => m.background && keep(m));
@@ -154,7 +161,7 @@ export function buildHostedHero(
   filterOpts: AnimeFilterOpts,
 ): HeroBuilt {
   const rng = mulberry32(seed);
-  const shuffle = <T,>(arr: T[]): T[] => {
+  const shuffle = <T>(arr: T[]): T[] => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i -= 1) {
       const j = Math.floor(rng() * (i + 1));
@@ -206,8 +213,9 @@ async function pickHeroRoots(built: HeroBuilt, filterOpts: AnimeFilterOpts): Pro
   const seen = new Set<string>();
   const picks: HeroPick[] = [];
   for (const m of filtered) {
-    if (isAnimeId(m.id)) prefetchFranchiseRoot(m.id);
-    const rootId = (isAnimeId(m.id) ? franchiseRootSync(m.id) : null) ?? m.id;
+    const useFranchiseRoot = isAnimeId(m.id) && animeArtworkKind(m) === "tv";
+    if (useFranchiseRoot) prefetchFranchiseRoot(m.id);
+    const rootId = (useFranchiseRoot ? franchiseRootSync(m.id) : null) ?? m.id;
     if (seen.has(rootId)) continue;
     seen.add(rootId);
     picks.push({ meta: m, rootId, src: built.trending[m.id] });
@@ -232,11 +240,18 @@ function preloadImage(url?: string): Promise<void> {
   });
 }
 
-async function hydrateSlide(tmdbKey: string, pick: HeroPick): Promise<{ meta: Meta; src?: string }> {
+async function hydrateSlide(
+  tmdbKey: string,
+  pick: HeroPick,
+): Promise<{ meta: Meta; src?: string }> {
   const { meta, rootId } = pick;
   let slide: Meta = meta;
   if (rootId !== meta.id) {
-    const rootMeta = await withTimeout(animeKitsuMeta(rootId).catch(() => null), 2000, null);
+    const rootMeta = await withTimeout(
+      animeKitsuMeta(rootId).catch(() => null),
+      2000,
+      null,
+    );
     slide = rootMeta
       ? {
           ...rootMeta,
@@ -246,8 +261,13 @@ async function hydrateSlide(tmdbKey: string, pick: HeroPick): Promise<{ meta: Me
         }
       : { ...meta, id: rootId };
   }
-  const stat = await withTimeout(staticHeroArt(slide.id).catch(() => undefined), 2500, undefined);
-  const cached = stat?.bg ? undefined : peekAnimeArt(slide.id);
+  const kind = animeArtworkKind(slide);
+  const stat = await withTimeout(
+    staticHeroArt(slide.id, kind).catch(() => undefined),
+    2500,
+    undefined,
+  );
+  const cached = stat?.bg ? undefined : peekAnimeArt(slide.id, kind);
   let background: string | undefined;
   let logo: string | undefined;
   if (stat?.bg) {
@@ -265,7 +285,7 @@ async function hydrateSlide(tmdbKey: string, pick: HeroPick): Promise<{ meta: Me
     );
     background = art.background ?? slide.background ?? slide.poster;
     logo = art.logo ?? slide.logo;
-    saveAnimeArt(slide.id, { bg: art.background, logo: art.logo });
+    saveAnimeArt(slide.id, kind, { bg: art.background, logo: art.logo });
   }
   await preloadImage(background);
   return { meta: { ...slide, background, logo }, src: pick.src };

@@ -1,4 +1,4 @@
-import { ArrowDownToLine, Bookmark, Check, MoreHorizontal, RotateCw, X } from "lucide-react";
+import { ArrowDownToLine, Check, MoreHorizontal, RotateCw, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { Meta } from "@/lib/cinemeta";
@@ -8,7 +8,12 @@ import { useT } from "@/lib/i18n";
 import { AddToListMenu } from "@/components/lists/add-to-list-menu";
 import { HoverTooltip } from "@/components/hover-tooltip";
 import type { ListItemInput } from "@/lib/custom-lists";
-import { AnilistMenuItems, PmdbMenuItems, SimklMenuItems, TraktMenuItems } from "./overflow-sync-items";
+import {
+  AnilistMenuItems,
+  PmdbMenuItems,
+  SimklMenuItems,
+  TraktMenuItems,
+} from "./overflow-sync-items";
 import { UiIcon } from "@/components/ui-icon";
 
 const CIRCLES_SAVED_ESTIMATE = 132;
@@ -41,16 +46,32 @@ export function useHeroActionOverflow(rowRef: RefObject<HTMLDivElement | null>, 
       }
     };
     measure();
-    const ro = new ResizeObserver(measure);
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
+    const widths = new WeakMap<Element, number>();
+    const ro = new ResizeObserver((entries) => {
+      for (const { target, contentRect } of entries) {
+        if (widths.get(target) === contentRect.width) continue;
+        widths.set(target, contentRect.width);
+        schedule();
+      }
+    });
     ro.observe(row);
     if (section) ro.observe(section);
-    const mo = new MutationObserver(measure);
-    if (section) mo.observe(section, { childList: true, subtree: true });
-    window.addEventListener("resize", measure);
+    const mo = new MutationObserver(schedule);
+    mo.observe(row, { childList: true, characterData: true, subtree: true });
+    window.addEventListener("resize", schedule);
     return () => {
+      cancelAnimationFrame(frame);
       ro.disconnect();
       mo.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", schedule);
     };
   }, deps);
 
@@ -68,8 +89,6 @@ export function HeroActionOverflow({
   onWatched,
   watchedMark = false,
   showSync = false,
-  inWatchlist = false,
-  onToggleWatchlist,
   listItem = null,
   simkl = null,
   anilist = null,
@@ -85,8 +104,6 @@ export function HeroActionOverflow({
   onWatched?: () => void;
   watchedMark?: boolean;
   showSync?: boolean;
-  inWatchlist?: boolean;
-  onToggleWatchlist?: () => void;
   listItem?: ListItemInput | null;
   simkl?: { harborId: string; type: "movie" | "series" } | null;
   anilist?: { harborId: string } | null;
@@ -142,7 +159,9 @@ export function HeroActionOverflow({
           className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-canvas/80 text-ink transition-[transform,background-color] duration-200 hover:bg-canvas/95 active:scale-[0.94]"
         >
           <MoreHorizontal size={20} strokeWidth={1.9} />
-          {isFav && <span className="absolute end-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+          {isFav && (
+            <span className="absolute end-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-accent" />
+          )}
         </button>
       </HoverTooltip>
       {menu &&
@@ -155,33 +174,20 @@ export function HeroActionOverflow({
           >
             {showSync && (
               <>
-                <Item
-                  icon={
-                    inWatchlist ? (
-                      <Check size={14} strokeWidth={2.4} />
-                    ) : (
-                      <Bookmark size={14} strokeWidth={2} />
-                    )
-                  }
-                  label={inWatchlist ? t("In Watchlist") : t("Add to Watchlist")}
-                  active={inWatchlist}
-                  onClick={() => {
-                    onToggleWatchlist?.();
-                    setMenu(null);
-                  }}
-                />
                 {simkl && (
                   <SimklMenuItems
+                    key={`simkl:${simkl.harborId}`}
                     harborId={simkl.harborId}
                     type={simkl.type}
                     onAction={() => setMenu(null)}
                   />
                 )}
                 {anilist && (
-                  <AnilistMenuItems harborId={anilist.harborId} onAction={() => setMenu(null)} />
+                  <AnilistMenuItems key={`anilist:${anilist.harborId}`} harborId={anilist.harborId} onAction={() => setMenu(null)} />
                 )}
                 {pmdb && (
                   <PmdbMenuItems
+                    key={`pmdb:${pmdb.harborId}`}
                     harborId={pmdb.harborId}
                     type={pmdb.type}
                     onAction={() => setMenu(null)}
@@ -297,21 +303,29 @@ function Item({
   label,
   onClick,
   active,
+  danger,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   active?: boolean;
+  danger?: boolean;
 }) {
   return (
     <button
       role="menuitem"
       onClick={onClick}
-      className={`flex h-9 items-center gap-2.5 rounded-lg px-3 text-start text-[13px] transition-colors hover:bg-raised ${
-        active ? "text-accent" : "text-ink"
+      className={`flex h-9 items-center gap-2.5 rounded-lg px-3 text-start text-[13px] transition-colors ${
+        danger
+          ? "text-danger hover:bg-danger/10"
+          : active
+            ? "text-accent hover:bg-raised"
+            : "text-ink hover:bg-raised"
       }`}
     >
-      <span className={active ? "text-accent" : "text-ink-muted"}>{icon}</span>
+      <span className={danger ? "text-danger" : active ? "text-accent" : "text-ink-muted"}>
+        {icon}
+      </span>
       {label}
     </button>
   );

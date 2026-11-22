@@ -4,6 +4,7 @@ use super::migrations;
 use super::{duration_label, MusicStream, MusicTrack};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use stream_cache::{is_fresh, stream_ttl};
@@ -11,6 +12,7 @@ use stream_cache::{is_fresh, stream_ttl};
 pub struct MusicDb {
     connection: Mutex<Option<Connection>>,
     opened: Mutex<Option<std::path::PathBuf>>,
+    generation: AtomicU64,
 }
 
 impl MusicDb {
@@ -18,6 +20,7 @@ impl MusicDb {
         Self {
             connection: Mutex::new(None),
             opened: Mutex::new(None),
+            generation: AtomicU64::new(0),
         }
     }
 
@@ -33,6 +36,11 @@ impl MusicDb {
         if slot.is_some() && opened.as_deref() == Some(path) {
             return Ok(());
         }
+        let generation = self
+            .generation
+            .load(Ordering::Relaxed)
+            .checked_add(1)
+            .ok_or_else(|| "Music database generation cannot advance".to_string())?;
         if slot.is_some() {
             *slot = None;
         }
@@ -43,6 +51,7 @@ impl MusicDb {
         Self::configure(&mut connection)?;
         *slot = Some(connection);
         *opened = Some(path.to_path_buf());
+        self.generation.store(generation, Ordering::Relaxed);
         Ok(())
     }
 
@@ -70,6 +79,26 @@ impl MusicDb {
             .as_mut()
             .ok_or_else(|| "Music database is not initialized".to_string())?;
         operation(connection)
+    }
+
+    pub fn generation(&self) -> Result<u64, String> {
+        self.with_connection(|_| Ok(self.generation.load(Ordering::Relaxed)))
+    }
+
+    pub(super) fn with_connection_at_generation<T>(
+        &self,
+        expected_generation: u64,
+        operation: impl FnOnce(&mut Connection) -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.with_connection(|connection| {
+            if self.generation.load(Ordering::Relaxed) != expected_generation {
+                return Err(
+                    "Music database changed while fetching playlist; retry in the current profile"
+                        .to_string(),
+                );
+            }
+            operation(connection)
+        })
     }
 
     pub fn upsert_track(&self, track: &MusicTrack) -> Result<(), String> {
@@ -173,6 +202,7 @@ impl MusicDb {
         Self {
             connection: Mutex::new(Some(connection)),
             opened: Mutex::new(None),
+            generation: AtomicU64::new(1),
         }
     }
 }
@@ -191,7 +221,7 @@ ON CONFLICT(id) DO UPDATE SET
   title = excluded.title,
   artist = excluded.artist,
   album = excluded.album,
-  artwork = excluded.artwork,
+  artwork = CASE WHEN excluded.artwork <> '' THEN excluded.artwork ELSE music_tracks.artwork END,
   duration_seconds = excluded.duration_seconds,
   media_kind = COALESCE(excluded.media_kind, music_tracks.media_kind),
   explicit = COALESCE(excluded.explicit, music_tracks.explicit),
@@ -272,6 +302,7 @@ pub(super) fn upsert_track_in_transaction(
 
 pub(super) fn track_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MusicTrack> {
     let connector_id = row.get::<_, String>(1)?;
+    let source_id = row.get::<_, String>(2)?;
     let duration_seconds = row.get::<_, Option<i64>>(7)?.unwrap_or(0).max(0) as u64;
     let resolved_url = row.get::<_, Option<String>>(8)?;
     let playback_url = if matches!(connector_id.as_str(), "local" | "direct") {
@@ -279,18 +310,24 @@ pub(super) fn track_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MusicT
     } else {
         None
     };
+    // Rows saved before the thumbnail fallback still have no artwork; a YouTube video id
+    // always addresses one, so old queues and playlists heal as they are read.
+    let mut artwork = row.get::<_, Option<String>>(6)?.unwrap_or_default();
+    if artwork.trim().is_empty() && connector_id == "youtube" && source_id.len() == 11 {
+        artwork = format!("https://i.ytimg.com/vi/{source_id}/hq720.jpg");
+    }
     Ok(MusicTrack {
         explicit: row.get(10)?,
         version: row.get(11)?,
         media_kind: row.get(9)?,
         id: row.get(0)?,
         connector_id: Some(connector_id),
-        source_id: Some(row.get(2)?),
+        source_id: Some(source_id),
         playback_url,
         title: row.get(3)?,
         artist: row.get(4)?,
         album: row.get(5)?,
-        artwork: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+        artwork,
         duration_seconds,
         duration_label: duration_label(duration_seconds),
     })

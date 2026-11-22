@@ -45,6 +45,7 @@ function harness(initial: DownloadItem[] = []) {
     initial.map((d) => [d.path, { isFile: true, canonicalPath: d.path.toLowerCase() }]),
   );
   const removed: string[] = [];
+  const cleanedFolders: string[] = [];
   const revealed: string[] = [];
   const writers = new Map<string, ReturnType<typeof deferred> & { aborted: boolean }>();
   const failures = new Set<string>();
@@ -52,7 +53,15 @@ function harness(initial: DownloadItem[] = []) {
   const native = { beforeDelete: undefined as ((path: string) => Promise<void>) | undefined };
   let persisted = JSON.stringify(initial);
   let nextId = 0;
-  const invoke = async (command: string, args: { path: string; protectedPaths?: string[] }) => {
+  const invoke = async (
+    command: string,
+    args: { path: string; folder?: string; protectedPaths?: string[] },
+  ) => {
+    if (command === "harbor_download_dir") return "C:/fixtures";
+    if (command === "download_remove_empty_folder") {
+      cleanedFolders.push(args.folder!);
+      return;
+    }
     const file = files.get(args.path);
     if (command === "download_file_info") {
       return file
@@ -138,6 +147,7 @@ function harness(initial: DownloadItem[] = []) {
     store: module.exports as Store,
     files,
     removed,
+    cleanedFolders,
     revealed,
     writers,
     failures,
@@ -146,6 +156,30 @@ function harness(initial: DownloadItem[] = []) {
     persisted: () => JSON.parse(persisted) as DownloadItem[],
   };
 }
+
+test("only the last download requests cleanup of its organized title folder", async () => {
+  for (const organizedFolder of ["C:/fixtures/Fixture", undefined]) {
+    const folder = "C:/fixtures/Fixture";
+    const h = harness([
+      item("first", { path: `${folder}/first.mkv`, organizedFolder }),
+      item("second", { path: `${folder}/second.mkv`, organizedFolder }),
+    ]);
+    await h.store.removeDownload("first");
+    assert.deepEqual(h.cleanedFolders, []);
+    await h.store.removeDownload("second");
+    assert.deepEqual(h.cleanedFolders, [folder]);
+  }
+});
+
+test("download cleanup leaves the base directory and manually chosen folders alone", async () => {
+  const h = harness([
+    item("flat"),
+    item("manual", { path: "C:/fixtures/Fixture/manual.mkv", organizedFolder: null }),
+  ]);
+  await h.store.removeDownload("flat");
+  await h.store.removeDownload("manual");
+  assert.deepEqual(h.cleanedFolders, []);
+});
 
 test("exact download lookup cannot substitute a duplicate episode copy", async () => {
   const h = harness([item("first"), item("second", { startedAt: 2 })]);

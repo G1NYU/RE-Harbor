@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { compactUsd } from "@/lib/format-money";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/feed/tags";
 import { useFilmSoundtrack } from "@/lib/providers/musicbrainz-soundtrack";
 import { tmdbCompanyIdByName, type TmdbDetail } from "@/lib/providers/tmdb";
@@ -61,9 +62,6 @@ export function InfoBlock({ detail, isAnime = false }: { detail: TmdbDetail; isA
         },
   );
   const mediaType: "movie" | "tv" = detail.kind === "tv" ? "tv" : "movie";
-
-  const fmtMoney = (n?: number) =>
-    n && n > 0 ? `$${(n / 1_000_000).toFixed(n >= 1_000_000_000 ? 2 : 0)}${n >= 1_000_000_000 ? "B" : "M"}` : null;
 
   const { settings } = useSettings();
   const tmdbKey = settings.tmdbKey;
@@ -156,15 +154,17 @@ export function InfoBlock({ detail, isAnime = false }: { detail: TmdbDetail; isA
       ? { label: t("Soundtrack"), kind: "node", node: <SoundtrackRow album={soundtrack} /> }
       : null,
     genreChips.length > 0 ? { label: t("Genres"), kind: "chips", chips: genreChips } : null,
-    fmtMoney(detail.budget) != null
-      ? { label: t("Budget"), kind: "text", value: fmtMoney(detail.budget)! }
+    compactUsd(detail.budget) != null
+      ? { label: t("Budget"), kind: "text", value: compactUsd(detail.budget)! }
       : null,
-    fmtMoney(detail.revenue) != null
-      ? { label: t("Revenue"), kind: "text", value: fmtMoney(detail.revenue)! }
+    compactUsd(detail.revenue) != null
+      ? { label: t("Revenue"), kind: "text", value: compactUsd(detail.revenue)! }
       : null,
-    ...(production ? productionRows(production, t) : []).map(
-      (row): Row => ({ label: row.label, kind: "node", node: row.node }),
-    ),
+    ...(production ? productionRows(production, t) : []).map((row): Row => ({
+      label: row.label,
+      kind: "node",
+      node: row.node,
+    })),
     criticism.length > 0
       ? {
           label: t("Discussed on"),

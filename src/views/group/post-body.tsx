@@ -6,6 +6,9 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
+import { useT } from "@/lib/i18n";
+import { parseQuotedBody } from "@/lib/ratings/quote";
 import { renderBbcode } from "@/lib/social/bbcode";
 import { handleLinkOutActivation } from "@/lib/social/link-out-activation";
 import { scanMentions } from "@/lib/social/mentions";
@@ -13,6 +16,8 @@ import { openLinkOut } from "@/lib/social/link-out";
 import { requestOpenProfile } from "@/lib/social/open-profile";
 import { useView } from "@/lib/view";
 import { useRenderedContentContext } from "@/components/context-menu/rendered-content-context";
+import { YouTubeEmbedFrame } from "@/components/youtube-embed-frame";
+import { QuotedRating } from "@/views/profile/quoted-rating";
 import {
   HOVER_CARD_CLOSE_MS,
   HOVER_CARD_OPEN_MS,
@@ -35,13 +40,23 @@ export function PostBody({
   onOpenProfile?: (handle: string) => void;
 }) {
   const { openMeta, openManga } = useView();
+  const t = useT();
   const onContextMenu = useRenderedContentContext();
   const [card, setCard] = useState<{ handle: string; anchor: DOMRect } | null>(null);
+  const [video, setVideo] = useState<{ id: string; target: HTMLElement } | null>(null);
   const openTimer = useRef<number | null>(null);
   const closeTimer = useRef<number | null>(null);
 
-  const html = useMemo(() => renderBbcode(body, new Set(scanMentions(body).notified)), [body]);
+  const quoted = useMemo(() => parseQuotedBody(body), [body]);
+  const html = useMemo(
+    () => renderBbcode(quoted.text, new Set(scanMentions(quoted.text).notified)),
+    [quoted.text],
+  );
   const markup = useMemo(() => ({ __html: html }), [html]);
+
+  useEffect(() => {
+    setVideo(null);
+  }, [quoted.text]);
 
   const clearOpen = () => {
     if (openTimer.current) window.clearTimeout(openTimer.current);
@@ -91,6 +106,14 @@ export function PostBody({
       return;
     }
     const el = e.target as HTMLElement;
+    const embedEl = el.closest?.("[data-harbor-youtube]");
+    const embedId = embedEl?.getAttribute("data-harbor-youtube");
+    const embedFrame = embedEl?.closest("[data-harbor-youtube-frame]");
+    if (embedId && embedFrame instanceof HTMLElement) {
+      e.preventDefault();
+      setVideo({ id: embedId, target: embedFrame });
+      return;
+    }
     const cardEl = el.closest?.("[data-harbor-media]");
     const mediaId = cardEl?.getAttribute("data-harbor-media");
     if (mediaId) {
@@ -137,6 +160,22 @@ export function PostBody({
 
   return (
     <>
+      {quoted.quote && (
+        <QuotedRating
+          quote={quoted.quote}
+          onOpenMeta={(id, kind, hint) =>
+            kind === "manga"
+              ? openManga(id)
+              : openMeta({
+                  id,
+                  type: kind === "series" || kind === "anime" ? "series" : "movie",
+                  name: hint?.name ?? "",
+                  poster: hint?.poster,
+                })
+          }
+          onOpenAuthor={onOpenProfile ?? requestOpenProfile}
+        />
+      )}
       <div
         className="max-w-none select-text break-words text-[14px] leading-relaxed text-ink-muted [&_a]:break-words"
         onContextMenu={onContextMenu}
@@ -155,6 +194,11 @@ export function PostBody({
           onLeave={scheduleClose}
         />
       )}
+      {video &&
+        createPortal(
+          <YouTubeEmbedFrame id={video.id} title={t("YouTube")} onClose={() => setVideo(null)} />,
+          video.target,
+        )}
     </>
   );
 }

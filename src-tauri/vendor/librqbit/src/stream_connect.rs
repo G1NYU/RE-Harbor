@@ -79,10 +79,14 @@ impl StreamConnector {
             return Ok((Box::new(r), Box::new(w)));
         }
 
-        let (r, w) = tokio::net::TcpStream::connect(addr)
+        let stream = tokio::net::TcpStream::connect(addr)
             .await
-            .context("error connecting")?
-            .into_split();
+            .context("error connecting")?;
+        // BitTorrent peer traffic is dominated by small request messages; Nagle
+        // adds a delayed-ACK interval to each one and directly slows queued
+        // block requests on high-RTT peers.
+        let _ = stream.set_nodelay(true);
+        let (r, w) = stream.into_split();
         Ok((Box::new(r), Box::new(w)))
     }
 }

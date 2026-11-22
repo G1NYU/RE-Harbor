@@ -1,4 +1,5 @@
 import { MusicCatalogRow } from "@/components/music/music-catalog-row";
+import type { MusicCatalogRow as MusicCatalogRowData } from "@/lib/music/types";
 import { resolvedTitle, type MusicBand, type MusicBandContext } from "./music-band-types";
 
 export const HOISTED_SOURCE = "spotify";
@@ -22,10 +23,15 @@ function rank(id: string): number {
   return at < 0 ? ORDER.length : at;
 }
 
-export function spotifyBands(ctx: MusicBandContext): MusicBand[] {
+export function spotifyBands(
+  ctx: MusicBandContext,
+  rows: readonly MusicCatalogRowData[],
+): MusicBand[] {
   const account = ctx.connections.find((connection) => connection.id === HOISTED_SOURCE);
   if (account?.status !== "connected") return [];
-  return ctx.slots.extra
+  // Read the provider's rows directly instead of the classified slots, so a shelf that looks
+  // like a chart ("Your top tracks") still renders with the rest of the Spotify section.
+  return rows
     .filter((row) => row.source === HOISTED_SOURCE && row.items.length > 0)
     .slice()
     .sort((a, b) => rank(a.id) - rank(b.id))

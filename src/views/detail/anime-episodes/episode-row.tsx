@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { EpisodeReleaseCountdown } from "@/components/episode-release-countdown";
 import { Play } from "@/components/icons/play-filled";
 import { Poster } from "@/components/poster";
 import type { Meta } from "@/lib/cinemeta";
@@ -15,6 +16,7 @@ import { useT } from "@/lib/i18n";
 import { FillerBadge, UpcomingBadge } from "../badges";
 import { EpisodeRatingBadge } from "../episode-rating-badge";
 import { EpisodeDownloadButton } from "../episode-download-button";
+import { AnimeReviewsButton } from "./anime-reviews-button";
 import { isUpcomingDate } from "../helpers";
 
 function partDisplaySeason(metaId: string, sourceMetaId?: string): number | null {
@@ -52,6 +54,8 @@ export function AnimeEpisodeRow({
   const { settings } = useSettings();
   const epMeta = metaForEp ? metaForEp(ep) : meta;
   const watchedAgo = progress.startedAt > 0 ? formatRelativeWatched(progress.startedAt) : "";
+  const episodeNumber = ep.displayNumber ?? ep.number;
+  const seasonNumber = ep.displaySeason ?? ep.seasonNumber ?? ep.imdbSeason ?? 1;
   const playEpisode = {
     season: animeSeasonKey(ep),
     episode: ep.number,
@@ -71,9 +75,16 @@ export function AnimeEpisodeRow({
       data-ep={ep.number}
       data-epid={ep.id}
       data-no-card-ring
-      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 160px" }}
+      style={{ contentVisibility: "auto", containIntrinsicBlockSize: "auto 113px" }}
       onContextMenu={(e) =>
-        onContextMenu?.(e, animeSeasonKey(ep), ep.number, progress.watched, ep.sourceMetaId, ep.absoluteNumber)
+        onContextMenu?.(
+          e,
+          animeSeasonKey(ep),
+          ep.number,
+          progress.watched,
+          ep.sourceMetaId,
+          ep.absoluteNumber,
+        )
       }
       className="group flex gap-6 rounded-lg px-4 py-5 transition-colors hover:bg-elevated/30"
     >
@@ -131,7 +142,7 @@ export function AnimeEpisodeRow({
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <h4 className="flex items-center gap-2 truncate text-[16px] font-semibold text-ink">
             <span className={`truncate ${spoiler?.title ? SPOILER_TEXT_CLASS : ""}`}>
-              {ep.title || t("Episode {n}", { n: ep.number })}
+              {ep.title || t("Episode {n}", { n: episodeNumber })}
             </span>
             {ep.filler && <FillerBadge />}
             {isUpcomingDate(ep.airdate) || forceUpcoming ? <UpcomingBadge /> : null}
@@ -140,9 +151,9 @@ export function AnimeEpisodeRow({
             <span>
               {[
                 showSeason
-                  ? `S${partDisplaySeason(meta.id, ep.sourceMetaId) ?? ep.imdbSeason ?? ep.seasonNumber ?? 1} · E${ep.number}`
-                  : `E${ep.number}`,
-                ep.absoluteNumber && ep.absoluteNumber !== ep.number
+                  ? `S${partDisplaySeason(meta.id, ep.sourceMetaId) ?? seasonNumber} · E${episodeNumber}`
+                  : `E${episodeNumber}`,
+                ep.absoluteNumber && ep.absoluteNumber !== episodeNumber
                   ? `Abs E${ep.absoluteNumber}`
                   : null,
                 ep.length ? t("{n} min", { n: ep.length }) : null,
@@ -160,6 +171,7 @@ export function AnimeEpisodeRow({
               </span>
             )}
           </p>
+          <EpisodeReleaseCountdown date={ep.airdate} />
           {ep.synopsis && (
             <p
               className={`line-clamp-2 text-[13.5px] leading-relaxed text-ink-muted ${
@@ -171,6 +183,7 @@ export function AnimeEpisodeRow({
           )}
         </div>
       </button>
+      <AnimeReviewsButton meta={meta} ep={ep} compact={false} />
       <EpisodeDownloadButton meta={epMeta} episode={playEpisode} />
     </div>
   );

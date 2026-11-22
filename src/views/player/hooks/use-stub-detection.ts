@@ -23,17 +23,20 @@ export function useStubDetection(params: {
     if (snap.status !== "playing") return;
     stubCheckedRef.current = src.url;
     const runtimeMin = src.meta.runtime ? parseInt(src.meta.runtime, 10) : null;
-    const isAnime =
-      src.meta.id?.startsWith("kitsu:") || src.meta.id?.startsWith("mal:");
+    const isAnime = src.meta.id?.startsWith("kitsu:") || src.meta.id?.startsWith("mal:");
+    // The dynamic dead-streams import may finish after a manual source switch.
+    // Do not eject the newly chosen source for the previous source's stub.
+    let cancelled = false;
     void import("@/lib/dead-streams").then(
       ({ shouldFlagAsStub, markStreamDead, recordStubEvent, STUB_TTL_MS }) => {
+        if (cancelled) return;
         const flag = shouldFlagAsStub({
           durationSec: snap.durationSec,
           runtimeMinutes: runtimeMin,
           isAnime,
           bytesAdvertised: src.streamRef?.size ?? null,
         });
-        if (!flag) return;
+        if (!flag || cancelled) return;
         const sf = {
           infoHash: src.streamRef?.infoHash ?? undefined,
           fileIdx: undefined,
@@ -44,9 +47,14 @@ export function useStubDetection(params: {
         const reason = `stub_${Math.round(snap.durationSec)}s`;
         markStreamDead(sf, reason, STUB_TTL_MS);
         recordStubEvent(reason);
-        console.warn(`[player] stub detected (${Math.round(snap.durationSec)}s); returning to picker`);
-        onStub();
+        console.warn(
+          `[player] stub detected (${Math.round(snap.durationSec)}s); returning to picker`,
+        );
+        if (!cancelled) onStub();
       },
     );
+    return () => {
+      cancelled = true;
+    };
   }, [instantPlay, snap.durationSec, snap.status, src.url, src.meta, src.streamRef, src.title]);
 }

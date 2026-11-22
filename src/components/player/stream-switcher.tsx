@@ -4,13 +4,16 @@ import { addonLogoMap } from "@/components/addon-logo";
 import { HostSourceBanner } from "@/components/host-source-banner";
 import { HoverTooltip } from "@/components/hover-tooltip";
 import { fetchInstalledAddons } from "@/lib/addon-store";
-import { userAddons, type Addon } from "@/lib/addons";
-import { useAuth } from "@/lib/auth";
+import { cachedUserAddons, type Addon } from "@/lib/addons";
+import { isNuvioSignedIn, isNuvioProviderActive } from "@/lib/nuvio/nuvio-client";
+import { fetchNuvioAddons } from "@/lib/nuvio/nuvio-sync";
+import { useAuth, resolveEffectiveStremioAuthKey } from "@/lib/auth";
 import { peekPickerCache, subscribePickerCache } from "@/lib/picker-cache";
 import { useSettings } from "@/lib/settings";
 import type { ScoredStream } from "@/lib/streams/types";
 import { hasCachedMarker } from "@/lib/streams/cached";
 import { filterStreamsByMode } from "@/lib/streams/mode";
+import { sortStreams } from "@/lib/streams/source-sort";
 import type { SourceDescriptor } from "@/lib/together/protocol";
 import { buildMatchScores, matchBadge } from "@/lib/together/source-match";
 import { addonInstanceKey, buildAddonOptions } from "@/views/play-picker/picker-utils";
@@ -22,6 +25,7 @@ import { FiltersMenu, type SwitcherFilters } from "./stream-switcher/filters-men
 import { sourceGroup } from "@/views/play-picker/quality-filter";
 import { KidsStreamSwitcher } from "./stream-switcher/kids-switcher";
 import { normalizeLangCode, streamMatchesLangs } from "./stream-switcher/lang-utils";
+import { expandOriginalAudioLang } from "@/lib/player/audio-language";
 import {
   QUALITY_BADGE,
   QUALITY_LABEL,
@@ -31,6 +35,8 @@ import {
 } from "./stream-switcher/quality";
 import { isCurrentStream, streamKey, SwitcherRow } from "./stream-switcher/switcher-row";
 import { useSwitcherRefresh } from "./stream-switcher/use-switcher-refresh";
+import { runnableStreamPlugins } from "@/lib/streams/plugins";
+import { PLUGIN_ADDON_PREFIX } from "@/lib/streams/plugins/addon";
 
 function isHiddenAddon(addonId: string, addonName?: string): boolean {
   const id = (addonId || "").toLowerCase();
@@ -89,16 +95,20 @@ export function StreamSwitcher({
       seen.add(code);
       out.push(lang);
     }
-    return out;
-  }, [baseLangs, settings.preferredAudioLangs, isAnimeRequest]);
-  const [cache, setCache] = useState(() => peekPickerCache(meta, episode, settings.animePreferImdbStreams));
+    return expandOriginalAudioLang(out, meta.originalLanguage, isAnimeRequest);
+  }, [baseLangs, settings.preferredAudioLangs, isAnimeRequest, meta.originalLanguage]);
+  const [cache, setCache] = useState(() =>
+    peekPickerCache(meta, episode, settings.animePreferImdbStreams),
+  );
   const [addonLogos, setAddonLogos] = useState<Map<string, string | null>>(new Map());
+  const [addonNames, setAddonNames] = useState<Map<string, string>>(new Map());
   const [filterToPreferred, setFilterToPreferred] = useState(
     settings.requirePreferredLanguage === true && preferredLangs.length > 0,
   );
 
   useEffect(() => {
-    const updateCache = () => setCache(peekPickerCache(meta, episode, settings.animePreferImdbStreams));
+    const updateCache = () =>
+      setCache(peekPickerCache(meta, episode, settings.animePreferImdbStreams));
     updateCache();
     return subscribePickerCache(updateCache);
   }, [meta, episode, settings.animePreferImdbStreams]);
@@ -115,10 +125,41 @@ export function StreamSwitcher({
     if (!open) return;
     let cancelled = false;
     (async () => {
+      const isNuvio = isNuvioProviderActive();
+      let nuvioAddonMode = "separate";
+      try {
+        const raw =
+          typeof localStorage !== "undefined"
+            ? localStorage.getItem("harbor.settings") ||
+              localStorage.getItem("harbor.settings.shared")
+            : null;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.nuvioAddonMode) nuvioAddonMode = parsed.nuvioAddonMode;
+        }
+      } catch {}
+      const shouldStremio = !isNuvio || nuvioAddonMode === "combined";
+      const shouldNuvio = (isNuvio || nuvioAddonMode === "combined") && isNuvioSignedIn();
+
       const installed = await fetchInstalledAddons().catch(() => [] as Addon[]);
-      const stremio = authKey ? await userAddons(authKey).catch(() => [] as Addon[]) : [];
+      const effectiveAuthKey = resolveEffectiveStremioAuthKey(authKey);
+      const stremio =
+        shouldStremio && effectiveAuthKey
+          ? await cachedUserAddons(effectiveAuthKey).catch(() => [] as Addon[])
+          : [];
+      const nuvio = shouldNuvio ? await fetchNuvioAddons().catch(() => [] as Addon[]) : [];
+      const plugins = runnableStreamPlugins();
       if (cancelled) return;
-      setAddonLogos(addonLogoMap([...installed, ...stremio]));
+      const list = [...installed, ...stremio, ...nuvio];
+      const logoMap = addonLogoMap(list);
+      plugins.forEach(({ id, icon }) => icon && logoMap.set(`${PLUGIN_ADDON_PREFIX}${id}`, icon));
+      setAddonLogos(logoMap);
+      setAddonNames(
+        new Map([
+          ...list.map((a) => [a.manifest.id, a.manifest.name] as const),
+          ...plugins.map(({ id, name }) => [id, name] as const),
+        ]),
+      );
     })();
     return () => {
       cancelled = true;
@@ -177,6 +218,7 @@ export function StreamSwitcher({
   const [addonFilter, setAddonFilter] = useState<string>("all");
   const [qualityFilter, setQualityFilter] = useState<QualityKey>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const sourceSort = settings.sourceSort;
   const qualityOptions = useMemo(() => {
     const counts = new Map<Exclude<QualityKey, "all">, number>();
     for (const s of allStreams) {
@@ -238,8 +280,8 @@ export function StreamSwitcher({
     if (addonFilter === "all" && matchScores) {
       list = list.slice().sort((a, b) => (matchScores.get(b) ?? 0) - (matchScores.get(a) ?? 0));
     }
-    return list;
-  }, [baseList, addonFilter, qualityFilter, sourceFilter, matchScores]);
+    return sortStreams(list, sourceSort);
+  }, [baseList, addonFilter, qualityFilter, sourceFilter, matchScores, sourceSort]);
   const matchedStreams = useMemo(
     () =>
       preferredLangs.length === 0
@@ -264,10 +306,27 @@ export function StreamSwitcher({
       return addonMatch && resMatch && sizeMatch;
     };
   }, [currentUrl, currentInfoHash, currentFileIdx, currentRef]);
-  const currentStream = useMemo(
-    () => allStreams.find((s) => matchCurrent(s)) ?? null,
-    [allStreams, matchCurrent],
-  );
+  const currentStream = useMemo(() => {
+    const refAddonId = currentRef?.addonId;
+    if (refAddonId) {
+      // Duplicate torrents can share a hash. Prefer the row that actually supplied
+      // the playing stream, otherwise the first same-hash row (often the faster
+      // addon) is displayed as current.
+      const exact = allStreams.find(
+        (s) =>
+          isCurrentStream(s, currentUrl, currentInfoHash, currentFileIdx) &&
+          (s.addonId === refAddonId || s.contributors?.some((c) => c.id === refAddonId)),
+      );
+      if (exact) return exact;
+    }
+    return allStreams.find((s) => matchCurrent(s)) ?? null;
+  }, [allStreams, currentRef?.addonId, currentUrl, currentInfoHash, currentFileIdx, matchCurrent]);
+  const currentAddon = useMemo(() => {
+    const id = currentRef?.addonId;
+    if (!id) return null;
+    const contributor = currentStream?.contributors?.find((c) => c.id === id);
+    return { id, name: addonNames.get(id) ?? contributor?.name ?? id };
+  }, [currentRef?.addonId, currentStream, addonNames]);
   const list = useMemo(() => {
     if (!currentStream) return filteredList;
     const curKey = streamKey(currentStream);
@@ -276,12 +335,22 @@ export function StreamSwitcher({
   const [showCount, setShowCount] = useState(80);
   useEffect(() => {
     setShowCount(80);
-  }, [addonFilter, qualityFilter, sourceFilter, filterToPreferred, cachedOnly, list.length]);
+  }, [
+    addonFilter,
+    qualityFilter,
+    sourceFilter,
+    filterToPreferred,
+    cachedOnly,
+    sourceSort,
+    list.length,
+  ]);
   const hiddenCount = addonFilteredList.length - matchedStreams.length;
   const uncachedHidden = allStreams.length - cachedStreams.length;
   const filters: SwitcherFilters = {
     mode: settings.streamMode,
     setMode: (m) => update({ streamMode: m }),
+    sourceSort,
+    setSourceSort: (v) => update({ sourceSort: v }),
     quality: qualityFilter,
     setQuality: setQualityFilter,
     qualityOptions,
@@ -394,17 +463,23 @@ export function StreamSwitcher({
           </div>
         ) : (
           <ul className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-thumb]:border-4 [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-ink/25 [&::-webkit-scrollbar-thumb]:bg-clip-padding [&::-webkit-scrollbar-thumb:hover]:bg-ink/40">
-            {list.slice(0, showCount).map((s, i) => (
-              <SwitcherRow
-                key={`${s.addonId}-${s.infoHash ?? s.url ?? i}`}
-                stream={s}
-                addonLogo={addonLogos.get(s.addonId) ?? null}
-                onPick={() => onPick(s)}
-                resolving={resolvingKey === streamKey(s)}
-                isCurrent={matchCurrent(s)}
-                match={matchBadge(matchScores?.get(s))}
-              />
-            ))}
+            {list.slice(0, showCount).map((s, i) => {
+              const isCurrent = currentStream === s;
+              const rowAddon = isCurrent ? currentAddon : null;
+              return (
+                <SwitcherRow
+                  key={`${s.addonId}-${s.infoHash ?? s.url ?? i}`}
+                  stream={s}
+                  addonLogo={addonLogos.get(addonInstanceKey(s)) ?? null}
+                  currentAddon={rowAddon}
+                  currentName={isCurrent ? (currentRef?.name ?? null) : null}
+                  onPick={() => onPick(s)}
+                  resolving={resolvingKey === streamKey(s)}
+                  isCurrent={isCurrent}
+                  match={matchBadge(matchScores?.get(s))}
+                />
+              );
+            })}
             {list.length > showCount && (
               <li className="px-4 pb-3 pt-1.5">
                 <button

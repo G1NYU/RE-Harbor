@@ -29,6 +29,13 @@ function loadVideo(invoke: (command: string, args: any) => Promise<any>) {
           return invoke(command, args);
         },
       };
+    if (name === "./video-quality")
+      return {
+        musicVideoQuality: () => "auto",
+        musicVideoMaxHeight: () => null,
+        defaultMusicVideoQuality: () => "auto",
+        clearMusicVideoSessionQuality: () => {},
+      };
     throw Error(name);
   });
   return { api, calls };
@@ -172,6 +179,17 @@ function loadSession(resolveStream: () => Promise<any>) {
       return {
         musicVideoStream: () => resolveStream(),
         musicVideoStreamKey: (value: any) => `${value.connectorId}:${value.sourceId}`,
+        prefetchMusicVideoStreams: () => {},
+        setMusicVideoTargetResolver: () => {},
+      };
+    if (name === "./video-pages")
+      return { searchMusicVideoPage: async () => ({ tracks: [], next: null }) };
+    if (name === "./video-quality")
+      return {
+        musicVideoQuality: () => "auto",
+        musicVideoMaxHeight: () => null,
+        defaultMusicVideoQuality: () => "auto",
+        clearMusicVideoSessionQuality: () => {},
       };
     throw Error(name);
   });

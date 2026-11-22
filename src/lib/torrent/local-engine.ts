@@ -3,6 +3,9 @@ import { stopFullDownload } from "./full-download";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const PENDING_DELETE_KEY = "harbor-internal.torrent.pending-delete.v1";
+// Prewarm-only torrents, so a hover/focus/consent prewarm that never became
+// playback can be removed (with its cache files) on the next app start.
+const PREWARM_LEDGER_KEY = "harbor-internal.torrent.prewarm.v1";
 const INFO_HASH_RE = /^[a-f0-9]{40}$/;
 
 export type EngineStatus = {
@@ -91,6 +94,8 @@ export async function torrentEngineAdd(
   magnet: string,
   trackers: string[],
   fileIdx?: number,
+  /** Who asked for this add; appears in engine diagnostics. */
+  origin?: string,
 ): Promise<AddResult | null> {
   if (!isTauri) return null;
   try {
@@ -99,7 +104,11 @@ export async function torrentEngineAdd(
       magnet,
       trackers,
       fileIdx: typeof fileIdx === "number" && fileIdx >= 0 ? fileIdx : null,
+      origin: origin ?? null,
     });
+    if (origin === "prewarm" && added.already_managed !== true) {
+      registerPrewarmTorrent(added.info_hash);
+    }
     schedulePostStartReconciliation();
     return added;
   } catch (e) {
@@ -113,6 +122,7 @@ export async function torrentEngineSelect(infoHash: string, fileIdx: number): Pr
   if (!isTauri) return false;
   try {
     await invoke("torrent_engine_select", { infoHash, fileIdx });
+    unregisterPrewarmTorrent(infoHash);
     return true;
   } catch (error) {
     lastAddError = String(error);
@@ -123,9 +133,9 @@ export async function torrentEngineSelect(infoHash: string, fileIdx: number): Pr
 
 export async function torrentEngineSelectSet(infoHash: string, fileIdxs: number[]): Promise<void> {
   if (!isTauri) return;
-  await invoke("torrent_engine_select_set", { infoHash, fileIdxs }).catch((e) =>
-    console.warn("[engine] select set failed", e),
-  );
+  await invoke("torrent_engine_select_set", { infoHash, fileIdxs })
+    .then(() => unregisterPrewarmTorrent(infoHash))
+    .catch((e) => console.warn("[engine] select set failed", e));
 }
 
 export async function torrentEngineStats(
@@ -165,6 +175,7 @@ export async function torrentEngineResume(infoHash: string): Promise<void> {
 
 async function tryTorrentEngineRemove(infoHash: string, deleteFiles: boolean): Promise<boolean> {
   const key = normalizeInfoHash(infoHash);
+  unregisterPrewarmTorrent(key);
   if (deleteFiles) markPendingDelete(key);
   cancelTorrentRemoval(key, false);
   clearTorrentPlaybackHandoff(key);
@@ -241,6 +252,48 @@ function clearPendingDelete(infoHash: string): void {
   writePendingDeletes(pending);
 }
 
+function readPrewarmLedger(): Set<string> {
+  if (typeof localStorage === "undefined") return new Set();
+  try {
+    const stored = JSON.parse(localStorage.getItem(PREWARM_LEDGER_KEY) ?? "[]") as unknown;
+    if (!Array.isArray(stored)) return new Set();
+    return new Set(
+      stored
+        .filter((value): value is string => typeof value === "string")
+        .map(normalizeInfoHash)
+        .filter((value) => INFO_HASH_RE.test(value)),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writePrewarmLedger(pending: Set<string>): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    if (pending.size === 0) localStorage.removeItem(PREWARM_LEDGER_KEY);
+    else localStorage.setItem(PREWARM_LEDGER_KEY, JSON.stringify([...pending]));
+  } catch {
+    /* noop */
+  }
+}
+
+/** Remember that a torrent only exists for a prewarm until playback claims it. */
+export function registerPrewarmTorrent(infoHash: string): void {
+  const key = normalizeInfoHash(infoHash);
+  if (!INFO_HASH_RE.test(key)) return;
+  const pending = readPrewarmLedger();
+  if (pending.has(key)) return;
+  pending.add(key);
+  writePrewarmLedger(pending);
+}
+
+function unregisterPrewarmTorrent(infoHash: string): void {
+  const pending = readPrewarmLedger();
+  if (!pending.delete(normalizeInfoHash(infoHash))) return;
+  writePrewarmLedger(pending);
+}
+
 export function localEngineStreamRef(url: string | null | undefined): LocalEngineStreamRef | null {
   if (!url) return null;
   try {
@@ -263,6 +316,7 @@ export function retainTorrentUsage(
   options: { preservePendingDelete?: boolean } = {},
 ): void {
   const key = normalizeInfoHash(infoHash);
+  unregisterPrewarmTorrent(key);
   if (options.preservePendingDelete !== true) claimTorrentPlaybackHandoff(key);
   cancelTorrentRemoval(key, options.preservePendingDelete !== true);
   const usage = torrentUsage.get(key) ?? {
@@ -276,6 +330,7 @@ export function retainTorrentUsage(
 }
 
 export function confirmTorrentUsage(infoHash: string): void {
+  unregisterPrewarmTorrent(infoHash);
   clearPendingDelete(infoHash);
 }
 
@@ -469,6 +524,44 @@ export function reconcilePendingTorrentRemovals(waitForReadyMs = 15000): Promise
 
 export function flushPendingTorrentRemovals(): Promise<void> {
   return runPendingTorrentReconciliation(0, true);
+}
+
+let prewarmReconciliation: Promise<void> | null = null;
+
+/**
+ * Remove torrents that only ever existed for a hover/focus/consent prewarm and
+ * were never claimed by playback. A prewarm that is still paused on the next app
+ * start was abandoned when the app closed (its abandon timer died with the
+ * webview), so it and its cache files are discarded then.
+ */
+export function reconcilePrewarmTorrents(waitForReadyMs = 15000): Promise<void> {
+  if (prewarmReconciliation) return prewarmReconciliation;
+  prewarmReconciliation = runPrewarmReconciliation(waitForReadyMs).finally(() => {
+    prewarmReconciliation = null;
+  });
+  return prewarmReconciliation;
+}
+
+async function runPrewarmReconciliation(waitForReadyMs: number): Promise<void> {
+  if (!isTauri || readPrewarmLedger().size === 0) return;
+  if (!(await waitForEngineReady(waitForReadyMs))) return;
+  let active: TorrentListItem[];
+  try {
+    active = await invoke<TorrentListItem[]>("torrent_engine_list");
+  } catch {
+    return;
+  }
+  const byHash = new Map(active.map((item) => [normalizeInfoHash(item.infoHash), item]));
+  for (const key of readPrewarmLedger()) {
+    const item = byHash.get(key);
+    const claimed =
+      item == null ||
+      item.paused !== true ||
+      (torrentUsage.get(key)?.owners.size ?? 0) > 0 ||
+      pendingRemovals.has(key);
+    if (!claimed) await torrentEngineRemove(key, true);
+    unregisterPrewarmTorrent(key);
+  }
 }
 
 export async function torrentEngineSelfTest(): Promise<SelfTestResult | null> {

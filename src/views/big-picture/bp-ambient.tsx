@@ -7,6 +7,7 @@ import { useBigPictureRoute } from "@/lib/big-picture";
 import { useBpFocusedMeta } from "./bp-focus-meta";
 import { useArtGlow } from "./bp-art-color";
 import { bpHeroCandidates, type BpHeroCandidate, type BpHeroSource } from "./bp-art";
+import { reusableAnimeBackdrop } from "@/lib/providers/anime-art-quality";
 import { useBpEnrichFor } from "./use-bp-enrich";
 import { useBpLivePanels } from "./use-bp-live-panels";
 import { useBpTrailer } from "./use-bp-trailer";
@@ -22,7 +23,12 @@ import {
   type BpSplit,
   type BpStill,
 } from "./bp-ambient-layers";
-import { BAND_SETTLE_MS, BP_BAND_FLOOR_REST, useBpBandState, type BpBandId } from "./use-bp-sections";
+import {
+  BAND_SETTLE_MS,
+  BP_BAND_FLOOR_REST,
+  useBpBandState,
+  type BpBandId,
+} from "./use-bp-sections";
 
 const ENRICH_GRACE_MS = 420;
 const BAND_FLOOR_MS = 600;
@@ -32,7 +38,9 @@ const MOSAIC_MIN = 14;
 const NO_POSTERS: readonly string[] = [];
 
 const TITLE_ART_ROUTES = new Set(
-  "home shows movies anime service detail person library collection tmdb-collection addon".split(" "),
+  "home shows movies anime service detail person library collection tmdb-collection addon".split(
+    " ",
+  ),
 );
 
 export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
@@ -44,27 +52,31 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
   const metaId = meta?.id ?? "";
   const { settings } = useSettings();
   const rtl = isRtl(useUiLanguage());
+  const anime = route.kind === "anime";
+  const art = (url: string | undefined) => (anime ? reusableAnimeBackdrop(url) : url);
 
   const fallback = useMemo<BpHeroSource | null>(() => {
-    const background = pool.find((m) => m.background)?.background;
+    const background = pool.map((m) => art(m.background)).find(Boolean);
     if (background) return { url: background, portrait: false };
     const poster = pool.find((m) => m.poster)?.poster;
     return poster ? { url: poster, portrait: true } : null;
-  }, [pool]);
+  }, [pool, anime]);
   // The pool fallback is another title's artwork, so it can only ever answer for
   // nothing-focused. Listing it beside a focused title's own art meant that
   // whenever that title had not resolved yet the fallback won, committed under
   // the focused id, and latched committedFor so the real art never replaced it.
   // That is the Spider-Man backdrop sitting behind a focused Silo.
+  const preferredBackdrop = detail?.textlessBackdrops?.[0] ?? detail?.gallery.backdrops[0];
   const candidates = useMemo(() => {
     const own: BpHeroSource[] = [
-      { url: detail?.gallery.backdrops[0], portrait: false },
-      { url: detail?.backdrop, portrait: false },
-      { url: meta?.background, portrait: false },
+      { url: art(preferredBackdrop), portrait: false },
+      { url: art(detail?.backdrop), portrait: false },
+      { url: art(meta?.background), portrait: false },
+      ...(anime ? pool.slice(0, 6).map((m) => ({ url: art(m.background), portrait: false })) : []),
       { url: meta?.poster, portrait: true },
     ];
     return bpHeroCandidates(meta ? own : fallback ? [fallback] : [], settings.heroFullQuality);
-  }, [detail?.backdrop, detail?.gallery.backdrops[0], meta, fallback, settings.heroFullQuality]);
+  }, [anime, pool, detail?.backdrop, preferredBackdrop, meta, fallback, settings.heroFullQuality]);
 
   const { src: trailerSrc } = useBpTrailer(ownsTitle ? meta : null);
   const [trailerReady, setTrailerReady] = useState(false);
@@ -118,7 +130,8 @@ export function BpAmbient({ pool, still }: { pool: Meta[]; still?: boolean }) {
     // effect lists tier, so the identical list used to be walked twice: a second
     // Image, request and decode for a src already committed and on screen. List
     // identity is the honest question, so an unchanged one only records the tier.
-    const walked = committedFor.current === metaId && committedQuality.current === settings.heroFullQuality;
+    const walked =
+      committedFor.current === metaId && committedQuality.current === settings.heroFullQuality;
     if (walked && committedList.current === candidates) {
       if (tier < committedTier.current) committedTier.current = tier;
       return;

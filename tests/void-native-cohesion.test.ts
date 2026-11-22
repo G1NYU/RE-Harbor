@@ -41,7 +41,7 @@ test("initial stream picker and in-player stream switcher share VOID surfaces", 
 test("native VOID screensaver and startup fallback retain user-selected artwork", () => {
   assert.match(screensaver, /data-void-screensaver-brand/);
   assert.match(screensaver, /settings\.theme\.preset === "cool-grey"/);
-  assert.match(artworkSettings, /<CustomArtwork role=\{role\}/);
+  assert.match(artworkSettings, /<CustomArtwork\s+role=\{role\}/);
   assert.match(artworkSettings, /<VoidDefaultArtwork size="sm"/);
   assert.match(loader, /data-void-default-artwork/);
   assert.match(loader, /<CustomArtwork role="loading"/);

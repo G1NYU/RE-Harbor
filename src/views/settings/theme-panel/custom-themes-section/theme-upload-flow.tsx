@@ -22,7 +22,7 @@ import { useT } from "@/lib/i18n";
 import { getActiveModal, isBackKey, isEditable } from "@/lib/keyboard-navigation/geometry";
 import { exportThemeJson, getCustomThemes, type CustomTheme } from "@/lib/custom-themes";
 import { currentAuthor, subscribeAuthor, type Author } from "@/lib/theme-auth";
-import { recordUpload, uploadTheme } from "@/lib/theme-store";
+import { recordUpload, THEME_SUBMISSION_SCREENSHOT_LIMIT, uploadTheme } from "@/lib/theme-store";
 import { optimizeBackgroundForShare } from "../image-utils";
 import { CheatSheet } from "../theme-studio/cheat-sheet";
 import { AuthorAccountPanel } from "./author-account-panel";
@@ -104,14 +104,17 @@ export function ThemeUploadFlow({ onClose }: { onClose: () => void }) {
     input.accept = "image/*";
     input.multiple = true;
     input.onchange = async () => {
-      const files = Array.from(input.files || []).slice(0, 6 - shots.length);
+      const files = Array.from(input.files || []).slice(
+        0,
+        THEME_SUBMISSION_SCREENSHOT_LIMIT - shots.length,
+      );
       const added = await Promise.all(
         files.map(async (f) => {
           const blob = await scaleToBlob(f);
           return { blob, url: URL.createObjectURL(blob) };
         }),
       );
-      setShots((s) => [...s, ...added].slice(0, 6));
+      setShots((s) => [...s, ...added].slice(0, THEME_SUBMISSION_SCREENSHOT_LIMIT));
     };
     input.click();
   };
@@ -264,7 +267,9 @@ export function ThemeUploadFlow({ onClose }: { onClose: () => void }) {
                 />
               </div>
             </div>
-            {error && <p className="max-w-[66ch] text-[15.5px] leading-[22px] text-danger">{error}</p>}
+            {error && (
+              <p className="max-w-[66ch] text-[15.5px] leading-[22px] text-danger">{error}</p>
+            )}
           </div>
         </div>
       )}
@@ -395,9 +400,7 @@ function ThemeStep({
                   <div key={i} className="flex-1" style={{ background: c }} />
                 ))}
               </div>
-              <span className={`truncate px-3.5 py-2.5 ${ROW_TITLE}`}>
-                {t.name}
-              </span>
+              <span className={`truncate px-3.5 py-2.5 ${ROW_TITLE}`}>{t.name}</span>
             </button>
           );
         })}
@@ -419,9 +422,9 @@ function ShotsStep({
   return (
     <div className="flex flex-col gap-4">
       <p className="max-w-[66ch] text-[15.5px] leading-[22px] text-ink-muted">
-        {t(
-          "Add up to 6 screenshots so people can see your theme in action. Optional, but they sell it.",
-        )}
+        {t("Add up to {n} screenshots to show your theme in action. Screenshots are optional.", {
+          n: THEME_SUBMISSION_SCREENSHOT_LIMIT,
+        })}
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {shots.map((s, i) => (
@@ -439,7 +442,7 @@ function ShotsStep({
             </button>
           </div>
         ))}
-        {shots.length < 6 && (
+        {shots.length < THEME_SUBMISSION_SCREENSHOT_LIMIT && (
           <button
             onClick={onAdd}
             className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-edge bg-surface text-ink-subtle transition-colors hover:border-accent hover:text-ink"
@@ -512,7 +515,9 @@ function Benefit({
       </span>
       <div className="flex flex-col gap-0.5">
         <span className={ROW_TITLE}>{title}</span>
-        <span className="max-w-[66ch] text-[15.5px] leading-[22px] text-ink-subtle">{children}</span>
+        <span className="max-w-[66ch] text-[15.5px] leading-[22px] text-ink-subtle">
+          {children}
+        </span>
       </div>
     </li>
   );
@@ -546,7 +551,9 @@ function SuccessView({
         </p>
       </div>
       <div className="flex items-center gap-2 rounded-md bg-surface p-2 ps-3">
-        <span className="max-w-[280px] truncate text-[15.5px] leading-[22px] text-ink-muted">{share}</span>
+        <span className="max-w-[280px] truncate text-[15.5px] leading-[22px] text-ink-muted">
+          {share}
+        </span>
         <button
           onClick={onCopy}
           className="flex h-11 items-center gap-1.5 rounded-md bg-elevated px-3.5 text-[15.5px] font-semibold text-ink-muted transition-colors hover:text-ink"

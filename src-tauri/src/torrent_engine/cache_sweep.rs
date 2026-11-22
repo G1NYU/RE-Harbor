@@ -20,6 +20,7 @@ pub fn run_with_cancel(
     retention_hours: u64,
     max_gb: u64,
     cancelled: &AtomicBool,
+    protected: &[String],
 ) -> SweepStats {
     let mut stats = SweepStats::default();
     let entries = match fs::read_dir(dir) {
@@ -56,6 +57,12 @@ pub fn run_with_cancel(
             .map(|n| KEEP.contains(&n))
             .unwrap_or(false);
         if keep_name {
+            continue;
+        }
+        // A torrent that is streaming right now owns this entry; deleting it
+        // would pull the bytes out from under the player.
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+        if protected.iter().any(|entry| entry == name) {
             continue;
         }
         let modified = entry.metadata().and_then(|m| m.modified()).ok();
@@ -180,7 +187,7 @@ mod tests {
         fs::write(dir.join("old.bin"), b"12345678").unwrap();
 
         let cancelled = AtomicBool::new(false);
-        let stats = run_with_cancel(&dir, 0, 0, &cancelled);
+        let stats = run_with_cancel(&dir, 0, 0, &cancelled, &[]);
 
         assert_eq!(stats.scanned, 3);
         assert_eq!(stats.deleted, 1);
@@ -204,10 +211,31 @@ mod tests {
         fs::write(dir.join("old.bin"), b"keep until next sweep").unwrap();
         let cancelled = AtomicBool::new(true);
 
-        let stats = run_with_cancel(&dir, 0, 0, &cancelled);
+        let stats = run_with_cancel(&dir, 0, 0, &cancelled, &[]);
 
         assert!(stats.cancelled);
         assert!(dir.join("old.bin").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn sweep_keeps_entries_of_torrents_that_are_still_streaming() {
+        let dir = std::env::temp_dir().join(format!(
+            "harbor-cache-sweep-protected-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("active-file.bin"), b"in use").unwrap();
+        fs::write(dir.join("cold-file.bin"), b"not in use").unwrap();
+        let cancelled = AtomicBool::new(false);
+        let protected = vec!["active-file.bin".to_string()];
+
+        let stats = run_with_cancel(&dir, 0, 0, &cancelled, &protected);
+
+        assert!(dir.join("active-file.bin").exists());
+        assert!(!dir.join("cold-file.bin").exists());
+        assert_eq!(stats.deleted, 1);
         fs::remove_dir_all(dir).unwrap();
     }
 }

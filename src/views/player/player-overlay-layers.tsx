@@ -1,6 +1,7 @@
 import { memo, type ComponentProps, type RefObject } from "react";
 import { DrawCanvas, StrokesLayer, type Stroke } from "@/components/player/draw-canvas";
 import { cropTransform } from "./hooks/use-video-fill";
+import type { HoldSpeed } from "./hooks/use-hold-speed";
 import { StreamSwitcher } from "@/components/player/stream-switcher";
 import { StreamCheckPill } from "@/components/player/stream-check-pill";
 import { AdReportButton } from "@/components/player/ad-report-button";
@@ -51,6 +52,8 @@ export type PlayerOverlayLayersProps = {
   subShowInPip: boolean;
   subAssNative: boolean;
   showStats: boolean;
+  showShortcuts: boolean;
+  closeShortcuts: () => void;
   holdSpeedActive: boolean;
   subtitleOffsetSec: number | null;
   volumeIndicator: VolumeIndicatorState;
@@ -66,6 +69,7 @@ export type PlayerOverlayLayersProps = {
   toggleFullscreen: () => void;
   onVolumeWheel: (deltaY: number) => void;
   onVolumeFeedback: (volume: number, muted: boolean) => void;
+  holdSpeed: HoldSpeed;
   isLocalSrc: boolean;
   sourceFailed: boolean;
   swappingEp: boolean;
@@ -178,6 +182,8 @@ export type PlayerOverlayLayersProps = {
   onSwitchStream: Switcher["onPick"];
   debridSlugs: string[];
   isSeriesPlayback: boolean;
+  queueSessionAvailable: boolean;
+  queuePlaybackEnabled: boolean;
   episodePanelOpen: boolean;
   setEpisodePanelOpen: (v: boolean) => void;
   upNextButtonVisible: boolean;
@@ -224,6 +230,8 @@ export const PlayerOverlayLayers = memo(function PlayerOverlayLayers(p: PlayerOv
         subShowInPip={p.subShowInPip}
         subAssNative={p.subAssNative}
         showStats={p.showStats}
+        showShortcuts={p.showShortcuts}
+        onCloseShortcuts={p.closeShortcuts}
         holdSpeedActive={p.holdSpeedActive}
         subtitleOffsetSec={p.subtitleOffsetSec}
         volumeIndicator={p.volumeIndicator}
@@ -253,6 +261,7 @@ export const PlayerOverlayLayers = memo(function PlayerOverlayLayers(p: PlayerOv
         onClick={p.playPauseToggle}
         onDoubleClick={p.toggleFullscreen}
         onWheelVolume={p.onVolumeWheel}
+        holdSpeed={p.holdSpeed}
       />
 
       {p.tenFoot ? (
@@ -514,8 +523,14 @@ export const PlayerOverlayLayers = memo(function PlayerOverlayLayers(p: PlayerOv
         tenFoot={p.tenFoot}
         engine={p.engine}
         isSeriesPlayback={p.isSeriesPlayback}
+        queueSessionAvailable={p.queueSessionAvailable}
+        queuePlaybackEnabled={p.queuePlaybackEnabled}
         meta={p.src.meta}
         currentEpisode={p.src.episode}
+        currentStreamUrl={p.liveUrl}
+        currentStreamRef={p.currentRef ?? p.src.streamRef ?? null}
+        currentImdbId={p.src.imdbId}
+        currentIsAnime={p.src.isAnime}
         episodePanelOpen={p.episodePanelOpen}
         onOpenEpisodePanel={() => p.setEpisodePanelOpen(true)}
         onCloseEpisodePanel={() => p.setEpisodePanelOpen(false)}
@@ -523,6 +538,7 @@ export const PlayerOverlayLayers = memo(function PlayerOverlayLayers(p: PlayerOv
         episodesCorner={p.episodesCorner}
         episodesHidden={p.episodesHidden}
         roomGuest={p.roomGuest}
+        inRoom={p.inRoom}
         onHostAdvance={p.onHostAdvance}
         watchedFor={p.watchedFor}
         nextEp={p.adjacentNext}

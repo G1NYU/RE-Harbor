@@ -1,3 +1,5 @@
+import seekSteps from "./hi/seek-steps";
+import reviews from "./hi/reviews";
 import playOrders from "./hi/play-orders";
 import gameRomLibrary from "./hi/game-rom-library";
 import gameNotes from "./hi/game-notes";
@@ -89,9 +91,12 @@ import catalogPR from "./hi/catalog-p-r";
 import catalogSU from "./hi/catalog-s-u";
 import catalogVZ from "./hi/catalog-v-z";
 import coverage from "./hi/coverage";
+import subtitles from "./hi/subtitles";
 import plugins from "./hi/plugins";
 import brands from "./hi/brands";
 import bpSports from "./hi/bp-sports";
+import queueBasket from "./hi/queue-basket";
+import liveWeb from "./hi/live-web";
 
 import nytTv from "./hi/nyt-tv";
 
@@ -276,6 +281,7 @@ const hi: Record<string, string> = {
   ...catalogSU,
   ...catalogVZ,
   ...coverage,
+  ...subtitles,
   ...settingsRefinements,
   ...plugins,
   ...brands,
@@ -354,14 +360,17 @@ const hi: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
   "Refract sync": "Refract सिंक",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "देखने के इतिहास और Harbor की वॉचलिस्ट में किए गए बदलावों को Refract के साथ सिंक करें।",
   "Refract personal API key": "Refract की निजी API कुंजी",
   "Verifying...": "सत्यापित किया जा रहा है…",
   "Connect Refract": "Refract कनेक्ट करें",
-  "Refract key saved in Harbor's secret store":
-    "Refract की कुंजी Harbor के सुरक्षित स्टोर में सहेजी गई है",
+  "Refract key saved in Harbor's secret store": "Refract की कुंजी Harbor के सुरक्षित स्टोर में सहेजी गई है",
   "Sync watched history and watchlist": "देखने का इतिहास और वॉचलिस्ट सिंक करें",
   "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
     "Harbor से देखने का इतिहास और वॉचलिस्ट में किए गए बदलाव Refract पर भेजें। केवल Harbor की मुख्य प्रोफ़ाइल सिंक होती है।",
@@ -392,15 +401,13 @@ const hi: Record<string, string> = {
   "Episode not found; verify season numbering": "एपिसोड नहीं मिला; सीज़न की संख्या जाँचें",
   "Last watched item sent successfully": "देखने का पिछला रिकॉर्ड सफलतापूर्वक भेजा गया",
   "Unknown error": "अज्ञात त्रुटि",
-  "Some items could not be matched or sent":
-    "कुछ आइटम का मिलान नहीं हो सका या उन्हें भेजा नहीं जा सका",
+  "Some items could not be matched or sent": "कुछ आइटम का मिलान नहीं हो सका या उन्हें भेजा नहीं जा सका",
   "Refract denied access; check key and permissions":
     "Refract ने पहुँच अस्वीकार कर दी; कुंजी और अनुमतियाँ जाँचें",
   "Network error; retry scheduled": "नेटवर्क त्रुटि; फिर से कोशिश निर्धारित है",
   "No verified IMDb/TMDB/TVDB identity is available for this title.":
     "इस शीर्षक के लिए कोई सत्यापित IMDb/TMDB/TVDB पहचान उपलब्ध नहीं है।",
-  "Refract could not uniquely identify this title.":
-    "Refract इस शीर्षक की विशिष्ट पहचान नहीं कर सका।",
+  "Refract could not uniquely identify this title.": "Refract इस शीर्षक की विशिष्ट पहचान नहीं कर सका।",
   "Refract preserved an existing library entry or viewing history.":
     "Refract ने मौजूदा लाइब्रेरी एंट्री या देखने का इतिहास सुरक्षित रखा।",
   "Added to Refract Plan to Watch.": "Refract की देखने की योजना में जोड़ा गया।",

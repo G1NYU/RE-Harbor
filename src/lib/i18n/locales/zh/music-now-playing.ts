@@ -38,7 +38,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "音质标识",
   "music.dock.part.source": "来源",
   "music.dock.part.time": "时间",
-  "music.dock.part.queue": "播放队列",
+  "music.dock.part.queue": "收听队列",
   "music.dock.part.like": "喜欢",
 
   "music.now.colors": "专辑配色",

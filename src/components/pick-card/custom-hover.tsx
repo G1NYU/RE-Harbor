@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import type { CustomHoverConfig } from "@/lib/custom-hover";
 import { useT } from "@/lib/i18n";
+import { FriendReviewBadges } from "@/components/ratings/friend-review-badges";
 
 export function customHoverPosterProps(
   config: CustomHoverConfig,
@@ -25,19 +26,25 @@ export function CustomHoverOverlay({
   meta,
   onPlay,
   preview,
+  showFriendReviews = false,
 }: {
   config: CustomHoverConfig;
   meta: Meta;
   onPlay: () => void;
   preview?: boolean;
+  showFriendReviews?: boolean;
 }) {
   const t = useT();
   const btn = preview ? "pointer-events-none" : "pointer-events-auto";
-  const vis = preview ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+  const vis = preview
+    ? "opacity-100"
+    : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
 
   const info = (config.showTitle || config.showMeta) && (
     <div className="flex min-w-0 flex-col gap-1">
-      {config.showTitle && <span className="line-clamp-1 text-[13px] font-semibold text-white">{meta.name}</span>}
+      {config.showTitle && (
+        <span className="line-clamp-1 text-[13px] font-semibold text-white">{meta.name}</span>
+      )}
       {config.showMeta && (
         <span className="flex items-center gap-2 text-[11px] text-white/85">
           {meta.imdbRating && (
@@ -67,6 +74,15 @@ export function CustomHoverOverlay({
     </span>
   );
 
+  const friendReviews = !preview && showFriendReviews && (
+    <FriendReviewBadges
+      metaId={meta.id}
+      kind={meta.type}
+      className="ms-auto shrink-0 gap-1"
+      avatarSize={22}
+    />
+  );
+
   if (config.overlay === "panel") {
     return (
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 overflow-hidden rounded-b-[var(--poster-radius,12px)]">
@@ -77,7 +93,10 @@ export function CustomHoverOverlay({
               : "translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
           }`}
         >
-          {info || <span />}
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            {info}
+            {friendReviews}
+          </div>
           {playDisc}
         </div>
       </div>
@@ -87,11 +106,18 @@ export function CustomHoverOverlay({
   return (
     <div
       className={`pointer-events-none absolute inset-0 z-20 flex flex-col justify-end rounded-[var(--poster-radius,12px)] p-3 transition-opacity duration-300 ${
-        config.overlay === "gradient" ? "bg-gradient-to-t from-black/85 via-black/20 to-transparent pt-9" : ""
+        config.overlay === "gradient"
+          ? "bg-gradient-to-t from-black/85 via-black/20 to-transparent pt-9"
+          : ""
       } ${vis}`}
     >
-      {info}
-      {playDisc && <div className="absolute inset-0 flex items-center justify-center">{playDisc}</div>}
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {info}
+        {friendReviews}
+      </div>
+      {playDisc && (
+        <div className="absolute inset-0 flex items-center justify-center">{playDisc}</div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,10 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Waiting for {name}…": "En attente de {name}…",
+  "Keeping the source you were watching.": "Conservation de la source que vous regardiez.",
   "Sound descriptions": "Descriptions sonores",
   "Hide sound effects and speaker names": "Masquer les bruitages et les noms de personnages",
-  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Supprime les descriptions entre crochets comme [la porte grince] et les noms de personnages en majuscules comme JOHN: pendant la lecture, pour qu'une version livrée uniquement avec une piste SDH se lise comme un dialogue normal. Les paroles de chansons, les parenthèses ordinaires et les écritures non latines sont préservées. Ignoré sur les pistes forcées et les pistes image.",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
+    "Supprime les descriptions entre crochets comme [la porte grince] et les noms de personnages en majuscules comme JOHN: pendant la lecture, pour qu'une version livrée uniquement avec une piste SDH se lise comme un dialogue normal. Les paroles de chansons, les parenthèses ordinaires et les écritures non latines sont préservées. Ignoré sur les pistes forcées et les pistes image.",
   '"Compound" interest is calculated on:': "Les intérêts « composés » sont calculés sur :",
   '"{name}" and everything in it will be removed. This cannot be undone.':
     "« {name} » et tout son contenu seront supprimés. Cette action est irréversible.",
@@ -1138,6 +1141,18 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "Clé API NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Choisissez si Harbor privilégie les sources directes et debrid, les torrents pair à pair ou affiche les deux.",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

@@ -58,8 +58,9 @@ export function setTransport(base: string, t: Transport): void {
 export async function withTransportFallback<T>(
   client: SuwayomiClient,
   run: (t: Transport) => Promise<T>,
+  preferred?: Transport,
 ): Promise<T> {
-  const first = await pickTransport(client);
+  const first = preferred ?? (await pickTransport(client));
   try {
     return await run(first);
   } catch (err) {
@@ -75,7 +76,11 @@ export async function withTransportFallback<T>(
 }
 
 export async function loadSources(client: SuwayomiClient, t: Transport): Promise<SuwayomiSource[]> {
-  const list = t === "rest" ? await restSources(client) : await gqlSources(client);
+  const list = await withTransportFallback(
+    client,
+    (transport) => (transport === "rest" ? restSources(client) : gqlSources(client)),
+    t,
+  );
   if (list.length) {
     sourceCache.set(client.server.base, new Map(list.map((s) => [s.id, s])));
     for (const s of list) registerSuwayomiSourceBase(s.id, client.server.base);

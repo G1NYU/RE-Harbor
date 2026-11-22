@@ -3,7 +3,7 @@ import { exists, mkdir } from "@tauri-apps/plugin-fs";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useSyncExternalStore } from "react";
 import type { Meta } from "@/lib/cinemeta";
-import type { PlayEpisode } from "@/lib/view";
+import type { PlayEpisode, PlayerStreamRef } from "@/lib/view";
 import { buildDefaultFilename, sanitizeName } from "./filename";
 import { startDownload, type DownloadHandle } from "./video-download";
 import { isWindowsDesktop } from "@/lib/platform";
@@ -25,11 +25,17 @@ export type DownloadItem = {
   season: number | null;
   episode: number | null;
   streamLabel: string | null;
+  /** Online release identity retained for automatic next-episode matching offline. */
+  sourceRef?: PlayerStreamRef | null;
   url: string;
   torrentInfoHash?: string | null;
   torrentFileIdx?: number | null;
   path: string;
+  /** Title folder chosen by automatic download organization. */
+  organizedFolder?: string | null;
   status: "downloading" | "paused" | "done" | "error" | "canceled" | "interrupted";
+  /** Set only by explicit cancellation, not network/engine AbortErrors. */
+  canceledAt?: number;
   receivedBytes: number;
   totalBytes: number | null;
   ratio: number;
@@ -79,6 +85,7 @@ type EnqueueArgs = {
   meta: Meta;
   episode?: PlayEpisode;
   streamLabel?: string | null;
+  sourceRef?: PlayerStreamRef | null;
   url: string;
   headers?: Record<string, string> | null;
   destinationPath?: string | null;
@@ -311,14 +318,16 @@ export async function enqueueDownload(args: EnqueueArgs): Promise<string> {
   if (existing) return existing.id;
   const torrentRef = localEngineStreamRef(url);
   let dir = "";
+  let organizedFolder: string | null = null;
   if (!destinationPath) {
     dir = await resolveDir();
     try {
       const raw = localStorage.getItem("harbor.settings");
       const settings = raw ? (JSON.parse(raw) as { downloadCreateFolders?: boolean }) : null;
-      if (settings?.downloadCreateFolders && dir) {
-        const folderName = sanitizeName(meta.name || "download");
+      const folderName = sanitizeName(meta.name || "download");
+      if (settings?.downloadCreateFolders && dir && folderName) {
         dir = `${dir}${dir.endsWith(sep()) ? "" : sep()}${folderName}`;
+        organizedFolder = dir;
         await mkdir(dir, { recursive: true }).catch(() => {});
       }
     } catch {}
@@ -339,10 +348,12 @@ export async function enqueueDownload(args: EnqueueArgs): Promise<string> {
     season: episode?.season ?? null,
     episode: episode?.episode ?? null,
     streamLabel: streamLabel ?? null,
+    sourceRef: args.sourceRef ? { ...args.sourceRef } : undefined,
     url,
     torrentInfoHash: torrentRef?.infoHash ?? null,
     torrentFileIdx: torrentRef?.fileIdx ?? null,
     path,
+    organizedFolder,
     status: "downloading",
     receivedBytes: 0,
     totalBytes: null,
@@ -517,7 +528,7 @@ export function cancelDownload(id: string): void {
   const item = items.get(id);
   if (!item || (item.status !== "downloading" && item.status !== "paused")) return;
   const wasPaused = item.status === "paused";
-  patch(id, { status: "canceled", bytesPerSec: 0 });
+  patch(id, { status: "canceled", canceledAt: Date.now(), bytesPerSec: 0 });
   managedControllers.get(id)?.abort();
   handles.get(id)?.abort();
   if (wasPaused) releaseDownloadTorrent(item);
@@ -651,6 +662,31 @@ function pathKey(path: string): string {
   return isWindowsDesktop() ? normalized.toLowerCase() : normalized;
 }
 
+async function removeEmptyTitleFolder(item: DownloadItem): Promise<void> {
+  if (item.kind === "ebook" || item.organizedFolder === null) return;
+  const slash = Math.max(item.path.lastIndexOf("/"), item.path.lastIndexOf("\\"));
+  if (slash < 0) return;
+  const folder = item.path.slice(0, slash);
+  const key = pathKey(folder);
+  const root = (await resolveDir().catch(() => "")).replace(/[\\/]+$/, "");
+  if (key === pathKey(root)) return;
+  if (item.organizedFolder !== undefined) {
+    if (key !== pathKey(item.organizedFolder)) return;
+  } else {
+    // Older records have no folder marker. Only recognize the standard title
+    // folder directly under the configured download location.
+    const title = sanitizeName(item.title);
+    if (!root || !title || key !== pathKey(`${root}/${title}`)) return;
+  }
+  if (
+    [...items.values()].some(
+      (other) => other.id !== item.id && pathKey(other.path).startsWith(`${key}/`),
+    )
+  )
+    return;
+  await invoke("download_remove_empty_folder", { folder });
+}
+
 async function checkFileOwnership(id: string, paths: string[], protectedPaths: string[]) {
   const targets = await Promise.all(
     paths.map(async (path) => ({ path, info: await inspectFile(path) })),
@@ -740,6 +776,7 @@ export async function removeDownload(
     items.delete(id);
     releaseDownloadTorrent(current);
     reconcileFromUrl(current.url);
+    await removeEmptyTitleFolder(current).catch(() => {});
   } finally {
     removing.delete(id);
     rebuild();

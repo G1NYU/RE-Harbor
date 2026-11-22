@@ -1,3 +1,4 @@
+import { subtitleSearchLabel } from "@/lib/subtitles/search-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Loader2, Plus, Search as SearchIcon } from "lucide-react";
 import { isVeryNewRelease } from "@/components/player/subtitle-menu/utils";
@@ -69,7 +70,7 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
 
   const [target, setTarget] = useState<BpSubtitleTarget>(home);
   const [override, setOverride] = useState(false);
-  const [query, setQuery] = useState(props.metaTitle ?? "");
+  const [query, setQuery] = useState(subtitleSearchLabel(home));
   const [results, setResults] = useState<SubResult[] | null>(null);
   const [pending, setPending] = useState(0);
   const [searching, setSearching] = useState(false);
@@ -95,7 +96,11 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
       setResults(null);
       setLimit(PAGE);
       const enabled = settings.subProvidersEnabled ?? {};
-      const playing = tgt.imdbId === home.imdbId && tgt.title === home.title;
+      const playing =
+        tgt.imdbId === home.imdbId &&
+        tgt.title === home.title &&
+        tgt.season === home.season &&
+        tgt.episode === home.episode;
       const opts: SearchOptions = {
         timeoutMs: 8_000,
         providers: {
@@ -151,6 +156,7 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
   }, [addons, target, run]);
 
   const submit = useCallback(async () => {
+    if (query.trim() === subtitleSearchLabel(target)) return run(target);
     const parsed = parseTitleQuery(query);
     if (parsed.title.length < 2) {
       void run(target);
@@ -175,6 +181,13 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
 
   const changeEp = (patch: Partial<BpSubtitleTarget>) => {
     const next = { ...target, ...patch };
+    setQuery(subtitleSearchLabel(next));
+    setOverride(
+      next.imdbId !== home.imdbId ||
+        next.title !== home.title ||
+        next.season !== home.season ||
+        next.episode !== home.episode,
+    );
     setTarget(next);
     void run(next);
   };
@@ -235,7 +248,7 @@ export function BpSubtitleFind(props: BpSubtitleFindProps) {
             label={t("Back to what's playing")}
             onPress={() => {
               setOverride(false);
-              setQuery(props.metaTitle ?? "");
+              setQuery(subtitleSearchLabel(home));
               setTarget(home);
               void run(home);
             }}

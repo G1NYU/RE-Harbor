@@ -26,15 +26,36 @@ const playerDownload = read("src/views/player/hooks/use-video-download.ts");
 const magnetCard = read("src/components/search/magnet-card.tsx");
 const app = read("src/App.tsx");
 const dhtBoot = read("src-tauri/src/torrent_engine/dht_boot.rs");
+const p2pModal = read("src/views/play-picker/p2p-confirm-modal.tsx");
+const prewarmHelper = read("src/lib/streams/p2p-prewarm.ts");
+const stremioLayout = read("src/views/play-picker/stremio-layout.tsx");
+const stremioRow = read("src/views/play-picker/stremio-row.tsx");
 const autoRetry = read("src/views/player/hooks/use-auto-retry.ts");
 
-test("selecting a torrent file does not start peer transfer", () => {
+test("selecting a torrent file starts discovery and prefetch while the player boots", () => {
   const start = engine.indexOf("pub async fn torrent_engine_select");
   const end = engine.indexOf("pub async fn torrent_engine_stats", start);
   assert.ok(start >= 0 && end > start, "torrent_engine_select block is missing");
   const select = engine.slice(start, end);
   assert.match(select, /update_only_files_bounded\(&session, &handle, &only\)/);
-  assert.doesNotMatch(select, /session\.unpause\(/);
+  assert.match(select, /\.unpause\(&handle\)/);
+  assert.match(select, /spawn_stream_prime\(handle\.clone\(\), file_idx\)/);
+});
+
+test("starting playback reuses the prewarmed magnet add", () => {
+  assert.match(resolve, /prewarmP2pStream\(stream\)/);
+  assert.match(resolve, /prewarmed\s*\?\s*await prewarmed/);
+});
+
+test("the consent prompt ignores StrictMode cleanup before remounting", () => {
+  assert.match(p2pModal, /const mountGeneration = useRef\(0\)/);
+  assert.match(p2pModal, /mountGeneration\.current === generation/);
+});
+
+test("magnet adds record their origin for diagnostics", () => {
+  assert.match(engine, /origin=\{origin\}/);
+  assert.match(prewarmHelper, /"prewarm"/);
+  assert.match(resolve, /"resolve"/);
 });
 
 test("the local HTTP stream request starts a paused torrent on demand", () => {
@@ -154,9 +175,12 @@ test("failed P2P preparation is discarded and remains retryable", () => {
 
 test("existing torrent preparation is reused without repeating magnet discovery", () => {
   const addStart = engine.indexOf("pub async fn torrent_engine_add");
-  const seedStart = engine.indexOf("dht_boot::seed_peers", addStart);
+  const seedStart = engine.indexOf("seed_side_dht(&magnet)", addStart);
   const existingLookup = engine.indexOf("session.get(TorrentIdOrHash::Hash(info_hash))", addStart);
+  assert.ok(seedStart > addStart, "add must seed the side DHT through the bounded helper");
   assert.ok(existingLookup > addStart && existingLookup < seedStart);
+  assert.match(engine, /async fn seed_side_dht/);
+  assert.match(engine, /dht_boot::seed_peers\(&dht, magnet, 40, SIDE_DHT_SEED_BUDGET\)/);
   assert.match(dhtBoot, /pub\(crate\) fn info_hash_from_magnet/);
 });
 
@@ -237,7 +261,7 @@ test("completed P2P downloads are reused by exact torrent identity", () => {
   const add = resolve.indexOf("torrentEngineAdd(");
   assert.ok(lookup >= 0 && add > lookup, "completed download lookup must run before torrent add");
   assert.match(resolve, /via: "local-download"/);
-  assert.match(resolve, /subtitles: stream\.subtitles\?\.map/);
+  assert.match(resolve, /subtitles: streamSubtitles\(stream\)/);
   assert.match(pickHandler, /r\.via === "local-download"/);
   assert.match(pickHandler, /intent !== "download"/);
   assert.match(episodePanel, /r\.via === "local-download"/);
@@ -257,4 +281,30 @@ test("closing magnet setup removes a newly-created torrent before player handoff
   assert.match(magnetCard, /scheduleAbandonedTorrentRemoval\(infoHash, 0\)/);
   assert.match(magnetCard, /if \(added\.already_managed !== true\)/);
   assert.match(magnetCard, /startPlay\(videos\[0\]\.idx, videos\[0\]\.name, added\)/);
+});
+
+test("hover prewarm is exclusive and drops a source when the row is left", () => {
+  assert.match(prewarmHelper, /INTENT_PREWARM_DELAY_MS = 1000/);
+  assert.match(prewarmHelper, /let intentKey: string \| null = null/);
+  assert.match(prewarmHelper, /claimIntentKey\(key\)/);
+  assert.match(prewarmHelper, /export function releaseIntentPrewarm/);
+  assert.match(prewarmHelper, /if \(intentKey === key\) intentKey = null/);
+  assert.match(stremioLayout, /intent: true/);
+  assert.match(
+    stremioLayout,
+    /onIntentCancel=\{download \? undefined : \(\) => abandonPrewarmedStream\(s\)\}/,
+  );
+  assert.match(stremioRow, /onPointerLeave=\{onIntent \? cancelIntent : undefined\}/);
+  assert.match(stremioRow, /onFocus=\{onIntent \? intentSoon : undefined\}/);
+  assert.match(stremioRow, /if \(fired\) onIntentCancel\?\.\(\)/);
+  assert.match(picker, /releaseIntentPrewarm\(\)/);
+});
+
+test("prewarm-only torrents left by a closed session are removed on startup", () => {
+  assert.match(usage, /PREWARM_LEDGER_KEY/);
+  assert.match(usage, /export function registerPrewarmTorrent/);
+  assert.match(usage, /export function reconcilePrewarmTorrents/);
+  assert.match(usage, /if \(origin === "prewarm" && added\.already_managed !== true\)/);
+  assert.match(usage, /unregisterPrewarmTorrent\(infoHash\)/);
+  assert.match(app, /void reconcilePrewarmTorrents\(\)/);
 });

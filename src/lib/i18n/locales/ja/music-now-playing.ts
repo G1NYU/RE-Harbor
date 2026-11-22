@@ -39,7 +39,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "品質バッジ",
   "music.dock.part.source": "ソース",
   "music.dock.part.time": "時間",
-  "music.dock.part.queue": "再生キュー",
+  "music.dock.part.queue": "音楽キュー",
   "music.dock.part.like": "お気に入り",
 
   "music.now.colors": "アルバムの色",

@@ -1,55 +1,20 @@
-import { invoke } from "@tauri-apps/api/core";
-import { isSuwayomiServerUrl } from "@/lib/manga/sources/suwayomi/auth-registry";
-import { readImageResponse } from "@/lib/context-image-policy";
+import { pageHeadersFor } from "@/lib/manga/plugins/adapter";
+import { cachedChapterImage, chapterImageBlob } from "./chapter-image-cache";
+import { isBatcaveImageUrl, IMAGE_FALLBACK_HEADERS } from "./image-request-headers";
+import type { ImagePriority } from "./chapter-image-cache-core";
+export { IMAGE_FALLBACK_HEADERS, resolveReaderImageHeaders } from "./image-request-headers";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
 const MEASURE_TIMEOUT_MS = 8000;
-
-export const IMAGE_FALLBACK_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-};
-
-type HarborFetchResponse = {
-  status: number;
-  ok: boolean;
-  body: string;
-  contentType?: string | null;
-  headers?: Record<string, string>;
-};
-
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64.trim());
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
 
 export async function fetchImageObjectUrl(
   url: string,
   headers: Record<string, string>,
   timeoutMs = 30000,
+  options: { priority?: ImagePriority; refresh?: boolean } = {},
 ): Promise<string> {
-  const resp = await invoke<HarborFetchResponse>("harbor_fetch", {
-    args: {
-      url,
-      method: "GET",
-      headers,
-      responseType: "base64",
-      timeoutMs,
-      allowLocalNetwork: isSuwayomiServerUrl(url),
-    },
-  });
-  if (!resp.ok) throw new Error(`status ${resp.status}`);
-  const type = resp.headers?.["content-type"] || resp.contentType || "";
-  const loaded = await readImageResponse(
-    new Response(base64ToBytes(resp.body), {
-      status: resp.status,
-      headers: type ? { "content-type": type } : {},
-    }),
-  );
-  return URL.createObjectURL(loaded.blob);
+  const blob = await chapterImageBlob(url, headers, { timeoutMs, ...options });
+  return URL.createObjectURL(blob);
 }
 
 function aspectOf(src: string): Promise<number | null> {
@@ -63,17 +28,31 @@ function aspectOf(src: string): Promise<number | null> {
 
 export async function measureAspect(src?: string): Promise<number> {
   if (!src) return 1.4;
-  const direct = await aspectOf(src);
-  if (direct != null) return direct;
+  const headers = pageHeadersFor(src) ?? IMAGE_FALLBACK_HEADERS;
+  const cached = cachedChapterImage(src, headers);
+  if (cached) {
+    const objectUrl = URL.createObjectURL(cached);
+    try {
+      return (await aspectOf(objectUrl)) ?? 1.4;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+  // Batcave chapter images reject ordinary <img> requests. Avoid that failed
+  // attempt when the verified browser already owns the image session.
+  if (!isTauri || !isBatcaveImageUrl(src)) {
+    const direct = await aspectOf(src);
+    if (direct != null) return direct;
+  }
   if (!isTauri) return 1.4;
-  let obj: string | null = null;
+  let objectUrl: string | null = null;
   try {
-    obj = await fetchImageObjectUrl(src, IMAGE_FALLBACK_HEADERS, MEASURE_TIMEOUT_MS);
-    return (await aspectOf(obj)) ?? 1.4;
+    objectUrl = await fetchImageObjectUrl(src, headers, MEASURE_TIMEOUT_MS, { priority: "near" });
+    return (await aspectOf(objectUrl)) ?? 1.4;
   } catch {
     return 1.4;
   } finally {
-    if (obj) URL.revokeObjectURL(obj);
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
 }
 

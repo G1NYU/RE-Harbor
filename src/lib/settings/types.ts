@@ -4,6 +4,7 @@ import type { ThemeSettings } from "@/lib/theme";
 import type { CustomList } from "@/lib/lists/types";
 import type { SourceRow } from "@/lib/custom-sources";
 import type { CustomStreamFilter } from "@/lib/streams/custom-filters";
+import type { SourceSort } from "@/lib/streams/source-sort";
 import type { SyncIndicatorPosition } from "@/lib/sync-toast-position";
 import type { FullscreenClockFormat, FullscreenClockStyle } from "@/lib/local-time";
 import type { SubtitleOffsetPosition, SubtitleOffsetSize } from "@/lib/player/subtitle-offset";
@@ -52,6 +53,15 @@ export type WebhookTrigger =
   | { event: "fromTraktWatchlist" }
   | { event: "liveTvEvent"; channelIds?: string[]; favoritesOnly?: boolean; leadMinutes?: number };
 
+export type SecondaryProfilePrivileges = {
+  canAddProfiles: boolean;
+  canManageStartup: boolean;
+  canViewAccountProvider: boolean;
+  canViewHarborAccount: boolean;
+  canViewProviderAccount: boolean;
+  canSignOutRoot: boolean;
+};
+
 export type ContentCategory = "anime" | "sports" | "adult";
 
 export type ContentFilters = Record<ContentCategory, boolean>;
@@ -84,6 +94,8 @@ export interface SimklGranularFilters {
 
 export type ProfileAudioMode = "auto" | "click" | "off";
 
+export type CardAwardDisplay = "tabs" | "badge" | "none";
+
 export type StreamPriorityEntry = { key: string; name: string };
 
 export type ScreensaverMediaKind = "image" | "gif" | "video";
@@ -104,7 +116,36 @@ export type MusicSpeedPreset = {
   keepPitch: boolean;
 };
 
+export type AccountProvider = "stremio" | "nuvio";
+
+export type TvCardOptions = {
+  showImdbBadge: boolean;
+  showTmdbBadge: boolean;
+  showRtBadge: boolean;
+  showPopcornBadge: boolean;
+  showMalBadge: boolean;
+  animeCardRating: "mal" | "imdb";
+  showMetacriticBadge: boolean;
+  showLetterboxdBadge: boolean;
+  showMdblistBadge: boolean;
+  showTraktBadge: boolean;
+  showSimklBadge: boolean;
+  scaleScoreStack: boolean;
+  showDubBadge: boolean;
+  showCardBadges: boolean;
+  top10Ribbon: boolean;
+  top10RibbonSide: "left" | "right";
+  badgePlacement: "top" | "bottom";
+  cardAwardDisplay: CardAwardDisplay;
+  watchlistBadge: "off" | "topStart" | "topEnd" | "bottomStart" | "bottomEnd";
+  showLocalLibraryBadge: boolean;
+  showWatchedBadge: boolean;
+};
+
 export type Settings = {
+  tvCardOptions: TvCardOptions;
+  accountProvider: AccountProvider;
+  spooktoberBanner: "disabled" | "small" | "below-hero" | undefined;
   soundTheme: "none" | "glass" | "modern" | "retro" | "cinematic" | "void";
   sfxVolume: number;
   playerVolumeSfx: boolean;
@@ -148,7 +189,6 @@ export type Settings = {
   showSimklBadge: boolean;
   showSimklDetail: boolean;
   showDubBadge: boolean;
-  simklShowCommunityRatings: boolean;
   simklEnableUserRatings: boolean;
   simklGranularFilters: SimklGranularFilters;
   cardBadgeLimit: number;
@@ -171,12 +211,16 @@ export type Settings = {
   posterDockTransitionMs: number;
   top10Ribbon: boolean;
   top10RibbonSide: "left" | "right";
-  awardTabs: boolean;
+  cardAwardDisplay: CardAwardDisplay;
   awardTabPosition: "above" | "below" | "top";
   rowTitleScale: number;
+  cardTitleScale: number;
   playerTitleScale: number;
   playerTitleSeriesFirst: boolean;
+  playerTitleLogo: boolean;
   uiScale: number;
+  harborCursor: boolean;
+  harborCursorScale: number;
   serveWebUi: boolean;
   remoteControlEnabled: boolean;
   controllerSupportEnabled: boolean;
@@ -245,6 +289,7 @@ export type Settings = {
     | "regional"
     | "tmdb";
   tvdbOrderPanel: boolean;
+  tvdbSeasonExplorer: boolean;
   tvdbPin: string;
   harborAvatar: string | null;
   harborColor: string;
@@ -282,6 +327,12 @@ export type Settings = {
   discordMusicPresence: boolean;
   discordHideMusicWhenPaused: boolean;
   playerEngine: "auto" | "html5" | "mpv";
+  /** Play in the user's own external mpv, with IPC to keep progress synced. */
+  playerExternalMpv: boolean;
+  /** Path to the mpv executable. If left empty then it uses mpv from PATH. */
+  playerExternalMpvPath: string;
+  /** Extra command line options for mpv. */
+  playerExternalMpvArgs: string;
   /** resize shrinks the Harbor window; native floats the video in its own window. */
   pipBehavior: "resize" | "native";
   playerShellId: string;
@@ -289,14 +340,19 @@ export type Settings = {
   playerMenuBlack: boolean;
   playerScreenLockEnabled: boolean;
   seekPreviewEnabled: boolean;
+  seekrApiKey: string;
   instantPlay: boolean;
   instantPlaybackPreparation: boolean;
   autoNextStreamOnStall: boolean;
   autoNextStreamOnStallSec: number;
   fullscreenMode: "fullscreen" | "borderless" | "maximized";
   seasonSourceLock: boolean;
-  rememberLastStream: boolean;
-  keepSourceNextEpisode: boolean;
+  /** Automatically download the upcoming episode without affecting active playback. */
+  autoPreDownloadNextEpisode: boolean;
+  /** Show the compact Up Next pre-download event icons. */
+  autoPreDownloadNotifications: boolean;
+  /** Last explicit switch-on time; allows retrying a manually canceled episode. */
+  autoPreDownloadNextEpisodeEnabledAt: number;
   playerHdrToSdr: boolean;
   playerRtxHdr: boolean;
   playerRtxVsr: boolean;
@@ -326,6 +382,7 @@ export type Settings = {
   streamCacheMaxGb: number;
   deleteWatchedDownloads: boolean;
   streamCacheDir: string;
+  /** Legacy custom mpv cache folder; only used to clean up old leftovers. */
   playbackCacheDir: string;
   remoteStreamServerUrl: string;
   remoteStreamServerStrict: boolean;
@@ -336,6 +393,9 @@ export type Settings = {
   playerAnime4kFolder: string;
   playerAnime4kOverride: string;
   playerShaders: Record<string, { enabled: boolean; variant?: string; dir?: string }>;
+  mangaUpscaleEnabled: boolean;
+  mangaUpscaleQuality: "fast" | "best";
+  mangaUpscaleAutoDownload: boolean;
   preferredSubLangs: string[];
   preferredAudioLangs: string[];
   subFontSize: number;
@@ -344,7 +404,7 @@ export type Settings = {
   subBorderSize: number;
   subMarginY: number;
   subAlignX: "left" | "center" | "right";
-  subAssOverride: "no" | "yes" | "force" | "scale" | "strip";
+  subAssOverride: "no" | "yes" | "force" | "scale" | "strip" | "font";
   subAssNormalizeSize: boolean;
   subStyle: "shadow" | "outline" | "box";
   subFontFamily: string;
@@ -372,6 +432,7 @@ export type Settings = {
   subOffsetIndicatorPosition: SubtitleOffsetPosition;
   subOffsetIndicatorSize: SubtitleOffsetSize;
   subShowInPip: boolean;
+  subLiftAboveControls: boolean;
   subHideSdh: boolean;
   secondarySubLang: string;
   subSecondaryPlacement: "top" | "bottom";
@@ -380,6 +441,7 @@ export type Settings = {
   autoSyncApplyStructural: boolean;
   autoSyncDrift: boolean;
   subtitleAutoSyncAsr: boolean;
+  subtitleMoonshineLanguage: string;
   subtitleAutoSyncPivot: boolean;
   subtitleAutoSyncCrowd: boolean;
   communitySyncUrl: string;
@@ -418,6 +480,7 @@ export type Settings = {
   posterBaseUrl: string;
   hidePosterTitles: boolean;
   hoverPreviewEnabled: boolean;
+  _hoverPreviewOnByDefault: boolean;
   hoverPreviewPlacement: "over" | "side";
   cardHoverStyle:
     | "none"
@@ -429,7 +492,7 @@ export type Settings = {
     | "spotlight"
     | "custom";
   rowCardStyle: "poster" | "tv";
-  tvCardLogoPos: "center" | "bottomStart" | "bottomEnd";
+  tvCardLogoPos: "center" | "bottomStart" | "bottomEnd" | "off";
   scrollUpTrailer: boolean;
   cardHoverShine: boolean;
   customHoverId: string;
@@ -449,6 +512,8 @@ export type Settings = {
   aiGroqKey: string;
   jinaKey: string;
   aiWebSearch: boolean;
+  aiWebSource: "jina" | "keenable";
+  keenableKey: string;
   playerD3d11Flip: boolean;
   mpvExtraOptions: string;
   mpvQuality: "balanced" | "performance" | "quality";
@@ -469,6 +534,14 @@ export type Settings = {
   seekForwardStepSec: number;
   seekBackStepShortSec: number;
   seekForwardStepShortSec: number;
+  // The "long seek" hotkeys (30s by default).
+  seekBackStepLongSec: number;
+  seekForwardStepLongSec: number;
+  // Slow rate the Toggle slow speed hotkey switches to from normal speed.
+  halfSpeedRate: number;
+  // How much the Speed down / Speed up hotkeys change the rate per press.
+  speedDownStep: number;
+  speedUpStep: number;
   shareWatchPresence: boolean;
   playerHdrOpaqueWindow: boolean;
   playerEscExitsFullscreen: boolean;
@@ -506,12 +579,24 @@ export type Settings = {
   audioDevice: string;
   bandwidthMbps: number;
   nextEpisodeLeadSec: number;
+  /**
+   * When the "More like this" end screen appears. 0 turns it off, -1 shows it
+   * when playback finishes, and a positive number shows it that many seconds
+   * before the end (up to 30 minutes) so the film is still running behind it.
+   */
+  endScreenLeadSec: number;
+  /** Seconds before the end screen closes itself. 0 leaves it open. */
+  endScreenCountdownSec: number;
+  /** What the countdown does when it reaches zero. */
+  endScreenOnZero: "close" | "play";
   autoPlayNextEpisode: boolean;
   stillWatching: boolean;
   stillWatchingAfter: number;
   keyboardPauseShowsControls: boolean;
   hideWatchedInCatalogs: boolean;
   hideWatchedInHero: boolean;
+  hideWatchedInMoreLikeThis: boolean;
+  moreLikeThisOnAiringSeries: boolean;
   hideUnreleased: boolean;
   localEpisodeSortDesc: boolean;
   /** Review count when the banner was last dismissed; it returns only if more turn up. */
@@ -527,10 +612,13 @@ export type Settings = {
     local: boolean;
     publicmetadb: boolean;
   };
+  /** Dismissing a CW card also deletes its saved playback progress on connected providers. */
+  cwClearProviderProgress: boolean;
   showPlaylistsTab: boolean;
   skipProfileScreen: boolean;
   profilePromptInterval: "launch" | "15m" | "30m" | "never";
   defaultProfileId: string;
+  nuvioDefaultProfileId: string;
   sportsLeagues: string[];
   sportsShowOdds: boolean;
   /** Scores and schedules need no provider; streams do. Off until asked for. */
@@ -549,22 +637,52 @@ export type Settings = {
   customLogoMark: string;
   customLogoWordmark: string;
   customAppIcon: string;
-  customAppIconPreset: string;
   musicArtworkAppIcon: boolean;
   musicSeekThumb: boolean;
   musicSeekThumbHover: boolean;
   musicSpeedPresets: MusicSpeedPreset[];
   homeMode: "harbor" | "classic";
+  classicCatalogSource: "all" | "stremio" | "nuvio";
+  nuvioAddonMode: "separate" | "combined";
   homeShowAllAddonRows: boolean;
   homeNewEpisodes: boolean;
   libraryBookmarkedOnly: boolean;
   librarySort: "recent" | "title" | "year";
-  preferCustomMetaAddon: boolean;
+  addonOnlyMetadata: boolean;
+  metadataAddonOrder: string[];
+  /** Per-section metadata source chains. Empty sections use the legacy fallback order. */
+  metadataSources?: Partial<
+    Record<
+      | "title"
+      | "description"
+      | "seasonSynopsis"
+      | "poster"
+      | "seasonPoster"
+      | "backdrop"
+      | "logo"
+      | "episodes"
+      | "ratings"
+      | "cast"
+      | "trailers"
+      | "search",
+      string[]
+    >
+  >;
+  metadataSourceLabels?: boolean;
+  searchTmdbTopMatch: boolean;
   cinemetaEnabled: boolean;
   animeOnlyInAnimeRoom: boolean;
   animeCwEnd: "hide" | "timer";
   cwAdvanceNext: boolean;
+  /** Experimental local anime identity pack used for CW grouping and tracker targeting. */
+  animeIdentityEnabled: boolean;
+  /** Opt-in, display-only repair of a checkpoint with proven native episode ownership. */
+  animeIdentityRepairEnabled: boolean;
+  /** Apply the verified anime episode only to live provider scrobbles. */
+  animeIdentityLiveScrobbleEnabled: boolean;
   cwHideCaughtUp: boolean;
+  /** Whether Continue Watching may play an episode whose release date is still in the future. */
+  cwPlayUnreleased: boolean;
   useNativeTitleBar: boolean;
   fullscreenClockEnabled: boolean;
   fullscreenClockFormat: FullscreenClockFormat;
@@ -575,7 +693,6 @@ export type Settings = {
   fullscreenClockSizePx: number;
   hybridTitleBar: boolean;
   topbarScrollBlur: boolean;
-  transparentTopBar: boolean;
   topbarAppearance: "transparent" | "glass" | "filled";
   dragAnywhere: boolean;
   resumeDetailScroll: boolean;
@@ -620,11 +737,6 @@ export type Settings = {
     hidden: string[];
     renamed: Record<string, string>;
   };
-  navCustomizationOwn: {
-    order: string[];
-    hidden: string[];
-    renamed: Record<string, string>;
-  } | null;
   animeRows: {
     order: string[];
     hidden: string[];
@@ -639,10 +751,12 @@ export type Settings = {
   animeMalRowsHidden: string[];
   addonTimeoutSec: number;
   profileAudio: ProfileAudioMode;
-  syncIndicator: boolean;
+  anilistSyncIndicator: boolean;
+  malSyncIndicator: boolean;
   syncIndicatorPosition: SyncIndicatorPosition;
   pickerLayout: "condensed" | "stremio";
   streamSort: "harbor" | "addon";
+  sourceSort: SourceSort;
   streamPriority: StreamPriorityEntry[];
   fullStreamDescription: boolean;
   pickerShowFilename: boolean;
@@ -654,6 +768,7 @@ export type Settings = {
   seekBarColor: string;
   seekBarImage: string;
   seekBarFill: boolean;
+  seekBarChapters: boolean;
   seekBarFillOpacity: number;
   seekDotShape: "circle" | "square" | "image" | "hidden";
   seekDotHover: boolean;
@@ -745,12 +860,15 @@ export type Settings = {
   gamesOpenInLibrary: boolean;
   wrappedButton: boolean;
   libraryHero: boolean;
+  libraryHiddenTabs: string[];
   mangaEnabled: boolean;
   feedLocaleBias: boolean;
   uiLanguage: UiLanguage;
   arabicWelcomeSeen: boolean;
   cropMode: string;
   customLists: CustomList[];
+  libraryGroups: import("@/lib/library-groups").LibraryGroup[];
+  libraryGroupSections: import("@/lib/library-groups").LibraryGroupSection[];
   pauseListStatusOnPause: boolean;
   translateTitles: boolean;
   translateDescriptions: boolean;
@@ -761,4 +879,6 @@ export type Settings = {
   xrayEnabled: boolean;
   xrayLiveScan: boolean;
   auddApiKey: string;
+  secondaryPrivileges: SecondaryProfilePrivileges;
+  nuvioSecondaryPrivileges: SecondaryProfilePrivileges;
 };

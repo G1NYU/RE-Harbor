@@ -58,12 +58,65 @@ async fn run_window_transition(
         .map_err(|e| format!("fullscreen transition result: {}", e))?
 }
 
+// AppKit keeps a window fullscreen across a refused or interrupted exit, while
+// tao clears its own flag as soon as the exit is requested. Entering then makes
+// tao rewrite the style mask on a window that is still fullscreen, and macOS 26+
+// aborts on that write outside a transition (tao-apps/tao#1414). Trust AppKit.
+fn window_is_fullscreen(main: &tauri::WebviewWindow) -> bool {
+    #[cfg(target_os = "macos")]
+    if let Some(fullscreen) = macos::appkit_fullscreen(main) {
+        return fullscreen;
+    }
+    main.is_fullscreen().unwrap_or(false)
+}
+
+fn exit_native_fullscreen(main: &tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    if !main.is_fullscreen().unwrap_or(true) {
+        // After a refused exit tao already reports windowed and its setter
+        // returns early, leaving the still-fullscreen window untouched. Exiting
+        // needs none of tao's style-mask preparation, so ask AppKit directly.
+        macos::toggle_fullscreen(main);
+        return Ok(());
+    }
+    main.set_fullscreen(false)
+        .map_err(|e| format!("set_fullscreen(false): {}", e))
+}
+
+#[cfg(target_os = "macos")]
+mod macos {
+    use objc2_app_kit::{NSWindow, NSWindowStyleMask};
+    use objc2_foundation::MainThreadMarker;
+
+    pub fn appkit_fullscreen(window: &tauri::WebviewWindow) -> Option<bool> {
+        MainThreadMarker::new()?;
+        let ns_window = ns_window(window)?;
+        Some(unsafe { (*ns_window).styleMask() }.contains(NSWindowStyleMask::FullScreen))
+    }
+
+    pub fn toggle_fullscreen(window: &tauri::WebviewWindow) {
+        if MainThreadMarker::new().is_none() {
+            return;
+        }
+        if let Some(ns_window) = ns_window(window) {
+            unsafe { (*ns_window).toggleFullScreen(None) };
+        }
+    }
+
+    fn ns_window(window: &tauri::WebviewWindow) -> Option<*mut NSWindow> {
+        let ns_window = window.ns_window().ok()? as *mut NSWindow;
+        (!ns_window.is_null()).then_some(ns_window)
+    }
+}
+
 fn enter_fullscreen(
     main: &tauri::WebviewWindow,
     saved: &Mutex<Option<SavedWindowState>>,
 ) -> Result<(), String> {
-    let already_fs = main.is_fullscreen().unwrap_or(false);
+    let already_fs = window_is_fullscreen(main);
     if !already_fs {
+        #[cfg(windows)]
+        crate::window_placement::pause_for_transition(main.app_handle(), true);
         // The OS owns a maximized window's restored bounds. Save its mode before
         // unmaximizing instead of capturing the maximized dimensions.
         let maximized = main.is_maximized().unwrap_or(false);
@@ -111,10 +164,11 @@ fn exit_fullscreen(
     saved: &Mutex<Option<SavedWindowState>>,
     restore_position: bool,
 ) -> Result<(), String> {
-    let is_fs = main.is_fullscreen().unwrap_or(false);
+    let is_fs = window_is_fullscreen(main);
+    #[cfg(windows)]
+    crate::window_placement::pause_for_transition(main.app_handle(), false);
     if is_fs {
-        main.set_fullscreen(false)
-            .map_err(|e| format!("set_fullscreen(false): {}", e))?;
+        exit_native_fullscreen(main)?;
     }
 
     // Restore even when the window is already unfullscreen'd: frontend paths

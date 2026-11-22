@@ -30,7 +30,9 @@ function BadgeContent({ badge }: { badge: CardBadge }) {
           {badge.source === "mal" ? (
             <MalLogo className="h-[11px] w-auto text-ink-muted" />
           ) : badge.source === "tmdb" ? (
-            <span className="text-[8.5px] font-bold leading-none tracking-tight text-ink-muted">TMDB</span>
+            <span className="text-[8.5px] font-bold leading-none tracking-tight text-ink-muted">
+              TMDB
+            </span>
           ) : (
             <ImdbIcon className="h-[11px] w-auto rounded-[2px]" />
           )}
@@ -47,7 +49,11 @@ function BadgeContent({ badge }: { badge: CardBadge }) {
     case "audience":
       return (
         <span className="flex items-center gap-0.5">
-          <Popcorn size={12} strokeWidth={2.4} className={badge.value >= 60 ? "text-accent" : "text-ink-muted"} />
+          <Popcorn
+            size={12}
+            strokeWidth={2.4}
+            className={badge.value >= 60 ? "text-accent" : "text-ink-muted"}
+          />
           <span>{Math.round(badge.value)}%</span>
         </span>
       );
@@ -62,14 +68,22 @@ function BadgeContent({ badge }: { badge: CardBadge }) {
     case "letterboxd":
       return (
         <span className="flex items-center gap-0.5">
-          <img src={letterboxdLogo} alt="" className="h-[11px] w-[11px] rounded-[2px] object-cover" />
+          <img
+            src={letterboxdLogo}
+            alt=""
+            className="h-[11px] w-[11px] rounded-[2px] object-cover"
+          />
           <span>{(badge.value / 2).toFixed(1)}</span>
         </span>
       );
     case "mdblist":
       return (
         <span className="flex items-center gap-0.5">
-          <img src={mdblistLogo} alt="" className="h-[11px] w-[11px] rounded-[2px] object-contain" />
+          <img
+            src={mdblistLogo}
+            alt=""
+            className="h-[11px] w-[11px] rounded-[2px] object-contain"
+          />
           <span>{Math.round(badge.value)}</span>
         </span>
       );
@@ -95,20 +109,34 @@ export function ScoreStack({
   limit = 3,
   placement = "bottom",
   raised = false,
+  shiftedFromEnd = false,
+  topClass,
+  scaleBadges = true,
 }: {
   badges: readonly CardBadge[];
   limit?: number;
   placement?: "top" | "bottom";
   raised?: boolean;
+  shiftedFromEnd?: boolean;
+  /** Optional top offset when TV-card overlays already occupy the top-right corner. */
+  topClass?: string;
+  scaleBadges?: boolean;
 }) {
   const shown = badges.slice(0, Math.max(1, limit));
   if (shown.length === 0) return null;
-  const scale = shown.length <= 3 ? 1 : shown.length === 4 ? 0.88 : shown.length === 5 ? 0.78 : 0.7;
+  const scale =
+    !scaleBadges || shown.length <= 3
+      ? 1
+      : shown.length === 4
+        ? 0.88
+        : shown.length === 5
+          ? 0.78
+          : 0.7;
   return (
     <div
       style={scale < 1 ? { transform: `scale(${scale})`, transformOrigin: "right" } : undefined}
-      className={`absolute end-1.5 flex items-center gap-1 whitespace-nowrap rounded-md bg-canvas/95 px-1.5 py-0.5 text-[10px] font-semibold text-ink ${
-        placement === "top" ? "top-1.5" : raised ? "bottom-9" : "bottom-1.5"
+      className={`absolute ${shiftedFromEnd ? "end-8" : "end-1.5"} flex items-center gap-1 whitespace-nowrap rounded-md bg-canvas/95 px-1.5 py-0.5 text-[10px] font-semibold text-ink ${
+        placement === "top" ? (topClass ?? "top-1.5") : raised ? "bottom-9" : "bottom-1.5"
       }`}
     >
       {shown.map((b, i) => (
@@ -120,4 +148,3 @@ export function ScoreStack({
     </div>
   );
 }
-

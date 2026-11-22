@@ -5,8 +5,21 @@ const MIN_FRAC = 0.02;
 const MAX_FRAC = 0.22;
 const SIGN_TAGS = /\\(?:pos|move|i?clip|p[1-9])/i;
 const DIALOGUE_NAME = /^(?:default|dialogue|dialog|main|regular)$/i;
+// A Matroska ASS header (mpv's `sub-ass-extradata`) carries the styles but not the
+// dialogue events, so the dominant style has to be guessed from the style names.
+const DIALOGUE_STYLE_NAME = /(?:^|[\s._-])(?:default|dialogue|dialog|main|regular)(?:\s*\d+)?$/i;
+const SIGN_STYLE_NAME =
+  /(?:^|[\s._-])(?:sign|signs|signage|title|song|lyrics?|credit|credits|note|notes|op|ed|opening|ending|insert|card)(?:$|[\s._-])/i;
 
 export type AssStyle = { size: number; order: number };
+
+type StyleChoice = { name: string; confident: boolean };
+
+export type AssBaseFactorInfo = {
+  factor: number;
+  /** Dialogue events, or a conventional dialogue style name, picked the style. */
+  confident: boolean;
+};
 
 function clamp(n: number, lo: number, hi: number): number {
   if (!Number.isFinite(n)) return lo;
@@ -98,20 +111,29 @@ export function parseAssStyles(text: string): Map<string, AssStyle> {
   return styles;
 }
 
-function fallbackStyle(styles: Map<string, AssStyle>): string {
+function fallbackStyle(styles: Map<string, AssStyle>): StyleChoice {
+  let exactDefault = "";
+  let dialogue = "";
   let firstPositive = "";
   let first = "";
   for (const [name, st] of styles) {
     if (!first) first = name;
-    if (st.size > 0) {
-      if (/^default$/i.test(name)) return name;
-      if (!firstPositive) firstPositive = name;
+    if (!(st.size > 0)) continue;
+    if (!firstPositive) firstPositive = name;
+    // Keep preferring an exact "Default"; only when it is absent fall back to
+    // a group-prefixed dialogue style instead of whatever style is listed first.
+    if (/^default$/i.test(name)) {
+      if (!exactDefault) exactDefault = name;
+    } else if (!dialogue && DIALOGUE_STYLE_NAME.test(name) && !SIGN_STYLE_NAME.test(name)) {
+      dialogue = name;
     }
   }
-  return firstPositive || first;
+  if (exactDefault) return { name: exactDefault, confident: true };
+  if (dialogue) return { name: dialogue, confident: true };
+  return { name: firstPositive || first, confident: false };
 }
 
-export function dominantDialogueStyle(text: string, styles: Map<string, AssStyle>): string {
+function dominantDialogueChoice(text: string, styles: Map<string, AssStyle>): StyleChoice {
   const section = matchSection(text, /^\[events\]$/i);
   const tally = new Map<string, { count: number; chars: number }>();
   if (section) {
@@ -152,23 +174,32 @@ export function dominantDialogueStyle(text: string, styles: Map<string, AssStyle
       if (db !== da) return db - da;
       return (styles.get(a)?.order ?? 0) - (styles.get(b)?.order ?? 0);
     });
-    return names[0];
+    return { name: names[0], confident: true };
   }
   return fallbackStyle(styles);
 }
 
-export function computeAssBaseFactor(text: string): number | null {
+export function dominantDialogueStyle(text: string, styles: Map<string, AssStyle>): string {
+  return dominantDialogueChoice(text, styles).name;
+}
+
+export function computeAssBaseFactorInfo(text: string): AssBaseFactorInfo | null {
   const styles = parseAssStyles(text);
   if (styles.size === 0) return null;
   const ry = inferPlayResY(text);
-  const dom = dominantDialogueStyle(text, styles);
-  const style = styles.get(dom);
+  const choice = dominantDialogueChoice(text, styles);
+  const style = styles.get(choice.name);
   if (!style || !(style.size > 0)) return null;
   const fdom = style.size;
   const frac = fdom / ry;
   if (frac < MIN_FRAC || frac > MAX_FRAC) return null;
   const factor = ry / (REF_H * fdom);
-  return Number.isFinite(factor) && factor > 0 ? factor : null;
+  if (!Number.isFinite(factor) || factor <= 0) return null;
+  return { factor, confident: choice.confident };
+}
+
+export function computeAssBaseFactor(text: string): number | null {
+  return computeAssBaseFactorInfo(text)?.factor ?? null;
 }
 
 export function assScaleFromFactor(factor: number, targetFontSize: number): number {

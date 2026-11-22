@@ -1,7 +1,10 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Waiting for {name}…": "Esperando a {name}…",
+  "Keeping the source you were watching.": "Manteniendo la fuente que estabas viendo.",
   "Sound descriptions": "Descripciones de sonido",
   "Hide sound effects and speaker names": "Ocultar efectos de sonido y nombres de personajes",
-  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Elimina las descripciones entre corchetes como [la puerta cruje] y los nombres de personajes en mayúsculas como JOHN: mientras se reproducen los subtítulos, para que una versión que solo trae una pista SDH se lea como diálogo normal. Las letras de canciones, los paréntesis normales y los alfabetos no latinos se dejan intactos. No se aplica a pistas forzadas ni a pistas de imagen.",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
+    "Elimina las descripciones entre corchetes como [la puerta cruje] y los nombres de personajes en mayúsculas como JOHN: mientras se reproducen los subtítulos, para que una versión que solo trae una pista SDH se lea como diálogo normal. Las letras de canciones, los paréntesis normales y los alfabetos no latinos se dejan intactos. No se aplica a pistas forzadas ni a pistas de imagen.",
   "Play from": "Reproducir desde",
   end: "fin",
   "m:ss": "m:ss",
@@ -913,6 +916,18 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "Clave de API de NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Elige si Harbor prefiere fuentes directas y debrid, torrents entre pares o muestra ambas.",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

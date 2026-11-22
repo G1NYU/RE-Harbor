@@ -388,6 +388,7 @@ impl ManagedTorrent {
                             .storage_factory
                             .create_and_init(t.shared(), &metadata)?,
                         true,
+                        false,
                     ));
                     g.state = ManagedTorrentState::Initializing(initializing.clone());
                     t.state_change_notify.notify_waiters();

@@ -575,6 +575,7 @@ const sweepA: Record<string, string> = {
   "70s": "70年代",
   "70s Auteurs": "70 年代作者电影",
   "8 seconds": "8 秒",
+  "10 seconds": "10 秒",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1。处理遍数减半，对性能较弱的显卡更友好。",
   "8-character key": "8 位密钥",

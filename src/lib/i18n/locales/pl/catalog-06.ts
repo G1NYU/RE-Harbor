@@ -24,10 +24,10 @@ const catalog06: Record<string, string> = {
     "Gdy Harbor jest otwarty, sprawdza dostępność kilka razy dziennie i powiadamia o niej tutaj.",
   "Harbor checks automatically every few hours.":
     "Harbor automatycznie sprawdza dostępność aktualizacji co kilka godzin.",
-  "Harbor checks harbor.site for new versions and installs them in place.":
-    "Harbor sprawdza dostępność nowych wersji w witrynie harbor.site i instaluje je w miejscu bieżącej wersji.",
-  "Harbor checks harbor.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
-    "Harbor sprawdza w harbor.site dostępność nowych wersji i aktualizuje istniejącą instalację. Nic nie zostanie zainstalowane bez Twojej zgody, a odrzucona aktualizacja nie będzie ponownie wyświetlana.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place.":
+    "Harbor sprawdza dostępność nowych wersji w witrynie harborcommunity.site i instaluje je w miejscu bieżącej wersji.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
+    "Harbor sprawdza w harborcommunity.site dostępność nowych wersji i aktualizuje istniejącą instalację. Nic nie zostanie zainstalowane bez Twojej zgody, a odrzucona aktualizacja nie będzie ponownie wyświetlana.",
   "Harbor could not find these": "Harbor nie znalazł tych pozycji",
   "Harbor could not open its web server. Try again, or set this up on the TV.":
     "Harbor nie mógł uruchomić serwera WWW. Spróbuj ponownie lub skonfiguruj to na telewizorze.",
@@ -106,7 +106,8 @@ const catalog06: Record<string, string> = {
   "Harbor never hosts your books or source files.":
     "Harbor nigdy nie przechowuje Twoich książek ani plików źródłowych.",
   "Harbor never hosts your books.": "Harbor nigdy nie przechowuje Twoich książek.",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Harbor zwykle uruchamia silnik P2P przy starcie, aby pierwszy strumień P2P łączył się szybciej. Oznacza to, że węzeł DHT działa i komunikuje się z siecią nawet wtedy, gdy nic nie jest oglądane. Włącz tę opcję w przypadku połączenia taryfowego lub z limitem danych. Silnik uruchomi się wtedy dopiero przy pierwszym odtworzeniu strumienia P2P. Zmiana zacznie obowiązywać po następnym uruchomieniu.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Harbor zwykle uruchamia silnik P2P przy starcie, aby pierwszy strumień P2P łączył się szybciej. Oznacza to, że węzeł DHT działa i komunikuje się z siecią nawet wtedy, gdy nic nie jest oglądane. Włącz tę opcję w przypadku połączenia taryfowego lub z limitem danych. Silnik uruchomi się wtedy dopiero przy pierwszym odtworzeniu strumienia P2P. Zmiana zacznie obowiązywać po następnym uruchomieniu.",
   "Harbor on other devices": "Harbor na innych urządzeniach",
   "Harbor on other devices (web app)": "Harbor na innych urządzeniach (aplikacja internetowa)",
   "Harbor on the server display": "Harbor na ekranie serwera",
@@ -176,7 +177,8 @@ const catalog06: Record<string, string> = {
     "Harbor powstał w języku angielskim. Obsługa innych języków jest częściowa, dlatego dodatki zwykle znajdują to, czego nie wykrywają własne filtry Harbor. Jeśli znasz inny język i chcesz pomóc, kod źródłowy jest otwarty.",
   "Harbor will mark what you finish as watched on Simkl and sync your plan-to-watch list.":
     "Harbor będzie oznaczać ukończone pozycje jako obejrzane w Simkl i synchronizować Twoją listę planowanych do obejrzenia.",
-  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.": "Harbor nie uruchomi silnika P2P, nie połączy się z trackerami ani nie użyje DHT. Użyj tej opcji, jeśli chcesz korzystać wyłącznie z usług debrid i bezpośrednich linków. Wyłącz ją, aby ponownie włączyć strumieniowanie P2P.",
+  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.":
+    "Harbor nie uruchomi silnika P2P, nie połączy się z trackerami ani nie użyje DHT. Użyj tej opcji, jeśli chcesz korzystać wyłącznie z usług debrid i bezpośrednich linków. Wyłącz ją, aby ponownie włączyć strumieniowanie P2P.",
   "Harbor will scrobble your playback to Trakt and sync your watchlist.":
     "Harbor będzie rejestrować odtwarzanie w Trakt i synchronizować Twoją listę do obejrzenia.",
   "Harbor would not be possible without Stremio. It is the foundation everything here is built on.":

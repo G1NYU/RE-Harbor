@@ -4,16 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { verifyApiKey } from "./client";
 import { invalidatePmdbWatchedCache, markPmdbWatched, unmarkPmdbWatched } from "./history";
 import { resolvePmdbEpisodeTarget, resolvePmdbTarget, stremioIdToPmdbTarget } from "./ids";
 import { armOnlineFlush, clearPendingResumes, flushPendingResumes } from "./pending-sync";
-import { pmdbSaveResume } from "./scrobble";
+import { syncPmdbPlayback } from "./scrobble";
 import { getSession, setSession, subscribeSession, updateSessionUsername } from "./session";
 import { clearPmdbWatchlistCache } from "./watchlist";
+import { setPmdbDefaultListId } from "./lists";
 import type { PmdbSession, PmdbTarget } from "./types";
 
 type Value = {
@@ -48,15 +49,7 @@ type Value = {
 const Ctx = createContext<Value | null>(null);
 
 export function PublicMetaDbProvider({ children }: { children: ReactNode }) {
-  const [session, setLocalSession] = useState<PmdbSession | null>(() => getSession());
-
-  useEffect(
-    () =>
-      subscribeSession(() => {
-        setLocalSession(getSession());
-      }),
-    [],
-  );
+  const session = useSyncExternalStore(subscribeSession, getSession);
 
   const connect = useCallback(async (apiKey: string, username?: string): Promise<boolean> => {
     const trimmed = apiKey.trim();
@@ -78,6 +71,11 @@ export function PublicMetaDbProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(() => {
     setSession(null);
+    try {
+      setPmdbDefaultListId(null);
+    } catch {
+      /* Disconnect even if preferences cannot be saved. */
+    }
     invalidatePmdbWatchedCache();
     clearPmdbWatchlistCache();
     clearPendingResumes();
@@ -101,10 +99,10 @@ export function PublicMetaDbProvider({ children }: { children: ReactNode }) {
       type?: "movie" | "series",
     ): Promise<boolean> => {
       const target = episode
-        ? await resolvePmdbEpisodeTarget(
-            metaId,
-            { season: episode.season, episode: episode.episode },
-        ).catch(() => null)
+        ? await resolvePmdbEpisodeTarget(metaId, {
+            season: episode.season,
+            episode: episode.episode,
+          }).catch(() => null)
         : ((await resolvePmdbTarget(metaId, type).catch(() => null)) ??
           resolveTarget(metaId, episode, type));
       if (!target) return false;
@@ -120,10 +118,10 @@ export function PublicMetaDbProvider({ children }: { children: ReactNode }) {
       type?: "movie" | "series",
     ): Promise<boolean> => {
       const target = episode
-        ? await resolvePmdbEpisodeTarget(
-            metaId,
-            { season: episode.season, episode: episode.episode },
-        ).catch(() => null)
+        ? await resolvePmdbEpisodeTarget(metaId, {
+            season: episode.season,
+            episode: episode.episode,
+          }).catch(() => null)
         : ((await resolvePmdbTarget(metaId, type).catch(() => null)) ??
           resolveTarget(metaId, episode, type));
       if (!target) return false;
@@ -161,8 +159,7 @@ export function PublicMetaDbProvider({ children }: { children: ReactNode }) {
     () =>
       armOnlineFlush({
         hasSession: () => getSession() != null,
-        save: (target, positionMs, runtimeMs) =>
-          pmdbSaveResume(target, positionMs, runtimeMs).then((res) => res !== null),
+        save: syncPmdbPlayback,
       }),
     [],
   );
@@ -184,7 +181,16 @@ export function PublicMetaDbProvider({ children }: { children: ReactNode }) {
       resolveTarget,
       resolveTargetAsync,
     }),
-    [session, connect, updateUsername, disconnect, markWatched, unmarkWatched, resolveTarget, resolveTargetAsync],
+    [
+      session,
+      connect,
+      updateUsername,
+      disconnect,
+      markWatched,
+      unmarkWatched,
+      resolveTarget,
+      resolveTargetAsync,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

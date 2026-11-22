@@ -38,7 +38,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "شارة الجودة",
   "music.dock.part.source": "المصدر",
   "music.dock.part.time": "الوقت",
-  "music.dock.part.queue": "قائمة الانتظار",
+  "music.dock.part.queue": "قائمة الاستماع",
   "music.dock.part.like": "إعجاب",
 
   "music.now.colors": "ألوان الألبوم",

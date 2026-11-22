@@ -74,6 +74,8 @@ export type PlayerSnapshot = {
   chapters: Chapter[];
   subDelaySec: number;
   audioDelaySec: number;
+  /** Observed native correction; undefined when the engine does not expose it. Zero means no correction. */
+  subtitleFps?: number;
   subText: string;
   subStartSec: number;
   secondarySubText: string;
@@ -90,6 +92,13 @@ export type PlayerSnapshot = {
 };
 
 export type PlayerSource = {
+  selectInitialTracks?: (
+    audio: TrackInfo[],
+    subtitles: TrackInfo[],
+  ) => {
+    audioId?: string;
+    subtitleId?: string | null;
+  };
   url: string;
   traceId?: string;
   startupProfile?: "standard" | "high-bitrate";
@@ -103,6 +112,8 @@ export type PlayerSource = {
   }[];
   notWebReady?: boolean;
   startAtSec?: number;
+  startPaused?: boolean;
+  title?: string;
   isLive?: boolean;
   headers?: Record<string, string>;
 };
@@ -122,8 +133,10 @@ export type PlayerBridge = {
   attach: (host: HTMLElement) => void;
   detach: () => void;
   load: (src: PlayerSource) => Promise<void>;
-  play: (options?: { preserveMuted?: boolean }) => Promise<void>;
-  pause: () => void;
+  // `reason` only names the caller in mpv's log (see pause-trace.ts); playback
+  // behaviour never depends on it.
+  play: (options?: { preserveMuted?: boolean; reason?: string }) => Promise<void>;
+  pause: (reason?: string) => void;
   seek: (sec: number, precision?: PlayerSeekPrecision) => void;
   frameStep?: (dir: 1 | -1) => void;
   setVolume: (v: number) => void;
@@ -154,6 +167,7 @@ export type PlayerBridge = {
   ) => Promise<boolean>;
   getSelectedTrackCues: () => SubCue[] | null;
   getSelectedTrackUrl: () => string | null;
+  getLoadedMediaSource?: () => Pick<PlayerSource, "url" | "headers"> | null;
   setAudioNormalize: (on: boolean) => void;
   setAudioProfile?: (profile: string) => void;
   setHdrToSdr?: (on: boolean, oled: boolean) => void;
@@ -172,6 +186,8 @@ export type PlayerBridge = {
 
 export type PlayerCapabilities = {
   engine: "html5" | "mpv";
+  /** Playback runs in the user's own external player window, outside Harbor. */
+  external?: boolean;
   pictureInPicture: boolean;
   airplay: boolean;
   chromecast: boolean;

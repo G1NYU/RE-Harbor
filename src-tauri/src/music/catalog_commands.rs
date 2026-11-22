@@ -17,7 +17,13 @@ pub async fn music_home_rows(
     state: tauri::State<'_, MusicState>,
     refresh: bool,
 ) -> Result<Vec<MusicCatalogRow>, String> {
-    if !refresh {
+    // A tab signed into since the last load changes what the YouTube shelf contributes; rebuild
+    // instead of serving rows that were cached from the anonymous view.
+    let restored = super::connectors::youtube_music::auth::ensure(&app, false).await;
+    if restored {
+        rows::invalidate(&state.db, Some("youtube"))?;
+    }
+    if !refresh && !restored {
         let cached = rows::cached(&state.db, None)?;
         if !cached.is_empty() {
             return Ok(cached);
@@ -29,6 +35,17 @@ pub async fn music_home_rows(
         rows::store(&state.db, &ordered)?;
     }
     Ok(ordered)
+}
+
+#[tauri::command]
+pub async fn music_library_rows(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, MusicState>,
+    connector: String,
+) -> Result<Vec<MusicCatalogRow>, String> {
+    pick(state.inner(), &connector)?
+        .library_rows(&app)
+        .await
 }
 
 #[tauri::command]
@@ -133,6 +150,78 @@ pub async fn music_catalog_playlist_tracks(
     remember(state.inner(), tracks)
 }
 
+/// One page of a catalog playlist; `cursor` is the provider's continuation from the last page.
+#[tauri::command]
+pub async fn music_catalog_playlist_page(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, MusicState>,
+    playlist: MusicPlaylistRef,
+    cursor: Option<String>,
+) -> Result<MusicCatalogPage, String> {
+    let connector = pick(state.inner(), &playlist.connector_id)?;
+    let page = connector
+        .playlist_page(&app, &playlist, cursor.as_deref())
+        .await?;
+    let tracks = page
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            MusicCatalogItem::Track(track) => Some(track.clone()),
+            _ => None,
+        })
+        .collect();
+    remember(state.inner(), tracks)?;
+    Ok(page)
+}
+
+#[tauri::command]
+pub async fn music_import_linked_playlist(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, MusicState>,
+    connector_id: String,
+    source_id: String,
+) -> Result<super::library::MusicPlaylist, String> {
+    let generation = state.db.generation()?;
+    let connector = pick(state.inner(), &connector_id)?;
+    let imported = connector.import_playlist(&app, &source_id).await?;
+    super::library::import_linked_playlist(
+        &state.db,
+        generation,
+        &connector_id,
+        &source_id,
+        &imported,
+    )
+}
+
+#[tauri::command]
+pub async fn music_sync_linked_playlist(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, MusicState>,
+    playlist_id: String,
+) -> Result<super::library::MusicPlaylist, String> {
+    let generation = state.db.generation()?;
+    let playlist = super::library::linked_playlist(&state.db, &playlist_id)?;
+    let source = playlist.source.ok_or("This playlist is not linked")?;
+    let connector = pick(state.inner(), &source.connector_id)?;
+    let imported = connector.import_playlist(&app, &source.source_id).await?;
+    super::library::sync_linked_playlist(
+        &state.db,
+        generation,
+        &playlist_id,
+        &source,
+        &playlist.updated_at,
+        &imported,
+    )
+}
+
+#[tauri::command]
+pub fn music_unlink_playlist(
+    state: tauri::State<'_, MusicState>,
+    playlist_id: String,
+) -> Result<super::library::MusicPlaylist, String> {
+    super::library::unlink_playlist(&state.db, &playlist_id)
+}
+
 #[tauri::command]
 pub async fn music_station_tracks(
     app: tauri::AppHandle,
@@ -212,6 +301,66 @@ pub async fn music_search_video_page(
     ).await.map_err(|_| "Music video search timed out".to_string())?
 }
 
+/// Canonical YouTube titles for video ids. YouTube Music mislabels some official videos
+/// (the one it calls "Smart (Slowed + Reverb ver.)" is titled "OFFICIAL MV" on
+/// youtube.com), so the discovery list is corrected from YouTube's own metadata.
+#[tauri::command]
+pub async fn music_video_titles(
+    ids: Vec<String>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    const MAX: usize = 24;
+    let mut unique: Vec<String> = Vec::new();
+    for id in ids {
+        if unique.len() >= MAX {
+            break;
+        }
+        let valid = id.len() == 11
+            && id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-');
+        if valid && !unique.contains(&id) {
+            unique.push(id);
+        }
+    }
+    if unique.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(4))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let mut tasks = Vec::with_capacity(unique.len());
+    for id in unique {
+        let client = client.clone();
+        tasks.push(tokio::spawn(async move {
+            let url = format!(
+                "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D{id}&format=json"
+            );
+            let Ok(response) = client.get(url).send().await else {
+                return (id, None);
+            };
+            if !response.status().is_success() {
+                return (id, None);
+            }
+            let Ok(value) = response.json::<serde_json::Value>().await else {
+                return (id, None);
+            };
+            let Some(title) = value["title"].as_str() else {
+                return (id, None);
+            };
+            let title: String = title.trim().chars().take(200).collect();
+            (id, (!title.is_empty()).then_some(title))
+        }));
+    }
+    let mut titles = std::collections::HashMap::new();
+    for task in tasks {
+        if let Ok((id, Some(title))) = task.await {
+            titles.insert(id, title);
+        }
+    }
+    Ok(titles)
+}
+
 /// The music video for a track, when its source has one. Playback itself runs through the
 /// ordinary video player so the music pane inherits embedding, hardware decoding and geometry.
 #[tauri::command]
@@ -219,19 +368,31 @@ pub async fn music_video_stream(
     app: tauri::AppHandle,
     state: tauri::State<'_, MusicState>,
     track: MusicTrack,
+    max_height: Option<u32>,
 ) -> Result<MusicVideoStream, String> {
     let connector = track
         .connector_id
         .as_deref()
         .ok_or_else(|| "This track has no source to ask for a video".to_string())?;
     pick(state.inner(), connector)?
-        .resolve_video(&app, &track)
+        .resolve_video(&app, &track, max_height)
         .await
 }
 
 #[tauri::command]
-pub fn music_connections(state: tauri::State<'_, MusicState>) -> Vec<MusicConnection> {
-    state.registry.connections()
+pub async fn music_connections(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, MusicState>,
+) -> Result<Vec<MusicConnection>, String> {
+    // Picks up a YouTube Music tab the listener signed into since the last check, so the row
+    // reports the account without a second sign-in.
+    if super::connectors::youtube_music::auth::ensure(&app, true).await {
+        // The Home cache still holds the anonymous shelves; the next Home load must rebuild them.
+        rows::invalidate(&state.db, Some("youtube"))?;
+    }
+    // Avoid exposing librespot's immutable account ID in the Connections list.
+    state.spotify.refresh_profile_display_name().await;
+    Ok(state.registry.connections())
 }
 
 #[tauri::command]
@@ -241,7 +402,10 @@ pub async fn music_connect(
     id: String,
     fields: HashMap<String, String>,
 ) -> Result<MusicConnection, String> {
-    pick(state.inner(), &id)?.connect(&app, &fields).await
+    let connection = pick(state.inner(), &id)?.connect(&app, &fields).await?;
+    // Signing in changes what this source contributes to Home, and the cached rows predate it.
+    rows::invalidate(&state.db, Some(&id))?;
+    Ok(connection)
 }
 
 #[tauri::command]
@@ -250,7 +414,10 @@ pub async fn music_disconnect(
     state: tauri::State<'_, MusicState>,
     id: String,
 ) -> Result<(), String> {
-    pick(state.inner(), &id)?.disconnect(&app).await
+    pick(state.inner(), &id)?.disconnect(&app).await?;
+    // The signed-in shelves no longer apply once the session is gone.
+    rows::invalidate(&state.db, Some(&id))?;
+    Ok(())
 }
 
 #[tauri::command]

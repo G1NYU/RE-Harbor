@@ -13,13 +13,22 @@ import { fetchPmdbWatchedKeySet } from "@/lib/publicmetadb/history";
 import { stremioIdToPmdbTarget } from "@/lib/publicmetadb/ids";
 import { usePublicMetaDb } from "@/lib/publicmetadb/provider";
 import type { PlayEpisode } from "@/lib/view";
+import { isNuvioSignedIn, isNuvioProviderActive } from "@/lib/nuvio/nuvio-client";
+import { readCachedWatchProgress, resolveNuvioProfileIndex } from "@/lib/nuvio/nuvio-sync";
 
 export function usePlayerWatched(params: {
   meta: Meta;
   authKey: string | null;
   imdbId: string | null;
   enabled: boolean;
-}): { watchedFor: (ep: PlayEpisode) => boolean } {
+}): {
+  watchedFor: (
+    ep: PlayEpisode,
+    entryId?: string,
+    entryImdbId?: string | null,
+    allowAlias?: boolean,
+  ) => boolean;
+} {
   const { meta, authKey, imdbId, enabled } = params;
   const { isConnected: traktConnected } = useTrakt();
   const { isConnected: simklConnected } = useSimkl();
@@ -29,6 +38,7 @@ export function usePlayerWatched(params: {
   const [simklWatched, setSimklWatched] = useState<Set<string>>(() => new Set());
   const [pmdbWatched, setPmdbWatched] = useState<Set<string>>(() => new Set());
   const [stremioWatched, setStremioWatched] = useState<Set<string>>(() => new Set());
+  const [nuvioWatched, setNuvioWatched] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (!enabled || !traktConnected) return;
@@ -74,7 +84,37 @@ export function usePlayerWatched(params: {
   }, [enabled, pmdbConnected, meta.id]);
 
   useEffect(() => {
-    if (!enabled || !authKey) return;
+    if (!enabled || !isNuvioSignedIn() || !isNuvioProviderActive()) {
+      setNuvioWatched(new Set());
+      return;
+    }
+    const updateNuvio = () => {
+      const slot = resolveNuvioProfileIndex();
+      const records = readCachedWatchProgress(slot);
+      const set = new Set<string>();
+      for (const r of records) {
+        const matches = r.content_id === meta.id || (imdbId && r.content_id === imdbId);
+        if (matches && r.season != null && r.episode != null) {
+          const ratio =
+            r.progress_seconds && r.duration_seconds ? r.progress_seconds / r.duration_seconds : 0;
+          if (ratio >= 0.85) {
+            set.add(`${r.season}:${r.episode}`);
+          }
+        }
+      }
+      setNuvioWatched(set);
+    };
+    updateNuvio();
+    window.addEventListener("harbor:nuvio-progress-pushed", updateNuvio);
+    window.addEventListener("harbor:nuvio-watched-updated", updateNuvio);
+    return () => {
+      window.removeEventListener("harbor:nuvio-progress-pushed", updateNuvio);
+      window.removeEventListener("harbor:nuvio-watched-updated", updateNuvio);
+    };
+  }, [enabled, meta.id, imdbId]);
+
+  useEffect(() => {
+    if (!enabled || !authKey || isNuvioProviderActive()) return;
     let cancelled = false;
     void (async () => {
       const item = await libraryGetOne(authKey, meta.id).catch(() => null);
@@ -90,23 +130,38 @@ export function usePlayerWatched(params: {
   }, [enabled, authKey, meta.id]);
 
   const imdbKey = meta.id.startsWith("tt") ? meta.id : imdbId;
-  const watchedFor = (ep: PlayEpisode): boolean =>
-    getEpisodeProgress(
-      meta.id,
-      ep.season,
-      ep.episode,
-      null,
-      imdbKey,
-      traktWatched,
-      stremioWatched,
-      undefined,
-      simklWatched,
-      undefined,
-      ep.imdbSeason,
-      ep.imdbEpisode,
-      pmdbWatched,
-      ep.absoluteNumber,
-    ).watched;
+  const isNuvio = isNuvioProviderActive();
+  const watchedFor = (
+    ep: PlayEpisode,
+    entryId: string = meta.id,
+    entryImdbId: string | null = null,
+    allowAlias = true,
+  ): boolean => {
+    const sameEntry = entryId === meta.id;
+    const entryImdb = entryImdbId ?? (sameEntry ? imdbKey : null);
+    const read = (id: string, traktImdbId: string | null, entrySets: boolean) =>
+      getEpisodeProgress(
+        id,
+        ep.season,
+        ep.episode,
+        null,
+        traktImdbId,
+        traktWatched,
+        entrySets ? (isNuvio ? nuvioWatched : stremioWatched) : undefined,
+        undefined,
+        entrySets ? simklWatched : undefined,
+        undefined,
+        ep.imdbSeason,
+        ep.imdbEpisode,
+        entrySets ? pmdbWatched : undefined,
+        ep.absoluteNumber,
+      ).watched;
+    if (isNuvio && sameEntry && nuvioWatched.has(`${ep.season}:${ep.episode}`)) {
+      return true;
+    }
+    if (read(entryId, entryImdb, sameEntry)) return true;
+    return allowAlias && !sameEntry ? read(meta.id, imdbKey, true) : false;
+  };
 
   return { watchedFor };
 }

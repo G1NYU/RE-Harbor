@@ -114,7 +114,7 @@ fn create_window(app: &tauri::AppHandle, profile: &str, id: &str, url: &reqwest:
         .initialization_script(READ_SCRIPT
             .replace("__HARBOR_SOURCE_MAX_BYTES__", &policy::MAX_BYTES.to_string())
             .replace("__HARBOR_SOURCE_URL__", &serde_json::to_string(url.as_str()).unwrap()))
-        .on_navigation(move |next| next.as_str() == "about:blank" || policy::same_origin(&origin, next))
+        .on_navigation(move |next| policy::navigable(&origin, next.as_str()))
         .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
         .on_download(move |_, event| {
             if let tauri::webview::DownloadEvent::Requested { url, .. } = event {
@@ -210,6 +210,7 @@ pub async fn fetch(profile: String, url: String, max_bytes: usize) -> Result<Opt
             if body.len() > max_bytes { return Err("source_limit"); }
             return Ok(Some(HarborFetchResponse { status: 200, ok: true,
                 body: base64::engine::general_purpose::STANDARD.encode(body.as_bytes()),
+                asset_path: None,
                 content_type: Some("application/json".into()),
                 headers: HashMap::from([("content-type".to_owned(), "application/json".to_owned())]),
                 url: Some(url.to_string()) }));
@@ -246,7 +247,7 @@ async fn read_response(mut response: reqwest::Response, max_bytes: usize, url: &
             body.extend_from_slice(&chunk);
         }
         Ok(HarborFetchResponse { status: status.as_u16(), ok: status.is_success(),
-            body: base64::engine::general_purpose::STANDARD.encode(body), content_type: headers.get("content-type").cloned(), headers, url: Some(url.to_string()) })
+            body: base64::engine::general_purpose::STANDARD.encode(body), asset_path: None, content_type: headers.get("content-type").cloned(), headers, url: Some(url.to_string()) })
 }
 
 #[cfg(test)]

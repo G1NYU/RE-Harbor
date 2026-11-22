@@ -22,8 +22,8 @@ export default {
   "games.dock.welcomeNote": "悬停即可快速访问游戏。随时可在设置 → 主题与外观 → 界面中关闭。",
   "games.dock.welcomeEnable": "显示游戏标签",
   "games.dock.welcomeDismiss": "暂不",
-  "games.dock.settingTitle": "游戏库快捷入口",
-  "games.dock.settingNote": "在边缘显示低调的标签，方便快速访问游戏。默认关闭。",
+  "games.dock.settingTitle": "快捷库",
+  "games.dock.settingNote": "在边缘显示低调的标签，方便快速访问你的库。默认关闭。",
   "games.dock.launchError": "无法打开游戏。请检查游戏安装和启动器，然后重试。",
   "games.dock.launcher": "启动器",
   "games.dock.client": "在 {launcher} 中打开",
@@ -75,5 +75,5 @@ export default {
   "games.badge.unavailable": "文件不可用",
   "games.badge.notInstalled": "未安装",
   "games.home.libraryFirstTitle": "在库中打开游戏",
-  "games.home.libraryFirstNote": "每次打开游戏时，从你的库开始，而不是探索。"
+  "games.home.libraryFirstNote": "每次打开游戏时，从你的库开始，而不是探索。",
 };

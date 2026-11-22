@@ -143,6 +143,7 @@ const catalog01: Record<string, string> = {
   "64 neurons": "64 neuroni",
   "70s Auteurs": "Cinema d'autore anni '70",
   "8 seconds": "8 secondi",
+  "10 seconds": "10 secondi",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1. Metà dei passaggi, meno impegnativa per le schede meno potenti.",
   "8-character key": "Chiave di 8 caratteri",

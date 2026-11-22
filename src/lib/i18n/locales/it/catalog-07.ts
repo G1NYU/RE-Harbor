@@ -476,6 +476,9 @@ const catalog07: Record<string, string> = {
   "Sci-fi, fantasy & horror": "Fantascienza, fantasy e horror",
   Score: "Punteggio",
   "Score /10": "Punteggio /10",
+  "Scale TV score badges": "Ridimensiona i badge dei voti sulle schede TV",
+  "Shrink the score stack when several ratings are enabled.":
+    "Riduci i badge dei voti quando sono attive più valutazioni.",
   "Score badges on cards": "Badge del punteggio sulle schede",
   "Score position": "Posizione del punteggio",
   Scores: "Punteggi",
@@ -645,7 +648,8 @@ const catalog07: Record<string, string> = {
   "Select identified titles to export.": "Seleziona i titoli identificati da esportare.",
   "Self-host": "Hosting autonomo",
   "Self-test": "Test automatico",
-  "Self-test is disabled while strict remote streaming is on. It downloads a small test file over peer-to-peer on this machine.": "Il test automatico è disattivato quando è attivo lo streaming remoto rigoroso. Scarica un piccolo file di prova tramite P2P su questo dispositivo.",
+  "Self-test is disabled while strict remote streaming is on. It downloads a small test file over peer-to-peer on this machine.":
+    "Il test automatico è disattivato quando è attivo lo streaming remoto rigoroso. Scarica un piccolo file di prova tramite P2P su questo dispositivo.",
   Send: "Invia",
   "Send a bug report": "Invia una segnalazione di bug",
   "Send a bug report straight to the Harbor team. Screenshots and screen recordings welcome.":
@@ -892,8 +896,8 @@ const catalog07: Record<string, string> = {
   "Show a Minecraft card on your profile. Leave the username blank to hide it.":
     "Mostra una scheda Minecraft sul tuo profilo. Lascia vuoto il nome utente per nasconderla.",
   "Show a Minecraft card with your username": "Mostra una scheda Minecraft con il tuo nome utente",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Mostra un pulsante Salta intro / Salta titoli di coda quando Harbor ne rileva uno. Disattiva questa opzione per non mostrarlo mai. Puoi anche toccare la X sul pulsante per ignorare un rilevamento errato per il resto dell'episodio.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Mostra un pulsante Salta intro / Salta titoli di coda quando Harbor ne rileva uno. Disattiva questa opzione per non mostrarlo mai. Il pulsante si nasconde da solo alla fine dell'intro o dei titoli di coda, oppure dopo il ritardo qui sotto.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Mostra un pulsante Salta durante la riproduzione di una pubblicità inserita già nota e un piccolo pulsante di segnalazione sulle nuove uscite, così puoi contrassegnare le pubblicità da verificare.",
   "Show a bookmark on saved titles": "Mostra un segnalibro sui titoli salvati",
@@ -1024,7 +1028,8 @@ const catalog07: Record<string, string> = {
     "Mostra i controlli del player quando metti in Pausa o Riprendi con la tastiera. Disattiva per lasciarli nascosti ed evitare che coprano i Sottotitoli.",
   "Show the player controls when you pause or resume using the keyboard. Turn off to keep them hidden so they don't cover subtitles.":
     "Mostra i controlli del player quando metti in Pausa o Riprendi con la tastiera. Disattiva per lasciarli nascosti ed evitare che coprano i Sottotitoli.",
-  "Show the report button on every P2P stream, not just likely new releases.": "Mostra il pulsante di segnalazione su ogni stream P2P, non solo sulle probabili nuove uscite.",
+  "Show the report button on every P2P stream, not just likely new releases.":
+    "Mostra il pulsante di segnalazione su ogni stream P2P, non solo sulle probabili nuove uscite.",
   "Show them anyway": "Mostrali comunque",
   "Show this catalog": "Mostra questo catalogo",
   "Show this control": "Mostra questo comando",

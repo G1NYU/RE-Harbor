@@ -1,3 +1,5 @@
+import { startNuvioMutationRetry } from "@/lib/nuvio/nuvio-sync";
+import { useNuvioSyncLoop } from "@/lib/nuvio/nuvio-sync-runtime";
 import { GAMES_IN_NAV } from "@/chrome/nav-items";
 import { GameAccessProvider } from "@/views/games/game-access-context";
 import { GameLibraryDock } from "@/views/games/game-library-dock";
@@ -10,16 +12,19 @@ import { SportsAccessGate } from "@/views/sports/access-gate";
 import { SportsEventSkeleton } from "@/views/sports/sports-skeletons";
 import { SportsReminderLoop } from "@/components/sports-reminder-loop";
 import {
+  Component,
   memo,
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type ErrorInfo,
   type ReactNode,
 } from "react";
-import { lazyView as lazy } from "@/lib/lazy-view";
+import { lazyView as lazy, preloadableView } from "@/lib/lazy-view";
 import { startIdleAway } from "@/lib/social/idle-away";
 import { requestAppBack } from "@/lib/app-back";
 import { FloatingBack } from "@/chrome/floating-back";
@@ -42,10 +47,12 @@ import { CinematicOverlay } from "@/chrome/cinematic-overlay";
 import { Topbar, TogetherButton } from "@/chrome/topbar";
 import { TabHotkeys } from "@/chrome/tab-hotkeys";
 import { startMaintenance, subscribeMemoryPressure } from "@/lib/maintenance";
+import { startupMarkOnce } from "@/lib/startup-trace";
 import { MiddleClickScroll } from "@/lib/use-middle-click-scroll";
 import { exitWindowFullscreenOnPlayerClose, toggleWindowFullscreen } from "@/lib/fullscreen-state";
 import { flushCloudSync } from "@/views/player/hooks/use-stremio-sync";
 import { startWriteQueueFlusher } from "@/lib/stremio-write-queue";
+import { expungeLeachedNuvioItemsFromStremio } from "@/lib/stremio";
 import {
   mediaServerConnections,
   mediaServerRefreshIntervalMs,
@@ -125,6 +132,7 @@ import { HarborNameSync } from "@/components/harbor-name-sync";
 import { SettingsProfileBridge } from "@/lib/settings-profile-bridge";
 import { TrackerProfileBridge } from "@/lib/tracker-profile-bridge";
 import { ProfilePickerModal } from "@/components/profile-picker/picker-modal";
+import { ConfirmActionModal } from "@/components/confirm-action-modal";
 import { WatchlistSync } from "@/lib/watchlist-sync";
 import { ContextMenuProvider } from "@/lib/context-menu";
 import { PageContextNavigationDialogs } from "@/chrome/context-page-navigation";
@@ -145,17 +153,15 @@ import { CharacterFavoritesProvider } from "@/lib/character-favorites";
 import { MangaFavoritesProvider } from "@/lib/manga-favorites";
 import { LocalWatchlistProvider } from "@/lib/local-watchlist";
 import { useSettings } from "@/lib/settings";
+import { mountHarborCursor } from "@/lib/harbor-cursor";
+import { ensureIdentityPack, installIdentityDebug, setIdentityFlags } from "@/lib/identity";
 import {
   flushPendingTorrentRemovals,
   reconcilePendingTorrentRemovals,
+  reconcilePrewarmTorrents,
   torrentEngineSetOptions,
 } from "@/lib/torrent/local-engine";
-import {
-  effectiveBinding,
-  eventToBinding,
-  findHotkeyMatch,
-  shouldHandleGlobalKeyboardEvent,
-} from "@/lib/hotkeys";
+import { findHotkeyMatch, shouldHandleGlobalKeyboardEvent } from "@/lib/hotkeys";
 import { ViewProvider, useView, type Frame, type MetaFilter, type View } from "@/lib/view";
 import { requestOpenProfile, requestEditProfile } from "@/lib/social/open-profile";
 import { openNotificationCenter } from "@/lib/social/notification-open";
@@ -163,6 +169,10 @@ import { anchorFromElement, openAccountMenu } from "@/lib/social/account-menu-op
 import { getUnreadCount, subscribeUnread } from "@/lib/social/unread-bridge";
 import { fetchMe } from "@/lib/account/identity";
 import { ThemeChromeBridge } from "@/components/theme-chrome-bridge";
+import { DmLauncher } from "@/components/dm/dm-launcher";
+import { UserDiscoveryHost } from "@/components/user-discovery-host";
+import { ShareToDmHost } from "@/components/share-to-dm";
+import { PartyInviteCenter } from "@/components/party-invite-center";
 import type { MetaType } from "@/lib/cinemeta";
 import { profileMediaMeta } from "@/lib/social/profile-media-meta";
 import { useDiscordPresence } from "@/lib/discord/use-discord-presence";
@@ -174,9 +184,7 @@ import { SpooktoberHome } from "@/views/spooktober/spooktober-home";
 // Memoizing the view stops that from cascading into a full re-render of the home feed, which the
 // profiler measured rendering ~18 times a second while the user was on other tabs.
 const MemoSpooktoberHome = memo(SpooktoberHome);
-import { MusicDock } from "@/components/music/music-dock";
-import { useInstallFeatures } from "@/lib/features/install";
-import { MusicSurprisePrompt } from "@/components/music/music-surprise-prompt";
+import { useInstallFeatures, useInstallFeaturesReady } from "@/lib/features/install";
 import { ParentalProvider } from "@/lib/parental";
 import { TraktProvider } from "@/lib/trakt/provider";
 import { AnilistProvider } from "@/lib/anilist/provider";
@@ -198,9 +206,43 @@ import { BigPictureEntryButton } from "@/views/big-picture/bp-entry-button";
 import { releaseBigPictureFullscreen } from "@/views/big-picture/use-bp-fullscreen";
 import { getNavFocusTarget } from "@/lib/keyboard-navigation/geometry";
 import { SFX } from "@/lib/sfx";
-import { startMusicTaskbarButtons, syncMusicTaskbarArtwork } from "@/lib/music/taskbar-buttons";
-import { resetMusicForProfile } from "@/lib/music/player";
 import { startMediaSessionWindowTracking } from "@/lib/media-session";
+import { QueueBasket } from "@/components/queue-basket/queue-basket";
+
+// Keep the Music UI outside the core startup graph. These chunks are not loaded
+// at all when the installer reports Music as unavailable.
+const MusicDock = lazy(() =>
+  import("@/components/music/music-dock").then((m) => ({ default: m.MusicDock })),
+);
+const MusicSurprisePrompt = lazy(() =>
+  import("@/components/music/music-surprise-prompt").then((m) => ({
+    default: m.MusicSurprisePrompt,
+  })),
+);
+const MusicVideoMini = lazy(() =>
+  import("@/components/music/music-video-mini").then((m) => ({ default: m.MusicVideoMini })),
+);
+
+class ThemeErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode; onError?: () => void },
+  { error: boolean }
+> {
+  state = { error: false };
+  static getDerivedStateFromError() {
+    return { error: true };
+  }
+  componentDidCatch(err: unknown, info: ErrorInfo) {
+    console.error(
+      "[Harbor] Theme render failed, falling back to default chrome",
+      err,
+      info.componentStack,
+    );
+    this.props.onError?.();
+  }
+  render() {
+    return this.state.error ? this.props.fallback : this.props.children;
+  }
+}
 
 const importAnime = () => import("@/views/anime");
 const importCalendar = () => import("@/views/calendar");
@@ -216,6 +258,7 @@ const importCuratedList = () => import("@/views/curated-list");
 const importFilter = () => import("@/views/filter");
 const importBrands = () => import("@/views/brands");
 const importGrid = () => import("@/views/grid");
+const importFolderHub = () => import("@/views/folder-hub");
 const importPerson = () => import("@/views/person");
 const importPeople = () => import("@/views/people");
 const importCollection = () => import("@/views/collection");
@@ -239,13 +282,23 @@ const importVod = () => import("@/views/playlist-vod");
 const importDownloads = () => import("@/views/downloads");
 const importOnboarding = () => import("@/components/onboarding");
 
-const AnimeView = lazy(() => importAnime().then((m) => ({ default: m.AnimeView })));
+const AnimeView = preloadableView<
+  Parameters<Awaited<ReturnType<typeof importAnime>>["AnimeView"]>[0]
+>(() => importAnime().then((m) => m.AnimeView));
 const CalendarView = lazy(() => importCalendar().then((m) => ({ default: m.CalendarView })));
 const WrappedView = lazy(() => importWrapped().then((m) => ({ default: m.WrappedView })));
-const DetailView = lazy(() => importDetail().then((m) => ({ default: m.DetailView })));
+const DetailView = preloadableView<
+  Parameters<Awaited<ReturnType<typeof importDetail>>["DetailView"]>[0]
+>(() => importDetail().then((m) => m.DetailView));
 const AddonsView = lazy(() => importAddons().then((m) => ({ default: m.AddonsView })));
-const Discover = memo(lazy(() => importDiscover().then((m) => ({ default: m.Discover }))));
-const Catalogs = memo(lazy(() => importCatalogs().then((m) => ({ default: m.Catalogs }))));
+const PreloadedDiscover = preloadableView<
+  Parameters<Awaited<ReturnType<typeof importDiscover>>["Discover"]>[0]
+>(() => importDiscover().then((m) => m.Discover));
+const Discover = memo(PreloadedDiscover);
+const PreloadedCatalogs = preloadableView<
+  Parameters<Awaited<ReturnType<typeof importCatalogs>>["Catalogs"]>[0]
+>(() => importCatalogs().then((m) => m.Catalogs));
+const Catalogs = memo(PreloadedCatalogs);
 const PluginsView = lazy(() => importPlugins().then((m) => ({ default: m.Plugins })));
 const AwardView = lazy(() => importAward().then((m) => ({ default: m.AwardView })));
 const AnimeAwardView = lazy(() => importAnimeAward().then((m) => ({ default: m.AnimeAwardView })));
@@ -255,6 +308,7 @@ const CuratedListView = lazy(() =>
 const FilterView = lazy(() => importFilter().then((m) => ({ default: m.FilterView })));
 const BrandsView = lazy(() => importBrands().then((m) => ({ default: m.BrandsView })));
 const GridView = lazy(() => importGrid().then((m) => ({ default: m.GridView })));
+const FolderHubView = lazy(() => importFolderHub().then((m) => ({ default: m.FolderHubView })));
 const PersonView = lazy(() => importPerson().then((m) => ({ default: m.PersonView })));
 const PeopleView = lazy(() => importPeople().then((m) => ({ default: m.PeopleView })));
 const ProfileView = lazy(() =>
@@ -281,7 +335,10 @@ const CommunityCollectionsView = lazy(() =>
 );
 const PlayPicker = lazy(() => importPlayPicker().then((m) => ({ default: m.PlayPicker })));
 const PlayerView = lazy(() => importPlayer().then((m) => ({ default: m.PlayerView })));
-const Movies = memo(lazy(() => importMovies().then((m) => ({ default: m.Movies }))));
+const PreloadedMovies = preloadableView<
+  Parameters<Awaited<ReturnType<typeof importMovies>>["Movies"]>[0]
+>(() => importMovies().then((m) => m.Movies));
+const Movies = memo(PreloadedMovies);
 const Kids = lazy(() => importKids().then((m) => ({ default: m.Kids })));
 const KidsDetailView = lazy(() =>
   import("@/views/kids-detail").then((m) => ({ default: m.KidsDetailView })),
@@ -289,7 +346,9 @@ const KidsDetailView = lazy(() =>
 const QueueView = lazy(() => importQueue().then((m) => ({ default: m.QueueView })));
 const ServiceView = lazy(() => importService().then((m) => ({ default: m.ServiceView })));
 const Settings = lazy(() => importSettings().then((m) => ({ default: m.Settings })));
-const Shows = lazy(() => importShows().then((m) => ({ default: m.Shows })));
+const Shows = preloadableView<Parameters<Awaited<ReturnType<typeof importShows>>["Shows"]>[0]>(() =>
+  importShows().then((m) => m.Shows),
+);
 const LibraryView = lazy(() => importLibrary().then((m) => ({ default: m.LibraryView })));
 const MusicView = lazy(() => importMusic().then((m) => ({ default: m.MusicView })));
 const GamesView = lazy(() => importGames().then((m) => ({ default: m.GamesView })));
@@ -308,6 +367,8 @@ const OnboardingModal = lazy(() =>
 const BigPictureShell = lazy(() =>
   import("@/views/big-picture/bp-shell").then((m) => ({ default: m.BigPictureShell })),
 );
+const importMidnightShell = () => import("@/themes/midnight/MidnightShell");
+let MidnightShellLazy = lazy(importMidnightShell);
 
 function useViewPreloader(tmdbKey: string) {
   const keyRef = useRef(tmdbKey);
@@ -317,56 +378,70 @@ function useViewPreloader(tmdbKey: string) {
     let cancelled = false;
     const win = window as Window & {
       requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
     };
-    const schedule = (cb: () => void) =>
-      typeof win.requestIdleCallback === "function"
-        ? win.requestIdleCallback(cb, { timeout: 2500 })
-        : window.setTimeout(cb, 1200);
-    schedule(() => {
-      if (cancelled) return;
-      void importDetail();
-      void importPlayPicker();
-      void importPlayer();
-      void importSettings();
-      void importAddons();
-      void importDiscover();
-      void importPerson();
-      void importPeople();
-      void importFilter();
-      void importCalendar();
-      void importMovies();
-      void importShows();
-      void importLive();
-      void importAnime();
-      void importQueue();
-      void importAward();
-      void importAnimeAward();
-      void importService();
-      void importOnboarding();
-      void importCatalogs();
-      void importPlugins();
-      void importLibrary();
-      void importCommunityCollections();
-      void importDownloads();
-      void importGrid();
-      void importWrapped();
-      void importKids();
-      if (keyRef.current) {
-        void import("@/lib/feed/pool").then((m) => m.getPool(keyRef.current)).catch(() => {});
-      }
-    });
+    let handle = 0;
+    const idle = typeof win.requestIdleCallback === "function";
+    const schedule = (cb: () => void) => {
+      handle = idle ? win.requestIdleCallback!(cb, { timeout: 2500 }) : window.setTimeout(cb, 1200);
+    };
+    const preloaders: Array<() => Promise<unknown>> = [
+      DetailView.preload,
+      PreloadedDiscover.preload,
+      PreloadedMovies.preload,
+      Shows.preload,
+      AnimeView.preload,
+      PreloadedCatalogs.preload,
+      importPlayPicker,
+      importPlayer,
+      importSettings,
+      importAddons,
+      importPerson,
+      importPeople,
+      importFilter,
+      importCalendar,
+      importLive,
+      importQueue,
+      importAward,
+      importAnimeAward,
+      importService,
+      importOnboarding,
+      importPlugins,
+      importLibrary,
+      importCommunityCollections,
+      importDownloads,
+      importGrid,
+      importWrapped,
+      importKids,
+      async () => {
+        if (keyRef.current) {
+          const m = await import("@/lib/feed/pool");
+          if (!cancelled) await m.getPool(keyRef.current);
+        }
+      },
+    ];
+    let next = 0;
+    const warmNext = () => {
+      if (cancelled || next >= preloaders.length) return;
+      // One module per idle opportunity: warming every view at once evaluates
+      // unrelated feature modules and starts their storage/network work during Home boot.
+      void preloaders[next++]()
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) schedule(warmNext);
+        });
+    };
+    schedule(warmNext);
     return () => {
       cancelled = true;
+      if (idle) win.cancelIdleCallback?.(handle);
+      else window.clearTimeout(handle);
     };
   }, []);
 }
 
 const KEEP_ALIVE_MS = 1500;
-// How long a top-level view stays mounted after you leave it. A view keeps its whole tree, its
-// observers and its effects while hidden (`display:none` skips painting, not JavaScript), so a
-// minute of exploring left home, discover, catalogs and movies resident at once — ~34k DOM nodes,
-// with every frame and GC pass paying for all of them. Long enough that an immediate back feels
-// instant, short enough that hopping tabs stops accumulating.
+// Allow a short return from a child page before unmounting its parent view.
 const IDLE_EVICT_MS = 10 * 1000;
 const PRESSURE_EVICT_MS = 1500;
 const UI_SCALE_MIN = 0.8;
@@ -400,22 +475,27 @@ function useKeepAlive(active: boolean, requested: boolean, pin = false): boolean
  * round at mount; doing that inside the home feed's first commit put a ~630ms React work loop in
  * the boot frame. Two frames of delay lets the shell paint before that work lands.
  */
-function AfterFirstPaint({ children }: { children: ReactNode }) {
+function AfterFirstPaint({ children, delayMs = 0 }: { children: ReactNode; delayMs?: number }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let second = 0;
+    let timer = 0;
     const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => setReady(true));
+      second = requestAnimationFrame(() => {
+        if (delayMs > 0) timer = window.setTimeout(() => setReady(true), delayMs);
+        else setReady(true);
+      });
     });
     return () => {
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [delayMs]);
   return ready ? <>{children}</> : null;
 }
 
-function useIdleEvict(active: boolean, pin = false): boolean {
+function useIdleEvict(active: boolean, pin = false, keepInactive = true): boolean {
   const [alive, setAlive] = useState(active);
   const [pressure, setPressure] = useState(false);
   useEffect(() => subscribeMemoryPressure(setPressure), []);
@@ -425,15 +505,38 @@ function useIdleEvict(active: boolean, pin = false): boolean {
       return;
     }
     if (!alive) return;
+    if (!keepInactive) {
+      setAlive(false);
+      return;
+    }
     const t = setTimeout(() => setAlive(false), pressure ? PRESSURE_EVICT_MS : IDLE_EVICT_MS);
     return () => clearTimeout(t);
-  }, [active, alive, pressure, pin]);
-  return alive || active || pin;
+  }, [active, alive, pressure, pin, keepInactive]);
+  return active || pin || (keepInactive && alive);
+}
+
+function HarborMouseCursor() {
+  const { settings } = useSettings();
+  const cursor = useRef<ReturnType<typeof mountHarborCursor> | null>(null);
+  useLayoutEffect(() => {
+    if (!settings.harborCursor) return;
+    const session = mountHarborCursor(window);
+    cursor.current = session;
+    return () => {
+      session.dispose();
+      cursor.current = null;
+    };
+  }, [settings.harborCursor]);
+  useLayoutEffect(() => {
+    if (settings.harborCursor) cursor.current?.setScale(settings.harborCursorScale);
+  }, [settings.harborCursor, settings.harborCursorScale]);
+  return null;
 }
 
 export function App({ onReady }: { onReady?: () => void }) {
   return (
     <SettingsProvider syncTorrentEnginePolicy>
+      {!isMobileWeb() && !isRemoteRoute() && <HarborMouseCursor />}
       <ProfilesProvider>
         <ParentalProvider>
           <TraktProvider>
@@ -467,7 +570,9 @@ export function App({ onReady }: { onReady?: () => void }) {
                                                       <MalAvatarSync />
                                                       <MiddleClickScroll />
                                                       <ThemeBackdrop />
-                                                      <WatchlistSync />
+                                                      <Profiled id="startup.watchlist-sync">
+                                                        <WatchlistSync />
+                                                      </Profiled>
                                                       {isMobileWeb() || isRemoteRoute() ? (
                                                         <>
                                                           <Suspense fallback={null}>
@@ -501,18 +606,26 @@ export function App({ onReady }: { onReady?: () => void }) {
                                                         <TogetherLocationPublisher />
                                                         <IdleAwayRunner />
                                                         <SessionRefreshRunner />
+                                                        <StremioLeachedExpungeRunner />
+                                                        <NuvioSyncLoopRunner />
+                                                        <RemoteHostMount />
+                                                        <RemoteOpenBridge />
+                                                      </AfterFirstPaint>
+                                                      <AfterFirstPaint delayMs={1500}>
                                                         <StatsSyncRunner />
                                                         <FeaturedListsSyncRunner />
                                                         <RatingsSyncRunner />
                                                         <ActivitySyncRunner />
+                                                      </AfterFirstPaint>
+                                                      <AfterFirstPaint>
                                                         <MediaServerSyncRunner />
+                                                        <IdentityStartupRunner />
+                                                        <NuvioMutationRetryRunner />
                                                         <AutoDownloadRunner />
                                                         <RemindersRunner />
                                                         <GameDownloadNotificationsRunner />
                                                         <GameSourceAlertsRunner />
                                                         <MangaTrackingRunner />
-                                                        <RemoteHostMount />
-                                                        <RemoteOpenBridge />
                                                       </AfterFirstPaint>
                                                       <PlayOnModal />
                                                       <GamepadRunner />
@@ -521,7 +634,9 @@ export function App({ onReady }: { onReady?: () => void }) {
                                                         <DiscordPresence />
                                                         <WatchPresenceRunner />
                                                       </AfterFirstPaint>
-                                                      <ContextMenu />
+                                                      <Profiled id="startup.context-menu">
+                                                        <ContextMenu />
+                                                      </Profiled>
                                                       <PageContextNavigationDialogs />
                                                       <AnnouncementGlobal />
                                                       <WatchLocalModal />
@@ -531,6 +646,7 @@ export function App({ onReady }: { onReady?: () => void }) {
                                                       <CustomHoverCssMount />
                                                       <TopRankModal />
                                                       <ProfilePickerModal />
+                                                      <ConfirmActionModal />
                                                       <CurfewGuard />
                                                       <Profiled id="search.overlay">
                                                         <SearchOverlay />
@@ -600,6 +716,29 @@ function RatingsSyncRunner() {
 
 function ActivitySyncRunner() {
   useActivitySync();
+  return null;
+}
+
+const IDENTITY_SYNC_FIRST_MS = 4000;
+const IDENTITY_SYNC_EVERY_MS = 6 * 60 * 60 * 1000;
+
+function IdentityStartupRunner() {
+  const { settings } = useSettings();
+  const enabled = settings.animeIdentityEnabled;
+  useEffect(() => {
+    setIdentityFlags({ pack: enabled, cards: enabled });
+    if (import.meta.env.DEV) installIdentityDebug();
+    if (!enabled) return;
+    const run = () => {
+      void ensureIdentityPack(false).catch(() => {});
+    };
+    const first = window.setTimeout(run, IDENTITY_SYNC_FIRST_MS);
+    const every = window.setInterval(run, IDENTITY_SYNC_EVERY_MS);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(every);
+    };
+  }, [enabled]);
   return null;
 }
 
@@ -683,6 +822,19 @@ function MediaServerSyncRunner() {
 
 function SessionRefreshRunner() {
   useEffect(startSessionRefresh, []);
+  return null;
+}
+
+function StremioLeachedExpungeRunner() {
+  useEffect(() => {
+    void expungeLeachedNuvioItemsFromStremio().catch(() => {});
+  }, []);
+  return null;
+}
+
+function NuvioSyncLoopRunner() {
+  const { player } = useView();
+  useNuvioSyncLoop(!player);
   return null;
 }
 
@@ -834,6 +986,7 @@ function parseDeepLinkEpisode(videoId?: string): { season: number; episode: numb
 
 function RevealOnMount({ onReady }: { onReady?: () => void }) {
   useEffect(() => {
+    startupMarkOnce("shell.committed");
     onReady?.();
   }, [onReady]);
   return null;
@@ -860,6 +1013,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
     filter,
     brands,
     grid,
+    folderHub,
     awardType,
     animeAwardSource,
     curatedListId,
@@ -892,6 +1046,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const activeProfileForMusic = activeProfile?.id ?? null;
   const kid = activeProfile?.kid ?? null;
   const preview = useThemePreview();
+  useEffect(() => {
+    startupMarkOnce("shell.committed");
+  }, []);
   useEffect(() => {
     void ensureCuratedLogos();
     const id = window.setTimeout(() => {
@@ -1131,7 +1288,6 @@ function Shell({ onReady }: { onReady?: () => void }) {
     const isDefaultUiScaleReset = (e: KeyboardEvent) => usesZoomModifier(e) && e.key === "0";
     const onKey = (e: KeyboardEvent) => {
       if (!shouldHandleGlobalKeyboardEvent(e)) return;
-      const binding = eventToBinding(e);
       const overrides = settings.hotkeys ?? {};
       const globalMatch = findHotkeyMatch(e, overrides, "Global");
       if (
@@ -1145,14 +1301,11 @@ function Shell({ onReady }: { onReady?: () => void }) {
       const uiScaleDownCustom = "globalUiScaleDown" in overrides;
       const uiScaleResetCustom = "globalUiScaleReset" in overrides;
       const matchesUp =
-        effectiveBinding("globalUiScaleUp", overrides) === binding ||
-        (!uiScaleUpCustom && isDefaultUiScaleUp(e));
+        globalMatch === "globalUiScaleUp" || (!uiScaleUpCustom && isDefaultUiScaleUp(e));
       const matchesDown =
-        effectiveBinding("globalUiScaleDown", overrides) === binding ||
-        (!uiScaleDownCustom && isDefaultUiScaleDown(e));
+        globalMatch === "globalUiScaleDown" || (!uiScaleDownCustom && isDefaultUiScaleDown(e));
       const matchesReset =
-        effectiveBinding("globalUiScaleReset", overrides) === binding ||
-        (!uiScaleResetCustom && isDefaultUiScaleReset(e));
+        globalMatch === "globalUiScaleReset" || (!uiScaleResetCustom && isDefaultUiScaleReset(e));
       if (!matchesUp && !matchesDown && !matchesReset) return;
       if (player && matchesReset) return;
       e.preventDefault();
@@ -1239,6 +1392,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
     void reconcilePendingTorrentRemovals();
+    void reconcilePrewarmTorrents();
   }, []);
 
   useEffect(() => {
@@ -1408,6 +1562,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
       topKind === "meta" ||
       topKind === "picker" ||
       topKind === "grid" ||
+      topKind === "folder-hub" ||
       topKind === "collection";
     if (!allowed) setView("kids");
   }, [kid, player, topKind, setView]);
@@ -1446,6 +1601,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const filterTop = topKind === "filter";
   const brandsTop = topKind === "brands";
   const gridTop = topKind === "grid";
+  const folderHubTop = topKind === "folder-hub";
   const awardTop = topKind === "award";
   const animeAwardTop = topKind === "anime-award";
   const curatedListTop = topKind === "curated-list";
@@ -1463,7 +1619,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const kidsTop = topKind === "kids";
   const showsTop = topKind === "shows";
   const installFeatures = useInstallFeatures();
-  const musicTop = topKind === "music" && installFeatures.music;
+  const installFeaturesReady = useInstallFeaturesReady();
+  const musicEnabled = installFeaturesReady && installFeatures.music;
+  const musicTop = topKind === "music" && musicEnabled;
   const gamesTop = topKind === "games" && installFeatures.games;
   const [gamesNavigationOpen, setGamesNavigationOpen] = useState(false);
 
@@ -1549,18 +1707,40 @@ function Shell({ onReady }: { onReady?: () => void }) {
   });
 
   useEffect(() => startMediaSessionWindowTracking(), []);
-  useEffect(() => startMusicTaskbarButtons(), []);
-  useEffect(() => syncMusicTaskbarArtwork(), [settings.musicArtworkAppIcon]);
-  useEffect(() => resetMusicForProfile(), [activeProfileForMusic]);
+  useEffect(() => {
+    if (!musicEnabled) return;
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void import("@/lib/music/taskbar-buttons").then(({ startMusicTaskbarButtons }) => {
+      if (!disposed) stop = startMusicTaskbarButtons();
+    });
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, [musicEnabled]);
+  useEffect(() => {
+    if (musicEnabled) {
+      void import("@/lib/music/taskbar-buttons").then(({ syncMusicTaskbarArtwork }) =>
+        syncMusicTaskbarArtwork(),
+      );
+    }
+  }, [musicEnabled, settings.musicArtworkAppIcon]);
+  useEffect(() => {
+    if (musicEnabled) {
+      void import("@/lib/music/player").then(({ resetMusicForProfile }) => resetMusicForProfile());
+    }
+  }, [musicEnabled, activeProfileForMusic]);
 
   const overlayPinned = useOverlayPinned();
-  const homeAlive = useIdleEvict(homeTop);
+  // Sidebar switches replace the root. Keep a catalog warm only while Back can reach it.
+  const homeAlive = useIdleEvict(homeTop, false, stackKinds.includes("home"));
   const settingsAlive = useIdleEvict(settingsTop, overlayPinned);
-  const animeAlive = useIdleEvict(animeTop);
-  const discoverAlive = useIdleEvict(discoverTop);
+  const animeAlive = useIdleEvict(animeTop, false, stackKinds.includes("anime"));
+  const discoverAlive = useIdleEvict(discoverTop, false, stackKinds.includes("discover"));
   const musicAlive = useIdleEvict(musicTop);
   const gamesAlive = useIdleEvict(gamesTop, stackKinds.includes("games"));
-  const catalogsAlive = useIdleEvict(catalogsTop);
+  const catalogsAlive = useIdleEvict(catalogsTop, false, stackKinds.includes("catalogs"));
   const pluginsAlive = useIdleEvict(pluginsTop);
   const addonsAlive = useIdleEvict(addonsTop);
   const calendarAlive = useIdleEvict(
@@ -1570,7 +1750,14 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const wrappedAlive = useIdleEvict(wrappedTop);
   const queueAlive = useKeepAlive(queueTop, queueTop);
   const serviceAlive = useKeepAlive(serviceTop, serviceTop && !!service);
-  const detailAlive = useKeepAlive(detailTop, !!meta);
+  // Keep detail state while a child playback or episode-detail screen is on top.
+  // Otherwise the keep-alive timer drops the page during playback and Back starts it over.
+  const keepDetailAlive =
+    topKind === "settings" ||
+    stackKinds.includes("episode-detail") ||
+    stackKinds.includes("picker") ||
+    stackKinds.includes("player");
+  const detailAlive = useKeepAlive(detailTop, !!meta, keepDetailAlive);
   const personAlive = useKeepAlive(personTop, personId !== null);
   const profileAlive = useKeepAlive(profileTop, profileHandle !== null);
   const feedAlive = useKeepAlive(feedTop, feedOpen, stackKinds.includes("feed"));
@@ -1597,13 +1784,14 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const filterAlive = useKeepAlive(filterTop, !!filter);
   const brandsAlive = useKeepAlive(brandsTop, !!brands);
   const gridAlive = useKeepAlive(gridTop, !!grid, stackKinds.includes("grid"));
+  const folderHubAlive = useKeepAlive(folderHubTop, !!folderHub, stackKinds.includes("folder-hub"));
   const awardAlive = useKeepAlive(awardTop, awardTop);
   const animeAwardAlive = useKeepAlive(animeAwardTop, animeAwardTop && !!animeAwardSource);
   const curatedListAlive = useKeepAlive(curatedListTop, curatedListTop && !!curatedListId);
   const pickerAlive = useKeepAlive(pickerTop, !!picker);
-  const moviesAlive = useIdleEvict(moviesTop);
+  const moviesAlive = useIdleEvict(moviesTop, false, stackKinds.includes("movies"));
   const kidsAlive = useIdleEvict(kidsTop);
-  const showsAlive = useIdleEvict(showsTop);
+  const showsAlive = useIdleEvict(showsTop, false, stackKinds.includes("shows"));
   const libraryAlive = useIdleEvict(libraryTop);
   const collectionsHubAlive = useIdleEvict(collectionsHubTop);
   const sportsAlive = useIdleEvict(sportsTop);
@@ -1614,12 +1802,12 @@ function Shell({ onReady }: { onReady?: () => void }) {
   const ebookAlive = useIdleEvict(ebookTop);
   const peopleAlive = useIdleEvict(peopleTop);
 
-  const gameDockVisible =
+  const quickLibraryVisible =
     !kid && !kidsTop && !playerActive && !pickerTop && !bigPicture && !immersive && !chromeHidden;
   return (
     <GameAccessProvider
       profile={activeProfile?.id ?? "default"}
-      enabled={!kid && !bigPicture && !playerActive}
+      enabled={installFeatures.games && !kid && !bigPicture && !playerActive}
       gamesActive={gamesTop}
       onNavigate={openGames}
       onLeave={goBack}
@@ -1674,6 +1862,19 @@ function Shell({ onReady }: { onReady?: () => void }) {
             !standaloneLive &&
             !pickerTop &&
             layout === "stremio" && <StremioRail />}
+          {!settingsTop && !playerActive && !pickerTop && layout === "midnight" && !immersive && (
+            <ThemeErrorBoundary
+              key={settings.theme.preset}
+              fallback={<TopDock />}
+              onError={() => {
+                MidnightShellLazy = lazy(importMidnightShell);
+              }}
+            >
+              <Suspense fallback={null}>
+                <MidnightShellLazy />
+              </Suspense>
+            </ThemeErrorBoundary>
+          )}
           {!settingsTop && !playerActive && !pickerTop && layout === "topdock" && !immersive && (
             <TopDock />
           )}
@@ -1687,11 +1888,14 @@ function Shell({ onReady }: { onReady?: () => void }) {
             <SideRail />
           )}
           {!playerActive && !pickerTop && layout === "minui" && !immersive && <MinUIDock />}
-          {!playerActive && !pickerTop && layout === "topdock" && !immersive && (
-            <div className={gamesTop ? "games-library-back" : "contents"}>
-              <FloatingBack offsetTop={92} />
-            </div>
-          )}
+          {!playerActive &&
+            !pickerTop &&
+            (layout === "topdock" || layout === "midnight") &&
+            !immersive && (
+              <div className={gamesTop ? "games-library-back" : "contents"}>
+                <FloatingBack offsetTop={92} />
+              </div>
+            )}
           {!playerActive && !pickerTop && layout === "cinematic" && !immersive && (
             <div className={gamesTop ? "games-library-back" : "contents"}>
               <FloatingBack offsetTop={92} />
@@ -1717,9 +1921,19 @@ function Shell({ onReady }: { onReady?: () => void }) {
               <WindowControls />
             </div>
           )}
-          {installFeatures.music && <MusicDock />}
-          <MusicSurprisePrompt />
+          {musicEnabled && (
+            <Suspense fallback={null}>
+              <MusicDock />
+              <MusicVideoMini />
+              <MusicSurprisePrompt />
+            </Suspense>
+          )}
+          <DmLauncher playing={playerActive} />
+          <UserDiscoveryHost />
+          <ShareToDmHost />
+          <PartyInviteCenter />
           {!playerActive && <WindowResizeEdges />}
+          {!playerActive && !pickerTop && !immersive && !chromeHidden && <QueueBasket />}
           <HybridTitleBar suppressed={playerActive || immersive || chromeHidden} />
           <div
             className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${playerActive ? "invisible" : ""}`}
@@ -1780,7 +1994,10 @@ function Shell({ onReady }: { onReady?: () => void }) {
             {calendarAlive && (
               <div {...layerProps(calendarTop)}>
                 <Suspense fallback={null}>
-                  <CalendarView active={calendarTop} gamesAllowed={!kid && GAMES_IN_NAV} />
+                  <CalendarView
+                    active={calendarTop}
+                    gamesAllowed={!kid && GAMES_IN_NAV && installFeatures.games}
+                  />
                 </Suspense>
               </div>
             )}
@@ -1832,7 +2049,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
             {gamesAlive && (
               <div {...layerProps(gamesTop)}>
                 <Suspense fallback={<GameRouteLoading />}>
-                  <GameDockWelcome eligible={gamesTop && gameDockVisible && !gamesNavigationOpen} />
+                  <GameDockWelcome
+                    eligible={gamesTop && quickLibraryVisible && !gamesNavigationOpen}
+                  />
                   <GamesView
                     harborNavigationOpen={gamesNavigationOpen}
                     onHarborNavigationChange={setGamesNavigationOpen}
@@ -1841,9 +2060,15 @@ function Shell({ onReady }: { onReady?: () => void }) {
                       !chromeHidden &&
                       !immersive &&
                       (themeHasTopbar ||
-                        ["minui", "topdock", "cinematic", "royal", "rail", "custom"].includes(
-                          layout,
-                        ))
+                        [
+                          "minui",
+                          "topdock",
+                          "midnight",
+                          "cinematic",
+                          "royal",
+                          "rail",
+                          "custom",
+                        ].includes(layout))
                     }
                     cloudKeys={{
                       rd: settings.rdKey,
@@ -1979,7 +2204,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
               <div {...layerProps(profileTop)}>
                 <Suspense fallback={null}>
                   <ProfileView
-                    key={`profile-${profileHandle}`}
+                    key={`profile-${settings.accountProvider}-${profileHandle}`}
                     handle={profileHandle}
                     onOpenProfile={requestOpenProfile}
                     onOpenMeta={(id, kind, hint) => {
@@ -2119,6 +2344,18 @@ function Shell({ onReady }: { onReady?: () => void }) {
                 </Suspense>
               </div>
             )}
+            {folderHubAlive && folderHub && (
+              <div {...layerProps(folderHubTop)}>
+                <Suspense fallback={null}>
+                  <FolderHubView
+                    key={`folder-hub-${folderHub.sourceId}-${folderHub.folder.id}`}
+                    folder={folderHub.folder}
+                    sourceId={folderHub.sourceId}
+                    active={folderHubTop}
+                  />
+                </Suspense>
+              </div>
+            )}
             {collectionsIndexAlive && (
               <div {...layerProps(collectionsIndexTop)}>
                 <Suspense fallback={null}>
@@ -2154,8 +2391,9 @@ function Shell({ onReady }: { onReady?: () => void }) {
               <div {...layerProps(pickerTop)}>
                 <Suspense fallback={null}>
                   <PlayPicker
-                    key={`picker-${picker.meta.id}-${picker.episode?.season ?? ""}-${picker.episode?.episode ?? ""}-${picker.attempt ?? 0}-${picker.intent ?? "play"}-${picker.seasonEpisodes?.length ?? 0}-${picker.contextRequestId ?? ""}-${picker.continuation?.id ?? ""}`}
+                    key={`picker-${picker.pickerRevision ?? 0}-${picker.meta.id}-${picker.episode?.season ?? ""}-${picker.episode?.episode ?? ""}-${picker.attempt ?? 0}-${picker.intent ?? "play"}-${picker.seasonEpisodes?.length ?? 0}-${picker.contextRequestId ?? ""}-${picker.continuation?.id ?? ""}-${picker.queueItemId ?? ""}`}
                     meta={picker.meta}
+                    queueItemId={picker.queueItemId}
                     episode={picker.episode}
                     autoPlay={picker.intent === "download" ? false : picker.autoPlay}
                     attempt={picker.attempt}
@@ -2201,7 +2439,7 @@ function Shell({ onReady }: { onReady?: () => void }) {
             )}
           </div>
         </div>
-        <GameLibraryDock visible={gameDockVisible && !gamesTop} />
+        <GameLibraryDock visible={quickLibraryVisible && !gamesTop} />
         {player && (
           <Suspense fallback={null}>
             <PlayerView
@@ -2230,3 +2468,8 @@ function Shell({ onReady }: { onReady?: () => void }) {
 }
 
 export type { Frame };
+
+function NuvioMutationRetryRunner() {
+  useEffect(() => startNuvioMutationRetry(), []);
+  return null;
+}

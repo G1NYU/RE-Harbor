@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
+import * as playbackHistorySource from "../src/lib/player/playback-history-source";
+import { resolvedEpisodeCoords as realEpisodeCoords } from "../src/lib/stremio.ts";
 
 function harness() {
   const data = new Map<string, string>();
@@ -10,6 +12,9 @@ function harness() {
   let online = true;
   let heldAuth = "";
   let releaseHeld: (() => void) | undefined;
+  let clearProviderProgress = false;
+  let cwSources = { trakt: false, simkl: false, publicmetadb: false };
+  const providerCalls: any[] = [];
   const storage = {
     getItem: (key: string) => data.get(key) ?? null,
     setItem(key: string, value: string) {
@@ -23,12 +28,49 @@ function harness() {
     const file = name.replace(/^@\/lib\//, "").replace(/^\.\//, "");
     if (cache.has(file)) return cache.get(file);
     if (file === "react") return { useSyncExternalStore() {} };
+    if (file.startsWith("@tauri-apps/"))
+      return {
+        invoke: async () => {},
+        isTauri: () => false,
+        fetch: async () => {
+          throw new Error(`Unexpected live request: ${file}`);
+        },
+      };
+    if (file.startsWith("@noble/hashes/"))
+      return name.endsWith("/sha256")
+        ? { sha256: (input: Uint8Array) => input }
+        : { bytesToHex: (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16)).join("") };
+    if (file === "feed/external-cw") return { removeExternalCwItem: () => {} };
+    if (file === "settings/load")
+      return {
+        loadStoredSettings: () => ({
+          cwClearProviderProgress: clearProviderProgress,
+          cwSources: { library: true, local: true, ...cwSources },
+        }),
+      };
+    if (file === "cw-provider-dismiss")
+      return {
+        clearProviderPlayback: async (item: unknown, providers: string[]) => {
+          providerCalls.push({ item, providers });
+          return { failed: [] };
+        },
+      };
+    if (file === "nuvio/nuvio-client")
+      return { isNuvioSignedIn: () => false, isNuvioProviderActive: () => false };
+    if (file === "nuvio/nuvio-sync")
+      return {
+        isNuvioProviderActive: () => false,
+        resolveNuvioProfileIndex: () => 1,
+        deleteWatchProgressFromNuvio: async () => {},
+        dismissNextUpInNuvioCloud: async () => {},
+      };
     if (file === "stremio")
       return {
         episodeFromVideoId: (id?: string) => {
           const match = id?.match(/:(\d+):(\d+)$/);
           return match ? { season: +match[1], episode: +match[2] } : null;
         },
+        resolvedEpisodeCoords: (item: any) => realEpisodeCoords(item),
         libraryPut: async (auth: string, item: any) => {
           if (auth === heldAuth) {
             heldAuth = "";
@@ -49,6 +91,7 @@ function harness() {
         },
         persistCritical() {},
       };
+    if (file === "player/playback-history-source") return playbackHistorySource;
     const mod = { exports: {} };
     cache.set(file, mod.exports);
     const output = ts.transpileModule(
@@ -70,6 +113,13 @@ function harness() {
     data,
     writes,
     load,
+    providerCalls,
+    set clearProviderProgress(value: boolean) {
+      clearProviderProgress = value;
+    },
+    set cwSources(value: { trakt: boolean; simkl: boolean; publicmetadb: boolean }) {
+      cwSources = value;
+    },
     set failure(key: string) {
       failKey = key;
     },
@@ -130,6 +180,86 @@ test("external dismissal keeps official local resume clearing without writing to
   assert.deepEqual(result, { sync: "not-required" });
   assert.equal(h.writes.length, 0);
   assert.deepEqual(JSON.parse(h.data.get("harbor.resume")!), {});
+});
+
+test("the master toggle clears provider playback even when no provider feeds the row", async () => {
+  const h = harness();
+  h.clearProviderProgress = true;
+  h.cwSources = { trakt: false, simkl: false, publicmetadb: false };
+  const item = {
+    ...entry(),
+    external: "trakt",
+    providerPlaybackIds: { trakt: "playback-42" },
+  };
+  const result = await h.load("cw-dismiss").dismissCw(item, "fixture-auth", { acknowledged: true });
+  assert.deepEqual(result, { sync: "not-required" });
+  assert.equal(h.providerCalls.length, 1);
+  assert.deepEqual(h.providerCalls[0].providers, ["trakt", "simkl", "publicmetadb"]);
+  assert.deepEqual(h.providerCalls[0].item.providerPlaybackIds, { trakt: "playback-42" });
+});
+
+test("a deduped card clears the playback id belonging to each provider member", async () => {
+  const h = harness();
+  h.clearProviderProgress = true;
+  h.cwSources = { trakt: false, simkl: false, publicmetadb: false };
+  const item = {
+    ...entry(),
+    external: "simkl",
+    providerPlaybackIds: { simkl: "simkl-playback" },
+    cwMembers: [
+      {
+        ...entry(),
+        external: "trakt",
+        providerPlaybackIds: { trakt: "trakt-playback" },
+      },
+      {
+        ...entry(),
+        external: "publicmetadb",
+        providerPlaybackIds: { publicmetadb: "pmdb-resume" },
+      },
+      {
+        ...entry(),
+        external: "trakt",
+        state: { ...entry().state, season: 2, episode: 4, video_id: "older-b:2:4" },
+        providerPlaybackIds: { trakt: "stale-trakt-playback" },
+      },
+    ],
+  };
+  const result = await h.load("cw-dismiss").dismissCw(item, "fixture-auth", { acknowledged: true });
+  assert.deepEqual(result, { sync: "not-required" });
+  assert.equal(h.providerCalls.length, 3);
+  assert.deepEqual(
+    h.providerCalls.map((call) => call.providers),
+    [["trakt"], ["simkl"], ["publicmetadb"]],
+  );
+  assert.deepEqual(
+    h.providerCalls.map((call) => call.item.providerPlaybackIds),
+    [{ trakt: "trakt-playback" }, { simkl: "simkl-playback" }, { publicmetadb: "pmdb-resume" }],
+  );
+});
+
+test("a stale provider member cannot authorize clearing another episode", async () => {
+  const h = harness();
+  h.clearProviderProgress = true;
+  h.cwSources = { trakt: false, simkl: false, publicmetadb: false };
+  const item = {
+    ...entry(),
+    cwMembers: [
+      {
+        ...entry(),
+        external: "trakt",
+        state: { ...entry().state, season: 2, episode: 4, video_id: "older-b:2:4" },
+        providerPlaybackIds: { trakt: "stale-trakt-playback" },
+      },
+    ],
+  };
+  await h.load("cw-dismiss").dismissCw(item, "fixture-auth", { acknowledged: true });
+
+  assert.deepEqual(
+    h.providerCalls.map((call) => call.item.providerPlaybackIds),
+    [undefined, undefined, undefined],
+    "the visible card is passed instead, so the provider re-verifies the episode",
+  );
 });
 
 test("acknowledged dismissal persists official progress tombstones and newer progress restores the card", async () => {
@@ -301,4 +431,98 @@ test("an old failure cannot resurrect a queue entry after the newer request comp
   h.release();
   await assert.rejects(old, /newer/i);
   assert.equal(queue.queuedWatched("older-b", "fixture-auth"), undefined);
+});
+
+test("repaired display proxy dismisses its real source only and stays dismissed after restart", async () => {
+  const h = harness();
+  const original = {
+    ...entry(),
+    _id: "mal:14719",
+    name: "JoJo's Bizarre Adventure (2012)",
+    state: {
+      ...entry().state,
+      season: 6, episode: 1, video_id: "kitsu:49847:1",
+      timeOffset: 240_000, duration: 1_440_000,
+      lastWatched: "2026-11-19T10:00:00Z",
+    },
+  };
+  const repaired = {
+    ...original,
+    _id: "kitsu:49847",
+    cwRepairSourceId: original._id,
+    cwMembers: [original],
+  };
+  const playbackHistory = "preserve-other-viewings";
+  h.data.set("harbor.playback-history.v1", playbackHistory);
+  const cw = h.load("cw-dismiss");
+  const result = await cw.dismissCw(repaired, "fixture-auth", { acknowledged: true });
+  assert.equal(result.sync, "synced");
+  assert.equal(h.writes.length, 1, "only one genuine library source is cleared");
+  assert.equal(h.writes[0].item._id, "mal:14719");
+  assert.equal(h.writes[0].item.state.timeOffset, 0);
+  assert.equal(h.data.get("harbor.playback-history.v1"), playbackHistory);
+  assert.equal(cw.isCwDismissed(original), true);
+  assert.equal(cw.isCwDismissed(repaired), true);
+
+  const restarted = harness();
+  h.data.forEach((value, key) => restarted.data.set(key, value));
+  const loaded = restarted.load("cw-dismiss");
+  assert.equal(loaded.isCwDismissed(original), true);
+  assert.equal(loaded.isCwDismissed(repaired), true);
+  // New activity after dismissal remains eligible: this must not block rewatches.
+  const newProgress = {
+    ...original, state: {
+      ...original.state, timeOffset: 360_000,
+      lastWatched: new Date(Date.now() + 60_000).toISOString(),
+    },
+  };
+  assert.equal(loaded.isCwDismissed(newProgress), false);
+});
+
+test("when a real native sibling is merged, dismissal clears both genuine source records", async () => {
+  const h = harness();
+  const original = {
+    ...entry(), _id: "mal:14719",
+    state: { ...entry().state, season: 6, episode: 1, video_id: "kitsu:49847:1" },
+  };
+  const native = {
+    ...entry(), _id: "kitsu:49847",
+    state: { ...entry().state, season: 6, episode: 1, video_id: "kitsu:49847:1" },
+  };
+  const repaired = {
+    ...original, _id: "kitsu:49847",
+    cwRepairSourceId: original._id,
+    cwMembers: [original, native],
+  };
+  const result = await h.load("cw-dismiss").dismissCw(repaired, "fixture-auth", { acknowledged: true });
+  assert.equal(result.sync, "synced");
+  assert.deepEqual(new Set(h.writes.map((w) => w.item._id)),
+    new Set(["mal:14719", "kitsu:49847"]));
+  assert.equal(h.writes.length, 2, "no third write for the synthetic display proxy");
+});
+
+
+test("nested franchise dismissal clears and marks the buried provider checkpoint", async () => {
+  const h = harness();
+  h.clearProviderProgress = true;
+  h.cwSources = { trakt: true, simkl: false, publicmetadb: false };
+  const local = { ...entry(), local: true };
+  const tracker = {
+    ...entry(), external: "trakt", providerPlaybackIds: { trakt: "provider-checkpoint-42" },
+  };
+  const native = { ...entry(), _id: "kitsu:49847", state: { ...entry().state } };
+  const outer = {
+    ...native,
+    cwMembers: [
+      { ...local, cwMembers: [local, tracker] },
+      native,
+    ],
+  };
+  const cw = h.load("cw-dismiss");
+  await cw.dismissCw(outer, "fixture-auth", { acknowledged: true });
+  assert.equal(cw.isCwDismissed(tracker), true, "buried provider gets an independent tombstone");
+  assert.equal(cw.isCwDismissed(local), true, "buried local source is dismissed");
+  assert.ok(h.providerCalls.some((call) => call.providers.includes("trakt") &&
+    call.item.providerPlaybackIds?.trakt === "provider-checkpoint-42"),
+    "the actual provider checkpoint is used for provider cleanup");
 });

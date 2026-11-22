@@ -1,3 +1,4 @@
+import { AUTOMATIC_SUBTITLE_BUFFER_SEC } from "@/lib/subtitles/autoload";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   emptySnapshot,
@@ -6,10 +7,10 @@ import {
   type PlayerSnapshot,
 } from "@/lib/player/bridge";
 import { probeMpv } from "@/lib/player/mpv";
+import { externalMpvEnabled } from "@/lib/player/external-mpv";
 import { mergeMpvOptions } from "@/lib/player/mpv-tuning";
 import { anime4kPackComplete, repairAnime4kPack } from "@/lib/anime4k";
-import { metaIsAnime } from "@/lib/player/anime-src";
-import { fullShaderChain, type Anime4kChoice } from "./use-anime4k";
+import { anime4kWantedFor, fullShaderChain, type Anime4kChoice } from "./use-anime4k";
 import { generalShaderKey, shaderCompanionOptions } from "@/lib/player/shader-chain";
 import type { PlayerSrc } from "@/lib/view";
 import type { Settings } from "@/lib/settings";
@@ -19,6 +20,9 @@ import { isLivePlaybackSrc } from "@/lib/player/live-src";
 import { readEmbedRect } from "@/lib/player/embed-rect";
 import { svpEnsureRunning, svpStatus } from "@/lib/svp";
 import { isSvpActiveForMedia } from "@/lib/player/svp-policy";
+import { ensureNativeMemory } from "@/lib/native-memory";
+import { isLocalEngineUrl } from "@/lib/stremio-server";
+import { withoutInitialBufferGate } from "@/lib/player/buffer-profile";
 import { pickBridge } from "../player-utils";
 
 function snapChangedIgnoringClock(a: PlayerSnapshot, b: PlayerSnapshot): boolean {
@@ -26,6 +30,9 @@ function snapChangedIgnoringClock(a: PlayerSnapshot, b: PlayerSnapshot): boolean
     a.status !== b.status ||
     a.buffering !== b.buffering ||
     a.firstFrameReady !== b.firstFrameReady ||
+    (b.firstFrameReady &&
+      a.bufferedSec >= AUTOMATIC_SUBTITLE_BUFFER_SEC !==
+        b.bufferedSec >= AUTOMATIC_SUBTITLE_BUFFER_SEC) ||
     a.durationSec !== b.durationSec ||
     a.volume !== b.volume ||
     a.muted !== b.muted ||
@@ -35,6 +42,7 @@ function snapChangedIgnoringClock(a: PlayerSnapshot, b: PlayerSnapshot): boolean
     a.chapters !== b.chapters ||
     a.subDelaySec !== b.subDelaySec ||
     a.audioDelaySec !== b.audioDelaySec ||
+    a.subtitleFps !== b.subtitleFps ||
     a.subText !== b.subText ||
     a.subStartSec !== b.subStartSec ||
     a.secondarySubText !== b.secondarySubText ||
@@ -65,8 +73,7 @@ export function usePlayerBridge(params: {
 
   const hdrOpaqueWindow = isWindowsDesktop() && settings.playerHdrOpaqueWindow;
   const embedActive = settings.playerMpvEmbed && !hdrOpaqueWindow;
-  const isAnimeSrc = metaIsAnime(src.meta) || !!src.isAnime;
-  const anime4kWanted = settings.playerAnime4k && (!settings.playerAnime4kAnimeOnly || isAnimeSrc);
+  const anime4kWanted = anime4kWantedFor(settings, src);
   // mpv only compiles a shader chain whose files it can open, and it drops the
   // rest without a word. Presets that name a kernel the installed pack predates
   // would silently run short, so the gap is filled before the chain is built
@@ -137,9 +144,10 @@ export function usePlayerBridge(params: {
     if (svpOn) void svpEnsureRunning().catch(() => {});
   }, [svpOn]);
   const isLiveLike = isLivePlaybackSrc(src);
+  const externalMpv = externalMpvEnabled(settings);
   const chosenEngine =
     isLiveLike && !src.notWebReady ? "html5" : autoFallbackTried ? "mpv" : settings.playerEngine;
-  const bridgeKey = `${chosenEngine}|${anime4kOn}|${embedActive}|${anime4kOn ? settings.playerAnime4kShaders.join(",") : ""}|${generalShaderKey(settings)}|${svpOn}|${svpOn ? settings.svpVpyPath : ""}`;
+  const bridgeKey = `${chosenEngine}|${anime4kOn}|${embedActive}|${anime4kOn ? settings.playerAnime4kShaders.join(",") : ""}|${generalShaderKey(settings)}|${svpOn}|${svpOn ? settings.svpVpyPath : ""}|${externalMpv ? `ext:${settings.playerExternalMpvPath}:${settings.playerExternalMpvArgs}` : ""}`;
   const [bridgeReady, setBridgeReady] = useState(false);
   useEffect(() => {
     if (svpPending || anime4kPending) return;
@@ -152,6 +160,17 @@ export function usePlayerBridge(params: {
     (async () => {
       const want = chosenEngine;
       const getEmbedRect = () => readEmbedRect(videoMountRef.current);
+      // Size manual buffer modes from the real machine, not the fallback.
+      await ensureNativeMemory();
+      const mergedExtraOptions = [
+        mergeMpvOptions(settings, svpOn, { anime4k: anime4kOn }),
+        shaderCompanionOptions(settings),
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const playerExtraOptions = isLocalEngineUrl(src.url)
+        ? withoutInitialBufferGate(mergedExtraOptions)
+        : mergedExtraOptions;
       const { bridge: choose, engine: chosen } = await pickBridge(want, src.notWebReady === true, {
         anime4k: anime4kOn,
         hdrToSdr: settings.playerHdrToSdr,
@@ -166,19 +185,21 @@ export function usePlayerBridge(params: {
           src,
           (settings.playerAnime4kOverride as Anime4kChoice) || "auto",
         ),
-        macEdr:
-          isMacDesktop() && embedActive && settings.playerMacEdr && !settings.playerHdrToSdr,
-        fullDownload: settings.torrentFullDownload,
+        macEdr: isMacDesktop() && embedActive && settings.playerMacEdr && !settings.playerHdrToSdr,
         separateDisplay:
           settings.playerSeparateDisplay.mode === "explicit"
             ? settings.playerSeparateDisplay.monitor
             : null,
         separateCoverTaskbar: settings.playerSeparateCoverTaskbar,
-        cacheDir: settings.playbackCacheDir,
-        extraOptions: [mergeMpvOptions(settings, svpOn, { anime4k: anime4kOn }), shaderCompanionOptions(settings)]
-          .filter(Boolean)
-          .join("\n"),
+        extraOptions: playerExtraOptions,
         getEmbedRect,
+        external: externalMpv
+          ? {
+              binary: settings.playerExternalMpvPath,
+              args: settings.playerExternalMpvArgs,
+              title: [src.title, src.subtitle].filter(Boolean).join(" - "),
+            }
+          : null,
       });
       if (cancelled) return;
       bridge = choose;

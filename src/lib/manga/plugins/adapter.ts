@@ -179,6 +179,19 @@ export function toPages(v: unknown, sourceUrl?: string): MangaPage[] {
     const url = typeof candidate === "string" ? candidate.trim() : "";
     if (!isSafeUrl(url)) continue;
     const headers = sanitizePageHeaders(url, rawHeaders, originHost);
+    if (sourceUrl && originHost && !headers?.referer) {
+      try {
+        const source = new URL(sourceUrl);
+        if (source.protocol === "https:" || source.protocol === "http:") {
+          const withReferrer = { ...headers, referer: source.origin + "/" };
+          recordPageHeaders(url, withReferrer);
+          out.push({ url, headers: withReferrer });
+          continue;
+        }
+      } catch {
+        // Keep ordinary image handling when the source address is invalid.
+      }
+    }
     recordPageHeaders(url, headers);
     out.push(headers ? { url, headers } : { url });
   }

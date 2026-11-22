@@ -29,6 +29,7 @@ export function KidsStreamSwitcher({
 
   return (
     <div
+      data-harbor-stream-switcher
       className="pointer-events-auto absolute inset-0 z-[60] flex items-center justify-center overflow-hidden bg-gradient-to-b from-[#3aa6c4]/95 via-[#1c789f]/96 to-[#0a3d5c]/98 px-8 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -114,7 +115,9 @@ export function KidsStreamSwitcher({
                       {isCurrent ? t("Playing now") : t("Video {n}", { n: i + 1 })}
                     </span>
                     {quality && (
-                      <span className={`text-[14px] font-bold ${isCurrent ? "text-[#0c4a6e]/70" : "text-white/70"}`}>
+                      <span
+                        className={`text-[14px] font-bold ${isCurrent ? "text-[#0c4a6e]/70" : "text-white/70"}`}
+                      >
                         {quality}
                       </span>
                     )}

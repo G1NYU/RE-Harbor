@@ -78,7 +78,12 @@ test("explicit presence wins over a stale online compatibility boolean", () => {
 
 test("offline presence is described as state, not as the owner's visibility action", () => {
   assert.equal(presenceStatusLabel("offline"), "Offline");
-  assert.match(userHoverCard, /presenceStatusLabel\(presence\)/);
+  assert.match(userHoverCard, /presence=\{presenceOverride\}/);
+  const panel = readFileSync(
+    new URL("../src/views/profile/profile-card-panel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /presenceStatusLabel\(presence\)/);
 });
 
 test("friends are counted, ordered, and grouped through resolved presence", () => {

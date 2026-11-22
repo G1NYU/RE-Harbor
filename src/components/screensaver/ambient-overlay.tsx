@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ScreensaverBrand,
-  ScreensaverClockFace,
-  useScreensaverClock,
-} from "./screensaver-clock";
+import { ScreensaverBrand, ScreensaverClockFace, useScreensaverClock } from "./screensaver-clock";
 
-export type AmbientItem = { bg: string; title: string; sub: string };
+export type AmbientItem = { bg: string; title: string; sub: string; logo?: string };
 
 const DEEP_IDLE_MS = 6 * 60 * 1000;
 const ROTATE_MS = 13000;
@@ -40,6 +36,27 @@ function AmbientSlide({ src, out, reduce }: { src: string; out: boolean; reduce:
   );
 }
 
+function AmbientMark({ logo, title }: { logo: string; title: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) {
+    return (
+      <span className="mt-1 truncate text-[30px] font-semibold tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)]">
+        {title}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={logo}
+      alt={title}
+      draggable={false}
+      decoding="async"
+      onError={() => setBroken(true)}
+      className="mt-1 max-h-[120px] w-auto max-w-full object-contain drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)]"
+    />
+  );
+}
+
 type Layer = { key: number; item: AmbientItem };
 
 export function AmbientOverlay({
@@ -57,7 +74,9 @@ export function AmbientOverlay({
 }) {
   const { time, date } = useScreensaverClock();
   const [deep, setDeep] = useState(false);
-  const [layers, setLayers] = useState<Layer[]>(() => (items[0] ? [{ key: 0, item: items[0] }] : []));
+  const [layers, setLayers] = useState<Layer[]>(() =>
+    items[0] ? [{ key: 0, item: items[0] }] : [],
+  );
   const keyRef = useRef(1);
   const idxRef = useRef(0);
 
@@ -108,13 +127,21 @@ export function AmbientOverlay({
       }}
     >
       {layers.map((layer, i) => (
-        <AmbientSlide key={layer.key} src={layer.item.bg} out={i !== layers.length - 1} reduce={reduce} />
+        <AmbientSlide
+          key={layer.key}
+          src={layer.item.bg}
+          out={i !== layers.length - 1}
+          reduce={reduce}
+        />
       ))}
 
       {deep && (
         <div
           className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(125% 90% at 50% 26%, oklch(0.22 0.03 262 / 0.6), oklch(0.06 0.01 260) 72%)" }}
+          style={{
+            background:
+              "radial-gradient(125% 90% at 50% 26%, oklch(0.22 0.03 262 / 0.6), oklch(0.06 0.01 260) 72%)",
+          }}
         />
       )}
       {!deep && (
@@ -142,9 +169,13 @@ export function AmbientOverlay({
                 {current.sub}
               </span>
             )}
-            <span className="mt-1 truncate text-[30px] font-semibold tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)]">
-              {current.title}
-            </span>
+            {current.logo ? (
+              <AmbientMark key={current.logo} logo={current.logo} title={current.title} />
+            ) : (
+              <span className="mt-1 truncate text-[30px] font-semibold tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.75)]">
+                {current.title}
+              </span>
+            )}
           </div>
         )}
       </div>

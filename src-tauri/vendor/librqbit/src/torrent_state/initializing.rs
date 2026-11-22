@@ -33,6 +33,7 @@ pub struct TorrentStateInitializing {
     pub(crate) only_files: Option<Vec<usize>>,
     pub(crate) checked_bytes: AtomicU64,
     previously_errored: bool,
+    skip_initial_check: bool,
 }
 
 fn compute_selected_pieces(
@@ -60,6 +61,7 @@ impl TorrentStateInitializing {
         only_files: Option<Vec<usize>>,
         files: FileStorage,
         previously_errored: bool,
+        skip_initial_check: bool,
     ) -> Self {
         Self {
             shared,
@@ -68,6 +70,7 @@ impl TorrentStateInitializing {
             files,
             checked_bytes: AtomicU64::new(0),
             previously_errored,
+            skip_initial_check,
         }
     }
 
@@ -197,6 +200,18 @@ impl TorrentStateInitializing {
 
         let mut have_pieces = match have_pieces {
             Some(h) => h,
+            None if self.skip_initial_check => {
+                // Persist the empty fastresume bitfield. Without it the next engine
+                // start has nothing to load and falls back to hashing every cached
+                // file, even though this cache exists for disposable streaming.
+                let empty = BF::from_boxed_slice(
+                    vec![0u8; self.metadata.lengths.piece_bitfield_bytes()].into(),
+                );
+                bitv_factory
+                    .store_initial_check(id, empty)
+                    .await
+                    .context("error storing initial check bitfield")?
+            }
             None => {
                 info!("Doing initial checksum validation, this might take a while...");
                 let have_pieces = self.shared.spawner.spawn_block_in_place(|| {

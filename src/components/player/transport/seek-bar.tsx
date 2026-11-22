@@ -7,6 +7,7 @@ import {
   setSeekHovering,
 } from "@/lib/player/playback-clock";
 import { useTrickplayState } from "@/lib/trickplay";
+import { useSeekrState } from "@/lib/seekr";
 import { useSkipSegmentsView } from "@/lib/skip-intro/segment-store";
 import { ThumbPreview } from "@/components/player/thumb-preview";
 import { SeekBarVisual } from "./seek-bar-visual";
@@ -43,6 +44,8 @@ export function SeekBar({
   const { settings } = useSettings();
   const baseDot = Math.min(Math.max(settings.seekDotSize ?? 16, 8), 200);
   const { active: trickplayActive, bufferedOnly } = useTrickplayState();
+  const { status: seekrStatus } = useSeekrState();
+  const previewActive = trickplayActive || seekrStatus === "active";
   const position = usePlaybackPositionGated(active);
   const buffered = usePlaybackBufferedGated(active);
   const downloaded = usePlaybackDownloadedGated(active);
@@ -187,7 +190,8 @@ export function SeekBar({
           hovered={hover != null}
           segments={segmentSpans}
         />
-        {durationSec > 0 &&
+        {settings.seekBarChapters !== false &&
+          durationSec > 0 &&
           chapters
             .filter((chapter) => chapter.startSec > 0 && chapter.startSec < durationSec)
             .map((chapter, index) => (
@@ -201,7 +205,7 @@ export function SeekBar({
             ))}
         {hover != null &&
           !(overDot && scrub == null) &&
-          (trickplayActive ? (
+          (previewActive ? (
             <ThumbPreview
               time={hover}
               dur={dur}

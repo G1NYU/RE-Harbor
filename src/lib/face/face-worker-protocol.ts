@@ -1,20 +1,20 @@
-import type { WireFace } from "./match";
-
-export type FaceWorkerRequest =
-  | { id: number; type: "ensure" }
-  | { id: number; type: "scan"; bitmap: ImageBitmap; width: number; height: number }
-  | { id: number; type: "embed-largest"; bitmap: ImageBitmap };
+import type { DetectedFace, WireFace } from "./match";
 
 export type FaceWorkerPayload = {
   ensure: { type: "ensure" };
-  scan: { type: "scan"; bitmap: ImageBitmap; width: number; height: number };
+  scan: { type: "scan"; bitmap: ImageBitmap };
   "embed-largest": { type: "embed-largest"; bitmap: ImageBitmap };
+  "embed-faces": { type: "embed-faces"; bitmap: ImageBitmap; faces: DetectedFace[] };
 };
 
+export type FaceWorkerRequest = FaceWorkerPayload[keyof FaceWorkerPayload] & { id: number };
+
 export type FaceWorkerResult = {
-  ensure: undefined;
+  // Whether the worker detects faces itself (it needs WebGL for that).
+  ensure: boolean;
   scan: WireFace[];
   "embed-largest": number[] | null;
+  "embed-faces": WireFace[];
 };
 
 export type FaceWorkerResponse =

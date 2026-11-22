@@ -8,6 +8,7 @@ struct ScrubRules {
     network_url: Regex,
     request_target: Regex,
     private_header: Regex,
+    curl_cookie: Regex,
     bearer: Regex,
     authorization: Regex,
     storage_key: Regex,
@@ -29,9 +30,10 @@ fn rules() -> &'static ScrubRules {
         )
         .unwrap(),
         private_header: Regex::new(
-            r"(?im)\b(authorization|proxy-authorization|cookie|set-cookie|x-api-key|x-auth-token|api-key)\s*:\s*[^\r\n]*",
+            r"(?im)\b(authorization|proxy-authorization|cookie|set-cookie|x-api-key|x-auth-token|api-key|location|referer|path)\s*:\s*[^\r\n]*",
         )
         .unwrap(),
+        curl_cookie: Regex::new(r"(?im)\b(?:Added|Replaced) cookie[^\r\n]*").unwrap(),
         bearer: Regex::new(r"(?i)bearer\s+[A-Za-z0-9._~+/=\-]{8,}").unwrap(),
         authorization: Regex::new(
             r#"(?i)(authorization"?\s*[:=]\s*"?)(bearer\s+|basic\s+)?([^"'\s,;&}\)]+)"#,
@@ -84,11 +86,18 @@ pub fn scrub(text: &str) -> String {
             };
             format!("{}: {bearer}{REDACTED}", &c[1])
         });
+    let headers = r.curl_cookie.replace_all(&headers, "cookie [REDACTED]");
     let step1 = r
         .bearer
         .replace_all(&headers, |_: &regex::Captures| format!("Bearer {REDACTED}"));
     let step2 = r.authorization.replace_all(&step1, |c: &regex::Captures| {
-        format!("{}{}{}", &c[1], &c[2], REDACTED)
+        // The scheme group is optional; indexing it would panic when absent.
+        format!(
+            "{}{}{}",
+            &c[1],
+            c.get(2).map_or("", |m| m.as_str()),
+            REDACTED
+        )
     });
     let step3 = r.storage_key.replace_all(&step2, |c: &regex::Captures| {
         format!("{}{}{}", &c[1], &c[2], REDACTED)
@@ -105,7 +114,19 @@ pub fn scrub(text: &str) -> String {
         format!("{}{}", &c[1], REDACTED)
     });
     let step9 = r.base64_token.replace_all(&step8, REDACTED);
-    r.long_token.replace_all(&step9, REDACTED).into_owned()
+    r.long_token
+        .replace_all(&step9, |c: &regex::Captures| {
+            let value = c.get(0).unwrap();
+            // Large byte ranges can resemble tokens; retain only this HTTP field.
+            let is_range = step9[..value.start()]
+                .to_ascii_lowercase()
+                .ends_with("content-range: bytes ")
+                && value.as_str().split_once('-').is_some_and(|(start, end)| {
+                    start.parse::<u64>().is_ok() && end.parse::<u64>().is_ok()
+                });
+            if is_range { value.as_str() } else { REDACTED }.to_owned()
+        })
+        .into_owned()
 }
 
 pub fn start_log(path: &std::path::Path) -> std::io::Result<std::sync::mpsc::SyncSender<String>> {
@@ -156,6 +177,50 @@ mod tests {
         assert!(out.contains("HTTP/1.1 403 Forbidden"));
         for secret in ["short", "tiny", "small", "secret", ": key"] {
             assert!(!out.contains(secret), "{out}");
+        }
+    }
+
+    #[test]
+    fn scrubs_curl_trace_secrets_but_preserves_network_timing_and_ranges() {
+        let input = "[wall_ms=1794176866229] [curl] trace: > GET /short/key HTTP/1.1\n\
+                     [curl] trace: [HTTP/2] [1] [:path: /short/key]\n\
+                     [curl] trace: < Location: /short/redirect\n\
+                     [curl] trace: > Authorization: Bearer tiny\n\
+                     [curl] trace: * Added cookie sid=\"small\" for domain example.test\n\
+                     [curl] trace: < HTTP/2 206\n\
+                     [curl] trace: > Range: bytes=5199796854-\n\
+                     [curl] trace: < Content-Range: bytes 5199796854-21513062332/21513062333";
+        let out = scrub(input);
+        for secret in ["/short", "tiny", "small"] {
+            assert!(!out.contains(secret), "{out}");
+        }
+        for diagnostic in [
+            "wall_ms=1794176866229",
+            "HTTP/2 206",
+            "Range: bytes=5199796854-",
+            "Content-Range: bytes 5199796854-21513062332/21513062333",
+        ] {
+            assert!(out.contains(diagnostic), "{out}");
+        }
+        assert_eq!(scrub(&out), out);
+    }
+
+    #[test]
+    fn redacts_authorization_headers_without_a_scheme() {
+        for (input, secret) in [
+            ("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+            (
+                "Authorization: Digest username=\"u\", response=\"digest-secret\"",
+                "digest-secret",
+            ),
+            ("Authorization:Bearer tight-secret", "tight-secret"),
+            ("authorization=bare-secret", "bare-secret"),
+            (r#"{"authorization":"json-secret"}"#, "json-secret"),
+            ("Proxy-Authorization: Basic proxy-secret", "proxy-secret"),
+        ] {
+            let out = scrub(input);
+            assert!(out.contains("[REDACTED]"), "{input} -> {out}");
+            assert!(!out.contains(secret), "{input} -> {out}");
         }
     }
 

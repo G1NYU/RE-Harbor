@@ -71,6 +71,8 @@ export type SubFetchParams = {
   videoHash?: string;
   videoSize?: number;
   durationSec?: number;
+  /** Query live audio selection when preflight begins, not at provider-search startup. */
+  getAudioMap?: () => string | undefined;
   deep?: boolean;
   autoSelect?: boolean;
   shouldAutoSelect?: () => boolean;
@@ -246,6 +248,9 @@ export async function fetchSubtitlesIntoPlayer(
   const rankedResults = (results: SubResult[]) =>
     results
       .filter(isAllowedSubtitleUrl)
+      // A generated translation offer ("Make Hindi") is an on-demand action, not a
+      // file: it is listed in the panel but only an explicit pick may start it.
+      .filter((r) => !isGeneratedLangLabel(r.lang))
       .filter((r) => langScore(r.lang ?? "", p.langs) >= 0)
       .sort((a, b) => {
         const language = langScore(b.lang ?? "", p.langs) - langScore(a.lang ?? "", p.langs);
@@ -272,6 +277,7 @@ export async function fetchSubtitlesIntoPlayer(
           false,
           meta(result),
         );
+        if (!p.isActive()) return;
         if (ok !== true) continue;
         markAddedSub(result.url);
         consumed.add(result);
@@ -379,6 +385,7 @@ export async function fetchSubtitlesIntoPlayer(
         mediaUrl: p.src.url,
         headers: p.src.headers,
         durationSec: p.durationSec ?? 0,
+        audioMap: p.getAudioMap?.(),
       },
       {
         probe: dependencies.preflightProbe,

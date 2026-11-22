@@ -41,7 +41,7 @@ export function EpisodeDetailView({
 }: EpisodeDetailViewProps) {
   const t = useT();
   const { settings } = useSettings();
-  const { openPicker, openMeta, goBack } = useView();
+  const { openPicker, goBack } = useView();
 
   const [seriesMeta, setSeriesMeta] = useState<Meta | null>(initialSeriesMeta || null);
   const [episodeData, setEpisodeData] = useState<EpisodeDetail | null>(null);
@@ -59,11 +59,13 @@ export function EpisodeDetailView({
     setHarborEpisodeRating(undefined);
     if (!imdbId || !imdbId.startsWith("tt")) return;
     let cancelled = false;
-    void harborImdbEpisodes(imdbId).then((map) => {
-      if (cancelled) return;
-      const r = map.get(`${season}:${episode}`);
-      if (r != null) setHarborEpisodeRating(r.toFixed(1));
-    }).catch(() => {});
+    void harborImdbEpisodes(imdbId)
+      .then((map) => {
+        if (cancelled) return;
+        const r = map.get(`${season}:${episode}`);
+        if (r != null) setHarborEpisodeRating(r.toFixed(1));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -77,12 +79,15 @@ export function EpisodeDetailView({
     void fetchOmdbScores(settings.omdbKey, episodeImdbId).then(() => {
       if (cancelled) return;
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [settings.omdbKey, episodeImdbId]);
 
   const episodeKey = `${seriesId}:${season}:${episode}`;
   const [revealedArtwork, setRevealedArtwork] = useState<string | null>(null);
-  const artworkHidden = settings.hideSpoilers && settings.blurEpisodes && revealedArtwork !== episodeKey;
+  const artworkHidden =
+    settings.hideSpoilers && settings.blurEpisodes && revealedArtwork !== episodeKey;
   const { tmdbKey } = settings;
 
   useEffect(() => {
@@ -108,7 +113,12 @@ export function EpisodeDetailView({
 
         const lookupMeta = playback?.meta.id === seriesId ? playback.meta : meta;
         const data = await fetchEpisodeData(
-          seriesId, lookupMeta, season, episode, { tmdbKey } as Settings, playback?.episode,
+          seriesId,
+          lookupMeta,
+          season,
+          episode,
+          { tmdbKey } as Settings,
+          playback?.episode,
         );
         if (cancelled) return;
 
@@ -128,7 +138,9 @@ export function EpisodeDetailView({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [episodeKey, initialSeriesMeta, playback, tmdbKey]);
 
   const getImageUrl = (path: string | null | undefined, size = "original"): string | undefined => {
@@ -137,15 +149,19 @@ export function EpisodeDetailView({
     return `https://image.tmdb.org/t/p/${size}${path}`;
   };
 
-  const background = getImageUrl(episodeData?.stillPath, "original") ?? seriesMeta?.background ?? undefined;
+  const background =
+    getImageUrl(episodeData?.stillPath, "original") ?? seriesMeta?.background ?? undefined;
 
   // Episode rating: hosted IMDb → OMDB (via episode IMDb ID) → TMDB vote_average → none
-  const episodeRating = harborEpisodeRating ??
+  const episodeRating =
+    harborEpisodeRating ??
     episodeOmdbScores?.imdbRating ??
     (episodeData?.voteAverage && episodeData.voteAverage > 0
-      ? episodeData.voteAverage.toFixed(1) : undefined);
+      ? episodeData.voteAverage.toFixed(1)
+      : undefined);
 
-  const seriesRating = omdbScores?.imdbRating ?? (imdbId ? seriesMeta?.imdbRating : undefined) ?? undefined;
+  const seriesRating =
+    omdbScores?.imdbRating ?? (imdbId ? seriesMeta?.imdbRating : undefined) ?? undefined;
 
   const traktResolution = stremioIdToTraktTarget(seriesId, { season, episode });
 
@@ -175,10 +191,6 @@ export function EpisodeDetailView({
     openPicker(playback?.meta ?? seriesMeta, playEpisode, { autoPlay: settings.instantPlay });
   }, [seriesMeta, episodeData, playback, openPicker, settings.instantPlay]);
 
-  const handleSeriesClick = useCallback(() => {
-    if (seriesMeta) openMeta(seriesMeta);
-  }, [seriesMeta, openMeta]);
-
   if (error) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-12">
@@ -195,7 +207,7 @@ export function EpisodeDetailView({
             </button>
             {seriesMeta && (
               <button
-                onClick={handleSeriesClick}
+                onClick={goBack}
                 className="rounded-lg bg-ink px-5 py-2.5 text-[14px] font-semibold text-canvas transition-colors hover:bg-ink/90"
               >
                 {t("View Series")}
@@ -225,10 +237,7 @@ export function EpisodeDetailView({
   }
 
   return (
-    <main
-      ref={scrollRef}
-      className="absolute inset-0 z-30 overflow-y-auto bg-canvas"
-    >
+    <main ref={scrollRef} className="absolute inset-0 z-30 overflow-y-auto bg-canvas">
       <section className="relative">
         <div
           data-tauri-drag-region
@@ -249,7 +258,7 @@ export function EpisodeDetailView({
           <div className="absolute inset-x-0 bottom-0 px-12 pb-14">
             <div className="max-w-3xl">
               <button
-                onClick={handleSeriesClick}
+                onClick={goBack}
                 className="mb-4 inline-flex items-center gap-1 text-[14px] font-semibold text-ink-muted transition-colors hover:text-ink"
               >
                 <ArrowLeft size={16} />
@@ -264,7 +273,9 @@ export function EpisodeDetailView({
               <div className="mt-6 flex flex-wrap items-center gap-3 text-[13px] font-medium text-ink-muted">
                 {episodeData.airDate && (
                   <Pill>
-                    {t("Aired {date}", { date: new Date(episodeData.airDate).toLocaleDateString() })}
+                    {t("Aired {date}", {
+                      date: new Date(episodeData.airDate).toLocaleDateString(),
+                    })}
                   </Pill>
                 )}
                 {episodeData.runtime && episodeData.runtime > 0 && (
@@ -307,9 +318,7 @@ export function EpisodeDetailView({
       </section>
 
       <div className="flex flex-col gap-16 px-12 pb-24 pt-14">
-        {episodeData.overview && (
-          <Synopsis text={episodeData.overview} />
-        )}
+        {episodeData.overview && <Synopsis text={episodeData.overview} />}
 
         {episodeData.guestStars && episodeData.guestStars.length > 0 && (
           <section>
@@ -317,13 +326,15 @@ export function EpisodeDetailView({
               {episodeData.guestStars.map((star, i) => (
                 <CastCard
                   key={`${star.id}-${i}`}
-                  cast={{
-                    id: star.id,
-                    name: star.name,
-                    character: star.character,
-                    profilePath: star.profilePath,
-                    order: i,
-                  } as CastEntry}
+                  cast={
+                    {
+                      id: star.id,
+                      name: star.name,
+                      character: star.character,
+                      profilePath: star.profilePath,
+                      order: i,
+                    } as CastEntry
+                  }
                 />
               ))}
             </Row>

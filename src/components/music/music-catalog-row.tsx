@@ -81,18 +81,24 @@ function WideFeature({
   const caption = subtitle ?? coverCardSubtitle(item);
   const seed = coverCardSeed(item);
   const activate = onOpen ?? onPlay;
-  const label = !onOpen && onPlay
-    ? item.kind === "track"
-      ? t("music.playTrack", { title: heading, artist: caption })
-      : t("music.card.playItem", { title: heading })
-    : t("music.card.openItem", { title: heading });
+  const label =
+    !onOpen && onPlay
+      ? item.kind === "track"
+        ? t("music.playTrack", { title: heading, artist: caption })
+        : t("music.card.playItem", { title: heading })
+      : t("music.card.openItem", { title: heading });
 
   return (
     <div
       onContextMenu={onMenu}
       className="music-top-result group relative flex w-full min-w-0 items-center gap-6 rounded-xl border border-edge-soft bg-surface p-5 text-start"
     >
-      <button type="button" onClick={activate} aria-label={label} className="absolute inset-0 rounded-xl" />
+      <button
+        type="button"
+        onClick={activate}
+        aria-label={label}
+        className="absolute inset-0 rounded-xl"
+      />
       <span className="pointer-events-none relative block w-[168px] shrink-0 overflow-hidden rounded-md">
         {item.kind === "playlist" ? (
           <MusicPlaylistCover artwork={item.artwork} seed={seed} className="rounded-md" />
@@ -136,7 +142,6 @@ function WideFeature({
   );
 }
 
-
 export function MusicCatalogRow({
   row,
   status = "ready",
@@ -149,6 +154,7 @@ export function MusicCatalogRow({
   count,
   emptyLabel,
   leadingCard,
+  trailingCard,
   badgeFor,
   artistArtwork,
   artistSubtitle,
@@ -177,6 +183,7 @@ export function MusicCatalogRow({
   count?: number;
   emptyLabel?: string;
   leadingCard?: ReactNode;
+  trailingCard?: ReactNode;
   badgeFor?: (item: MusicCatalogItem, index: number) => MusicCardBadge | null | undefined;
   artistArtwork?: (artist: MusicArtistRef) => readonly (string | null | undefined)[];
   artistSubtitle?: (artist: MusicArtistRef) => string | undefined;
@@ -196,9 +203,14 @@ export function MusicCatalogRow({
 }) {
   const t = useT();
   const playback = useMusicCatalogPlayback();
-  const play = onPlay ?? ((item: MusicCatalogItem) => { void playback.play(item, row.items, row.id); });
+  const play =
+    onPlay ??
+    ((item: MusicCatalogItem) => {
+      void playback.play(item, row.items, row.id);
+    });
   const itemMenu = useMusicItemMenu({
-    onPlay: onPlay || playable || row.layout === "trackGrid" || row.layout === "wide" ? play : undefined,
+    onPlay:
+      onPlay || playable || row.layout === "trackGrid" || row.layout === "wide" ? play : undefined,
     onOpen,
   });
   const openMenu = (item: MusicCatalogItem, index: number, event: MouseEvent<HTMLElement>) => {
@@ -299,7 +311,11 @@ export function MusicCatalogRow({
             onMenu={(event) => openMenu(feature, 0, event)}
           />
         )}
-        {playback.error && <p role="alert" className="text-[13px] text-ink-muted">{playback.error}</p>}
+        {playback.error && (
+          <p role="alert" className="text-[13px] text-ink-muted">
+            {playback.error}
+          </p>
+        )}
         {itemMenu.menu}
       </section>
     );
@@ -355,20 +371,29 @@ export function MusicCatalogRow({
         badge={badgeAt(item, index)}
         explicitMark={explicitMarks.get(item.id) ?? null}
         onPlay={onPlay || playable ? () => play(item, index) : undefined}
-        playing={playingItemId === item.id || (playback.pending?.id === item.id && playback.pending?.connectorId === item.connectorId)}
+        playing={
+          playingItemId === item.id ||
+          (playback.pending?.id === item.id && playback.pending?.connectorId === item.connectorId)
+        }
         onOpen={onOpen && (() => onOpen(item, index))}
         onMenu={(event) => openMenu(item, index, event)}
         overlay={(() => {
           if (item.kind === "track") return undefined;
           const pending =
-            playback.pending?.id === item.id &&
-            playback.pending?.connectorId === item.connectorId;
+            playback.pending?.id === item.id && playback.pending?.connectorId === item.connectorId;
           if (!pending && liveItemId !== item.id) return undefined;
           return <MusicNowPlayingMark loading={pending} />;
         })()}
       />
     ),
   );
+
+  // Edge cards sit outside the item cards, so a "create new" tile can lead or trail the shelf.
+  const shelfChildren = [
+    ...(leadingCard ? [<Fragment key="music-row-lead">{leadingCard}</Fragment>] : []),
+    ...cards,
+    ...(trailingCard ? [<Fragment key="music-row-trail">{trailingCard}</Fragment>] : []),
+  ];
 
   const body = grid ? (
     <section className={`flex min-w-0 flex-col gap-4 ${className}`}>
@@ -377,7 +402,7 @@ export function MusicCatalogRow({
         className="grid gap-x-5 gap-y-7"
         style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${cellMin}px, 1fr))` }}
       >
-        {leadingCard ? [<Fragment key="music-row-lead">{leadingCard}</Fragment>, ...cards] : cards}
+        {shelfChildren}
       </div>
     </section>
   ) : (
@@ -391,14 +416,18 @@ export function MusicCatalogRow({
       onEndReached={onEndReached}
       className={className}
     >
-      {leadingCard ? [<Fragment key="music-row-lead">{leadingCard}</Fragment>, ...cards] : cards}
+      {shelfChildren}
     </Row>
   );
 
   return (
     <>
       {body}
-      {playback.error && <p role="alert" className="px-[9px] text-[13px] text-ink-muted">{playback.error}</p>}
+      {playback.error && (
+        <p role="alert" className="px-[9px] text-[13px] text-ink-muted">
+          {playback.error}
+        </p>
+      )}
       {itemMenu.menu}
     </>
   );

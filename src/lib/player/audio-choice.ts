@@ -47,6 +47,13 @@ export function selectPlaybackAudio(
       codec(track.codec) === codec(saved.codec) &&
       channelsMatch(track),
   );
+  // Untagged dubs can have distinct muxed titles even while mpv is still
+  // populating decoder details. Only use an explicit, unique track title.
+  const untagged = (lang?: string) => !normalize(lang) || normalize(lang) === "und";
+  if (!matches.length && untagged(saved.lang) && normalize(saved.title)) {
+    const named = tracks.filter((track) => normalize(track.title) === normalize(saved.title));
+    if (named.length === 1 && untagged(named[0].lang)) return named[0];
+  }
   return matches.length === 1
     ? matches[0]
     : (matches.find((track) => track.id === saved.id) ?? null);

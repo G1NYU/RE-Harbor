@@ -607,7 +607,8 @@ const catalog08: Record<string, string> = {
   "Same Wi-Fi as this computer": "이 컴퓨터와 동일한 Wi-Fi",
   "Same file": "동일한 파일",
   "Same file as host": "호스트와 같은 파일",
-  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.": "Real-Debrid와 동일한 읽기 전용 방식으로 사용됩니다. 재생 선택기에서 캐시되지 않은 소스를 대기열에 추가할 수도 있습니다.",
+  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.":
+    "Real-Debrid와 동일한 읽기 전용 방식으로 사용됩니다. 재생 선택기에서 캐시되지 않은 소스를 대기열에 추가할 수도 있습니다.",
   "Same-genre picks from your installed sources": "설치된 소스의 동일 장르 추천작",
   "Sample title": "샘플 제목",
   "Sandman Picks": "샌드맨 추천작",
@@ -779,6 +780,9 @@ const catalog08: Record<string, string> = {
   "Sci-fi, fantasy & horror": "SF, 판타지 및 호러",
   Score: "점수",
   "Score /10": "점수 /10",
+  "Scale TV score badges": "TV 카드 평점 배지 크기 조절",
+  "Shrink the score stack when several ratings are enabled.":
+    "여러 평점을 활성화하면 평점 배지 묶음을 축소합니다.",
   "Score badges on cards": "카드에 평점 배지 표시",
   "Score position": "평점 위치",
   Scores: "평점",

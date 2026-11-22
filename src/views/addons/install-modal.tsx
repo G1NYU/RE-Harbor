@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   fetchManifestAt,
   findHostnameMatch,
-  isInstalled,
+  loadInstalled,
   manifestToConfigureUrl,
   parseAddonUrl,
 } from "@/lib/addon-store";
@@ -15,13 +15,16 @@ import type { Addon } from "@/lib/addons";
 
 type Mode =
   | { kind: "install"; url: string }
-  | { kind: "manage"; existing: { id: string; name: string; logo?: string | null; transportUrl: string } };
+  | {
+      kind: "manage";
+      existing: { id: string; name: string; logo?: string | null; transportUrl: string };
+    };
 
 type ResolveMatch = {
   manifest: Addon["manifest"];
   url: string;
   matchKind: "fresh" | "id-match" | "hostname-match";
-  replaceId: string | null;
+  replaceUrl: string | null;
   replaceName: string | null;
 };
 
@@ -36,12 +39,13 @@ export function AddonInstallModal({
   onClose: () => void;
   onInstall: (
     rawUrl: string,
-    opts: { replaceId?: string },
+    opts: { replaceUrl?: string; newInstance?: boolean },
   ) => Promise<{ replaced: boolean; addon: Addon } | null>;
 }) {
   const t = useT();
   const [pasted, setPasted] = useState(mode.kind === "install" ? mode.url : "");
   const [resolved, setResolved] = useState<ResolveMatch | null>(null);
+  const [secondCopy, setSecondCopy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [installStage, setInstallStage] = useState<InstallStage[] | null>(null);
@@ -67,27 +71,29 @@ export function AddonInstallModal({
       if (parsed.kind === "error") throw new Error(parsed.message);
       const manifest = await fetchManifestAt(parsed.url);
       let matchKind: ResolveMatch["matchKind"] = "fresh";
-      let replaceId: string | null = null;
+      let replaceUrl: string | null = null;
       let replaceName: string | null = null;
       if (mode.kind === "manage" && mode.existing.id) {
+        // Reconfiguring a known entry: always swap that exact instance, even when the
+        // addon has a second copy installed.
+        replaceUrl = mode.existing.transportUrl;
         if (mode.existing.id === manifest.id) {
           matchKind = "id-match";
         } else {
           matchKind = "hostname-match";
-          replaceId = mode.existing.id;
           replaceName = mode.existing.name;
         }
-      } else if (isInstalled(manifest.id)) {
+      } else if (loadInstalled().filter((a) => a.id === manifest.id).length === 1) {
         matchKind = "id-match";
-      } else {
+      } else if (!loadInstalled().some((a) => a.id === manifest.id)) {
         const host = findHostnameMatch(parsed.url);
         if (host) {
           matchKind = "hostname-match";
-          replaceId = host.id;
+          replaceUrl = host.transportUrl;
           replaceName = host.manifest?.name ?? host.id;
         }
       }
-      setResolved({ manifest, url: parsed.url, matchKind, replaceId, replaceName });
+      setResolved({ manifest, url: parsed.url, matchKind, replaceUrl, replaceName });
     } catch (e) {
       setError(e instanceof Error ? e.message : t("Couldn't read that addon URL."));
     } finally {
@@ -101,14 +107,20 @@ export function AddonInstallModal({
     }
   }, [mode]);
 
+  const isUpdate = !!resolved && resolved.matchKind !== "fresh" && !secondCopy;
+  const canAddCopy = mode.kind === "install" && !!resolved && resolved.matchKind !== "fresh";
+
   const onSubmit = async () => {
     if (!resolved) {
       void tryResolve(pasted.trim());
       return;
     }
     const stages: InstallStage[] = [
-      { label: resolved.matchKind === "fresh" ? t("Reading manifest") : t("Reading new manifest"), done: true },
-      { label: resolved.matchKind === "fresh" ? t("Saving to library") : t("Swapping configuration"), done: false },
+      { label: isUpdate ? t("Reading new manifest") : t("Reading manifest"), done: true },
+      {
+        label: isUpdate ? t("Swapping configuration") : t("Saving to library"),
+        done: false,
+      },
       { label: t("Syncing to Stremio"), done: false },
     ];
     setInstallStage(stages);
@@ -116,7 +128,8 @@ export function AddonInstallModal({
     setInstallStage((s) => (s ? s.map((x, i) => (i === 1 ? { ...x, done: true } : x)) : s));
     try {
       const result = await onInstall(resolved.url, {
-        replaceId: resolved.replaceId ?? undefined,
+        replaceUrl: secondCopy ? undefined : (resolved.replaceUrl ?? undefined),
+        newInstance: secondCopy,
       });
       setInstallStage((s) => (s ? s.map((x, i) => (i === 2 ? { ...x, done: true } : x)) : s));
       await new Promise((r) => setTimeout(r, 280));
@@ -127,8 +140,6 @@ export function AddonInstallModal({
       setInstallStage(null);
     }
   };
-
-  const isUpdate = resolved && resolved.matchKind !== "fresh";
 
   return createPortal(
     <div
@@ -198,6 +209,7 @@ export function AddonInstallModal({
                       manifestToConfigureUrl(mode.existing.transportUrl),
                       mode.existing.name,
                       mode.existing.logo ?? null,
+                      mode.existing.transportUrl,
                     );
                     onClose();
                   }}
@@ -209,6 +221,7 @@ export function AddonInstallModal({
                 onChange={(v) => {
                   setPasted(v);
                   setResolved(null);
+                  setSecondCopy(false);
                   setError(null);
                 }}
                 loading={loading}
@@ -226,9 +239,21 @@ export function AddonInstallModal({
               {resolved && (
                 <ManifestPreview
                   manifest={resolved.manifest}
-                  matchKind={resolved.matchKind}
+                  matchKind={secondCopy ? "fresh" : resolved.matchKind}
                   replaceName={resolved.replaceName}
                 />
+              )}
+
+              {canAddCopy && (
+                <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-xl border border-edge-soft bg-canvas/40 px-3.5 py-2.5 text-[12.5px] text-ink-muted">
+                  <input
+                    type="checkbox"
+                    checked={secondCopy}
+                    onChange={(e) => setSecondCopy(e.target.checked)}
+                    className="h-3.5 w-3.5 cursor-pointer"
+                  />
+                  {t("Install as a second copy and keep the existing one")}
+                </label>
               )}
             </>
           )}
@@ -283,12 +308,20 @@ function ManageStep1({
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-[10.5px] font-bold text-canvas">
           1
         </span>
-        <p className="text-[13.5px] font-semibold text-ink">{t("Configure on the addon's setup page")}</p>
+        <p className="text-[13.5px] font-semibold text-ink">
+          {t("Configure on the addon's setup page")}
+        </p>
       </div>
       <p className="ps-7 text-[12.5px] leading-relaxed text-ink-muted">
         {isWeb()
-          ? t("Click below to open {name}'s setup page. Pick your options, then copy the install link it gives you and paste it below to update the addon.", { name })
-          : t("Click below to open {name}'s setup page in Harbor's built-in browser. Pick your options. When you click Install on their page, Harbor catches the link automatically and updates the addon.", { name })}
+          ? t(
+              "Click below to open {name}'s setup page. Pick your options, then copy the install link it gives you and paste it below to update the addon.",
+              { name },
+            )
+          : t(
+              "Click below to open {name}'s setup page in Harbor's built-in browser. Pick your options. When you click Install on their page, Harbor catches the link automatically and updates the addon.",
+              { name },
+            )}
       </p>
       <button
         type="button"
@@ -299,7 +332,9 @@ function ManageStep1({
         {t("Open setup page")}
       </button>
       <p className="mt-1 ps-7 text-[11.5px] leading-relaxed text-ink-subtle">
-        {t("Heads-up: a few addons (like AIOStatus) don't pre-fill from the URL. If the form loads blank, paste the existing manifest URL into their \"Import from URL\" field to restore your settings.")}
+        {t(
+          'Heads-up: a few addons (like AIOStatus) don\'t pre-fill from the URL. If the form loads blank, paste the existing manifest URL into their "Import from URL" field to restore your settings.',
+        )}
       </p>
     </div>
   );
@@ -329,7 +364,9 @@ function PasteRow({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-[10.5px] font-bold text-canvas">
             {step}
           </span>
-          <p className="text-[13.5px] font-semibold text-ink">{t("Or paste the install link manually")}</p>
+          <p className="text-[13.5px] font-semibold text-ink">
+            {t("Or paste the install link manually")}
+          </p>
         </div>
       )}
       <div className={managing ? "ps-7" : ""}>
@@ -375,9 +412,7 @@ function ManifestPreview({
 }) {
   const t = useT();
   const types = manifest.types ?? [];
-  const resources = (manifest.resources ?? []).map((r) =>
-    typeof r === "string" ? r : r.name,
-  );
+  const resources = (manifest.resources ?? []).map((r) => (typeof r === "string" ? r : r.name));
   return (
     <div className="mt-5 flex flex-col gap-4 rounded-xl border border-edge bg-canvas/30 p-4 animate-in fade-in slide-in-from-bottom-1 duration-200">
       <div className="flex items-start gap-4">
@@ -411,7 +446,10 @@ function ManifestPreview({
       </div>
       {matchKind === "hostname-match" && replaceName && (
         <p className="rounded-lg bg-amber-300/[0.06] px-3 py-2 text-[12px] leading-relaxed text-amber-200 ring-1 ring-amber-300/20">
-          {t("Looks like a re-configure of {name}. We'll replace the existing entry so you don't end up with two copies.", { name: replaceName })}
+          {t(
+            "Looks like a re-configure of {name}. We'll replace the existing entry so you don't end up with two copies.",
+            { name: replaceName },
+          )}
         </p>
       )}
       {(types.length > 0 || resources.length > 0) && (

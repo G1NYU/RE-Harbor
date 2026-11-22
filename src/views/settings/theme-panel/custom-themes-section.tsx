@@ -21,10 +21,11 @@ import {
   setThemeLibraryOpen,
   subscribeThemeLibraryRequest,
 } from "./library-open-store";
+import { requestThemeEditor } from "./theme-editor-store";
 import type { StoreTab } from "./custom-themes-section/community-store/store-tabs";
 import { importForeignTheme } from "@/lib/theme-import";
 import { isHarborStyleName, parseHarborStyle, serializeHarborStyle } from "@/lib/harborstyle";
-import { useSettings } from "@/lib/settings";
+import { useSettings, type Settings } from "@/lib/settings";
 import { pushActivityHint } from "@/lib/discord/activity-hint";
 import {
   FEATURED_CUSTOM_THEMES,
@@ -35,6 +36,10 @@ import {
   type ThemePreset,
 } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+
+// Held for the session: a theme's nav is written into settings, so the user's own
+// nav is saved here and restored when a later theme supplies none of its own.
+let navCustomizationOwn: Settings["navCustomization"] | null = null;
 
 export function CustomThemesSection({
   startOpenTab,
@@ -126,19 +131,21 @@ export function CustomThemesSection({
   const activateTheme = (id: string, nav?: ThemePreset["navCustomization"]) => {
     const next = getThemeById(id);
     const bg = next?.background;
-    const held = settings.navCustomizationOwn;
-    const navPatch = nav
-      ? {
-          navCustomization: {
-            order: nav.order ?? [],
-            hidden: nav.hidden ?? [],
-            renamed: nav.renamed ?? {},
-          },
-          navCustomizationOwn: held ?? settings.navCustomization,
-        }
-      : held
-        ? { navCustomization: held, navCustomizationOwn: null }
-        : {};
+    if (nav) navCustomizationOwn ??= settings.navCustomization;
+    const held = navCustomizationOwn;
+    let navPatch: { navCustomization?: Settings["navCustomization"] } = {};
+    if (nav) {
+      navPatch = {
+        navCustomization: {
+          order: nav.order ?? [],
+          hidden: nav.hidden ?? [],
+          renamed: nav.renamed ?? {},
+        },
+      };
+    } else if (held) {
+      navPatch = { navCustomization: held };
+      navCustomizationOwn = null;
+    }
     update({
       theme: {
         ...settings.theme,
@@ -262,7 +269,7 @@ export function CustomThemesSection({
       <ActiveBanner
         theme={activeTheme}
         onExport={() => activeTheme && showExport(activeTheme.id)}
-        onCustomize={() => window.dispatchEvent(new CustomEvent("harbor:open-theme-editor"))}
+        onCustomize={requestThemeEditor}
       />
 
       <HeroCards

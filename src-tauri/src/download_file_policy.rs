@@ -54,6 +54,16 @@ pub fn remove_download_file(path: &Path, playing: Option<&Path>) -> Result<(), S
     }
 }
 
+pub fn remove_empty_folder(folder: &Path) {
+    if !folder.is_absolute() || folder.file_name().is_none() {
+        return;
+    }
+    if std::fs::symlink_metadata(folder).is_ok_and(|metadata| metadata.file_type().is_dir()) {
+        // remove_dir checks emptiness atomically and never removes contents.
+        let _ = std::fs::remove_dir(folder);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,5 +115,22 @@ mod tests {
     fn refuses_relative_paths_without_resolving_them_against_the_working_directory() {
         assert!(inspect_download_file(std::path::Path::new("movie.mp4")).is_err());
         assert!(remove_download_file(std::path::Path::new("movie.mp4"), None).is_err());
+    }
+
+    #[test]
+    fn removes_an_organized_directory_only_after_all_contents_are_gone() {
+        let fixture = Fixture::new();
+        let title = fixture.0.join("Title");
+        std::fs::create_dir(&title).unwrap();
+        let sidecar = title.join("notes.txt");
+        std::fs::write(&sidecar, b"keep").unwrap();
+        remove_empty_folder(&title);
+        assert!(sidecar.is_file());
+        remove_empty_folder(&sidecar);
+        assert!(sidecar.is_file());
+        std::fs::remove_file(sidecar).unwrap();
+        remove_empty_folder(&title);
+        assert!(!title.exists());
+        assert!(fixture.0.is_dir());
     }
 }

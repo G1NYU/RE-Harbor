@@ -473,7 +473,8 @@ const catalog: Record<string, string> = {
   "Live preview": "Pratinjau langsung",
   "Live preview is on. Done and Save both keep what you've picked as your Custom theme. Reset reverts the editor to the saved palette.":
     "Pratinjau langsung aktif. Selesai dan Simpan sama-sama mempertahankan pilihan Anda sebagai tema Kustom. Atur ulang mengembalikan editor ke palet tersimpan.",
-  "Live state of Harbor's own P2P engine on this machine.": "Status langsung mesin P2P milik Harbor di perangkat ini.",
+  "Live state of Harbor's own P2P engine on this machine.":
+    "Status langsung mesin P2P milik Harbor di perangkat ini.",
   "Live streams that actually work.": "Stream langsung yang benar-benar berfungsi.",
   "Live sync": "Sinkronisasi langsung",
   "Live web": "Web langsung",
@@ -488,8 +489,8 @@ const catalog: Record<string, string> = {
   "Load more": "Muat lebih banyak",
   "Load more comments": "Muat lebih banyak komentar",
   "Load more threads": "Muat lebih banyak utas",
-  "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.":
-    "Muat artwork beresolusi tertinggi untuk hero unggulan. Menggunakan lebih banyak bandwidth.",
+  "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.":
+    "Muat artwork beresolusi tertinggi untuk hero unggulan, hero halaman detail, dan latar pemilih stream yang tidak diburamkan. Menggunakan lebih banyak bandwidth dan memori video.",
   "Loaded {loaded} of {total} movies...": "Telah memuat {loaded} dari {total} film...",
   "Loaded {loaded} of {total} shows...": "Telah memuat {loaded} dari {total} acara...",
   "Loaded {name}": "{name} dimuat",

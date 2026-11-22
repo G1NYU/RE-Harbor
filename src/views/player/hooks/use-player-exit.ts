@@ -1,3 +1,4 @@
+import { isNuvioProviderActive } from "@/lib/nuvio/nuvio-client";
 import { useCallback, type RefObject } from "react";
 import { clearOnePickerCache } from "@/lib/picker-cache";
 import {
@@ -6,8 +7,9 @@ import {
   savePlayback,
   streamMatchesEntry,
 } from "@/lib/playback-history";
-import type { PlayerBridge } from "@/lib/player/bridge";
+import type { PlayerBridge, PlayerSnapshot } from "@/lib/player/bridge";
 import { getPlaybackPosition } from "@/lib/player/playback-clock";
+import { isPlaybackFinished } from "@/lib/player/playback-end";
 import { saveResumeMs } from "@/lib/resume";
 import { useProfiles } from "@/lib/profiles";
 import { exitWindowFullscreenOnPlayerClose } from "@/lib/fullscreen-state";
@@ -21,6 +23,7 @@ export function usePlayerExit(params: {
   src: PlayerSrc;
   season: number | undefined;
   episode: number | undefined;
+  snap: PlayerSnapshot;
   bridgeRef: RefObject<PlayerBridge | null>;
   liveUrl: string;
   liveStreamRef: PlayerStreamRef | undefined;
@@ -41,6 +44,7 @@ export function usePlayerExit(params: {
     src,
     season,
     episode,
+    snap,
     bridgeRef,
     liveUrl,
     liveStreamRef,
@@ -64,10 +68,22 @@ export function usePlayerExit(params: {
     await captureExitSnapshot();
     const pos = getPlaybackPosition();
     if (Number.isFinite(pos) && pos > 0) {
-      saveResumeMs(
-        src.meta.id, pos * 1000, season, episode,
-        undefined, undefined, undefined, activeProfile?.id,
-      );
+      // The autosave clears resume on completion; writing it again here would
+      // resurrect a finished episode as resumable (and could beat newer
+      // progress in ordering). Resume ownership stays with the autosave on a
+      // finished close, and only in-progress closes preserve the position.
+      if (!isPlaybackFinished(snap, pos)) {
+        saveResumeMs(
+          src.meta.id,
+          pos * 1000,
+          season,
+          episode,
+          undefined,
+          undefined,
+          undefined,
+          activeProfile?.id,
+        );
+      }
       if (liveStreamRef && pos >= REMEMBER_MIN_SEC) {
         const rememberedUrl = (src.historyUrl ?? liveUrl) || src.url;
         savePlayback(
@@ -94,6 +110,9 @@ export function usePlayerExit(params: {
       clearInvite();
     }
     exitPlayback();
+    if (isNuvioProviderActive()) {
+      window.dispatchEvent(new CustomEvent("harbor:playback-session-ended"));
+    }
   }, [
     captureExitSnapshot,
     exitPlayback,
@@ -113,6 +132,8 @@ export function usePlayerExit(params: {
     src.url,
     stopCast,
     castActiveRef,
+    snap.status,
+    snap.durationSec,
     activeProfile?.id,
   ]);
 

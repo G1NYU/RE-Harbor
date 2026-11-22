@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { usePinnedCatalogRows } from "./home/hooks/use-pinned-rows";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { CatalogRows } from "@/components/catalog/catalog-rows";
 import { CatalogCustomizeBar } from "@/components/catalog/customize-bar";
@@ -19,7 +28,6 @@ import { hasPageRowChanges, resetPageRows, usePageRows } from "@/lib/page-rows";
 import { useSettings } from "@/lib/settings";
 import {
   ANIME_CLOUD_ID,
-  cwSortKey,
   isAnimeCwItem,
   isCwMember,
   library,
@@ -27,13 +35,13 @@ import {
 } from "@/lib/stremio";
 import { listLocalCw, localCwVersion, subscribeLocalCw } from "@/lib/local-cw";
 import { localToLibraryItem } from "@/lib/continue-watching";
-import { clearLocalCw } from "@/lib/local-cw";
 import {
   dismissManualWatched,
   manualWatchedLibraryItems,
   manualWatchedVersion,
   subscribeManualWatched,
 } from "@/lib/manual-watched";
+import { sortCwFinal } from "@/lib/cw-order";
 import { useCwAdvance } from "./home/hooks/use-cw-advance";
 import { useScrollMemory } from "@/lib/view";
 import { buildShowHero, bucketCopy } from "./shows/hero-curation";
@@ -116,7 +124,7 @@ export function Shows({ active = true }: { active?: boolean }) {
               hasMore: !spec.noPaginate && metas.length >= 14,
               fetcher: spec.noPaginate ? undefined : spec.fetcher,
             };
-            setRows((current) => upsertOrdered(current, row, order));
+            startTransition(() => setRows((current) => upsertOrdered(current, row, order)));
             return true;
           }),
         );
@@ -169,7 +177,7 @@ export function Shows({ active = true }: { active?: boolean }) {
             fetcher: listPager(list),
           });
         }
-        setRows(built);
+        startTransition(() => setRows(built));
       }
     })().catch(console.error);
     return () => {
@@ -180,18 +188,15 @@ export function Shows({ active = true }: { active?: boolean }) {
   const localCwVer = useSyncExternalStore(subscribeLocalCw, localCwVersion);
   const continueWatching = useMemo(
     () =>
-      (hideSharedCw ? listLocalCw(true).map(localToLibraryItem) : items)
-        .filter(
+      sortCwFinal(
+        (hideSharedCw ? listLocalCw(true).map(localToLibraryItem) : items).filter(
           (i) =>
             i.type === "series" &&
             !ANIME_CLOUD_ID.test(i._id) &&
             isCwMember(i) &&
             !isCwDismissed(i),
-        )
-        .map((i) => ({ i, k: cwSortKey(i) }))
-        .sort((a, b) => b.k - a.k)
-        .map((e) => e.i)
-        .slice(0, 16),
+        ),
+      ).slice(0, 16),
     [items, cwVersion, hideSharedCw, localCwVer, activeProfile?.id],
   );
 
@@ -213,6 +218,14 @@ export function Shows({ active = true }: { active?: boolean }) {
     resurfaceLibrary,
     "exclude",
     manualWatchedVer,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    0,
+    settings.episodeHiding,
+    settings.animeCwEnd,
+    items,
   );
 
   useEffect(() => {
@@ -286,7 +299,15 @@ export function Shows({ active = true }: { active?: boolean }) {
         })),
     [showCollections],
   );
-  const allRestRows = useMemo(() => [...collectionRows, ...restRows], [collectionRows, restRows]);
+  const pinnedRows = usePinnedCatalogRows("shows");
+  const allRestRows = useMemo(
+    () => [
+      ...pinnedRows.map((row) => ({ ...row, title: row.name })),
+      ...collectionRows,
+      ...restRows,
+    ],
+    [pinnedRows, collectionRows, restRows],
+  );
   const catalogRows = useMemo<ShowRow[]>(() => {
     if (top10.length < 10) return allRestRows;
     const trending = rows.find((r) => r.key === "trending");
@@ -327,6 +348,7 @@ export function Shows({ active = true }: { active?: boolean }) {
               min={260}
               shape="landscape"
               scrollKey="shows:cw"
+              scrollAnchorKey={cwItems[0]?._id ?? ""}
             >
               {cwItems.map((it) => (
                 <ContinueCard
@@ -335,9 +357,7 @@ export function Shows({ active = true }: { active?: boolean }) {
                   onDismiss={(item) =>
                     item.manualWatched
                       ? dismissManualWatched(item._id, { acknowledged: true })
-                      : item.local
-                        ? clearLocalCw(item._id, { acknowledged: true })
-                        : dismissCw(item, authKey, { acknowledged: true })
+                      : dismissCw(item, authKey, { acknowledged: true })
                   }
                 />
               ))}

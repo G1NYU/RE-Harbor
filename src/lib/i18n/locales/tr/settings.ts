@@ -461,8 +461,8 @@ const settings: Record<string, string> = {
   "Check the spelling or try a shorter search.":
     "Yazımı kontrol edin veya daha kısa bir arama yapmayı deneyin.",
   "Check your connection and try again.": "Bağlantınızı kontrol edip tekrar deneyin.",
-  "Checking harbor.site for a newer build.":
-    "Daha yeni bir derleme için harbor.site kontrol ediliyor.",
+  "Checking harborcommunity.site for a newer build.":
+    "Daha yeni bir derleme için harborcommunity.site kontrol ediliyor.",
   "Checking plots, cast, and scenes": "Konular, oyuncular ve sahneler inceleniyor",
   "Checking sources and audio": "Kaynaklar ve ses kontrol ediliyor",
   "Checking with TMDB…": "TMDB ile kontrol ediliyor…",
@@ -813,7 +813,8 @@ const settings: Record<string, string> = {
   "Disable all": "Tümünü devre dışı bırak",
   "Disable rule": "Kuralı devre dışı bırak",
   "Disable P2P entirely": "P2P'yi tamamen devre dışı bırak",
-  "Disabled because P2P is disabled above": "Yukarıda P2P devre dışı bırakıldığı için kullanılamıyor",
+  "Disabled because P2P is disabled above":
+    "Yukarıda P2P devre dışı bırakıldığı için kullanılamıyor",
   "Disabled while strict remote streaming is on":
     "Yalnızca uzak sunucu kullanımı açıkken devre dışıdır",
   "Discard changes": "Değişiklikleri iptal et",
@@ -1000,7 +1001,8 @@ const settings: Record<string, string> = {
   "Fan-made avatars for personal use. Harbor claims no rights to these characters; they belong to their creators and studios, shown here under fair use. Every one is optimized down to a tiny WebP.":
     "Kişisel kullanım için hayran yapımı avatarlar. Harbor bu karakterler üzerinde herhangi bir hak iddia etmez; karakterler yaratıcılarına ve stüdyolarına aittir ve burada adil kullanım kapsamında gösterilir. Her biri çok küçük bir WebP dosyası olacak şekilde optimize edilmiştir.",
   "Fanart.tv · logos and backdrops": "Fanart.tv · logolar ve arka planlar",
-  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.": "Usenet'e zaten aboneyseniz P2P'den daha hızlıdır ve daha az dikkat çeker. Eklenti sayfasında yapılandırın ve döndürülen manifest URL'sini yapıştırın.",
+  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.":
+    "Usenet'e zaten aboneyseniz P2P'den daha hızlıdır ve daha az dikkat çeker. Eklenti sayfasında yapılandırın ve döndürülen manifest URL'sini yapıştırın.",
   "Favorite Anime": "Favori Animeler",
   "Favorite Characters": "Favori Karakterler",
   "Favorite Manga": "Favori Mangalar",
@@ -1209,10 +1211,10 @@ const settings: Record<string, string> = {
     "Harbor açıkken günde birkaç kez kontrol eder ve sizi burada bilgilendirir.",
   "Harbor checks automatically every few hours.":
     "Harbor birkaç saatte bir otomatik olarak kontrol eder.",
-  "Harbor checks harbor.site for new versions and installs them in place.":
-    "Harbor yeni sürümleri harbor.site üzerinden kontrol eder ve mevcut kurulumun üzerine yükler.",
-  "Harbor checks harbor.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
-    "Harbor, harbor.site üzerinden yeni sürümleri kontrol eder ve mevcut kurulumun üzerine yükler. Siz onaylamadan hiçbir şey yüklenmez ve reddettiğiniz bir güncelleme için bir daha bildirim almazsınız.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place.":
+    "Harbor yeni sürümleri harborcommunity.site üzerinden kontrol eder ve mevcut kurulumun üzerine yükler.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
+    "Harbor, harborcommunity.site üzerinden yeni sürümleri kontrol eder ve mevcut kurulumun üzerine yükler. Siz onaylamadan hiçbir şey yüklenmez ve reddettiğiniz bir güncelleme için bir daha bildirim almazsınız.",
   "Harbor couldn't analyze the audio for this source. Try again or adjust it manually.":
     "Harbor bu kaynağın sesini analiz edemedi. Tekrar deneyin veya elle ayarlayın.",
   "Harbor couldn't find a reliable timing correction for this subtitle.":
@@ -1237,7 +1239,8 @@ const settings: Record<string, string> = {
     "Harbor, bu dilde bir altyazı parçası varsa onu otomatik olarak yükler. Oynatıcıdaki altyazı menüsünden tek bir video için ikinci altyazı parçasını ayarlayabilir veya kaldırabilirsiniz.",
   "Harbor needs a TMDB key for artwork, rows and collections. It is free.":
     "Harbor'ın görseller, satırlar ve koleksiyonlar için bir TMDB anahtarına ihtiyacı var. Anahtar ücretsizdir.",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Harbor normalde ilk P2P yayınının daha hızlı bağlanması için P2P motorunu açılışta başlatır. Bu, hiçbir şey izlemiyor olsanız bile bir DHT düğümünün çalışmasını ve ağla iletişim kurmasını sağlar. Tarifeli veya sınırlı bir bağlantı kullanıyorsanız bunu açın. Böylece motor, ilk kez gerçekten bir P2P yayını oynattığınızda başlar. Bir sonraki açılışta geçerli olur.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Harbor normalde ilk P2P yayınının daha hızlı bağlanması için P2P motorunu açılışta başlatır. Bu, hiçbir şey izlemiyor olsanız bile bir DHT düğümünün çalışmasını ve ağla iletişim kurmasını sağlar. Tarifeli veya sınırlı bir bağlantı kullanıyorsanız bunu açın. Böylece motor, ilk kez gerçekten bir P2P yayını oynattığınızda başlar. Bir sonraki açılışta geçerli olur.",
   "Harbor on other devices": "Diğer cihazlarda Harbor",
   "Harbor plays IPTV from your own provider. Add a playlist and the guide fills in.":
     "Harbor, kendi sağlayıcınızın IPTV yayınlarını oynatır. Bir oynatma listesi eklediğinizde rehber doldurulur.",
@@ -1274,7 +1277,8 @@ const settings: Record<string, string> = {
     "Harbor, güvenli olduğunda ekran kartını kullanır; olmadığında CPU'ya geri döner. Neredeyse herkes için doğru seçimdir.",
   "Harbor will mark what you finish as watched on Simkl and sync your plan-to-watch list.":
     "Harbor, tamamladığınız içerikleri Simkl'da izlendi olarak işaretler ve izlemeyi planladıklarınız listesini eşitler.",
-  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.": "Harbor P2P motorunu başlatmaz, izleyicilerle iletişim kurmaz veya DHT'yi çalıştırmaz. Yalnızca debrid ve doğrudan bağlantıları kullanmak istiyorsanız bunu etkinleştirin. P2P yayınını yeniden etkinleştirmek için kapatın.",
+  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.":
+    "Harbor P2P motorunu başlatmaz, izleyicilerle iletişim kurmaz veya DHT'yi çalıştırmaz. Yalnızca debrid ve doğrudan bağlantıları kullanmak istiyorsanız bunu etkinleştirin. P2P yayınını yeniden etkinleştirmek için kapatın.",
   "Harbor will scrobble your playback to Trakt and sync your watchlist.":
     "Harbor, izleme etkinliğinizi Trakt'a aktarır ve izleme listenizi eşitler.",
   "Harbor would not be possible without Stremio. It is the foundation everything here is built on.":
@@ -1639,8 +1643,8 @@ const settings: Record<string, string> = {
   "Live-injected into the document. Use it to retheme buttons, change spacing, recolor anything.":
     "Belgeye anında eklenir. Düğmelerin temasını ve aralıkları değiştirmek ya da istediğiniz öğeyi yeniden renklendirmek için kullanın.",
   "Living-room focus, floating glass chrome.": "Oturma odası odaklı, yüzen cam arayüz.",
-  "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.":
-    "Öne çıkan alan için en yüksek çözünürlüklü görseli yükleyin. Daha fazla bant genişliği kullanır.",
+  "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.":
+    "Öne çıkan alan, ayrıntı sayfası görseli ve bulanıklaştırılmamış kaynak seçici arka planları için en yüksek çözünürlüklü görseli yükleyin. Daha fazla bant genişliği ve video belleği kullanır.",
   "Loaded {loaded} of {total} movies...": "{total} filmden {loaded} tanesi yüklendi...",
   "Loaded {loaded} of {total} shows...": "{total} diziden {loaded} tanesi yüklendi...",
   "Loading environment details…": "Ortam ayrıntıları yükleniyor…",
@@ -1853,9 +1857,12 @@ const settings: Record<string, string> = {
     "Filtre yok. Tüm bit hızları eşit değerlendirilir.",
   "No filter. Home shows every language.": "Filtre yok. Ana sayfa tüm dilleri gösterir.",
   "No filtering": "Filtreleme yok",
-  "Cached source resolution and direct download links.": "Önbelleğe alınmış kaynak çözümleme ve doğrudan indirme bağlantıları.",
-  "Cached source resolution and cloud library access.": "Önbelleğe alınmış kaynak çözümleme ve bulut kitaplığı erişimi.",
-  "Both shows direct, debrid, and peer-to-peer results together. Direct/debrid keeps P2P results out of the way unless nothing else is available. P2P puts them first.": "Her ikisi, doğrudan, debrid ve eşler arası sonuçları birlikte gösterir. Doğrudan/debrid, başka bir şey yoksa P2P sonuçlarını geri planda tutar. P2P ise onları en öne koyar.",
+  "Cached source resolution and direct download links.":
+    "Önbelleğe alınmış kaynak çözümleme ve doğrudan indirme bağlantıları.",
+  "Cached source resolution and cloud library access.":
+    "Önbelleğe alınmış kaynak çözümleme ve bulut kitaplığı erişimi.",
+  "Both shows direct, debrid, and peer-to-peer results together. Direct/debrid keeps P2P results out of the way unless nothing else is available. P2P puts them first.":
+    "Her ikisi, doğrudan, debrid ve eşler arası sonuçları birlikte gösterir. Doğrudan/debrid, başka bir şey yoksa P2P sonuçlarını geri planda tutar. P2P ise onları en öne koyar.",
 };
 
 export default settings;

@@ -1,24 +1,29 @@
 import { FormatBadge, RuleBadges, streamBadges } from "@/components/format-badge";
+import { Download } from "lucide-react";
 import type { ScoredStream } from "@/lib/streams/types";
 import { useT } from "@/lib/i18n";
 
 export function StreamPill({
   stream,
   cached,
+  intent = "play",
   onPick,
 }: {
   stream: ScoredStream;
   cached: boolean;
+  intent?: "play" | "download";
   onPick: () => void;
 }) {
   const t = useT();
   void cached;
-  const headline = stream.name?.trim() || stream.parsedTitle || stream.title || stream.addonName || t("Source");
+  const headline =
+    stream.name?.trim() || stream.parsedTitle || stream.title || stream.addonName || t("Source");
   const description = stream.title?.trim() || stream.description?.trim() || "";
   const badges = streamBadges(stream);
   return (
     <button
       onClick={onPick}
+      aria-label={intent === "download" ? `${t("Download")}: ${headline}` : undefined}
       className="group flex w-full items-start gap-3 rounded-xl bg-elevated/40 px-3 py-2.5 text-start ring-1 ring-edge-soft/40 transition-colors hover:bg-raised hover:ring-edge"
     >
       <div className="flex flex-1 flex-col gap-1.5 min-w-0">
@@ -37,6 +42,9 @@ export function StreamPill({
           </p>
         )}
       </div>
+      {intent === "download" && (
+        <Download size={17} className="mt-0.5 shrink-0 text-ink-muted" aria-hidden="true" />
+      )}
     </button>
   );
 }

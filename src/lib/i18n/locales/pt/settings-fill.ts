@@ -46,7 +46,7 @@ const settingsFill: Record<string, string> = {
   "Check the shared database first. When this exact subtitle has already been synced by someone else, yours snaps into place with no analysis.":
     "Consulta primeiro o banco de dados compartilhado. Quando esta legenda exata já tiver sido sincronizada por outra pessoa, a sua se encaixa no lugar sem nenhuma análise.",
   "Community sync server": "Servidor de sincronização da comunidade",
-  "https://sync.harbor.site": "https://sync.harbor.site",
+  "https://sync.harborcommunity.site": "https://sync.harborcommunity.site",
   "Leave blank to use Harbor's own community server. Enter a URL to point at your own server instead. Private mode below stops all contact either way.":
     "Deixe em branco para usar o próprio servidor da comunidade do Harbor. Insira uma URL para apontar para o seu próprio servidor. O modo privado abaixo interrompe todo contato de qualquer forma.",
   "Private mode": "Modo privado",
@@ -278,7 +278,8 @@ const settingsFill: Record<string, string> = {
     "Addons lentos e fontes P2P costumam precisar de mais de 10 segundos para iniciar. Aumente este tempo se os streams estiverem sendo ignorados antes de terem uma chance.",
   "{n} sec": "{n} s",
   "Only start the P2P engine when needed": "Iniciar o mecanismo P2P somente quando necessário",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Normalmente, o Harbor inicia o mecanismo P2P ao abrir para que o primeiro stream P2P conecte mais rápido. Isso mantém um nó DHT ativo e em contato com a rede mesmo quando você não está assistindo. Ative esta opção se sua conexão for limitada ou tiver franquia de dados: o mecanismo só será iniciado quando você reproduzir um stream P2P pela primeira vez. A alteração entra em vigor na próxima inicialização.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Normalmente, o Harbor inicia o mecanismo P2P ao abrir para que o primeiro stream P2P conecte mais rápido. Isso mantém um nó DHT ativo e em contato com a rede mesmo quando você não está assistindo. Ative esta opção se sua conexão for limitada ou tiver franquia de dados: o mecanismo só será iniciado quando você reproduzir um stream P2P pela primeira vez. A alteração entra em vigor na próxima inicialização.",
   "What fullscreen does": "Como funciona a tela cheia",
   "True fullscreen covers the whole screen and hides the taskbar. Maximize fills the screen but keeps the taskbar and title bar, so you can still switch apps.":
     "A tela cheia real ocupa toda a tela e oculta a barra de tarefas. Maximizar preenche a tela, mas mantém a barra de tarefas e a barra de título para você continuar alternando entre aplicativos.",

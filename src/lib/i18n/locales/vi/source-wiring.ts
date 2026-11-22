@@ -531,6 +531,8 @@ const sourceWiring: Record<string, string> = {
   "Jump to spread": "Chuyển đến trang đôi",
   "Jump to page": "Chuyển đến trang",
   "Go to pages {pages}": "Đến các trang {pages}",
+  "Episode pages": "Trang tập",
+  "Go to page": "Đi tới trang",
   "Go to page {page}": "Đến trang {page}",
   "Zoom controls, {percent} percent": "Điều khiển thu phóng, {percent} phần trăm",
   "Close zoom controls": "Đóng điều khiển thu phóng",

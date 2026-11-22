@@ -8,9 +8,11 @@ import type { MusicArtistRef, MusicTrack } from "@/lib/music/types";
 import {
   type CSSProperties,
   type RefObject,
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -20,7 +22,10 @@ import {
   ArrowUpRight,
   AudioLines,
   BarChart3,
+  ChevronUp,
+  Globe2,
   Heart,
+  Loader2,
   Maximize,
   Search,
   SlidersHorizontal,
@@ -37,6 +42,7 @@ import { MusicNowTitle } from "./music-now-title";
 import { MusicUpNextRow } from "./music-up-next-row";
 import { MusicVideoSurface } from "./music-video-surface";
 import { MusicVideoFullscreen } from "./music-video-fullscreen";
+import { MusicVideoMiniToggle } from "./music-video-mini-toggle";
 import {
   exitMusicVideoFullscreen,
   getMusicVideoFullscreen,
@@ -46,14 +52,15 @@ import {
 import { MusicNowSearch } from "./music-now-search";
 import { musicUpcoming } from "./music-queue";
 import { CastIcon } from "@/components/player/cast-icon";
-import { useT } from "@/lib/i18n";
+import { getUiLanguage, LANGUAGES, useT, type UiLanguage } from "@/lib/i18n";
+import { useSettings } from "@/lib/settings";
+import { aiIsGroq, aiKey } from "@/lib/ai-models";
+import { translateLyrics } from "@/lib/music/lyrics-translation";
+import { Dropdown } from "@/components/dropdown";
 import { pushBackHandler } from "@/lib/back-intercept";
-import {
-  useMusicPlayer,
-  seekMusic,
-  toggleMusicLiked,
-  isMusicVideoActive,
-} from "@/lib/music/player";
+import { getMusicState, seekMusic, toggleMusicLiked, isMusicVideoActive } from "@/lib/music/player";
+import { useMusicClock, useMusicPlayback } from "@/lib/music/use-music-playback";
+import { useMusicTransport } from "@/lib/music/transport";
 import { loadTrackLyrics, lyricIndexAt, type LyricLine } from "@/lib/music/lyrics";
 import {
   LYRIC_OFFSET_STEP,
@@ -61,9 +68,13 @@ import {
   setLyricOffset,
   shiftedLyricTime,
 } from "@/lib/music/lyric-offset";
+import { addLyricSyncPoint, applyLyricSync } from "@/lib/music/lyric-sync";
+import { useLyricSync } from "@/lib/music/use-lyric-sync";
 import { karaokeScrollTop } from "@/lib/music/karaoke-scroll";
 import { MusicKaraoke } from "./music-karaoke";
 import { loadMusicAudioDevices, useMusicAudioSettings } from "@/lib/music/audio-settings";
+import type { MusicAudioSettingsValue } from "@/lib/music/audio-settings";
+import type { SyncPoint } from "@/lib/subtitles/text-sync";
 import { setMusicAppearance, useMusicAppearance } from "@/lib/music/appearance";
 import { musicSourceName } from "@/lib/music/recovery";
 import type { MusicExploreRequest } from "@/lib/music/navigation";
@@ -76,10 +87,176 @@ import { musicTrackQuality } from "@/lib/music/quality";
 import "./music-now-playing.css";
 
 const NOW_LIKE_SPOKES = [0, 45, 90, 135, 180, 225, 270, 315];
+const LYRIC_TARGET_KEY = "harbor.lyrics.translate-to.v1";
 
-function ArtworkLevels({ track, enabled }: { track: MusicTrack; enabled: boolean }) {
+function savedLyricTarget(): UiLanguage {
+  try {
+    const saved = localStorage.getItem(LYRIC_TARGET_KEY);
+    if (LANGUAGES.some(({ code }) => code === saved)) return saved as UiLanguage;
+  } catch {
+    /* Storage can be unavailable; the app language is the default. */
+  }
+  return getUiLanguage();
+}
+
+// LRCLib exposes a single lyric version, so the original stays visible and the translation sits
+// underneath it; lines that already match the selected language are left alone.
+type LyricTranslation = { language: UiLanguage; lines: (string | null)[] };
+
+const lyricTranslationDiffers = (lines: (string | null)[], source: LyricLine[]): boolean =>
+  lines.some((text, index) => {
+    const original = source[index]?.text.trim();
+    return !!text && !!original && text.trim() !== original;
+  });
+
+/**
+ * The meter store publishes on every poll, so the widget that reads it owns its own subscription.
+ * Keeping it out of the panel is what stops a live reading from re-rendering the queue beside it.
+ */
+function NowPlayingLevels({ track, enabled }: { track: MusicTrack; enabled: boolean }) {
   const meter = useMusicAudioMeter(track, enabled);
-  return <MusicLevelMeter meter={meter} />;
+  return (
+    <div className="music-now-levels" data-now-levels>
+      <MusicLevelMeter meter={meter} />
+    </div>
+  );
+}
+
+/** Same reason as the levels beside the artwork: only this block follows the meter. */
+function NowPlayingSignal({
+  track,
+  enabled,
+  speakerActive,
+  outputLabel,
+  transportCodec,
+  audioSettings,
+}: {
+  track: MusicTrack;
+  enabled: boolean;
+  speakerActive: boolean;
+  outputLabel?: string;
+  transportCodec?: string;
+  audioSettings?: MusicAudioSettingsValue;
+}) {
+  const meter = useMusicAudioMeter(track, enabled);
+  return (
+    <MusicSignalDetails
+      track={
+        isMusicVideoActive()
+          ? { ...track, quality: undefined, sourceId: undefined, playbackUrl: undefined }
+          : track
+      }
+      outputLabel={outputLabel}
+      transportCodec={transportCodec}
+      audioSettings={audioSettings}
+      meter={speakerActive ? undefined : meter}
+      showLevels={false}
+    />
+  );
+}
+
+/**
+ * Timed lyrics are the one part of this window that has to follow the playback clock, so the list
+ * subscribes to it directly. The panel above renders only when the track, queue or a control
+ * changes, and the line highlight costs a render of these lines alone.
+ */
+function NowPlayingLyricList({
+  lines,
+  lyricOffset,
+  translation,
+  target,
+  syncPoints,
+  liveSync,
+  syncPick,
+  onPick,
+  onSeek,
+  onAlign,
+}: {
+  lines: LyricLine[];
+  lyricOffset: number;
+  translation: (string | null)[] | null;
+  target: UiLanguage;
+  syncPoints: SyncPoint[];
+  liveSync: boolean;
+  syncPick: number | null;
+  onPick: (index: number) => void;
+  onSeek: (index: number) => void;
+  onAlign: (index: number) => void;
+}) {
+  const t = useT();
+  const clock = useMusicClock();
+  const listRef = useRef<HTMLOListElement>(null);
+  const active = lyricIndexAt(lines, shiftedLyricTime(clock, lyricOffset));
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const line = active >= 0 ? list.children.item(active) : null;
+    if (!(line instanceof HTMLElement)) {
+      list.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const top = karaokeScrollTop({
+      lineTop: line.offsetTop,
+      lineHeight: line.clientHeight,
+      viewHeight: list.clientHeight,
+      maxScroll: list.scrollHeight - list.clientHeight,
+      anchor: 0.5,
+    });
+    list.scrollTo({ top, behavior: calm ? "auto" : "smooth" });
+  }, [active, lines.length]);
+  return (
+    <ol ref={listRef} className="music-now-lyrics">
+      {lines.map((line, index) => {
+        const translated = translation?.[index] ?? null;
+        const showTranslation = !!translated && translated.trim() !== line.text.trim();
+        const point = syncPoints.findIndex((held) => Math.abs(held.t - line.at) < 0.001);
+        return (
+          <li key={`${line.at}:${index}`} data-active={index === active ? "1" : undefined}>
+            {line.text ? (
+              <>
+                <button
+                  type="button"
+                  data-sync={liveSync ? "1" : undefined}
+                  data-picked={syncPick === index ? "1" : undefined}
+                  onClick={() => (liveSync ? onPick(index) : onSeek(index))}
+                >
+                  <span className="music-now-lyric-text">
+                    {line.text}
+                    {point >= 0 && (
+                      <span
+                        className="music-now-lyric-sync-badge"
+                        title={t(point === 0 ? "Aligned here" : "Drift fixed")}
+                      >
+                        {point + 1}
+                      </span>
+                    )}
+                  </span>
+                  {showTranslation && (
+                    <span className="music-now-lyric-translation" dir="auto" lang={target}>
+                      {translated}
+                    </span>
+                  )}
+                </button>
+                {liveSync && syncPick === index && (
+                  <div className="music-now-lyric-sync-actions">
+                    <button type="button" onClick={() => onAlign(index)}>
+                      {t("Align to now")}
+                    </button>
+                    <button type="button" onClick={() => onSeek(index)}>
+                      {t("Jump here")}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="music-now-lyric-rest" aria-hidden="true" />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 /** Keep 20Hz meter re-renders scoped to the tiny caption, not the player shell. */
@@ -103,7 +280,7 @@ function MusicVisualizerCaption({ track, playing }: { track: MusicTrack; playing
   return <small data-music-visualizer-status={status} aria-live="polite">{t(label)}</small>;
 }
 
-export function MusicNowPlaying({
+export const MusicNowPlaying = memo(function MusicNowPlaying({
   inset,
   dockRef,
   closing = false,
@@ -129,7 +306,10 @@ export function MusicNowPlaying({
   onQueue: () => void;
 }) {
   const t = useT();
-  const player = useMusicPlayer();
+  const { settings } = useSettings();
+  // The catalog state without the clock: a position tick must not redraw the whole window.
+  const player = useMusicPlayback();
+  const transport = useMusicTransport();
   const appearance = useMusicAppearance();
   const audio = useMusicAudioSettings();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -161,27 +341,23 @@ export function MusicNowPlaying({
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [lyricsState, setLyricsState] = useState<"loading" | "ready" | "empty">("loading");
   const [hasLyrics, setHasLyrics] = useState<boolean | null>(null);
-  const lyricsRef = useRef<HTMLOListElement>(null);
+  const [lyricTarget, setLyricTarget] = useState<UiLanguage>(savedLyricTarget);
+  const [lyricTranslation, setLyricTranslation] = useState<LyricTranslation | null>(null);
+  const [lyricTranslationOn, setLyricTranslationOn] = useState(false);
+  const [lyricTranslating, setLyricTranslating] = useState(false);
+  const [lyricTranslationFailed, setLyricTranslationFailed] = useState(false);
+  const lyricTranslationRun = useRef(0);
   const [outputs, setOutputs] = useState<Array<{ name: string; description: string }>>([]);
   const current = player.current;
   const { profile: recording, display } = useRecordingProfile(current);
   const speaker = getMusicSpeakerState();
-  const meter = useMusicAudioMeter(
-    current,
-    Boolean(
-      current &&
-      player.phase !== "resolving" &&
-      panel === "signal" &&
-      !isMusicVideoActive() &&
-      !speaker.active,
-    ),
-  );
   const artMenu = useMusicTrackContextMenu(display, {
     onGoToArtist: () => onExplore("artist"),
     onGoToAlbum: display?.album ? () => onExplore("album") : undefined,
   });
   const video = current?.mediaKind === "video";
   const immersive = video && appearance.immersive;
+  const theatre = video && appearance.theatre && !immersive;
   // Immersive swaps position, inset, aspect-ratio and radius at once, and none of those can be
   // transitioned, so the frame snaps. A veil rises over the swap and clears once it has landed,
   // which reads as a deliberate cut and works the same going in as coming out.
@@ -248,6 +424,7 @@ export function MusicNowPlaying({
   useEffect(() => {
     const dock = dockRef.current;
     if (!dock) return;
+    const root = document.documentElement;
     const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const obscured = [...(dock.parentElement?.children ?? [])].filter(
       (node): node is HTMLElement =>
@@ -260,6 +437,8 @@ export function MusicNowPlaying({
     obscured.forEach((node) => {
       node.inert = true;
     });
+    // Inert stops input, not painting: the stylesheet parks the covered page's animations.
+    root.dataset.musicNowPlaying = "on";
     const raf = requestAnimationFrame(() => closeRef.current?.focus({ preventScroll: true }));
     const removeBack = pushBackHandler(() => {
       onClose();
@@ -283,6 +462,7 @@ export function MusicNowPlaying({
       cancelAnimationFrame(raf);
       removeBack();
       document.removeEventListener("keydown", keydown);
+      delete root.dataset.musicNowPlaying;
       obscured.forEach((node, index) => {
         node.inert = wasInert[index];
       });
@@ -304,7 +484,70 @@ export function MusicNowPlaying({
     },
     [current],
   );
-  const activeLyric = lyricIndexAt(lyrics, shiftedLyricTime(player.currentTime, lyricOffset));
+  const [syncPoints, setSyncPoints] = useLyricSync(current);
+  const [liveSync, setLiveSync] = useState(false);
+  const [syncPick, setSyncPick] = useState<number | null>(null);
+  useEffect(() => {
+    setLiveSync(false);
+    setSyncPick(null);
+  }, [current?.id]);
+  useEffect(() => {
+    lyricTranslationRun.current += 1;
+    setLyricTranslation(null);
+    setLyricTranslationOn(false);
+    setLyricTranslating(false);
+    setLyricTranslationFailed(false);
+  }, [current?.id, lyricTarget]);
+  const toggleLyricTranslation = useCallback(async () => {
+    if (lyricTranslationOn) {
+      setLyricTranslationOn(false);
+      return;
+    }
+    if (lyricTranslation?.language === lyricTarget) {
+      setLyricTranslationOn(lyricTranslationDiffers(lyricTranslation.lines, lyrics));
+      return;
+    }
+    if (lyricTranslating || lyrics.length === 0) return;
+    const run = ++lyricTranslationRun.current;
+    setLyricTranslating(true);
+    setLyricTranslationFailed(false);
+    try {
+      const key = aiKey(settings).trim();
+      const result = await translateLyrics(
+        lyrics,
+        lyricTarget,
+        key ? { key, model: settings.aiSearchModel, groq: aiIsGroq(settings) } : null,
+      );
+      if (run !== lyricTranslationRun.current) return;
+      setLyricTranslation({ language: lyricTarget, lines: result });
+      const translated = lyricTranslationDiffers(result, lyrics);
+      setLyricTranslationOn(translated);
+      setLyricTranslationFailed(!translated && !result.some(Boolean));
+    } catch {
+      if (run === lyricTranslationRun.current) setLyricTranslationFailed(true);
+    } finally {
+      if (run === lyricTranslationRun.current) setLyricTranslating(false);
+    }
+  }, [lyricTarget, lyricTranslation, lyricTranslationOn, lyricTranslating, lyrics, settings]);
+  const timedLyrics = applyLyricSync(lyrics, syncPoints);
+  const seekLyric = useCallback(
+    (index: number) => {
+      const line = timedLyrics[index];
+      if (line) seekMusic(line.at + lyricOffset);
+    },
+    [lyricOffset, timedLyrics],
+  );
+  const alignLyric = useCallback(
+    (index: number) => {
+      const line = lyrics[index];
+      // Read the clock on demand: subscribing to it here would redraw the queue every tick.
+      const at = getMusicState().currentTime;
+      if (!line || !Number.isFinite(at)) return;
+      setSyncPoints(addLyricSyncPoint(syncPoints, { t: line.at, at: at - lyricOffset }));
+      setSyncPick(null);
+    },
+    [lyrics, lyricOffset, setSyncPoints, syncPoints],
+  );
   useEffect(() => {
     if (!current) return;
     let alive = true;
@@ -344,27 +587,16 @@ export function MusicNowPlaying({
       window.clearTimeout(giveUp);
     };
   }, [panel, current]);
-  useEffect(() => {
-    if (panel !== "lyrics") return;
-    const list = lyricsRef.current;
-    if (!list) return;
-    const line = activeLyric >= 0 ? list.children.item(activeLyric) : null;
-    if (!(line instanceof HTMLElement)) {
-      list.scrollTo({ top: 0, behavior: "auto" });
-      return;
-    }
-    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const top = karaokeScrollTop({
-      lineTop: line.offsetTop,
-      lineHeight: line.clientHeight,
-      viewHeight: list.clientHeight,
-      maxScroll: list.scrollHeight - list.clientHeight,
-      anchor: 0.5,
-    });
-    list.scrollTo({ top, behavior: calm ? "auto" : "smooth" });
-  }, [panel, activeLyric, lyricsState]);
 
-  const next = musicUpcoming(player.queue, player.queueIndex, 40);
+  // Rebuilt only when the queue or the play order changes, not on every render.
+  const next = useMemo(
+    () => musicUpcoming(player.queue, player.queueIndex, 40),
+    [player.queue, player.queueIndex, transport],
+  );
+  const openUpNextArtist = useCallback(
+    (track: MusicTrack) => onExplore("artist", undefined, track),
+    [onExplore],
+  );
 
   const lyricsOff = hasLyrics === false;
   const tabOpen = (id: string) => id !== "lyrics" || !lyricsOff;
@@ -391,6 +623,7 @@ export function MusicNowPlaying({
         data-now-playing
         data-closing={closing ? "1" : undefined}
         data-immersive={immersive ? "1" : undefined}
+        data-theatre={theatre ? "1" : undefined}
         style={{ insetInlineStart: inset } as CSSProperties}
         aria-label={t("music.now.title")}
       >
@@ -431,11 +664,24 @@ export function MusicNowPlaying({
               <button
                 type="button"
                 aria-pressed={appearance.immersive}
-                onClick={() => setMusicAppearance({ immersive: !appearance.immersive })}
+                onClick={() =>
+                  setMusicAppearance({ immersive: !appearance.immersive, theatre: false })
+                }
                 title={t("Immersive")}
               >
                 <Wallpaper size={17} aria-hidden="true" />
                 <span>{t("Immersive")}</span>
+              </button>
+            )}
+            {video && (
+              <button
+                type="button"
+                aria-pressed={theatre}
+                onClick={() => setMusicAppearance({ theatre: !theatre, immersive: false })}
+                title={t("Theatre mode")}
+              >
+                <ChevronUp size={17} aria-hidden="true" />
+                <span>{t("Theatre mode")}</span>
               </button>
             )}
             <button
@@ -451,23 +697,32 @@ export function MusicNowPlaying({
           </div>
         </header>
         <div className="music-now-scroll">
-        <div className="music-now-layout">
-          {artMenu.menu}
-          <div className="music-now-art-column">
-            <div
-              ref={artwork}
-              className="music-now-artwork"
-              style={video && !immersive ? { aspectRatio: "16 / 9" } : undefined}
-              onContextMenu={artMenu.onContextMenu}
-            >
-              {video ? (
-                createPortal(<MusicVideoSurface track={current} expanded />, host)
-              ) : (
-                <Poster
-                  src={display.artwork}
-                  seed={`track:${current.connectorId}:${current.id}`}
-                  ratio="square"
-                  className="w-full [--poster-radius:0px]"
+          <div className="music-now-layout">
+            {artMenu.menu}
+            <div className="music-now-art-column" data-video={video ? "1" : undefined}>
+              <div
+                ref={artwork}
+                className="music-now-artwork"
+                style={video && !immersive ? { aspectRatio: "16 / 9" } : undefined}
+                onContextMenu={artMenu.onContextMenu}
+              >
+                {video ? (
+                  createPortal(<MusicVideoSurface track={current} expanded />, host)
+                ) : (
+                  <Poster
+                    src={display.artwork}
+                    seed={`track:${current.connectorId}:${current.id}`}
+                    ratio="square"
+                    className="w-full [--poster-radius:0px]"
+                  />
+                )}
+              </div>
+              {video && <MusicVideoFullscreen track={current} />}
+              {video && <MusicVideoMiniToggle className="music-now-mini-toggle" />}
+              {appearance.levels && current.mediaKind !== "video" && (
+                <NowPlayingLevels
+                  track={current}
+                  enabled={player.phase !== "resolving" && !isMusicVideoActive() && !speaker.active}
                 />
               )}
               {appearance.dockVisualizer && !video && !speaker.active && (
@@ -478,13 +733,6 @@ export function MusicNowPlaying({
                 </div>
               )}
             </div>
-            {video && <MusicVideoFullscreen track={current} />}
-            {appearance.levels && !speaker.active && current.mediaKind !== "video" && (
-              <div className="music-now-levels" data-now-levels>
-                <ArtworkLevels track={current} enabled={player.phase !== "resolving" && !isMusicVideoActive()} />
-              </div>
-            )}
-          </div>
           <div className="music-now-content">
             <button type="button" onClick={onSource} className="music-now-source">
               <MusicServiceLogo source={current.connectorId ?? ""} itemId={current.id} size={22} />
@@ -508,301 +756,397 @@ export function MusicNowPlaying({
                 <ArrowUpRight size={14} aria-hidden="true" />
               </button>
             )}
-            <div className="music-now-actions">
-              <HoverTooltip label={t("music.now.videos")} side="top" align="center">
-                <button
-                  type="button"
-                  onClick={() => onExplore("videos")}
-                  className="music-now-action music-now-videos"
-                  aria-label={t("music.now.videos")}
-                >
-                  <Video size={22} aria-hidden="true" />
-                </button>
-              </HoverTooltip>
-              {video && (
-                <HoverTooltip label={t("Fullscreen")} side="top" align="center">
+              <div className="music-now-actions">
+                <HoverTooltip label={t("music.now.videos")} side="top" align="center">
                   <button
                     type="button"
-                    onClick={toggleMusicVideoFullscreen}
-                    className="music-now-action"
-                    aria-label={t("Fullscreen")}
+                    onClick={() => onExplore("videos")}
+                    className="music-now-action music-now-videos"
+                    aria-label={t("music.now.videos")}
                   >
-                    <Maximize size={22} aria-hidden="true" />
+                    <Video size={22} aria-hidden="true" />
                   </button>
                 </HoverTooltip>
-              )}
-              <HoverTooltip label={t(liked ? "music.unsaveTrack" : "music.saveTrack")} side="top" align="center">
-                <button
-                  type="button"
-                  data-burst={burst || undefined}
-                  onClick={() => {
-                    if (!liked) setBurst((count) => count + 1);
-                    toggleMusicLiked(current);
-                  }}
-                  aria-pressed={liked}
-                  aria-label={t(liked ? "music.unsaveTrack" : "music.saveTrack")}
-                  className="music-now-action"
-                >
-                  <Heart size={22} fill={liked ? "currentColor" : "none"} aria-hidden="true" />
-                  {burst > 0 && liked && (
-                    <span key={burst} className="dock-like-burst" aria-hidden="true">
-                      <span className="dock-like-ring" />
-                      {NOW_LIKE_SPOKES.map((rotate, index) => (
-                        <span
-                          key={index}
-                          className="dock-like-dot"
-                          style={
-                            {
-                              "--rotate": `${rotate}deg`,
-                              "--translate-y": index % 2 ? "-16px" : "-21px",
-                            } as CSSProperties
-                          }
-                        />
-                      ))}
-                    </span>
-                  )}
-                </button>
-              </HoverTooltip>
-              <button
-                type="button"
-                onClick={() => setPanel("signal")}
-                className="music-now-quality"
-                aria-label={t("music.now.signal")}
-              >
-                {!isMusicVideoActive() && musicTrackQuality(current) ? (
-                  <MusicQualityBadge track={current} showEvidence />
-                ) : (
-                  <>
-                    <AudioLines size={17} />
-                    <span>{t("music.now.signal")}</span>
-                  </>
+                {video && (
+                  <HoverTooltip label={t("Fullscreen")} side="top" align="center">
+                    <button
+                      type="button"
+                      onClick={toggleMusicVideoFullscreen}
+                      className="music-now-action"
+                      aria-label={t("Fullscreen")}
+                    >
+                      <Maximize size={22} aria-hidden="true" />
+                    </button>
+                  </HoverTooltip>
                 )}
-              </button>
-            </div>
-            <div className="music-now-tabs" role="tablist" aria-label={t("music.now.details")}>
-              {(["queue", "about", "lyrics", "signal"] as const).map((id, index, ids) => (
-                <button
-                  key={id}
-                  type="button"
-                  id={`music-now-tab-${id}`}
-                  role="tab"
-                  aria-selected={panel === id}
-                  aria-controls={searching ? undefined : `music-now-panel-${id}`}
-                  disabled={!tabOpen(id)}
-                  title={tabOpen(id) ? undefined : t("No lyrics for this track")}
-                  tabIndex={panel === id ? 0 : -1}
-                  onClick={() => {
-                    closeSearch();
-                    setPanel(id);
-                  }}
-                  onKeyDown={(event) => {
-                    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
-                    const step =
-                      event.key === "ArrowRight"
-                        ? rtl
-                          ? -1
-                          : 1
-                        : event.key === "ArrowLeft"
-                          ? rtl
-                            ? 1
-                            : -1
-                          : 0;
-                    let hop = index;
-                    if (step)
-                      for (let turn = 0; turn < ids.length; turn += 1) {
-                        hop = (hop + step + ids.length) % ids.length;
-                        if (tabOpen(ids[hop])) break;
-                      }
-                    const target =
-                      event.key === "Home"
-                        ? ids.find(tabOpen)
-                        : event.key === "End"
-                          ? [...ids].reverse().find(tabOpen)
-                          : step
-                            ? ids[hop]
-                            : null;
-                    if (target) {
-                      event.preventDefault();
-                      closeSearch();
-                      setPanel(target);
-                      document.getElementById(`music-now-tab-${target}`)?.focus();
-                    }
-                  }}
+                <HoverTooltip
+                  label={t(liked ? "music.unsaveTrack" : "music.saveTrack")}
+                  side="top"
+                  align="center"
                 >
-                  {t(
-                    id === "queue"
-                      ? "music.now.next"
-                      : id === "about"
-                        ? "music.artist.about"
-                        : id === "lyrics"
-                          ? "Lyrics"
-                          : "music.now.signal",
-                  )}
-                </button>
-              ))}
-              <button
-                ref={searchRef}
-                type="button"
-                onClick={() => {
-                  if (searching && !searchExit) {
-                    closeSearch();
-                    return;
-                  }
-                  setSearchExit(false);
-                  setSearching(true);
-                }}
-                className="music-now-all-queue"
-                aria-pressed={searching && !searchExit}
-                aria-label={t("music.searchPlaceholder")}
-                title={t("music.searchPlaceholder")}
-              >
-                <Search size={17} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={onQueue}
-                className="music-now-all-queue"
-                aria-label={t("music.transport.openQueue")}
-              >
-                <MusicGlyph name="queue" size={17} aria-hidden="true" />
-              </button>
-            </div>
-
-            {searching ? (
-              <div
-                ref={searchSlotRef}
-                className="music-now-search-slot"
-                data-exit={searchExit ? "1" : undefined}
-              >
-                <MusicNowSearch onClose={closeSearch} />
-              </div>
-            ) : (
-              <div
-                role="tabpanel"
-                id={`music-now-panel-${panel}`}
-                aria-labelledby={`music-now-tab-${panel}`}
-                className="music-now-panel"
-                data-panel={panel}
-              >
-                {panel === "about" ? (
-                  <MusicListeningDetails
-                    track={display}
-                    profile={recording}
-                    onArtist={(artist) => onExplore("artist", artist)}
-                  />
-                ) : panel === "lyrics" ? (
-                  lyricsState === "ready" ? (
-                    <>
-                      <div className="music-now-lyric-sync">
-                        <span>{t("Lyric sync")}</span>
-                        <button
-                          type="button"
-                          onClick={() => nudgeLyrics(-LYRIC_OFFSET_STEP)}
-                          aria-label={t("Lyrics earlier")}
-                          title={t("Lyrics earlier")}
-                        >
-                          -
-                        </button>
-                        <em>
-                          {lyricOffset === 0
-                            ? "0.00s"
-                            : `${lyricOffset > 0 ? "+" : ""}${lyricOffset.toFixed(2)}s`}
-                        </em>
-                        <button
-                          type="button"
-                          onClick={() => nudgeLyrics(LYRIC_OFFSET_STEP)}
-                          aria-label={t("Lyrics later")}
-                          title={t("Lyrics later")}
-                        >
-                          +
-                        </button>
-                      </div>
-                      <ol ref={lyricsRef} className="music-now-lyrics">
-                        {lyrics.map((line, index) => (
-                          <li
-                            key={`${line.at}:${index}`}
-                            data-active={index === activeLyric ? "1" : undefined}
-                          >
-                            {line.text ? (
-                              <button type="button" onClick={() => seekMusic(line.at)}>
-                                {line.text}
-                              </button>
-                            ) : (
-                              <span className="music-now-lyric-rest" aria-hidden="true" />
-                            )}
-                          </li>
-                        ))}
-                      </ol>
-                    </>
-                  ) : (
-                    <div className="music-now-empty">
-                      <MusicGlyph name="lyrics" size={23} />
-                      <p>
-                        {t(
-                          lyricsState === "loading" ? "Finding lyrics" : "No lyrics for this track",
-                        )}
-                      </p>
-                    </div>
-                  )
-                ) : panel === "signal" ? (
-                  <MusicSignalDetails
-                    track={
-                      isMusicVideoActive()
-                        ? {
-                            ...current,
-                            quality: undefined,
-                            sourceId: undefined,
-                            playbackUrl: undefined,
-                          }
-                        : current
-                    }
-                    outputLabel={output}
-                    transportCodec={speaker.active ? speaker.transportCodec : undefined}
-                    audioSettings={speaker.active ? undefined : audio.settings}
-                    meter={speaker.active ? undefined : meter}
-                    showLevels={false}
-                  />
-                ) : (
-                  <MusicQueueContinuation remaining={upNext.length}>
-                    {upNext.length > 0 && (
-                      <ol className="music-now-next-list">
-                        {upNext.map((track, index) => (
-                          <MusicUpNextRow
-                            key={`${track.connectorId}:${track.id}:${index}`}
-                            track={track}
-                            queue={upNextQueue}
-                            onArtist={() => onExplore("artist", undefined, track)}
+                  <button
+                    type="button"
+                    data-burst={burst || undefined}
+                    onClick={() => {
+                      if (!liked) setBurst((count) => count + 1);
+                      toggleMusicLiked(current);
+                    }}
+                    aria-pressed={liked}
+                    aria-label={t(liked ? "music.unsaveTrack" : "music.saveTrack")}
+                    className="music-now-action"
+                  >
+                    <Heart size={22} fill={liked ? "currentColor" : "none"} aria-hidden="true" />
+                    {burst > 0 && liked && (
+                      <span key={burst} className="dock-like-burst" aria-hidden="true">
+                        <span className="dock-like-ring" />
+                        {NOW_LIKE_SPOKES.map((rotate, index) => (
+                          <span
+                            key={index}
+                            className="dock-like-dot"
+                            style={
+                              {
+                                "--rotate": `${rotate}deg`,
+                                "--translate-y": index % 2 ? "-16px" : "-21px",
+                              } as CSSProperties
+                            }
                           />
                         ))}
-                      </ol>
+                      </span>
                     )}
-                  </MusicQueueContinuation>
-                )}
+                  </button>
+                </HoverTooltip>
+                <button
+                  type="button"
+                  onClick={() => setPanel("signal")}
+                  className="music-now-quality"
+                  aria-label={t("music.now.signal")}
+                >
+                  {!isMusicVideoActive() && musicTrackQuality(current) ? (
+                    <MusicQualityBadge track={current} showEvidence />
+                  ) : (
+                    <>
+                      <AudioLines size={17} />
+                      <span>{t("music.now.signal")}</span>
+                    </>
+                  )}
+                </button>
               </div>
-            )}
+              <div className="music-now-tabs" role="tablist" aria-label={t("music.now.details")}>
+                {(["queue", "about", "lyrics", "signal"] as const).map((id, index, ids) => (
+                  <button
+                    key={id}
+                    type="button"
+                    id={`music-now-tab-${id}`}
+                    role="tab"
+                    aria-selected={panel === id}
+                    aria-controls={searching ? undefined : `music-now-panel-${id}`}
+                    disabled={!tabOpen(id)}
+                    title={tabOpen(id) ? undefined : t("No lyrics for this track")}
+                    tabIndex={panel === id ? 0 : -1}
+                    onClick={() => {
+                      closeSearch();
+                      setPanel(id);
+                    }}
+                    onKeyDown={(event) => {
+                      const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+                      const step =
+                        event.key === "ArrowRight"
+                          ? rtl
+                            ? -1
+                            : 1
+                          : event.key === "ArrowLeft"
+                            ? rtl
+                              ? 1
+                              : -1
+                            : 0;
+                      let hop = index;
+                      if (step)
+                        for (let turn = 0; turn < ids.length; turn += 1) {
+                          hop = (hop + step + ids.length) % ids.length;
+                          if (tabOpen(ids[hop])) break;
+                        }
+                      const target =
+                        event.key === "Home"
+                          ? ids.find(tabOpen)
+                          : event.key === "End"
+                            ? [...ids].reverse().find(tabOpen)
+                            : step
+                              ? ids[hop]
+                              : null;
+                      if (target) {
+                        event.preventDefault();
+                        closeSearch();
+                        setPanel(target);
+                        document.getElementById(`music-now-tab-${target}`)?.focus();
+                      }
+                    }}
+                  >
+                    {t(
+                      id === "queue"
+                        ? "music.now.next"
+                        : id === "about"
+                          ? "music.artist.about"
+                          : id === "lyrics"
+                            ? "Lyrics"
+                            : "music.now.signal",
+                    )}
+                  </button>
+                ))}
+                <button
+                  ref={searchRef}
+                  type="button"
+                  onClick={() => {
+                    if (searching && !searchExit) {
+                      closeSearch();
+                      return;
+                    }
+                    setSearchExit(false);
+                    setSearching(true);
+                  }}
+                  className="music-now-all-queue"
+                  aria-pressed={searching && !searchExit}
+                  aria-label={t("music.searchPlaceholder")}
+                  title={t("music.searchPlaceholder")}
+                >
+                  <Search size={17} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onQueue}
+                  className="music-now-all-queue"
+                  aria-label={t("music.transport.openQueue")}
+                >
+                  <MusicGlyph name="queue" size={17} aria-hidden="true" />
+                </button>
+              </div>
+
+              {searching ? (
+                <div
+                  ref={searchSlotRef}
+                  className="music-now-search-slot"
+                  data-exit={searchExit ? "1" : undefined}
+                >
+                  <MusicNowSearch onClose={closeSearch} />
+                </div>
+              ) : (
+                <div
+                  role="tabpanel"
+                  id={`music-now-panel-${panel}`}
+                  aria-labelledby={`music-now-tab-${panel}`}
+                  className="music-now-panel"
+                  data-panel={panel}
+                >
+                  {panel === "about" ? (
+                    <MusicListeningDetails
+                      track={display}
+                      profile={recording}
+                      onArtist={(artist) => onExplore("artist", artist)}
+                    />
+                  ) : panel === "lyrics" ? (
+                    lyricsState === "ready" ? (
+                      <>
+                        <div className="music-now-lyric-tools">
+                          <Dropdown
+                            value={lyricTarget}
+                            onChange={(value) => {
+                              const next = value as UiLanguage;
+                              setLyricTarget(next);
+                              try {
+                                localStorage.setItem(LYRIC_TARGET_KEY, next);
+                              } catch {
+                                /* The choice still applies for this session. */
+                              }
+                            }}
+                            ariaLabel={t("Translate lyrics to")}
+                            size="sm"
+                            options={LANGUAGES.map(({ code, nativeLabel }) => ({
+                              value: code,
+                              label: nativeLabel,
+                              dir: "auto",
+                            }))}
+                            className="w-[8.5rem] [&>button]:h-7 [&>button]:rounded-full [&>button]:bg-white/[0.06] [&>button]:px-2.5 [&>button]:text-[12px]"
+                          />
+                          <button
+                            type="button"
+                            className="music-now-lyric-translate"
+                            data-on={lyricTranslationOn ? "1" : undefined}
+                            data-failed={lyricTranslationFailed ? "1" : undefined}
+                            aria-pressed={lyricTranslationOn}
+                            disabled={lyricTranslating}
+                            onClick={() => void toggleLyricTranslation()}
+                            title={lyricTranslationOn ? t("Show original") : t("Translate")}
+                          >
+                            {lyricTranslating ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Globe2 size={14} />
+                            )}
+                            <span>
+                              {lyricTranslating
+                                ? `${t("Translate")}…`
+                                : lyricTranslationFailed
+                                  ? t("Try again")
+                                  : lyricTranslationOn
+                                    ? t("Show original")
+                                    : t("Translate")}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            className="music-now-lyric-live"
+                            data-on={liveSync ? "1" : undefined}
+                            aria-pressed={liveSync}
+                            onClick={() => {
+                              setLiveSync((open) => !open);
+                              setSyncPick(null);
+                            }}
+                            title={t("Live sync")}
+                          >
+                            <AudioLines size={14} />
+                            <span>{t("Live sync")}</span>
+                          </button>
+                        </div>
+                        {liveSync && (
+                          <div className="music-now-lyric-live-hint" role="status">
+                            <span>
+                              {syncPoints.length === 0
+                                ? t(
+                                    "Play until you hear a line. Tap that same line below, then choose Align to now.",
+                                  )
+                                : syncPoints.length === 1
+                                  ? t(
+                                      "Timing is aligned. If it becomes early or late later, repeat this at another line.",
+                                    )
+                                  : t("Timing and drift are corrected. Check playback, then save.")}
+                            </span>
+                            {syncPoints.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSyncPoints([]);
+                                  setSyncPick(null);
+                                }}
+                              >
+                                {t("Reset")}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              data-primary="1"
+                              onClick={() => {
+                                setLiveSync(false);
+                                setSyncPick(null);
+                              }}
+                            >
+                              {t("Save")}
+                            </button>
+                          </div>
+                        )}
+                        <div className="music-now-lyric-sync">
+                          <span>{t("Lyric sync")}</span>
+                          <button
+                            type="button"
+                            onClick={() => nudgeLyrics(-LYRIC_OFFSET_STEP)}
+                            aria-label={t("Lyrics earlier")}
+                            title={t("Lyrics earlier")}
+                          >
+                            -
+                          </button>
+                          <em>
+                            {lyricOffset === 0
+                              ? "0.00s"
+                              : `${lyricOffset > 0 ? "+" : ""}${lyricOffset.toFixed(2)}s`}
+                          </em>
+                          <button
+                            type="button"
+                            onClick={() => nudgeLyrics(LYRIC_OFFSET_STEP)}
+                            aria-label={t("Lyrics later")}
+                            title={t("Lyrics later")}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <NowPlayingLyricList
+                          lines={timedLyrics}
+                          lyricOffset={lyricOffset}
+                          translation={
+                            lyricTranslationOn && lyricTranslation?.language === lyricTarget
+                              ? lyricTranslation.lines
+                              : null
+                          }
+                          target={lyricTarget}
+                          syncPoints={syncPoints}
+                          liveSync={liveSync}
+                          syncPick={syncPick}
+                          onPick={(index) => setSyncPick((pick) => (pick === index ? null : index))}
+                          onSeek={seekLyric}
+                          onAlign={alignLyric}
+                        />
+                      </>
+                    ) : (
+                      <div className="music-now-empty">
+                        <MusicGlyph name="lyrics" size={23} />
+                        <p>
+                          {t(
+                            lyricsState === "loading"
+                              ? "Finding lyrics"
+                              : "No lyrics for this track",
+                          )}
+                        </p>
+                      </div>
+                    )
+                  ) : panel === "signal" ? (
+                    <NowPlayingSignal
+                      track={current}
+                      enabled={
+                        !speaker.active && player.phase !== "resolving" && !isMusicVideoActive()
+                      }
+                      speakerActive={speaker.active}
+                      outputLabel={output}
+                      transportCodec={speaker.active ? speaker.transportCodec : undefined}
+                      audioSettings={speaker.active ? undefined : audio.settings}
+                    />
+                  ) : (
+                    <MusicQueueContinuation remaining={upNext.length}>
+                      {upNext.length > 0 && (
+                        <ol className="music-now-next-list">
+                          {upNext.map((track, index) => (
+                            <MusicUpNextRow
+                              key={`${track.connectorId}:${track.id}:${index}`}
+                              track={track}
+                              queue={upNextQueue}
+                              onArtist={openUpNextArtist}
+                            />
+                          ))}
+                        </ol>
+                      )}
+                    </MusicQueueContinuation>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        </div>
         <div className="music-now-footer">
-            <div className="music-now-output">
-              <button type="button" onClick={onSpeakers}>
-                {speaker.active && speaker.device ? (
-                  <span className="music-dock-device size-7">
-                    <CastIcon device={speaker.device} size={28} />
-                  </span>
-                ) : (
-                  <Speaker size={17} aria-hidden="true" />
-                )}
-                <span>{output ?? t("music.now.output")}</span>
-              </button>
-              <button type="button" onClick={onAudio}>
-                <SlidersHorizontal size={17} aria-hidden="true" />
-                {t("music.audio.title")}
-              </button>
-            </div>
+          <div className="music-now-output">
+            <button type="button" onClick={onSpeakers}>
+              {speaker.active && speaker.device ? (
+                <span className="music-dock-device size-7">
+                  <CastIcon device={speaker.device} size={28} />
+                </span>
+              ) : (
+                <Speaker size={17} aria-hidden="true" />
+              )}
+              <span>{output ?? t("music.now.output")}</span>
+            </button>
+            <button type="button" onClick={onAudio}>
+              <SlidersHorizontal size={17} aria-hidden="true" />
+              {t("music.audio.title")}
+            </button>
+          </div>
         </div>
         <MusicKaraoke open={karaoke} onClose={() => setKaraoke(false)} />
       </section>
     </>
   );
-}
+});

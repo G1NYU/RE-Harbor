@@ -40,7 +40,7 @@ const settingsFill: Record<string, string> = {
   "Check the shared database first. When this exact subtitle has already been synced by someone else, yours snaps into place with no analysis.":
     "Kiểm tra cơ sở dữ liệu dùng chung trước. Nếu phụ đề chính xác này đã được người khác đồng bộ, phụ đề của bạn sẽ khớp ngay mà không cần phân tích.",
   "Community sync server": "Máy chủ đồng bộ cộng đồng",
-  "https://sync.harbor.site": "https://sync.harbor.site",
+  "https://sync.harborcommunity.site": "https://sync.harborcommunity.site",
   "Leave blank to use Harbor's own community server. Enter a URL to point at your own server instead. Private mode below stops all contact either way.":
     "Để trống để dùng máy chủ cộng đồng của Harbor. Nhập URL nếu muốn dùng máy chủ riêng. Chế độ riêng tư bên dưới sẽ chặn mọi kết nối trong cả hai trường hợp.",
   "Private mode": "Chế độ riêng tư",
@@ -269,7 +269,8 @@ const settingsFill: Record<string, string> = {
     "Các tiện ích bổ sung chậm và nguồn P2P thường cần hơn 10 giây để bắt đầu. Hãy tăng thời gian này nếu luồng phát bị bỏ qua trước khi có đủ thời gian kết nối.",
   "{n} sec": "{n} giây",
   "Only start the P2P engine when needed": "Chỉ khởi động công cụ P2P khi cần",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Harbor thường khởi động công cụ P2P ngay khi mở ứng dụng để luồng P2P đầu tiên kết nối nhanh hơn. Việc này duy trì một nút DHT hoạt động và giao tiếp với mạng ngay cả khi bạn không xem gì. Bật tùy chọn này nếu đang dùng kết nối tính phí theo lưu lượng hoặc bị giới hạn: khi đó công cụ chỉ khởi động khi bạn thực sự phát luồng P2P lần đầu. Có hiệu lực từ lần khởi động tiếp theo.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Harbor thường khởi động công cụ P2P ngay khi mở ứng dụng để luồng P2P đầu tiên kết nối nhanh hơn. Việc này duy trì một nút DHT hoạt động và giao tiếp với mạng ngay cả khi bạn không xem gì. Bật tùy chọn này nếu đang dùng kết nối tính phí theo lưu lượng hoặc bị giới hạn: khi đó công cụ chỉ khởi động khi bạn thực sự phát luồng P2P lần đầu. Có hiệu lực từ lần khởi động tiếp theo.",
   "What fullscreen does": "Chế độ toàn màn hình hoạt động thế nào",
   "True fullscreen covers the whole screen and hides the taskbar. Maximize fills the screen but keeps the taskbar and title bar, so you can still switch apps.":
     "Toàn màn hình thực sự phủ kín toàn bộ màn hình và ẩn thanh tác vụ. Phóng to lấp đầy màn hình nhưng vẫn giữ thanh tác vụ và thanh tiêu đề để bạn vẫn có thể chuyển ứng dụng.",

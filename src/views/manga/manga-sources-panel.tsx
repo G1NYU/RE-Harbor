@@ -1,4 +1,13 @@
-import { ArrowRight, ChevronLeft, FolderOpen, Pencil, Plug, Plus, Server, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  FolderOpen,
+  Pencil,
+  Plug,
+  Plus,
+  Server,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { LocalFolderTutorial } from "./manga-sources-panel/local-tutorial";
 import {
@@ -21,7 +30,13 @@ import { listServers, subscribeServers } from "./manga-sources-panel/suwayomi/se
 import { sourceMatchesServer } from "@/lib/manga/sources/suwayomi/server-link";
 import { useT } from "@/lib/i18n";
 
-const KIND_LABEL: Record<string, string> = { local: "Folder", suwayomi: "Server", plugin: "Plugin", html: "Site", mangayomi: "Extension" };
+const KIND_LABEL: Record<string, string> = {
+  local: "Folder",
+  suwayomi: "Server",
+  plugin: "Plugin",
+  html: "Site",
+  mangayomi: "Extension",
+};
 type IconType = ComponentType<{ size?: number; className?: string }>;
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -34,7 +49,11 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 function SourceIcon({ src, name, icon: Icon }: { src?: string; name?: string; icon?: IconType }) {
   const [failed, setFailed] = useState(false);
-  const initials = (name ?? "").replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase() || "?";
+  const initials =
+    (name ?? "")
+      .replace(/[^a-z0-9]/gi, "")
+      .slice(0, 2)
+      .toUpperCase() || "?";
   return (
     <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-canvas ring-1 ring-edge-soft">
       {src && !failed ? (
@@ -48,26 +67,55 @@ function SourceIcon({ src, name, icon: Icon }: { src?: string; name?: string; ic
   );
 }
 
-const BYOS: Array<{ kind: MangaSourceKind; icon: IconType; iconUrl?: string; title: string; subtitle: string; placeholder: string }> = [
-  { kind: "local", icon: FolderOpen, title: "Local folder", subtitle: "Read manga files you already have", placeholder: "" },
+const BYOS: Array<{
+  kind: MangaSourceKind;
+  icon: IconType;
+  iconUrl?: string;
+  title: string;
+  subtitle: string;
+  placeholder: string;
+}> = [
+  {
+    kind: "local",
+    icon: FolderOpen,
+    title: "Local folder",
+    subtitle: "Read manga files you already have",
+    placeholder: "",
+  },
 ];
 
-function CustomRow({ source, flash, onRemove }: { source: MangaSource; flash: boolean; onRemove: () => void }) {
+function CustomRow({
+  source,
+  flash,
+  onRemove,
+}: {
+  source: MangaSource;
+  flash: boolean;
+  onRemove: () => void | Promise<void>;
+}) {
   const t = useT();
   const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState(false);
   const [editing, setEditing] = useState(false);
-  const remove = () => {
+  const remove = async () => {
+    if (removing) return;
+    setRemoveError(false);
     setRemoving(true);
-    window.setTimeout(onRemove, 240);
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 240));
+    try {
+      await onRemove();
+    } catch {
+      // Do not leave a failed removal hidden behind the exit animation.
+      setRemoving(false);
+      setRemoveError(true);
+    }
   };
-  const editable =
-    source.kind === "html" || source.kind === "suwayomi" || source.kind === "local";
-  const Icon =
-    source.kind === "local" ? FolderOpen : source.kind === "suwayomi" ? Server : Plug;
+  const editable = source.kind === "html" || source.kind === "suwayomi" || source.kind === "local";
+  const Icon = source.kind === "local" ? FolderOpen : source.kind === "suwayomi" ? Server : Plug;
   return (
     <div
       className={`overflow-hidden transition-all duration-300 ${
-        removing ? "max-h-0 scale-95 opacity-0" : editing ? "max-h-[900px]" : "max-h-28"
+        removing ? "max-h-0 scale-95 opacity-0" : editing || removeError ? "max-h-[900px]" : "max-h-28"
       }`}
     >
       <div
@@ -101,13 +149,19 @@ function CustomRow({ source, flash, onRemove }: { source: MangaSource; flash: bo
           )}
           <button
             type="button"
-            onClick={remove}
+            onClick={() => void remove()}
+            disabled={removing}
             aria-label={t("Remove {name}", { name: source.name })}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-raised text-ink-subtle ring-1 ring-edge-soft transition-all hover:text-danger active:scale-95 motion-reduce:active:scale-100"
           >
             <Trash2 size={18} strokeWidth={2} />
           </button>
         </div>
+        {removeError && (
+          <p role="alert" className="px-5 pb-3 text-[13px] text-danger">
+            {t("Could not remove source")}
+          </p>
+        )}
         {editing && (
           <div className="harbor-rise border-t border-edge-soft p-5">
             <SourceEditor source={source} onDone={() => setEditing(false)} />
@@ -118,7 +172,14 @@ function CustomRow({ source, flash, onRemove }: { source: MangaSource; flash: bo
   );
 }
 
-function ByosOption({ kind, icon: Icon, iconUrl, title, subtitle, placeholder }: (typeof BYOS)[number]) {
+function ByosOption({
+  kind,
+  icon: Icon,
+  iconUrl,
+  title,
+  subtitle,
+  placeholder,
+}: (typeof BYOS)[number]) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [tut, setTut] = useState(false);
@@ -128,8 +189,13 @@ function ByosOption({ kind, icon: Icon, iconUrl, title, subtitle, placeholder }:
   const pickFolder = async () => {
     try {
       const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
-      const dir = await openDialog({ directory: true, multiple: false, title: t("Choose manga folder") });
-      if (typeof dir === "string" && !addMangaSource("", dir, "local")) setError(t("Could not add that folder"));
+      const dir = await openDialog({
+        directory: true,
+        multiple: false,
+        title: t("Choose manga folder"),
+      });
+      if (typeof dir === "string" && !addMangaSource("", dir, "local"))
+        setError(t("Could not add that folder"));
     } catch {
       setError(t("Folder picker is only available in the desktop app"));
     }
@@ -153,7 +219,11 @@ function ByosOption({ kind, icon: Icon, iconUrl, title, subtitle, placeholder }:
         <span className="truncate text-[13px] text-ink-muted">{t(subtitle)}</span>
       </div>
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-raised text-ink-muted ring-1 ring-edge-soft transition-colors group-hover/byos:text-ink">
-        <Plus size={18} strokeWidth={2.4} className={`transition-transform ${kind !== "local" && open ? "rotate-45" : ""}`} />
+        <Plus
+          size={18}
+          strokeWidth={2.4}
+          className={`transition-transform ${kind !== "local" && open ? "rotate-45" : ""}`}
+        />
       </span>
     </div>
   );
@@ -162,7 +232,11 @@ function ByosOption({ kind, icon: Icon, iconUrl, title, subtitle, placeholder }:
     return (
       <>
         <div className={`group/byos transition-all hover:ring-edge ${CARD}`}>
-          <button type="button" onClick={() => setTut(true)} className="w-full text-start active:scale-[0.99]">
+          <button
+            type="button"
+            onClick={() => setTut(true)}
+            className="w-full text-start active:scale-[0.99]"
+          >
             {row}
           </button>
           {error && <p className="px-5 pb-4 text-[13px] font-medium text-danger">{error}</p>}
@@ -174,7 +248,11 @@ function ByosOption({ kind, icon: Icon, iconUrl, title, subtitle, placeholder }:
 
   return (
     <div className={`group/byos transition-all ${open ? "ring-edge" : "hover:ring-edge"} ${CARD}`}>
-      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full text-start active:scale-[0.99]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full text-start active:scale-[0.99]"
+      >
         {row}
       </button>
       {open && (
@@ -223,7 +301,9 @@ export function MangaSourcesView({
       (s) =>
         !s.builtin &&
         s.id !== "all" &&
-        !(s.kind === "suwayomi" && servers.some((sv) => sourceMatchesServer(s.baseUrl, sv.baseUrl))),
+        !(
+          s.kind === "suwayomi" && servers.some((sv) => sourceMatchesServer(s.baseUrl, sv.baseUrl))
+        ),
     );
   }, [tick]);
   const total = useMemo(() => listMangaSources().filter((s) => s.id !== "all").length, [tick]);
@@ -267,7 +347,9 @@ export function MangaSourcesView({
       </div>
 
       <div className="flex flex-col gap-2.5">
-        <h1 className="font-display text-[34px] font-medium tracking-tight text-ink">{t("Manga sources")}</h1>
+        <h1 className="font-display text-[34px] font-medium tracking-tight text-ink">
+          {t("Manga sources")}
+        </h1>
         <p className="max-w-xl text-[15.5px] leading-relaxed text-ink-muted">
           {t(
             "Harbor does not host any manga or any sources. Connect your own server or open a folder you already have, and mix as many as you like.",

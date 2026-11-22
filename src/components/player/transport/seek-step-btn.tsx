@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
-import { SEEK_STEP_OPTIONS, sanitizeSeekStep } from "@/lib/seek-step";
+import { formatSeekStep, sanitizeSeekStep, seekStepChoices } from "@/lib/seek-step";
 const DEFAULT_SHORT_SEC = 3;
 const CURATED_SEEK = [5, 10, 30];
 import { useSettings } from "@/lib/settings";
@@ -35,7 +35,8 @@ export function SeekStepBtn({
   useEffect(() => {
     if (!pickerOpen) setExpanded(false);
   }, [pickerOpen]);
-  const curatedFor = (v: number) => [...new Set([...CURATED_SEEK, v])].sort((a, b) => a - b);
+  const choicesFor = (v: number) =>
+    expanded ? seekStepChoices(v) : seekStepChoices(v, CURATED_SEEK);
   const wrapRef = useRef<HTMLDivElement>(null);
   const holdTimerRef = useRef<number | null>(null);
   const claimedRef = useRef(false);
@@ -134,7 +135,9 @@ export function SeekStepBtn({
           }}
           aria-label={t("{word} {n} seconds. Hold for options", { word, n: seconds })}
           className={`relative flex h-14 w-14 items-center justify-center rounded-full transition-[background-color,transform] duration-150 active:scale-90 motion-reduce:active:scale-100 ${
-            pickerOpen ? "bg-white/15 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"
+            pickerOpen
+              ? "bg-white/15 text-white"
+              : "text-white/85 hover:bg-white/10 hover:text-white"
           }`}
         >
           {numberedOk ? (
@@ -173,7 +176,7 @@ export function SeekStepBtn({
           <SeekGroup
             label={t("Arrows")}
             value={seconds}
-            options={expanded ? SEEK_STEP_OPTIONS : curatedFor(seconds)}
+            options={choicesFor(seconds)}
             onPick={commitChoice}
             ariaFor={(n) => t("{word} {n} seconds", { word, n })}
           />
@@ -181,7 +184,7 @@ export function SeekStepBtn({
           <SeekGroup
             label={t("Shift + Arrows")}
             value={shortSeconds}
-            options={expanded ? SEEK_STEP_OPTIONS : curatedFor(shortSeconds)}
+            options={choicesFor(shortSeconds)}
             onPick={commitShortChoice}
             ariaFor={(n) => t("Short {word} {n} seconds", { word, n })}
           />
@@ -236,7 +239,7 @@ function SeekGroup({
                   : "bg-canvas/50 text-ink-muted hover:bg-canvas/70 hover:text-ink"
               }`}
             >
-              {s}s
+              {formatSeekStep(s)}
             </button>
           );
         })}

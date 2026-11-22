@@ -49,7 +49,8 @@ the whole output directory, not just that executable. `sources/` contains:
 
 - `pkforge.zip`, `pkhex.zip` and `automod.zip` from the exact validated revisions.
 - The wrapper's `Program.cs`, project file, `upstream.json`, `LICENSE`,
-  `build.mjs` and this README, so its build inputs and instructions travel with it.
+  `build.mjs`, `retry-git.mjs` and this README, so its build inputs and
+  instructions travel with it.
 
 Only after publishing and copying all sources does the script write
 `engine.json`, recording the protocol, runtime identifier, PKForge revision,

@@ -1,3 +1,5 @@
+import seekSteps from "./pt/seek-steps";
+import reviews from "./pt/reviews";
 import playOrders from "./pt/play-orders";
 import gameRomLibrary from "./pt/game-rom-library";
 import gameNotes from "./pt/game-notes";
@@ -82,6 +84,7 @@ import ebookSources from "./pt/ebook-sources";
 import settingsRefinements from "./pt/settings-refinements";
 import experimentalUpdates from "./pt/experimental-updates";
 import coverage from "./pt/coverage";
+import subtitles from "./pt/subtitles";
 import chrome from "./pt/chrome";
 import common from "./pt/common";
 import catalog from "./pt/catalog";
@@ -120,6 +123,8 @@ import wiringSweep4 from "./pt/wiring-sweep-4";
 import plugins from "./pt/plugins";
 import brands from "./pt/brands";
 import bpSports from "./pt/bp-sports";
+import queueBasket from "./pt/queue-basket";
+import liveWeb from "./pt/live-web";
 
 import nytTv from "./pt/nyt-tv";
 
@@ -301,6 +306,7 @@ const pt: Record<string, string> = {
 
   ...ebookSources,
   ...coverage,
+  ...subtitles,
   ...chrome,
   ...common,
   ...catalog,
@@ -415,6 +421,67 @@ const pt: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
+  "Refract sync": "Sincronização do Refract",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "Sincronize o histórico de exibição e as alterações na lista de títulos para assistir do Harbor com o Refract.",
+  "Refract personal API key": "Chave de API pessoal do Refract",
+  "Verifying...": "Verificando…",
+  "Connect Refract": "Conectar Refract",
+  "Refract key saved in Harbor's secret store":
+    "Chave do Refract salva no armazenamento seguro do Harbor",
+  "Sync watched history and watchlist": "Sincronizar histórico e lista de títulos para assistir",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Envie o histórico de exibição e as alterações na lista de títulos para assistir do Harbor ao Refract. Apenas o perfil principal do Harbor é sincronizado.",
+  "Retry pending watches": "Tentar enviar novamente os registros pendentes",
+  "Disconnect Refract": "Desconectar Refract",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Conectado ao Refract ({identity}). A sincronização do histórico de exibição está ativada.",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Não foi possível verificar a chave pelo Refract /v1/me. Verifique as permissões e a conexão.",
+  "Disconnected from Refract.": "Refract desconectado.",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Crie uma chave de API pessoal no Refract com as permissões profile:read, library:read, library:write e history:write. Nunca compartilhe a chave nem a inclua em um commit.",
+  "Automatic watch threshold": "Limite para registro automático de exibição",
+  "After {count} minutes": "Após {count} minutos",
+  "{count}% (default)": "{count}% (padrão)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "Registre um filme ou episódio no Refract quando a reprodução atingir o tempo ou a porcentagem selecionada. Avançar além do limite também conta. O registro antecipado marca o conteúdo como assistido, e não como parcialmente assistido. O limite de conclusão do Harbor permanece inalterado.",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract: quero assistir",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "Adições e remoções da lista de títulos para assistir são enviadas automaticamente enquanto a sincronização está ativa. Requer library:write; reconecte com uma chave atualizada, se necessário. O histórico existente do Refract e os demais status da biblioteca são preservados.",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "{sent} enviados · {pending} pendentes · {failed} sem correspondência",
+  "Unmatched items": "Itens sem correspondência",
+  "Refract queue full; unable to save another watch":
+    "Fila do Refract cheia; não foi possível salvar outra visualização",
+  "No verified IMDb/TMDB/TVDB identity": "Nenhum ID IMDb/TMDB/TVDB verificado",
+  "Movie not found in Refract": "Filme não encontrado no Refract",
+  "Episode not found; verify season numbering":
+    "Episódio não encontrado; verifique a numeração das temporadas",
+  "Last watched item sent successfully": "Última visualização enviada com sucesso",
+  "Unknown error": "Erro desconhecido",
+  "Some items could not be matched or sent":
+    "Alguns itens não puderam ser identificados ou enviados",
+  "Refract denied access; check key and permissions":
+    "O Refract negou o acesso; verifique a chave e as permissões",
+  "Network error; retry scheduled": "Erro de rede; nova tentativa agendada",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "Não há um ID IMDb/TMDB/TVDB verificado para este título.",
+  "Refract could not uniquely identify this title.":
+    "O Refract não conseguiu identificar este título de forma inequívoca.",
+  "Refract preserved an existing library entry or viewing history.":
+    "O Refract preservou um item existente da biblioteca ou do histórico.",
+  "Added to Refract Plan to Watch.": "Adicionado à lista Quero assistir do Refract.",
+  "Removed from Refract Plan to Watch.": "Removido da lista Quero assistir do Refract.",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "A lista do Refract exige library:write. Reconecte com uma chave que tenha essa permissão.",
+  "Refract could not confirm the watchlist change. Try again.":
+    "O Refract não conseguiu confirmar a alteração na lista. Tente novamente.",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default pt;

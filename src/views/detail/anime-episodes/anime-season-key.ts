@@ -4,6 +4,25 @@ import { parseKitsuId } from "@/lib/providers/kitsu";
 import { splitFranchiseDisplaySeason } from "@/lib/streams/anime-identity-core";
 import type { EpisodeDetailPlayback, PlayEpisode } from "@/lib/view";
 
+/**
+ * The native entry that canonically owns a displayed provider season.
+ *
+ * A catalog/umbrella page can show the same cour under a provider season while
+ * the native entry owns it under entry-relative numbering. Switching to the
+ * owner makes metadata, ratings and watched progress come from one work. Only
+ * switch when that owner already supplies episodes in the loaded pool.
+ */
+export function canonicalSeasonOwnerId(
+  currentId: string,
+  season: number | null,
+  resolvedOwnerId: string | null,
+  pool: Array<Pick<KitsuEpisode, "sourceMetaId">>,
+): string | null {
+  if (season == null || !Number.isInteger(season) || season < 1) return null;
+  if (!resolvedOwnerId || resolvedOwnerId === currentId) return null;
+  return pool.some((episode) => episode.sourceMetaId === resolvedOwnerId) ? resolvedOwnerId : null;
+}
+
 export function animeSeasonKey(ep: KitsuEpisode): number {
   if (ep.imdbSeason === 0) return 0;
   return ep.id < 0 ? (ep.imdbSeason ?? ep.seasonNumber ?? 1) : (ep.seasonNumber ?? 1);
@@ -117,4 +136,59 @@ export function resolveAnimeDetailTarget(
     seriesMeta: parentMeta,
     playback,
   };
+}
+
+export function nativeSeasonRows(
+  visibleEpisodes: KitsuEpisode[],
+  nativeEpisodes: KitsuEpisode[],
+  seasonHint: number,
+): KitsuEpisode[] {
+  const byCoordinate = new Map(
+    nativeEpisodes
+      .filter((ep) => ep.imdbSeason === seasonHint && ep.imdbEpisode != null)
+      .map((ep) => [ep.imdbEpisode, ep]),
+  );
+  return visibleEpisodes.map((ep) => {
+    if ((ep.imdbSeason ?? ep.seasonNumber) !== seasonHint) return ep;
+    const native = byCoordinate.get(ep.imdbEpisode ?? ep.number);
+    return native && (!ep.imdbId || !native.imdbId || ep.imdbId === native.imdbId) ? native : ep;
+  });
+}
+
+
+/** Only an episode that names this exact IMDb show and provider season
+ * can authorize a tracker status / airing-timer owner. A saved or searched
+ * season candidate by itself is just a hint, never verified ownership. */
+export function verifiedSeasonOwnerFromEpisodes(
+  rows: readonly Pick<KitsuEpisode, "sourceMetaId" | "imdbId" | "imdbSeason">[],
+  imdbId: string | null | undefined,
+  season: number | null,
+): string | null {
+  if (!imdbId || !/^tt[1-9]\d*$/.test(imdbId) ||
+      !Number.isInteger(season) || season == null || season < 1) return null;
+  const owners = new Set(rows
+    .filter((row) => row.imdbId === imdbId && row.imdbSeason === season)
+    .map((row) => row.sourceMetaId)
+    .filter((id): id is string => !!id && /^(?:kitsu|mal|anilist|anidb):[1-9]\d*$/.test(id)));
+  return owners.size === 1 ? [...owners][0] : null;
+}
+
+/**
+ * Native rows are resolved for one specific provider season; do not use rows
+ * from the previously selected season while the next one is loading.
+ * This owner can be unambiguous even when the displayed TVDB rows mix entries.
+ */
+export function nativeSeasonOwnerId(
+  native: {
+    page: string;
+    season: number;
+    episodes: readonly Pick<KitsuEpisode, "sourceMetaId">[];
+  } | null,
+  page: string,
+  season: number | null,
+): string | null {
+  if (!native || native.page !== page || native.season !== season || !native.episodes.length)
+    return null;
+  const ids = new Set(native.episodes.map((ep) => ep.sourceMetaId).filter((id): id is string => !!id));
+  return ids.size === 1 ? [...ids][0] : null;
 }

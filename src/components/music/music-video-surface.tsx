@@ -12,9 +12,11 @@ import { useT } from "@/lib/i18n";
 import type { MusicTrack } from "@/lib/music/types";
 import { useMusicPlayer } from "@/lib/music/player";
 import { musicVideoSurfaces } from "@/lib/music/video-session";
+import { useMusicVideoQuality } from "@/lib/music/video-quality";
 import { musicVideoStream, musicVideoStreamKey, type MusicVideoStream } from "@/lib/music/video";
 import {
   adoptMusicVideoHost,
+  musicVideoElementVolume,
   musicVideoHost,
   musicVideoHostLive,
   musicVideoHostSource,
@@ -26,13 +28,15 @@ import {
   toggleMusicVideoFullscreen,
 } from "@/lib/music/video-fullscreen";
 import { loadTrackLyrics, type LyricLine } from "@/lib/music/lyrics";
+import { applyLyricSync } from "@/lib/music/lyric-sync";
+import { useLyricSync } from "@/lib/music/use-lyric-sync";
 import { MusicVideoControls } from "./music-video-controls";
 import "./music-video-surface.css";
 
 /** How long a spinner may stand before it offers a way out, and before it stops claiming to work. */
 const SLOW_MS = 12_000;
 const STUCK_MS = 45_000;
-const RESOLVE_MS = 30_000;
+const RESOLVE_MS = 35_000;
 
 /** Survives the handoff the way the picture does: a choice made on the watch page holds in the pop-out. */
 let lyricsPreferred = false;
@@ -84,11 +88,13 @@ export function MusicVideoSurface({
   onShowing,
   error = false,
   onRetry,
+  mini = false,
 }: {
   track: MusicTrack;
   active?: boolean;
   expanded?: boolean;
   onShowing?: (showing: boolean) => void;
+  mini?: boolean;
   error?: boolean;
   onRetry?: () => void;
 }) {
@@ -107,6 +113,7 @@ export function MusicVideoSurface({
     getMusicVideoFullscreen,
   ).active;
   const player = useMusicPlayer();
+  const [syncPoints] = useLyricSync(track);
   const selected = state.owner === owner;
   const ready = active && selected && state.status === "playing";
   const [stream, setStream] = useState<MusicVideoStream | null>(() =>
@@ -126,6 +133,7 @@ export function MusicVideoSurface({
   const [waited, setWaited] = useState(0);
   const [lyricsOn, setLyricsOn] = useState(() => lyricsPreferred);
   const [lyrics, setLyrics] = useState<LyricLine[] | null>(null);
+  const timedLyrics = lyrics ? applyLyricSync(lyrics, syncPoints) : null;
   const [lyricsBusy, setLyricsBusy] = useState(false);
   const [lyricsMissing, setLyricsMissing] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -162,7 +170,7 @@ export function MusicVideoSurface({
       setDecoded(false);
       return;
     }
-    const held = attempt === 0 ? musicVideoHostSource(key) ?? musicVideoHostLive() : null;
+    const held = attempt === 0 ? (musicVideoHostSource(key) ?? musicVideoHostLive()) : null;
     if (held) {
       setStream(held);
       setDecoded((picture?.readyState ?? 0) >= 2);
@@ -244,8 +252,9 @@ export function MusicVideoSurface({
   const paused = player.phase === "paused";
   useEffect(() => {
     if (!stream || !picture) return;
-    if (sound) sound.volume = volume;
-    else picture.volume = volume;
+    const elementVolume = musicVideoElementVolume(volume);
+    if (sound) sound.volume = elementVolume;
+    else picture.volume = elementVolume;
     if (paused) {
       sound?.pause();
       picture.pause();
@@ -324,6 +333,23 @@ export function MusicVideoSurface({
     setAttempt((count) => count + 1);
     retryMusicVideo(track);
   }, [onRetry, track.id, track.connectorId]);
+  // A new quality is a new stream: resolve again and keep the same position.
+  const quality = useMusicVideoQuality();
+  const qualityRef = useRef(quality);
+  useEffect(() => {
+    if (qualityRef.current === quality) return;
+    qualityRef.current = quality;
+    setAttempt((count) => count + 1);
+    retryMusicVideo(track);
+  }, [quality, track]);
+  // A restored paused track, or one whose resolve ran before the audio was primed, has no
+  // picture yet. Once playback actually starts, try it again instead of leaving the error up.
+  useEffect(() => {
+    if (!active || attempt > 0 || player.phase !== "playing") return;
+    if (state.status !== "unavailable" || state.owner !== owner) return;
+    setAttempt(1);
+    retryMusicVideo(track);
+  }, [active, attempt, player.phase, state.status, state.owner, owner, track]);
   // Fullscreen is a lean-back surface: the chrome rests on its own the way a film player does.
   useEffect(() => {
     if (!fullscreen) {
@@ -360,9 +386,10 @@ export function MusicVideoSurface({
       ref={shell}
       className="music-video-surface"
       data-music-video-surface={expanded ? "expanded" : "watch"}
+      data-mini={mini ? "1" : undefined}
       data-video-state={showing ? "playing" : unavailable ? "unavailable" : "loading"}
       data-idle={fullscreen && idle ? "1" : undefined}
-      onDoubleClick={toggleMusicVideoFullscreen}
+      onDoubleClick={mini ? undefined : toggleMusicVideoFullscreen}
     >
       {!showing && (
         <div className="music-video-placeholder" role="status">
@@ -382,18 +409,19 @@ export function MusicVideoSurface({
           )}
         </div>
       )}
-      {showing && (
+      {showing && !mini && (
         <MusicVideoControls
-          lyrics={lyrics}
+          lyrics={timedLyrics}
           lyricsState={lyricsState}
           onToggleLyrics={toggleLyrics}
           currentTime={currentTime}
           fullscreen={fullscreen}
           onToggleFullscreen={toggleMusicVideoFullscreen}
           expanded={expanded}
+          availableHeights={stream?.availableHeights ?? []}
         />
       )}
-      {interrupted && (
+      {interrupted && !mini && (
         <div className="music-video-badge">
           {halted ? (
             <button

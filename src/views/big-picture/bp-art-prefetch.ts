@@ -117,7 +117,10 @@ export function prefetchBpRowNeighbours(
     const m = metas[index - step];
     if (m) near.push(m);
   }
-  prefetchBpHeroArt(near.map((m) => m.background), fullQuality);
+  prefetchBpHeroArt(
+    near.map((m) => m.background),
+    fullQuality,
+  );
   const next = metas[index + 1];
   if (!tmdbKey) {
     if (next) decodeBpHeroArt(next.background, fullQuality);
@@ -125,7 +128,12 @@ export function prefetchBpRowNeighbours(
   }
   for (const m of near) {
     void warmBpEnrich(tmdbKey, m).then((detail) => {
-      const best = [detail?.gallery?.backdrops?.[0], detail?.backdrop, m.background].find(Boolean);
+      const best = [
+        detail?.textlessBackdrops?.[0],
+        detail?.gallery?.backdrops?.[0],
+        detail?.backdrop,
+        m.background,
+      ].find(Boolean);
       if (m === next) {
         decodeBpHeroArt(best, fullQuality);
         return;

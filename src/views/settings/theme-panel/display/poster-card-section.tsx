@@ -10,6 +10,17 @@ import { SettingRow } from "../../kit";
 import { SButton } from "../../ui";
 import { POSTER_RADII, POSTER_SIZES, posterSizeKey, radiusKey } from "./poster-options";
 import { PreviewImage } from "../../preview-image";
+import { CardSharedState } from "@/components/use-card-shared-state";
+const EMPTY_CARD_SHARED_STATE: CardSharedState = {
+  showTop10: false,
+  inCinema: false,
+  rerun: false,
+  newBadge: null,
+  hasDub: false,
+  watched: false,
+  inWatchlist: false,
+  inLocalLibrary: false,
+};
 
 function sizeIndex(scale: number): number {
   const key = posterSizeKey(scale);
@@ -62,6 +73,7 @@ export function PosterCardSection() {
                 { value: "bottomStart", label: t("Start") },
                 { value: "center", label: t("Center") },
                 { value: "bottomEnd", label: t("End") },
+                { value: "off", label: t("Off") },
               ]}
               onChange={(v) => update({ tvCardLogoPos: v })}
             />
@@ -97,6 +109,7 @@ export function PosterCardSection() {
                   meta={sample}
                   logo={art.logo ?? undefined}
                   posterSrc={art.poster}
+                  sharedState={EMPTY_CARD_SHARED_STATE}
                 />
               </div>
             ) : (
@@ -114,7 +127,7 @@ export function PosterCardSection() {
           <div className="hset-postertune-dials" style={tv ? { flex: "1 1 280px" } : undefined}>
             <SettingRow
               wide
-              label={t("Size")}
+              label={t("Poster size")}
               desc={t("How large every poster card is drawn across Home and search.")}
             >
               <div className="flex w-full items-center gap-4">
@@ -123,7 +136,7 @@ export function PosterCardSection() {
                   min={0}
                   max={POSTER_SIZES.length - 1}
                   step={1}
-                  aria-label={t("Size")}
+                  aria-label={t("Poster size")}
                   value={sizeIndex(settings.posterScale)}
                   onChange={(e) =>
                     update({ posterScale: POSTER_SIZES[Number(e.target.value)].scale })

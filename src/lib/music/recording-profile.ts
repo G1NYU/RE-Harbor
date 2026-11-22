@@ -4,7 +4,7 @@ import type { MusicAlbumRef, MusicArtistRef, MusicTrack } from "./types";
 declare const __APP_VERSION__: string;
 export const MUSICBRAINZ_HEADERS = {
   Accept: "application/json",
-  "User-Agent": `Harbor/${typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev"} (https://github.com/harborstremio/harbor)`,
+  "User-Agent": `Harbor/${typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev"} (https://github.com/HarborCommunity/Harbor)`,
 };
 
 type Obj = Record<string, unknown>;
@@ -154,7 +154,7 @@ async function json(url: string, signal: AbortSignal): Promise<Obj> {
         signal: controller.signal,
         headers: {
           Accept: "application/json",
-          ...(musicBrainz ? { "User-Agent": "Harbor/0.9 (https://harbor.site)" } : {}),
+          ...(musicBrainz ? { "User-Agent": "Harbor/0.9 (https://harborcommunity.site)" } : {}),
         },
       });
       if (!response.ok) {

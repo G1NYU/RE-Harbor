@@ -8,6 +8,7 @@ import * as jsx from "react/jsx-runtime";
 import * as icons from "lucide-react";
 import { createRoot } from "react-dom/client";
 import * as leave from "../src/lib/player/leave-confirm";
+import * as playbackEnd from "../src/lib/player/playback-end";
 import * as back from "../src/lib/back-intercept";
 import * as pickerReturn from "../src/lib/picker-return";
 import * as dockedNavigation from "../src/lib/player/docked-navigation";
@@ -25,6 +26,7 @@ function harness() {
     HTMLElement: dom.window.HTMLElement,
     CustomEvent: dom.window.CustomEvent,
     localStorage: dom.window.localStorage,
+    getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
     ResizeObserver: class {
       observe() {}
       disconnect() {}
@@ -42,10 +44,12 @@ function harness() {
       registerProfileDestination: () => () => {},
       subscribeOpenProfile: () => () => {},
     },
+    "@/lib/social/user-discovery-open": { requestOpenUserDiscovery: () => calls.push("discovery") },
     "@/lib/social/open-group": { subscribeOpenGroup: () => () => {} },
     "./discover": { trackEvent: () => {}, profileFromMeta: () => ({}) },
     "./settings": { useSettings: () => ({ settings: {} }) },
     "./smooth-scroll": {},
+    "./scroll-activity": { noteScrollActivity: () => {} },
     "./together/provider": { useTogether: () => ({ snapshot: { state: "idle" } }) },
     "./fullscreen-state": { beginMarathonAdvance: () => calls.push("advance") },
     "./back-intercept": back,
@@ -72,6 +76,7 @@ function harness() {
       streamMatchesEntry: () => false,
     },
     "@/lib/player/playback-clock": { getPlaybackPosition: () => 42 },
+    "@/lib/player/playback-end": playbackEnd,
     "@/lib/resume": { saveResumeMs: (...args: unknown[]) => calls.push(["resume", ...args]) },
     "@/lib/fullscreen-state": {
       isAnyFullscreen: async () => fullscreen,
@@ -79,6 +84,13 @@ function harness() {
       exitWindowFullscreenOnPlayerClose: async () => calls.push("fullscreen"),
     },
     "../player-utils": { MAX_AUTORETRY_ATTEMPTS: 3 },
+    "@/lib/theme-auth": { authToken: () => null, currentAuthor: () => null },
+    "@/lib/active-profile-id": { isNuvioProviderActive: () => false },
+    "@/lib/nuvio/nuvio-client": {
+      isNuvioSignedIn: () => false,
+      isNuvioProviderActive: () => false,
+      loadNuvioState: () => ({ profiles: [], activeProfileIndex: 1 }),
+    },
   };
   const load = (path: string): any => {
     const module = { exports: {} };
@@ -149,6 +161,127 @@ test("Settings and ordinary routes use the existing view stack without a player 
     await React.act(() => view.openProfile("another-person"));
     assert.equal(view.topKind, "profile");
     assert.equal(leave.getLeaveConfirm().open, false);
+    const stack = [...view.stackKinds];
+    await React.act(() => view.openUserDiscovery());
+    assert.deepEqual(view.stackKinds, stack, "discovery opens over the current page");
+    assert.ok(h.calls.includes("discovery"));
+  } finally {
+    await h.dispose();
+  }
+});
+
+test("card and row actions stay stable across navigation while view consumers update", async () => {
+  const h = harness();
+  try {
+    const { ViewProvider, useView, useViewActions } = h.load("src/lib/view.tsx");
+    let view: any;
+    let actions: any;
+    let renders = 0;
+    const RowConsumer = React.memo(function RowConsumer() {
+      actions = useViewActions();
+      renders++;
+      return null;
+    });
+    function ViewConsumer() {
+      view = useView();
+      return null;
+    }
+    await React.act(() =>
+      h.root.render(
+        React.createElement(
+          ViewProvider,
+          null,
+          React.createElement(RowConsumer),
+          React.createElement(ViewConsumer),
+        ),
+      ),
+    );
+    const original = actions;
+    const before = renders;
+    actions.rememberRowScroll("fixture-row", 123);
+    await React.act(() => view.setView("library"));
+    assert.equal(view.topKind, "library");
+    assert.equal(actions, original);
+    assert.equal(renders, before, "navigation must not wake every card and row");
+    actions.rememberRowScroll("fixture-row", 456);
+    assert.equal(actions.recallRowScroll("fixture-row"), 456);
+  } finally {
+    await h.dispose();
+  }
+});
+
+test("push, Back, and Forward save scroll before changing the active view", async () => {
+  const h = harness();
+  const { ViewProvider, useView } = h.load("src/lib/view.tsx");
+  let view: any;
+  const savedFrom: string[] = [];
+  function Probe() {
+    view = useView();
+    return null;
+  }
+  try {
+    await React.act(() => h.root.render(jsx.jsx(ViewProvider, { children: jsx.jsx(Probe, {}) })));
+    const unregister = view.registerScrollSave(() => savedFrom.push(view.topKind));
+    await React.act(() => view.openMeta({ id: "tt1", name: "Fixture", type: "movie" }));
+    await React.act(() => view.goBack());
+    await React.act(() => view.goForward());
+    assert.deepEqual(savedFrom, ["home", "meta", "home"]);
+    assert.equal(view.topKind, "meta");
+    unregister();
+    await React.act(() => view.goBack());
+    assert.equal(savedFrom.length, 3);
+  } finally {
+    await h.dispose();
+  }
+});
+
+test("catalog stays mounted behind detail but unmounts on a sidebar root switch", async () => {
+  const h = harness();
+  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const start = app.indexOf("function useIdleEvict(");
+  const end = app.indexOf("\nexport function App(", start);
+  const output = ts.transpileModule(app.slice(start, end), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const useIdleEvict = new Function(
+    "useState",
+    "useEffect",
+    "subscribeMemoryPressure",
+    "IDLE_EVICT_MS",
+    "PRESSURE_EVICT_MS",
+    output + "\nreturn useIdleEvict;",
+  )(React.useState, React.useEffect, () => () => {}, 10000, 1500);
+  const { ViewProvider, useView } = h.load("src/lib/view.tsx");
+  let view: any;
+  let mounts = 0;
+  function Catalog() {
+    React.useEffect(() => {
+      mounts++;
+    }, []);
+    return jsx.jsx("div", { id: "catalog" });
+  }
+  function Probe() {
+    view = useView();
+    const alive = useIdleEvict(
+      view.topKind === "movies",
+      false,
+      view.stackKinds.includes("movies"),
+    );
+    return alive ? jsx.jsx(Catalog, {}) : null;
+  }
+  try {
+    await React.act(() => h.root.render(jsx.jsx(ViewProvider, { children: jsx.jsx(Probe, {}) })));
+    await React.act(() => view.setView("movies"));
+    const original = document.querySelector("#catalog");
+    assert.ok(original);
+    await React.act(() => view.openMeta({ id: "tt1", name: "Fixture", type: "movie" }));
+    assert.equal(document.querySelector("#catalog"), original);
+    await React.act(() => view.goBack());
+    assert.equal(document.querySelector("#catalog"), original);
+    await React.act(() => view.setView("discover"));
+    assert.equal(document.querySelector("#catalog"), null);
+    await React.act(() => view.setView("movies"));
+    assert.equal(mounts, 2);
   } finally {
     await h.dispose();
   }
@@ -308,6 +441,8 @@ test("the original close flow saves progress before PiP, casting, fullscreen and
       },
       season: 2,
       episode: 3,
+      // A playable episode, not a finished close that should clear its resume.
+      snap: { status: "playing", positionSec: 42, durationSec: 3600 },
       bridgeRef: { current: null },
       liveUrl: "fixture://episode",
       liveStreamRef: { title: "Episode" },

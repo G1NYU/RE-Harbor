@@ -1,12 +1,20 @@
 import { useTrackPlaybackState } from "@/lib/music/use-track-playback-state";
 import { useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
-import { GripVertical, Heart, LoaderCircle, MoreHorizontal, Pause, Play } from "@/components/icons/music-icons";
+import {
+  GripVertical,
+  Heart,
+  ListPlus,
+  LoaderCircle,
+  MoreHorizontal,
+  Pause,
+  Play,
+} from "@/components/icons/music-icons";
 import { MusicTrackMenu, useMusicTrackMenuItems } from "./music-track-menu";
 import { MusicCardBadgeChip, type MusicCardBadge } from "@/components/music/music-cover-card";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";
 import type { MusicTrack } from "@/lib/music/types";
-import { toggleMusicLiked, toggleMusicPlayback } from "@/lib/music/player";
+import { enqueueMusic, toggleMusicLiked, toggleMusicPlayback } from "@/lib/music/player";
 import { useMusicTrackLiked } from "@/lib/music/use-track-liked";
 import { MusicMediaBadge } from "./music-media-badge";
 import { MusicArtistLink } from "./music-artist-link";
@@ -97,10 +105,12 @@ export function MusicTrackRow({
   const openMenu = (event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    const target = event.target instanceof Element
-      ? event.target.closest<HTMLElement>("button, [href], [tabindex]:not([tabindex='-1'])")
-      : null;
-    anchorRef.current = target && event.currentTarget.contains(target) ? target : event.currentTarget;
+    const target =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>("button, [href], [tabindex]:not([tabindex='-1'])")
+        : null;
+    anchorRef.current =
+      target && event.currentTarget.contains(target) ? target : event.currentTarget;
     setContextPosition(
       event.type === "contextmenu" && (event.clientX !== 0 || event.clientY !== 0)
         ? { x: event.clientX, y: event.clientY }
@@ -203,12 +213,28 @@ export function MusicTrackRow({
         )}
       </div>
       {showDuration && (
-        <span data-music-duration className="ms-4 inline-flex shrink-0 items-center gap-3 text-xs tabular-nums text-ink-muted">
+        <span
+          data-music-duration
+          className="ms-4 inline-flex shrink-0 items-center gap-3 text-xs tabular-nums text-ink-muted"
+        >
           <MusicTrackLabels track={track} />
           <MusicMediaBadge kind={track.mediaKind} compact />
           <span>{track.durationLabel}</span>
         </span>
       )}
+      <button
+        type="button"
+        data-music-queue-action
+        onClick={(event) => {
+          event.stopPropagation();
+          (onAddToQueue ?? (() => enqueueMusic(track)))();
+        }}
+        aria-label={t("music.card.addToQueue")}
+        title={t("music.card.addToQueue")}
+        className="ms-3 grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-subtle opacity-0 transition-[color,background-color,opacity] duration-200 ease-out hover:bg-elevated hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 group-data-[menu-open]:opacity-100"
+      >
+        <ListPlus size={16} aria-hidden="true" />
+      </button>
       {saveable && (
         <button
           type="button"
@@ -216,7 +242,7 @@ export function MusicTrackRow({
           data-burst={burst || undefined}
           onClick={(event) => {
             event.stopPropagation();
-            setBurst((count) => saved ? 0 : count + 1);
+            setBurst((count) => (saved ? 0 : count + 1));
             save();
           }}
           aria-pressed={saved}
@@ -226,9 +252,14 @@ export function MusicTrackRow({
         >
           <Heart size={16} fill={saved ? "currentColor" : "none"} aria-hidden="true" />
           {burst > 0 && saved && (
-            <span key={burst} className="dock-like-burst" aria-hidden="true" onAnimationEnd={(event) => {
-              if (event.animationName === "dock-like-ring") setBurst(0);
-            }}>
+            <span
+              key={burst}
+              className="dock-like-burst"
+              aria-hidden="true"
+              onAnimationEnd={(event) => {
+                if (event.animationName === "dock-like-ring") setBurst(0);
+              }}
+            >
               <span className="dock-like-ring" />
               {ROW_LIKE_SPOKES.map((rotate, index) => (
                 <span

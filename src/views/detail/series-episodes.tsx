@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { EpisodeJumper } from "@/components/episode-jumper";
 import { providerForModel } from "@/lib/ai-models";
@@ -19,7 +19,7 @@ import { getEpisodeProgress, resumeDefaultSeason } from "@/lib/episode-progress"
 import { scrollToDataEp } from "@/lib/episode-scroll";
 import { getViewedSeason } from "@/lib/season-view-pref";
 import { tmdbSeasonEpisodes, type Episode, type Season } from "@/lib/providers/tmdb";
-import { tmdbLanguageIso } from "@/lib/providers/tmdb/tmdb-client";
+import { effectiveTmdbLanguage, tmdbLanguageIso } from "@/lib/providers/tmdb/tmdb-client";
 import type { OrderedEpisode } from "@/lib/providers/tvdb-order";
 import { pickPreferredEpisodeOverview, pickPreferredEpisodeTitle } from "@/lib/localized-text";
 import {
@@ -47,34 +47,49 @@ import { useArcGroups } from "./series-episodes/use-arc-groups";
 import { OrderedEpisodes } from "./series-episodes/ordered-episodes";
 import { useEpisodeOrder } from "./series-episodes/use-episode-order";
 import { useEpisodeEnrich } from "./series-episodes/use-episode-enrich";
+import { useEpisodeImdbRatings } from "./use-episode-imdb-ratings";
+import { selectOmdbSeasonsForOrder } from "@/lib/omdb-season-queue";
 import { useWatchedSets } from "./series-episodes/use-watched-sets";
 import { useEpisodeProgressMap } from "./series-episodes/use-episode-progress-map";
 import { useTvdbSeasonTypes } from "./series-episodes/use-tvdb-season-types";
 import { useSeriesTvdbStills } from "./series-episodes/use-series-tvdb-stills";
 import { TvdbOrderPanel } from "./series-episodes/tvdb-order-panel";
+import { SeasonExplorer } from "./season-explorer";
+import { useSeasonExplorerView } from "./use-season-explorer";
 
 export function SeriesEpisodes({
   meta,
   tvId,
   imdbId,
   seasons,
+  seasonPosters,
   lastEpisodeAir,
   scrollRef,
   cinemetaVideos,
   stremioWatched,
   resumeSeason,
   resumeEpisode,
+  orderProviderOverride,
+  seasonOverviewsBySource,
+  synopsisOrder,
 }: {
   meta: Meta;
   tvId: number;
   imdbId: string | null;
   seasons: Season[];
+  seasonPosters?: Record<number, string>;
   lastEpisodeAir?: { seasonNumber: number; airDate: string | null };
   scrollRef: React.RefObject<HTMLElement | null>;
   cinemetaVideos?: NonNullable<Meta["videos"]>;
   stremioWatched?: Set<string>;
   resumeSeason?: number;
   resumeEpisode?: number;
+  orderProviderOverride?: "tmdb" | "tvdb";
+  seasonOverviewsBySource?: Record<
+    string,
+    { sourceName?: string; overviews: Record<number, string> }
+  >;
+  synopsisOrder?: string[];
 }) {
   const t = useT();
   const { settings, update } = useSettings();
@@ -98,12 +113,30 @@ export function SeriesEpisodes({
     watched: boolean,
   ) => {
     e.preventDefault();
+    const selected = [...orderedEps, ...enrichedEpisodes].find(
+      (ep) => ep.seasonNumber === season && ep.episodeNumber === episode,
+    );
+    const video = cinemetaVideos?.find(
+      (entry) => entry.season === season && entry.episode === episode,
+    );
     setWatchedMenu({
       x: e.clientX,
       y: e.clientY,
       season,
       episode,
       watched,
+      queueTarget: {
+        meta,
+        episode: {
+          season,
+          episode,
+          name: selected?.name || video?.name || undefined,
+          runtime: selected?.runtime ?? undefined,
+          overview: selected?.overview || undefined,
+          still: video?.thumbnail || undefined,
+          imdbId: video?.id || undefined,
+        },
+      },
       origin: e.currentTarget instanceof HTMLElement ? e.currentTarget : null,
     });
   };
@@ -152,11 +185,22 @@ export function SeriesEpisodes({
         }
       }
     }
-    const manual = manualEpisodeKeys(meta.id);
+    const manual = manualEpisodeKeys(meta.id, [imdbId]);
     for (const k of manual.watched) s.add(k);
     for (const k of manual.unwatched) s.delete(k);
     return s;
-  }, [stremioWatched, simklWatched, traktWatched, pmdbWatched, meta.id, imdbId, mwVersion]);
+  }, [
+    stremioWatched,
+    simklWatched,
+    traktWatched,
+    pmdbWatched,
+    meta.id,
+    imdbId,
+    mwVersion,
+    resumeSeason,
+    resumeEpisode,
+    seasons,
+  ]);
   const cache = useRef<Map<string, Episode[]>>(new Map());
 
   const traktKey = imdbId ?? meta.id;
@@ -197,9 +241,15 @@ export function SeriesEpisodes({
     tvdbKey: settings.tvdbKey,
     omdbKey: settings.omdbKey,
     metaId: meta.id,
-    preferCustomMeta: settings.preferCustomMetaAddon,
+    preferCustomMeta: settings.addonOnlyMetadata,
   });
-  const tvdbStills = useSeriesTvdbStills(imdbId, enrichedBase.length, settings.tvdbSeasonType);
+  const tvdbStills = useSeriesTvdbStills(
+    imdbId,
+    enrichedBase.length,
+    settings.tvdbSeasonType,
+    false,
+    !!settings.tvdbKey,
+  );
   const enrichedEpisodes = useMemo(() => {
     if (Object.keys(tvdbStills).length === 0) return enrichedBase;
     return enrichedBase.map((ep) => {
@@ -303,7 +353,7 @@ export function SeriesEpisodes({
   const [mode, setMode] = useState<"seasons" | "arcs">("seasons");
   const arc = useArcGroups({ tvId, tmdbKey: settings.tmdbKey, enabled: settings.episodeArcGroups });
   const arcActive = settings.episodeArcGroups && arc.hasArcs && mode === "arcs";
-  const orderProvider = effectiveOrderProvider(settings);
+  const orderProvider = orderProviderOverride ?? effectiveOrderProvider(settings);
   const ordering = useEpisodeOrder(
     imdbId,
     meta.id,
@@ -315,7 +365,7 @@ export function SeriesEpisodes({
     imdbId,
     meta.id,
     settings.tvdbKey,
-    tvdbPanelEnabled(settings),
+    tvdbPanelEnabled(settings) && !!settings.tvdbKey,
   );
   const orderTypesEff =
     settings.tmdbKey && orderTypes.length > 0
@@ -326,6 +376,14 @@ export function SeriesEpisodes({
     setOrderSeason(-1);
   }, [meta.id]);
   const orderActive = !arcActive && ordering != null;
+  useEffect(() => {
+    if (orderActive || seasons.some((s) => s.seasonNumber === active)) return;
+    userPickedRef.current = false;
+    setActive(
+      getViewedSeason(meta.id, seasons) ??
+        resumeDefaultSeason(meta.id, seasons, combinedWatched, resumeSeason),
+    );
+  }, [orderActive, active, meta.id, seasons, combinedWatched, resumeSeason]);
   const panelActive = tvdbPanelEnabled(settings) && (orderActive || orderTypes.length > 0);
   const altActive = arcActive || orderActive;
   const orderSeasonEff =
@@ -347,6 +405,9 @@ export function SeriesEpisodes({
     setActive,
     setOrderSeason,
     userPickedRef,
+    tmdbSeasonNameFallback:
+      settings.tvdbSeasonType === "aired" || settings.tvdbSeasonType === "official",
+    seasonPosters,
   });
   useEffect(() => {
     let cancelled = false;
@@ -391,6 +452,35 @@ export function SeriesEpisodes({
     : ordering
       ? (ordering.bySeason.get(orderSeasonEff) ?? [])
       : [];
+  const ratingScope = JSON.stringify([meta.id, settings.tvdbSeasonType, orderSeasonEff]);
+  const [visibleRatingSeasons, setVisibleRatingSeasons] = useState<{
+    scope: string;
+    seasons: number[];
+  }>({ scope: "", seasons: [] });
+  const onRatingSeasonVisible = useCallback(
+    (season: number) => {
+      setVisibleRatingSeasons((previous) => {
+        const current = previous.scope === ratingScope ? previous.seasons : [];
+        return current.includes(season)
+          ? previous
+          : { scope: ratingScope, seasons: [...current, season] };
+      });
+    },
+    [ratingScope],
+  );
+  const canonicalRatingSeasons = orderActive
+    ? orderedEpsRaw.map((episode) => episode.seasonNumber)
+    : [active];
+  const selectedRatingSeasons = selectOmdbSeasonsForOrder(
+    canonicalRatingSeasons,
+    visibleRatingSeasons.scope === ratingScope ? visibleRatingSeasons.seasons : [],
+    resumeSeason,
+  );
+  const orderedImdbRatings = useEpisodeImdbRatings(
+    imdbId,
+    selectedRatingSeasons.seasons,
+    settings.omdbKey,
+  );
   const orderedEps = useMemo(() => {
     // pickLocalizedText keys script tests by ISO-1 ("ko"), not TVDB codes ("kor").
     const lang = metadataLanguage;
@@ -450,7 +540,9 @@ export function SeriesEpisodes({
                 : "und",
       };
       if (ep.imdbRating == null) {
-        const r = imdbRatings.get(`${ep.seasonNumber}:${ep.episodeNumber}`);
+        const r =
+          orderedImdbRatings.get(`${ep.seasonNumber}:${ep.episodeNumber}`) ??
+          imdbRatings.get(`${ep.seasonNumber}:${ep.episodeNumber}`);
         if (r != null && r > 0) next = { ...next, imdbRating: r };
       }
       return next;
@@ -458,6 +550,7 @@ export function SeriesEpisodes({
   }, [
     orderedEpsRaw,
     imdbRatings,
+    orderedImdbRatings,
     orderActive,
     orderSeasonEff,
     settings.tvdbSeasonType,
@@ -471,6 +564,10 @@ export function SeriesEpisodes({
         ? orderedEps.filter((ep) => !hiddenSet.has(`${ep.seasonNumber}:${ep.episodeNumber}`))
         : orderedEps,
     [orderedEps, hideActive, hiddenSet],
+  );
+  const showOrderedSeason = useMemo(
+    () => new Set(visibleOrderedEps.map((e) => e.orderSeason ?? e.seasonNumber)).size > 1,
+    [visibleOrderedEps],
   );
   const orderedLoading = arcActive && arc.loading;
 
@@ -489,7 +586,7 @@ export function SeriesEpisodes({
     metaId: meta.id,
     traktKey,
     traktWatched,
-    stremioWatched,
+    stremioWatched: combinedWatched,
     simklWatched,
     pmdbWatched,
     mwVersion,
@@ -507,9 +604,45 @@ export function SeriesEpisodes({
     [enrichedEpisodes],
   );
 
+  const explorerType = orderActive ? settings.tvdbSeasonType : "aired";
+  const showExplorer =
+    settings.tvdbSeasonExplorer !== false &&
+    !arcActive &&
+    picker.items.length > 0 &&
+    !["absolute", "tvdbabsolute"].includes(explorerType);
+
+  const explorer = useSeasonExplorerView({
+    metaId: meta.id,
+    imdbId,
+    tvdbKey: settings.tvdbKey,
+    tmdbKey: settings.tmdbKey,
+    tmdbTvId: tvId,
+    seasonPosters,
+    titlePoster: meta.poster,
+    seasonType: explorerType === "aired" ? "official" : explorerType,
+    lang: effectiveTmdbLanguage(),
+    items: picker.items,
+    preferFallbackSynopsis: !synopsisOrder?.[0] || synopsisOrder[0].startsWith("addon:"),
+    synopsisOrder,
+    addonSeasonOverviews: seasonOverviewsBySource,
+    fallbackSourceName: meta.addonOrigin?.name ?? "Addon",
+    activeKey: picker.activeKey,
+    enabled: showExplorer,
+    allowProxy: false,
+  });
+
   return (
     <div data-episodes className="flex scroll-mt-24 flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+      {showExplorer && (
+        <SeasonExplorer
+          key={`${meta.id}:${source}:${settings.tvdbSeasonType}`}
+          data={explorer}
+          background={meta.background}
+          activeKey={picker.activeKey}
+          onSelect={picker.onSelect}
+        />
+      )}
+      <div data-scroll-anchor="detail-episodes" className="flex items-start justify-between gap-4">
         <h3 className="shrink-0 pt-1 text-[22px] font-medium tracking-tight text-ink">
           {t("Episodes")}
         </h3>
@@ -564,7 +697,7 @@ export function SeriesEpisodes({
           />
           {panelActive ? (
             <TvdbOrderPanel
-              items={picker.items}
+              items={explorer.items}
               activeKey={picker.activeKey}
               onSelect={picker.onSelect}
               orderTypes={orderTypesEff}
@@ -574,7 +707,7 @@ export function SeriesEpisodes({
           ) : (
             (picker.items.length > 1 || arcAvailable) && (
               <SeasonArcPicker
-                items={picker.items}
+                items={explorer.items}
                 activeKey={picker.activeKey}
                 onSelect={picker.onSelect}
                 mode={arcAvailable ? mode : undefined}
@@ -609,6 +742,7 @@ export function SeriesEpisodes({
         <>
           {altActive && (
             <OrderedEpisodes
+              key={`${ratingScope}:${source}`}
               meta={meta}
               episodes={visibleOrderedEps}
               loading={orderedLoading}
@@ -620,6 +754,10 @@ export function SeriesEpisodes({
               cinemetaVideos={cinemetaVideos}
               seriesImdbId={imdbId}
               onContextMenu={openWatchedMenu}
+              onSeasonVisible={
+                orderActive && selectedRatingSeasons.lazy ? onRatingSeasonVisible : undefined
+              }
+              showSeason={showOrderedSeason}
             />
           )}
 
@@ -717,11 +855,22 @@ export function SeriesEpisodes({
             background: meta.background,
           }}
           target={watchedMenu}
-          allEpisodes={enrichedEpisodes.map((ep) => ({
-            season: ep.seasonNumber,
-            episode: ep.episodeNumber,
-            released: ep.airDate ?? null,
-          }))}
+          imdbId={imdbId}
+          allEpisodes={
+            cinemetaVideos?.length
+              ? cinemetaVideos
+                  .map((v) => ({
+                    season: v.season ?? 0,
+                    episode: v.episode ?? v.number ?? 1,
+                    released: v.released ?? null,
+                  }))
+                  .filter((e) => e.season > 0 && e.episode > 0)
+              : enrichedEpisodes.map((ep) => ({
+                  season: ep.seasonNumber,
+                  episode: ep.episodeNumber,
+                  released: ep.airDate ?? null,
+                }))
+          }
           onClose={() => setWatchedMenu(null)}
         />
       )}

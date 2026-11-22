@@ -97,7 +97,7 @@ test("lyricIndexAt is exact at boundaries, -1 before the first line, last after 
   assert.equal(lyrics.lyricIndexAt(lines, Number.NaN), -1);
 });
 
-test("loadTrackLyrics picks the closest duration, not the first search result", async () => {
+test("loadTrackLyrics reads the light get endpoint and still picks the closest duration", async () => {
   const { lyrics, calls } = build(async () =>
     ok([
       { duration: 240, instrumental: false, syncedLyrics: "[00:01.00]Live version" },
@@ -108,8 +108,9 @@ test("loadTrackLyrics picks the closest duration, not the first search result", 
   const lines = await lyrics.loadTrackLyrics(track());
   assert.deepEqual(lines, [{ at: 2, text: "Studio version" }]);
   assert.equal(calls.length, 1);
-  assert.ok(calls[0].startsWith("https://lrclib.net/api/search?"), calls[0]);
+  assert.ok(calls[0].startsWith("https://lrclib.net/api/get?"), calls[0]);
   assert.ok(calls[0].includes("artist_name=King%20Von"), calls[0]);
+  assert.ok(calls[0].includes("duration=116"), calls[0]);
 });
 
 test("loadTrackLyrics prefers the exact get endpoint when album and duration are known", async () => {
@@ -125,15 +126,48 @@ test("loadTrackLyrics prefers the exact get endpoint when album and duration are
   assert.ok(calls[0].includes("duration=116"), calls[0]);
 });
 
+test("a provider album that LRCLIB rejects does not force the heavy search", async () => {
+  const { lyrics, calls } = build(async (url) =>
+    url.includes("album_name=")
+      ? { ok: false, status: 404, json: async () => null }
+      : ok({ duration: 116, instrumental: false, syncedLyrics: "[00:07.00]Found anyway" }),
+  );
+  // YouTube Music sometimes stores "73K likes" in the album field.
+  const lines = await lyrics.loadTrackLyrics(track({ id: "t-bad-album", album: "73K likes" }));
+  assert.deepEqual(lines, [{ at: 7, text: "Found anyway" }]);
+  assert.equal(calls.length, 2, calls.join("\n"));
+  assert.ok(
+    calls.every((url) => !url.includes("/api/search?")),
+    calls.join("\n"),
+  );
+});
+
+test("a wrong provider duration still resolves through get instead of the heavy search", async () => {
+  const { lyrics, calls } = build(async (url) => {
+    if (url.includes("album_name=") || url.includes("duration="))
+      return { ok: false, status: 404, json: async () => null };
+    return ok({ duration: 192, instrumental: false, syncedLyrics: "[00:08.00]Duration was off" });
+  });
+  const lines = await lyrics.loadTrackLyrics(track({ id: "t-duration", album: "73K likes" }));
+  assert.deepEqual(lines, [{ at: 8, text: "Duration was off" }]);
+  assert.equal(calls.length, 3, calls.join("\n"));
+  assert.ok(
+    calls.every((url) => !url.includes("/api/search?")),
+    calls.join("\n"),
+  );
+});
+
 test("loadTrackLyrics falls back to search when the exact lookup misses", async () => {
   const { lyrics, calls } = build(async (url) =>
     url.includes("/api/get?")
-      ? { ok: false, json: async () => null }
+      ? { ok: false, status: 404, json: async () => null }
       : ok([{ duration: 116, instrumental: false, syncedLyrics: "[00:05.00]From search" }]),
   );
   const lines = await lyrics.loadTrackLyrics(track({ album: "Welcome to O'Block", id: "t-miss" }));
   assert.deepEqual(lines, [{ at: 5, text: "From search" }]);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 4);
+  assert.ok(calls[0].includes("album_name="), calls[0]);
+  assert.ok(calls[3].startsWith("https://lrclib.net/api/search?"), calls[3]);
 });
 
 test("loadTrackLyrics returns null for instrumentals and for plain-only lyrics", async () => {
@@ -148,13 +182,13 @@ test("loadTrackLyrics returns null for instrumentals and for plain-only lyrics",
   assert.equal(await plain.lyrics.loadTrackLyrics(track({ id: "t-plain" })), null);
 });
 
-test("loadTrackLyrics never throws and caches the negative result", async () => {
+test("loadTrackLyrics never throws and permits recovery after network failure", async () => {
   const { lyrics, calls } = build(async () => {
     throw new Error("offline");
   });
   assert.equal(await lyrics.loadTrackLyrics(track({ id: "t-off" })), null);
   assert.equal(await lyrics.loadTrackLyrics(track({ id: "t-off" })), null);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 4);
 });
 
 test("loadTrackLyrics caches a hit so scrubbing never refetches", async () => {
@@ -165,4 +199,57 @@ test("loadTrackLyrics caches a hit so scrubbing never refetches", async () => {
   const second = await lyrics.loadTrackLyrics(track({ id: "t-cache" }));
   assert.deepEqual(first, second);
   assert.equal(calls.length, 1);
+});
+
+test("lyrics retry a temporary server error and retain the recovered result", async () => {
+  let attempts = 0;
+  const { lyrics, calls } = build(async () =>
+    ++attempts === 1
+      ? { ok: false, status: 503 }
+      : ok([{ duration: 116, syncedLyrics: "[00:02]Recovered" }]),
+  );
+  assert.deepEqual(await lyrics.loadTrackLyrics(track()), [{ at: 2, text: "Recovered" }]);
+  await lyrics.loadTrackLyrics(track());
+  assert.equal(calls.length, 2);
+});
+
+test("lyrics do not immediately retry throttled requests or cache them as missing", async () => {
+  let limited = true;
+  const { lyrics, calls } = build(async () =>
+    limited
+      ? { ok: false, status: 429 }
+      : ok([{ duration: 116, syncedLyrics: "[00:02]Recovered" }]),
+  );
+  assert.equal(await lyrics.loadTrackLyrics(track()), null);
+  assert.equal(calls.length, 1);
+  limited = false;
+  assert.deepEqual(await lyrics.loadTrackLyrics(track()), [{ at: 2, text: "Recovered" }]);
+});
+test("a YouTube video title is reduced to the song before lyrics are requested", () => {
+  const { lyrics } = build(async () => ok(null));
+  assert.equal(
+    lyrics.lyricTitle("LE SSERAFIM (르세라핌) 'Smart' OFFICIAL MV", "LE SSERAFIM"),
+    "Smart",
+  );
+  assert.equal(lyrics.lyricTitle("Smart (Slowed + Reverb ver.)", "LE SSERAFIM"), "Smart");
+  assert.equal(lyrics.lyricTitle("Daft Punk - One More Time", "Daft Punk"), "One More Time");
+  assert.equal(lyrics.lyricTitle("One More Time", "Daft Punk"), "One More Time");
+  assert.equal(lyrics.lyricTitle("", "Daft Punk"), "");
+});
+
+test("the lyrics request uses the cleaned song title", async () => {
+  const { lyrics, calls } = build(async () =>
+    ok({ duration: 189, instrumental: false, syncedLyrics: "[00:02.00]Cleaned" }),
+  );
+  const lines = await lyrics.loadTrackLyrics(
+    track({
+      id: "t-mv",
+      title: "LE SSERAFIM (르세라핌) 'Smart' OFFICIAL MV",
+      artist: "LE SSERAFIM",
+      durationSeconds: 189,
+    }),
+  );
+  assert.deepEqual(lines, [{ at: 2, text: "Cleaned" }]);
+  assert.ok(calls[0].includes("track_name=Smart"), calls[0]);
+  assert.ok(!calls[0].includes("OFFICIAL"), calls[0]);
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
+import { selectSourceCandidate } from "../src/lib/music/source-selection.ts";
 import { queueTrackKey } from "../src/lib/music/queue-order.ts";
 import { dedupeMusicTracks, sameMusicTrack } from "../src/lib/music/track-identity.ts";
 import type { MusicTrack } from "../src/lib/music/types.ts";
@@ -74,6 +75,7 @@ function player() {
       isDeckWindow: () => false,
       answerDeckRequests: () => () => {},
       broadcastDeckState: () => {},
+      isDeckWindow: () => false,
       sendDeckAdopted: () => {},
       serveDeckCommands: () => () => {},
     },
@@ -86,6 +88,61 @@ function player() {
       likedIdsFor: (t: any) => (t ? [t.id] : []),
       withoutLiked: (ids: readonly string[], t: any) => ids.filter((id: string) => id !== t.id),
     },
+    "./source-selection": { selectSourceCandidate },
+    "./source-version": {
+      compatibleVocalVersion: () => true,
+      shouldResolvePreferredSource: () => false,
+    },
+    "./queue-automation": {
+      cancelMusicQueueAutomation: () => false,
+      markMusicQueueAutomationStarted: () => {},
+      ownsMusicQueueAutomation: () => false,
+    },
+    "@/lib/active-profile-id": {
+      activeProfileId: () => "default",
+      activeProfileIsPrimary: () => true,
+    },
+    "./listening-affinity": {
+      hydrateListeningAffinity: async () => {},
+      observeMusicListening: () => {},
+    },
+    "./artist-blocks": {
+      filterBlockedTracks: (tracks: unknown) => tracks,
+      hydrateArtistBlockStore: async () => {},
+    },
+    "./liked-artists": { hydrateLikedArtistStore: async () => {} },
+    "./decks": { engineSnapshot: async () => null },
+    "./queue-source": { adoptRequestedIdentity: (identity: unknown) => identity },
+    "./spotify-startup": {
+      shouldReportSpotifyStartupTimeout: () => false,
+      SPOTIFY_STARTUP_TIMEOUT_MESSAGE: "Spotify playback timed out.",
+      SPOTIFY_STARTUP_TIMEOUT_MS: 35_000,
+    },
+    "./explicit-preference": {
+      explicitnessOf: () => 0,
+      rankByExplicitness: (list: unknown[]) => list,
+    },
+    "./pinned-sources": {
+      loadPinnedSources: () => {},
+      peekPinnedSource: () => null,
+      pinSourceFor: () => {},
+      unpinSourceFor: () => {},
+    },
+    "./transport": {
+      getMusicTransport: () => ({ shuffle: false, repeat: "off" }),
+      musicAdvance: () => null,
+      musicPrevious: () => null,
+      musicWarmTargets: () => [],
+      resetMusicOrder: () => {},
+      setMusicPriorityNext: () => {},
+    },
+    "./recent-context": {
+      hydrateMusicContextTracks: async () => {},
+      hydrateMusicRecentContexts: async () => {},
+    },
+    "./recent-destinations": { hydrateMusicDestinations: async () => {} },
+    "./pinned-playlists": { hydratePinnedMusicPlaylists: async () => {} },
+    "@/lib/platform": { isWindowsDesktop: () => false },
     "./source-consent": {
       musicSourceAllowed: () => true,
       musicPlaybackSourceAllowed: () => true,
@@ -112,6 +169,7 @@ function player() {
     "./playback-origin": {
       beginMusicQueue: noop,
       getMusicPlaybackOrigin: () => null,
+      beginMusicQueue: () => {},
       restoreMusicPlaybackOrigin: () => {},
     },
     "./preferences": {

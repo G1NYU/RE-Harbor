@@ -392,6 +392,7 @@ const wired: Record<string, string> = {
   "Episode titles, alternate names, network info, and the arc/DVD/absolute orderings. Layered on TMDB so the better source wins per field. Free for personal use at":
     "عناوين الحلقات والأسماء البديلة ومعلومات الشبكة وترتيبات الأجزاء وDVD والترتيب المطلق. تُضاف فوق بيانات TMDB ليُعتمد المصدر الأفضل لكل حقل. مجاني للاستخدام الشخصي على",
   "Episode {number}": "الحلقة {number}",
+  "Episode pages": "صفحات الحلقات",
   "Episodes that air after you add a series grab themselves":
     "تُنزّل تلقائيًا الحلقات التي تُعرض بعد إضافة المسلسل",
   "Estimating…": "جارٍ التقدير…",
@@ -454,6 +455,7 @@ const wired: Record<string, string> = {
   "Gilded Trophies": "جوائز مذهّبة",
   "Go to featured item {n}": "الانتقال إلى العنصر المميز {n}",
   "Go to host": "الانتقال إلى المضيف",
+  "Go to page": "الانتقال إلى صفحة",
   "Go to page {page}": "الانتقال إلى الصفحة {page}",
   "Go to pages {pages}": "الانتقال إلى الصفحات {pages}",
   Good: "جيد",
@@ -1048,7 +1050,8 @@ const wired: Record<string, string> = {
   "Root data attributes": "سمات بيانات الجذر",
   "SVP active": "SVP نشط",
   "Safe by design": "آمن بحكم التصميم",
-  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.": "نفس استخدام Real-Debrid للقراءة فقط. ويتيح لك أيضًا إضافة المصادر غير المخزنة مؤقتًا إلى قائمة الانتظار من منتقي التشغيل.",
+  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.":
+    "نفس استخدام Real-Debrid للقراءة فقط. ويتيح لك أيضًا إضافة المصادر غير المخزنة مؤقتًا إلى قائمة الانتظار من منتقي التشغيل.",
   "Same-genre picks from your installed sources": "اختيارات من النوع نفسه من مصادرك المثبّتة",
   "Sample title": "عنوان تجريبي",
   "Save dialog failed": "تعذّر فتح مربع الحفظ",
@@ -1383,7 +1386,8 @@ const wired: Record<string, string> = {
     "استخدم مفتاح API لترجمة الفصول إلى لغتك. احصل على مفتاح من",
   "Use {color} for the line tracker": "استخدم {color} لمؤشر تتبّع السطر",
   "Use {color} ink": "استخدم حبرًا باللون {color}",
-  "Used to check cache and unrestrict links. Harbor never adds or removes anything on your account on its own.": "يُستخدم للتحقق من ذاكرة التخزين المؤقت وإلغاء قيود الروابط. لا يضيف Harbor أي شيء إلى حسابك أو يزيله من تلقاء نفسه مطلقًا.",
+  "Used to check cache and unrestrict links. Harbor never adds or removes anything on your account on its own.":
+    "يُستخدم للتحقق من ذاكرة التخزين المؤقت وإلغاء قيود الروابط. لا يضيف Harbor أي شيء إلى حسابك أو يزيله من تلقاء نفسه مطلقًا.",
   "Uses the directdl endpoint, which skips queueing for anything already cached.":
     "يستخدم نقطة النهاية directdl، التي تتجاوز قائمة الانتظار لأي محتوى مخزّن مؤقتًا بالفعل.",
   "Uses up to 150 MB": "يستخدم ما يصل إلى 150 MB",

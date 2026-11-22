@@ -5,15 +5,22 @@ import type { Addon } from "@/lib/addons";
 import type { ScoredStream } from "@/lib/streams/types";
 import { StremioRow } from "./stremio-row";
 import { FACET_DIMS, facetOptions, matchesFacets, type FacetState } from "./stream-facets";
-import { addonInstanceKey, buildAddonOptions } from "./picker-utils";
+import { addonInstanceKey, buildAddonOptions, needsDownload } from "./picker-utils";
 import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
+import {
+  INTENT_PREWARM_ABANDON_MS,
+  abandonPrewarmedStream,
+  prewarmP2pStream,
+} from "@/lib/streams/p2p-prewarm";
 import type { CustomStreamFilter } from "@/lib/streams/custom-filters";
+import { sortStreams } from "@/lib/streams/source-sort";
 import { FacetMenuRow } from "./facet-menu-row";
 import { FilterBuilder } from "./filter-builder";
 
 export function StremioLayout({
   streams,
+  lastPlayedStream,
   addons,
   pipelineDone,
   loadingAddonCount,
@@ -26,6 +33,7 @@ export function StremioLayout({
   isAnime = false,
 }: {
   streams: ScoredStream[];
+  lastPlayedStream?: ScoredStream | null;
   addons: Addon[] | null;
   pipelineDone: boolean;
   loadingAddonCount: number;
@@ -91,21 +99,18 @@ export function StremioLayout({
   useEffect(() => {
     if (filter !== "all" && addonFiltered.length === 0 && streams.length > 0) setFilter("all");
   }, [filter, addonFiltered.length, streams.length]);
+  const sourceSort = settings.sourceSort;
   const visibleStreams = useMemo(() => {
     const filtered = addonFiltered.filter((s) => matchesFacets(s, facet));
+    if (sourceSort !== "default") return sortStreams(filtered, sourceSort);
     if (filter !== "all") return filtered;
     if (preserveOrder) return filtered;
-    const downloadRx = /[⏳⌛⬇⏬🔽📥]|\bdownload(ing)?\b|\bqueued?\b|\bnot[\s_-]?cached\b/iu;
-    const isDownload = (s: ScoredStream) => {
-      const haystack = `${s.name ?? ""} ${s.title ?? ""} ${s.description ?? ""}`;
-      return downloadRx.test(haystack);
-    };
     return filtered.slice().sort((a, b) => {
       const aw = /watchhub/i.test(a.addonId) || /watchhub/i.test(a.addonName ?? "") ? 1 : 0;
       const bw = /watchhub/i.test(b.addonId) || /watchhub/i.test(b.addonName ?? "") ? 1 : 0;
       if (aw !== bw) return aw - bw;
-      const ad = isDownload(a) ? 1 : 0;
-      const bd = isDownload(b) ? 1 : 0;
+      const ad = needsDownload(a) ? 1 : 0;
+      const bd = needsDownload(b) ? 1 : 0;
       if (ad !== bd) return ad - bd;
       const ar = addonRank.get(a.addonUrl ?? "") ?? 9999;
       const br = addonRank.get(b.addonUrl ?? "") ?? 9999;
@@ -115,7 +120,7 @@ export function StremioLayout({
       if (ai !== bi) return bi - ai;
       return 0;
     });
-  }, [addonFiltered, facet, filter, addonRank, preserveOrder]);
+  }, [addonFiltered, facet, filter, addonRank, preserveOrder, sourceSort]);
   const filterLabel =
     filter === "all" ? t("All") : (addonOptions.find((o) => o.id === filter)?.name ?? t("All"));
   const filterLogo = filter === "all" ? null : (addonLogoMap.get(filter) ?? null);
@@ -194,16 +199,29 @@ export function StremioLayout({
           setEditingFilter(f);
           setBuilderOpen(true);
         }}
+        sourceSort={sourceSort}
+        onSourceSort={(v) => update({ sourceSort: v })}
       />
       <div className="flex flex-col gap-2">
         {visibleStreams.map((s, i) => (
           <StremioRow
             key={`${s.url ?? s.infoHash ?? s.title}-${i}`}
             stream={s}
+            playedLast={s === lastPlayedStream}
             failed={failedStreams.has(s)}
             addonLogo={addonLogoMap.get(s.addonUrl ?? "") ?? addonLogoMap.get(s.addonId) ?? null}
             match={matchFor ? matchFor(s) : null}
             onPlay={() => onPlay(s)}
+            onIntent={
+              download
+                ? undefined
+                : () =>
+                    prewarmP2pStream(s, {
+                      abandonAfterMs: INTENT_PREWARM_ABANDON_MS,
+                      intent: true,
+                    })
+            }
+            onIntentCancel={download ? undefined : () => abandonPrewarmedStream(s)}
             download={download}
             downloadState={downloadStateFor?.(s)}
             isAnime={isAnime}

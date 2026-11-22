@@ -6,14 +6,25 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 use tokio::sync::Mutex;
 
-const MUSIC_ORIGIN: &str = "https://music.youtube.com";
-const MUSIC_API: &str = "https://music.youtube.com/youtubei/v1";
-const DESKTOP_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+pub(super) const MUSIC_ORIGIN: &str = "https://music.youtube.com";
+pub(super) const MUSIC_API: &str = "https://music.youtube.com/youtubei/v1";
+pub(super) const DESKTOP_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 const VISITOR_FILE: &str = "youtube-visitor-id";
 const CONSENT_COOKIE: &str = "SOCS=CAI";
 const VISITOR_HEADER: &str = "x-goog-visitor-id";
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+pub(super) const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// The public web-client key. Anonymous browsing works without it, but authenticated account
+/// and library requests answer as if signed out when it is missing.
+const WEB_API_KEY: &str = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30";
+
+pub(super) fn key_param(signed: bool) -> String {
+    if signed {
+        format!("&key={WEB_API_KEY}")
+    } else {
+        String::new()
+    }
+}
 pub const SONGS_FILTER: &str = "EgWKAQIIAWoMEA4QChADEAQQCRAF";
 pub const VIDEOS_FILTER: &str = "EgWKAQIQAWoMEA4QChADEAQQCRAF";
 pub const ALBUMS_FILTER: &str = "EgWKAQIYAWoMEA4QChADEAQQCRAF";
@@ -107,16 +118,39 @@ impl Client {
         endpoint: &str,
         mut body: Value,
     ) -> Result<Value, String> {
-        let visitor = self.visitor(app).await;
+        let session = super::auth::current();
+        // The session's own visitor id pairs with its cookies; unknown sessions keep the
+        // anonymous one this client already maintains.
+        let visitor = match session.as_ref().and_then(|session| session.visitor.clone()) {
+            Some(visitor) => Some(visitor),
+            None => self.visitor(app).await,
+        };
         body["context"] = music_context();
+        let cookie = session
+            .as_ref()
+            .map(|session| session.cookie_header.as_str())
+            .unwrap_or(CONSENT_COOKIE);
         let mut request = self
             .http
-            .post(format!("{MUSIC_API}/{endpoint}?alt=json"))
+            .post(format!("{MUSIC_API}/{endpoint}?alt=json{}", key_param(session.is_some())))
             .timeout(REQUEST_TIMEOUT)
             .header(reqwest::header::USER_AGENT, DESKTOP_AGENT)
             .header(reqwest::header::ORIGIN, MUSIC_ORIGIN)
-            .header(reqwest::header::COOKIE, CONSENT_COOKIE)
+            .header(reqwest::header::COOKIE, cookie)
             .json(&body);
+        if let Some(session) = session.as_ref() {
+            if let Some(authorization) = super::auth::authorization(
+                &session.cookie_header,
+                MUSIC_ORIGIN,
+                now_seconds(),
+                &session.credential,
+            ) {
+                request = request
+                    .header(reqwest::header::AUTHORIZATION, authorization)
+                    .header("X-Goog-AuthUser", "0")
+                    .header("X-Origin", MUSIC_ORIGIN);
+            }
+        }
         if let Some(visitor) = visitor.as_deref() {
             request = request.header(VISITOR_HEADER, visitor);
         }
@@ -185,7 +219,7 @@ impl Client {
     }
 }
 
-async fn read_response(response: reqwest::Response) -> Result<Value, String> {
+pub(super) async fn read_response(response: reqwest::Response) -> Result<Value, String> {
     let status = response.status();
     let value = response
         .json::<Value>()
@@ -201,7 +235,7 @@ async fn read_response(response: reqwest::Response) -> Result<Value, String> {
     Ok(value)
 }
 
-fn music_context() -> Value {
+pub(super) fn music_context() -> Value {
     json!({
         "client": {
             "clientName": "WEB_REMIX",
@@ -213,7 +247,7 @@ fn music_context() -> Value {
     })
 }
 
-fn now_seconds() -> u64 {
+pub(super) fn now_seconds() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs())
@@ -330,5 +364,14 @@ mod tests {
             .as_str()
             .expect("version")
             .starts_with("1.20"));
+    }
+
+    #[test]
+    fn only_signed_requests_carry_the_web_key() {
+        assert_eq!(
+            key_param(true),
+            "&key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
+        );
+        assert!(key_param(false).is_empty());
     }
 }

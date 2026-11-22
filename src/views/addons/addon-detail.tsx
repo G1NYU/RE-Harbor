@@ -303,6 +303,7 @@ export function AddonDetail({
                     configureUrl,
                     nameOf(resolved),
                     resolveAddonLogo(m?.logo, resolved.transportUrl),
+                    resolved.transportUrl,
                   )
                 }
                 className="flex h-11 items-center gap-2 rounded-full border border-edge-soft px-5 text-[13.5px] font-semibold text-ink-muted transition-colors hover:border-edge hover:text-ink"

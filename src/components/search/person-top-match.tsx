@@ -4,23 +4,6 @@ import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
 import { useContextMenu } from "@/lib/context-menu";
 
-export function matchPersonForQuery(
-  people: SearchPerson[] | undefined,
-  query: string,
-): SearchPerson | null {
-  const p = people?.[0];
-  if (!p || !p.profile) return null;
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  const q = norm(query);
-  const n = norm(p.name);
-  if (q.length < 3 || !n) return null;
-  return n === q || n.startsWith(q) || q.startsWith(n) ? p : null;
-}
-
 export function PersonTopMatch({
   person,
   onClose,

@@ -48,7 +48,6 @@ import { MangaSourcesView } from "./manga/manga-sources-panel";
 import { MangaUniverses, UniversesCta } from "./manga/manga-universes";
 import { AnilistMangaRows } from "./manga/anilist-manga-rows";
 import { MangaHiddenRows } from "./manga/manga-row-visibility";
-import { BecauseYouWatched } from "./manga/because-you-watched";
 import { useMangaFavorites } from "@/lib/manga-favorites";
 import { mangaLists } from "@/lib/manga-lists";
 
@@ -61,7 +60,7 @@ type Mode =
   | { screen: "universes" }
   | { screen: "sources" }
   | { screen: "downloads"; from?: string }
-  | { screen: "browse-extension"; source: SuwayomiSource }
+  | { screen: "browse-extension"; source: SuwayomiSource; baseUrl?: string; from?: string }
   | { screen: "detail"; mangaId: string; downloadRequest?: number }
   | {
       screen: "reader";
@@ -146,7 +145,8 @@ export function MangaView() {
       if (m.screen === "browse") return;
       e.preventDefault();
       if (m.screen === "reader") setMode({ screen: "detail", mangaId: m.mangaId });
-      else if (m.screen === "downloads" && m.from) setMode({ screen: "detail", mangaId: m.from });
+      else if ((m.screen === "downloads" || m.screen === "browse-extension") && m.from)
+        setMode({ screen: "detail", mangaId: m.from });
       else setMode({ screen: "browse" });
     };
     window.addEventListener("harbor:local-back", onLocalBack);
@@ -161,8 +161,11 @@ export function MangaView() {
   }, [mangaId]);
 
   useEffect(() => {
-    if (!settings.mangaEnabled) return;
+    if (!settings.mangaEnabled || !isBrowse || topKind !== "manga") return;
     let cancelled = false;
+    // Never leave the previous source's hero on screen when the new source is
+    // still loading (or its request fails).
+    setFeatured([]);
     popularManga(0)
       .then((list) => {
         if (!cancelled) setFeatured(list.filter((m) => m.cover).slice(0, 6));
@@ -171,7 +174,7 @@ export function MangaView() {
     return () => {
       cancelled = true;
     };
-  }, [settings.mangaEnabled, sourceTick]);
+  }, [settings.mangaEnabled, sourceTick, isBrowse, topKind]);
 
   useEffect(() => {
     if (mode.screen !== "reader") return;
@@ -289,30 +292,7 @@ export function MangaView() {
           featured={featured}
           onOpen={(id) => setMode({ screen: "detail", mangaId: id })}
         />
-        <div className="mt-8">
-          <MangaContinue onResume={resume} />
-        </div>
-        <MangaHiddenRows />
-        <LazyMount minHeight={280}>
-          <AnilistMangaRows onOpen={openMangaByTitle} />
-        </LazyMount>
-        <LazyMount minHeight={280}>
-          <BecauseYouWatched onOpen={openMangaItem} />
-        </LazyMount>
-        <div className="mt-8">
-          <LazyMount minHeight={300}>
-            <MangaRail
-              title={t("Popular Manga")}
-              subtitle={t("Most read right now")}
-              collapsibleKey="harbor.manga.popularRowOpen"
-              hideKey="popular"
-              scrollKey="manga:Popular Manga"
-              load={() => popularManga(0)}
-              onOpen={openMangaItem}
-            />
-          </LazyMount>
-        </div>
-        <div className="mb-9 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <button
             type="button"
             onClick={() => setMode({ screen: "collections" })}
@@ -348,6 +328,27 @@ export function MangaView() {
           </button>
           <UniversesCta onClick={() => setMode({ screen: "universes" })} />
           <LibraryCta onClick={() => setMode({ screen: "library" })} />
+        </div>
+        <div className="mt-8">
+          <MangaContinue onResume={resume} />
+        </div>
+        <MangaHiddenRows />
+        <LazyMount minHeight={280}>
+          <AnilistMangaRows onOpen={openMangaByTitle} />
+        </LazyMount>
+        <div className="mt-8">
+          <LazyMount minHeight={300}>
+            <MangaRail
+              key={activeMangaSourceId()}
+              title={t("Popular Manga")}
+              subtitle={t("Most read right now")}
+              collapsibleKey="harbor.manga.popularRowOpen"
+              hideKey="popular"
+              scrollKey="manga:Popular Manga"
+              load={() => popularManga(0)}
+              onOpen={openMangaItem}
+            />
+          </LazyMount>
         </div>
         <div className="mb-6 mt-3 flex items-center justify-between gap-4">
           <h2 className="text-[22px] font-medium tracking-tight text-ink">{t("Browse manga")}</h2>
@@ -397,6 +398,9 @@ export function MangaView() {
             onBack={() => setMode({ screen: "browse" })}
             onResume={resume}
             onOpenDownloads={() => setMode({ screen: "downloads", from: mode.mangaId })}
+            onBrowseExtension={(source, baseUrl) =>
+              setMode({ screen: "browse-extension", source, baseUrl, from: mode.mangaId })
+            }
             onOpenManga={(id) => setMode({ screen: "detail", mangaId: id })}
             scrollRoot={detailScrollRef}
             onRead={(chapters, index, manga) =>
@@ -426,7 +430,7 @@ export function MangaView() {
           <h1 className="mb-8 font-display text-[32px] font-medium tracking-tight text-ink">
             {t("Collections")}
           </h1>
-          <MangaCollections onOpen={openMangaItem} />
+          <MangaCollections onOpen={(id) => setMode({ screen: "detail", mangaId: id })} />
         </main>
       )}
 
@@ -465,9 +469,11 @@ export function MangaView() {
           className="flex-1 overflow-y-auto overflow-x-hidden px-12 pb-16 pt-24"
         >
           <BrowseResults
-            config={{ baseUrl: activeMangaSource()?.baseUrl ?? "" }}
+            config={{ baseUrl: mode.baseUrl ?? activeMangaSource()?.baseUrl ?? "" }}
             source={mode.source}
-            onBack={() => setMode({ screen: "browse" })}
+            onBack={() =>
+              setMode(mode.from ? { screen: "detail", mangaId: mode.from } : { screen: "browse" })
+            }
             onOpen={(item) => setMode({ screen: "detail", mangaId: item.id })}
             scrollRef={browseExtensionScrollRef}
           />

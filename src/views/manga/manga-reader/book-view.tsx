@@ -1,11 +1,9 @@
-import { Image } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import type { ContextAction } from "@/lib/context-actions";
+import { useEffect, useRef } from "react";
 import { useContextMenu, useContextTarget, type ContextMenuTarget } from "@/lib/context-menu";
-import { ContextImageViewer } from "@/components/context-image-viewer";
-import type { ContextImage } from "@/lib/context-image";
 import { useT } from "@/lib/i18n";
-import { visibleReaderPages } from "./reader-context";
 import {
+  disposeFlipbook,
   fitLevel,
   guardPageLoaded,
   hasNativeZoom,
@@ -15,6 +13,7 @@ import {
   type FlipInstance,
 } from "./flipbook";
 import { IMAGE_FALLBACK_HEADERS, measureAspect } from "./reader-utils";
+import { chapterImageBlob } from "./chapter-image-cache";
 
 const BASE = "/flipbook";
 const NAME = "harborBook";
@@ -28,6 +27,7 @@ const hostOf = (u: string): string => {
 };
 
 const SNAP_BACK_MS = 220;
+const ASPECT_TIMEOUT_MS = 3000;
 
 function prefersReducedMotion(): boolean {
   return (
@@ -86,6 +86,31 @@ function loadFlipbook(): Promise<void> {
   return loaded;
 }
 
+function sampleAspect(src: string): Promise<number> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(1.4);
+    }, ASPECT_TIMEOUT_MS);
+    void measureAspect(src).then(
+      (aspect) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(aspect);
+      },
+      () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(1.4);
+      },
+    );
+  });
+}
+
 function sampledAspect(srcs: string[]): Promise<number> {
   if (srcs.length === 0) return Promise.resolve(1.4);
   const idxs = [
@@ -98,7 +123,7 @@ function sampledAspect(srcs: string[]): Promise<number> {
       ].filter((i) => i < srcs.length),
     ),
   ];
-  return Promise.all(idxs.map((i) => measureAspect(srcs[i]))).then((aspects) => {
+  return Promise.all(idxs.map((i) => sampleAspect(srcs[i]))).then((aspects) => {
     const valid = aspects.filter((a) => a > 0.2 && a < 6).sort((a, b) => a - b);
     if (!valid.length) return 1.4;
     return valid[Math.floor((valid.length - 1) / 2)];
@@ -122,11 +147,13 @@ export function BookFlip({
   resumePage,
   soundEnabled,
   instanceName = NAME,
+  contextActions,
   zoom = 1,
   pageHeaders,
   instantTurns = false,
   onProgress,
   onReady,
+  onError,
 }: {
   pages: string[];
   rtl: boolean;
@@ -134,49 +161,49 @@ export function BookFlip({
   resumePage: number;
   soundEnabled: boolean;
   instanceName?: string;
+  contextActions?: () => ContextAction[];
   zoom?: number;
   pageHeaders?: Record<string, Record<string, string>>;
   instantTurns?: boolean;
   onProgress: (page: number, spread: string) => void;
   onReady?: (api: BookApi) => void;
+  onError?: (error: unknown) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const report = useRef(onProgress);
   report.current = onProgress;
   const ready = useRef(onReady);
   ready.current = onReady;
+  const failed = useRef(onError);
+  failed.current = onError;
   const soundOn = useRef(soundEnabled);
   soundOn.current = soundEnabled;
   const headersRef = useRef(pageHeaders);
   headersRef.current = pageHeaders;
+  const hostHeadersRef = useRef<Map<string, Record<string, string>>>(new Map());
+  const hostHeaders = new Map<string, Record<string, string>>();
+  for (const [url, headers] of Object.entries(pageHeaders ?? {})) {
+    const host = hostOf(url);
+    const referer = Object.entries(headers).find(([name]) => name.toLowerCase() === "referer")?.[1];
+    if (host && referer) {
+      hostHeaders.set(host, { ...IMAGE_FALLBACK_HEADERS, Referer: referer });
+    }
+  }
+  hostHeadersRef.current = hostHeaders;
   const instRef = useRef<FlipInstance | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const panRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
-  const visiblePages = useRef<ReturnType<typeof visibleReaderPages>>([]);
-  const [image, setImage] = useState<ContextImage | null>(null);
   const t = useT();
   const { open } = useContextMenu();
   const contextTarget = (): ContextMenuTarget => ({
     kind: "actions",
     id: `reader-pages:${instanceName}`,
     label: t("Visible pages"),
-    actions: () =>
-      visiblePages.current.map((page) => ({
-        id: `reader-page:${instanceName}:${page.number}`,
-        icon: <Image size={16} />,
-        label: t("View page {number}", { number: page.number }),
-        restoreFocus: false,
-        run: () =>
-          setImage({
-            src: page.src,
-            label: t("Page {number}", { number: page.number }),
-            filename: `page-${page.number}`,
-          }),
-      })),
+    // The reader remains a semantic boundary even without contextual commands.
+    actions: contextActions ?? (() => []),
   });
   const contextRef = useContextTarget(contextTarget);
-  const contextOrigin = useRef<HTMLDivElement | null>(null);
 
   const applyTransform = (smooth: boolean) => {
     const el = wrapRef.current;
@@ -236,7 +263,6 @@ export function BookFlip({
     ensureStyle();
     let cancelled = false;
     let inst: FlipInstance | null = null;
-    visiblePages.current = [];
 
     const origFetch = window.fetch;
     const origOnPopState = window.onpopstate;
@@ -248,18 +274,22 @@ export function BookFlip({
         if (h) hosts.add(h);
       }
     }
-    const httpMod =
-      hosts.size || (headersRef.current && Object.keys(headersRef.current).length > 0)
-        ? import("@tauri-apps/plugin-http")
-        : null;
-    if (httpMod) {
+    const useNativeImages = hosts.size > 0;
+    const chapterUrls = new Set(pages);
+    if (useNativeImages) {
       window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
         const u = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         const host = hostOf(u);
-        const headers =
-          headersRef.current?.[u] ?? (host && hosts.has(host) ? IMAGE_FALLBACK_HEADERS : undefined);
-        if (headers) {
-          return httpMod.then((m) => (m.fetch as unknown as typeof fetch)(u, { headers }));
+        const supplied =
+          headersRef.current?.[u] ??
+          (host ? hostHeadersRef.current.get(host) : undefined) ??
+          (host && hosts.has(host) ? IMAGE_FALLBACK_HEADERS : undefined);
+        // Only route chapter images through this temporary fetch hook.
+        // Other requests must retain the original Fetch semantics.
+        if (supplied && chapterUrls.has(u) && (!init?.method || init.method.toUpperCase() === "GET")) {
+          return chapterImageBlob(u, supplied).then(
+            (blob) => new Response(blob, { status: 200, headers: { "content-type": blob.type } }),
+          );
         }
         return origFetch(input, init);
       }) as typeof fetch;
@@ -269,19 +299,33 @@ export function BookFlip({
       const d = (e as CustomEvent).detail as { page?: string | number; name?: string } | undefined;
       if (!d || d.name !== instanceName) return;
       const spread = String(d.page);
-      visiblePages.current = visibleReaderPages(pages, spread);
       const first = Number(spread.split("-")[0]);
       if (!Number.isFinite(first) || first <= 0) return;
       report.current(first - 1, spread);
     };
     window.addEventListener("r3d-pagechange", onPage);
     void (async () => {
+      // The flipbook treats an initial 403 as a permanent failed texture even
+      // when the reader verifies the image host a moment later. Complete that
+      // verification before the flipbook starts its own concurrent page fetches.
+      const firstPage = pages[Math.min(Math.max(resumePage, 0), pages.length - 1)];
+      if (isTauri && firstPage) {
+        const pageHost = hostOf(firstPage).toLowerCase();
+        if (pageHost === "batcave.biz" || pageHost.endsWith(".batcave.biz")) {
+          const supplied =
+            headersRef.current?.[firstPage] ??
+            hostHeadersRef.current.get(pageHost) ??
+            IMAGE_FALLBACK_HEADERS;
+          await chapterImageBlob(firstPage, supplied);
+          if (cancelled) return;
+        }
+      }
       const aspect = await sampledAspect(pages);
       await loadFlipbook();
       if (cancelled || !ref.current) return;
       guardPageLoaded();
       const Ctor = (window as unknown as { FlipBook?: FlipCtor }).FlipBook;
-      if (!Ctor) return;
+      if (!Ctor) throw new Error("Flipbook constructor is unavailable");
       const FB = (window as unknown as { FLIPBOOK?: Record<string, unknown> }).FLIPBOOK;
       if (FB) {
         FB.threejsSrc = `${BASE}/js/libs/three.min.js`;
@@ -291,6 +335,10 @@ export function BookFlip({
       inst = new Ctor(ref.current, {
         name: instanceName,
         pages: pages.map((src) => ({ src })),
+        // Harbor's Tauri/WebView origin can be http:. The vendor defaults to
+        // matchProtocol=true and silently rewrites https: chapter URLs to http:,
+        // defeating verified image recovery and breaking signed image CDNs.
+        matchProtocol: false,
         viewMode: "webgl",
         singlePageMode,
         singlePageModeIfMobile: true,
@@ -431,13 +479,18 @@ export function BookFlip({
       window.setTimeout(() => {
         if (instRef.current === local) window.dispatchEvent(new Event("resize"));
       }, 250);
-    })();
+    })().catch((error) => {
+      if (cancelled) return;
+      console.warn("[flipbook]", error);
+      failed.current?.(error);
+    });
     return () => {
       cancelled = true;
       instRef.current = null;
-      if (httpMod) window.fetch = origFetch;
+      if (useNativeImages) window.fetch = origFetch;
       window.onpopstate = origOnPopState;
       window.removeEventListener("r3d-pagechange", onPage);
+      disposeFlipbook(inst);
       try {
         inst?.dispose?.();
         inst?.destroy?.();
@@ -450,10 +503,7 @@ export function BookFlip({
 
   return (
     <div
-      ref={(node) => {
-        contextOrigin.current = node;
-        contextRef(node);
-      }}
+      ref={contextRef}
       tabIndex={0}
       aria-label={t("Visible pages")}
       className="relative h-full w-full overflow-hidden"
@@ -469,13 +519,6 @@ export function BookFlip({
       >
         <div ref={ref} className="harbor-flipbook h-full w-full" />
       </div>
-      {image && (
-        <ContextImageViewer
-          image={image}
-          returnFocus={contextOrigin.current}
-          onClose={() => setImage(null)}
-        />
-      )}
     </div>
   );
 }

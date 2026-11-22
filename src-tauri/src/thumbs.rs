@@ -1,17 +1,17 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tauri::State;
+use tauri::{Emitter, State};
 #[cfg(windows)]
 #[allow(unused_imports)]
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, Command};
-use tokio::sync::{mpsc, oneshot, Mutex, Notify};
+use tokio::sync::{mpsc, oneshot, Mutex, Notify, OnceCell};
 use uuid::Uuid;
 
 #[cfg(windows)]
@@ -21,13 +21,20 @@ const BUCKET_SECONDS: f64 = 2.0;
 const THUMB_WIDTH: u32 = 240;
 const SCREENSHOT_QUALITY: u32 = 72;
 const REQUEST_TIMEOUT_MS: u64 = 12000;
-const SEEK_WAIT_MS: u64 = 4000;
+// This source needs 3-5 s per cold seek. A 4 s cutoff discarded frames that
+// were nearly ready and forced a second seek for the same data.
+const SEEK_WAIT_MS: u64 = 8000;
+// A move this close still reads as "here", so a running seek should finish
+// instead of paying for another one.
+const NEARBY_BUCKETS: u32 = 5;
 const SHADOW_QUIT_GRACE: Duration = Duration::from_millis(80);
 const SHADOW_KILL_WAIT: Duration = Duration::from_secs(2);
 const THUMB_CACHE_MAX_BYTES: usize = 48 * 1024 * 1024;
-const THUMB_CACHE_MAX_ENTRIES: usize = 160;
+const THUMB_CACHE_MAX_ENTRIES: usize = 512;
+const PREFETCH_MAX_ATTEMPTS: usize = 512;
+const PREFETCH_MAX_QUEUED: usize = 8;
 
-type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<(), String>>>>>;
+type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>;
 
 struct CacheEntry {
     value: String,
@@ -126,13 +133,23 @@ pub struct ThumbsState {
 struct Inner {
     shadow: Option<Shadow>,
     url: Option<String>,
+    headers: Option<HashMap<String, String>>,
     session: Option<String>,
     cache: ThumbCache,
     pending: Pending,
     next_request_id: u64,
     next_worker_id: u64,
     wanted: Option<u32>,
+    in_flight: Option<u32>,
+    wanted_notify: Arc<Notify>,
     active_worker: Option<u64>,
+    prefetch: VecDeque<u32>,
+    prefetched: HashSet<u32>,
+    speculative: bool,
+    prefetch_allowed: bool,
+    timeline: VecDeque<u32>,
+    timeline_initialized: bool,
+    timeline_turn: bool,
 }
 
 struct Shadow {
@@ -141,6 +158,13 @@ struct Shadow {
     cache_dir: PathBuf,
     pipe: String,
     seek_notify: Arc<Notify>,
+    filter_ready: Arc<OnceCell<()>>,
+}
+
+enum ThumbResult {
+    Ready(String),
+    Superseded,
+    Failed,
 }
 
 impl ThumbsState {
@@ -149,13 +173,23 @@ impl ThumbsState {
             inner: Arc::new(Mutex::new(Inner {
                 shadow: None,
                 url: None,
+                headers: None,
                 session: None,
                 cache: ThumbCache::new(THUMB_CACHE_MAX_BYTES, THUMB_CACHE_MAX_ENTRIES),
                 pending: Arc::new(Mutex::new(HashMap::new())),
                 next_request_id: 1000,
                 next_worker_id: 1,
                 wanted: None,
+                in_flight: None,
+                wanted_notify: Arc::new(Notify::new()),
                 active_worker: None,
+                prefetch: VecDeque::new(),
+                prefetched: HashSet::new(),
+                speculative: false,
+                prefetch_allowed: false,
+                timeline: VecDeque::new(),
+                timeline_initialized: false,
+                timeline_turn: false,
             })),
             spawn_lock: Arc::new(Mutex::new(())),
         }
@@ -266,14 +300,29 @@ async fn send_ipc_message(
 }
 
 #[tauri::command]
-pub async fn thumbs_set_url(state: State<'_, ThumbsState>, url: String) -> Result<(), String> {
+pub async fn thumbs_set_url(
+    state: State<'_, ThumbsState>,
+    url: String,
+    headers: Option<HashMap<String, String>>,
+) -> Result<String, String> {
+    let session = Uuid::new_v4().simple().to_string();
     let shadow = {
         let mut inner = state.inner.lock().await;
         let shadow = inner.shadow.take();
         inner.url = Some(url);
-        inner.session = Some(Uuid::new_v4().simple().to_string());
+        inner.headers = headers;
+        inner.session = Some(session.clone());
         inner.cache.clear();
+        inner.prefetch.clear();
+        inner.prefetch_allowed = false;
+        inner.timeline.clear();
+        inner.timeline_initialized = false;
+        inner.timeline_turn = false;
+        inner.prefetched.clear();
+        inner.speculative = false;
+        inner.wanted_notify.notify_waiters();
         inner.wanted = None;
+        inner.in_flight = None;
         inner.active_worker = None;
         shadow
     };
@@ -281,19 +330,20 @@ pub async fn thumbs_set_url(state: State<'_, ThumbsState>, url: String) -> Resul
     if let Some(mut s) = shadow {
         drop_shadow(&mut s).await;
     }
-    Ok(())
+    Ok(session)
 }
 
 #[tauri::command]
 pub async fn thumbs_spawn_eager(state: State<'_, ThumbsState>) -> Result<(), String> {
     let _spawn_guard = state.spawn_lock.lock().await;
-    let (url, session, pending) = {
+    let (url, headers, session, pending) = {
         let inner = state.inner.lock().await;
         if inner.shadow.is_some() {
             return Ok(());
         }
         (
             inner.url.clone().ok_or_else(|| "no url".to_string())?,
+            inner.headers.clone(),
             inner
                 .session
                 .clone()
@@ -301,7 +351,7 @@ pub async fn thumbs_spawn_eager(state: State<'_, ThumbsState>) -> Result<(), Str
             inner.pending.clone(),
         )
     };
-    let shadow = spawn_shadow(&url, &session, pending).await?;
+    let shadow = spawn_shadow(&url, &session, pending, &headers).await?;
     let stale = {
         let mut inner = state.inner.lock().await;
         if inner.session.as_deref() == Some(session.as_str()) && inner.shadow.is_none() {
@@ -319,8 +369,10 @@ pub async fn thumbs_spawn_eager(state: State<'_, ThumbsState>) -> Result<(), Str
 
 #[tauri::command]
 pub async fn thumbs_get(
+    app: tauri::AppHandle,
     state: State<'_, ThumbsState>,
     time_sec: f64,
+    session: String,
 ) -> Result<Option<String>, String> {
     if !time_sec.is_finite() || time_sec < 0.0 {
         return Ok(None);
@@ -328,38 +380,167 @@ pub async fn thumbs_get(
     let bucket = (time_sec / BUCKET_SECONDS).round() as u32;
     let inner_arc = state.inner.clone();
     let mut inner = inner_arc.lock().await;
+    if inner.session.as_deref() != Some(session.as_str()) {
+        return Ok(None);
+    }
     if let Some(p) = inner.cache.get(bucket) {
         return Ok(Some(p.clone()));
     }
     if inner.url.is_none() || inner.session.is_none() {
         return Err("no url".to_string());
     }
-    inner.wanted = Some(bucket);
+    // Promote a speculative frame without restarting its seek. Keep a wanted
+    // entry in case cancellation was already signalled before this request.
+    if inner.active_worker.is_some() && inner.in_flight == Some(bucket) {
+        inner.speculative = false;
+        inner.wanted = Some(bucket);
+        return Ok(None);
+    }
+    if inner.wanted != Some(bucket) {
+        inner.wanted = Some(bucket);
+        inner.wanted_notify.notify_waiters();
+    }
     if inner.active_worker.is_none() {
         let worker_id = inner.next_worker_id;
         inner.next_worker_id = inner.next_worker_id.wrapping_add(1);
         inner.active_worker = Some(worker_id);
         let arc = inner_arc.clone();
         let spawn_lock = state.spawn_lock.clone();
-        tokio::spawn(worker(arc, spawn_lock, worker_id));
+        tokio::spawn(worker(arc, spawn_lock, worker_id, app));
     }
     Ok(None)
 }
 
-async fn worker(inner_arc: Arc<Mutex<Inner>>, spawn_lock: Arc<Mutex<()>>, worker_id: u64) {
+#[tauri::command]
+pub async fn thumbs_prefetch(
+    app: tauri::AppHandle,
+    state: State<'_, ThumbsState>,
+    session: String,
+    times: Vec<f64>,
+    duration_sec: Option<f64>,
+) -> Result<(), String> {
+    let mut inner = state.inner.lock().await;
+    if inner.session.as_deref() != Some(session.as_str()) {
+        return Ok(());
+    }
+    inner.prefetch.clear();
+    inner.prefetch_allowed = !times.is_empty();
+    if inner.prefetch_allowed && !inner.timeline_initialized {
+        if let Some(duration) = duration_sec.filter(|d| d.is_finite() && *d > 0.0) {
+            inner.timeline = timeline_buckets(duration);
+            inner.timeline_initialized = true;
+        }
+    }
+    if times.is_empty() && inner.speculative {
+        inner.wanted_notify.notify_waiters();
+    }
+    for time in times.into_iter().take(PREFETCH_MAX_QUEUED) {
+        if !time.is_finite() || time < 0.0 {
+            continue;
+        }
+        let bucket = (time / BUCKET_SECONDS).round() as u32;
+        if !inner.cache.contains(bucket)
+            && !inner.prefetched.contains(&bucket)
+            && inner.in_flight != Some(bucket)
+            && !inner.prefetch.contains(&bucket)
+        {
+            inner.prefetch.push_back(bucket);
+        }
+    }
+    if inner.prefetch_allowed
+        && inner.active_worker.is_none()
+        && (!inner.prefetch.is_empty() || !inner.timeline.is_empty())
+        && inner.prefetched.len() < PREFETCH_MAX_ATTEMPTS
+    {
+        let worker_id = inner.next_worker_id;
+        inner.next_worker_id = inner.next_worker_id.wrapping_add(1);
+        inner.active_worker = Some(worker_id);
+        tokio::spawn(worker(
+            state.inner.clone(),
+            state.spawn_lock.clone(),
+            worker_id,
+            app,
+        ));
+    }
+    Ok(())
+}
+
+// Fill the largest uncovered intervals first, rather than spending minutes
+// building previews only at the beginning of a long title.
+fn timeline_buckets(duration: f64) -> VecDeque<u32> {
+    let spacing = (duration / 180.0).max(30.0);
+    let count = (duration / spacing).ceil() as usize;
+    let mut ranges = VecDeque::from([(0, count)]);
+    let mut buckets = VecDeque::new();
+    while let Some((start, end)) = ranges.pop_front() {
+        if start >= end {
+            continue;
+        }
+        let mid = start + (end - start) / 2;
+        let bucket = ((mid as f64 * spacing) / BUCKET_SECONDS).floor() as u32;
+        buckets.push_back(bucket);
+        ranges.push_back((start, mid));
+        ranges.push_back((mid + 1, end));
+    }
+    buckets
+}
+
+fn should_cancel(wanted: Option<u32>, bucket: u32) -> bool {
+    match wanted {
+        Some(wanted) => wanted.abs_diff(bucket) > NEARBY_BUCKETS,
+        None => true,
+    }
+}
+
+fn next_bucket(inner: &mut Inner) -> Option<u32> {
+    inner.in_flight = None;
+    inner.speculative = false;
+    if let Some(bucket) = inner.wanted.take() {
+        return Some(bucket);
+    }
+    while inner.prefetch_allowed && inner.prefetched.len() < PREFETCH_MAX_ATTEMPTS {
+        let bucket = if inner.timeline_turn {
+            inner
+                .timeline
+                .pop_front()
+                .or_else(|| inner.prefetch.pop_front())
+        } else {
+            inner
+                .prefetch
+                .pop_front()
+                .or_else(|| inner.timeline.pop_front())
+        }?;
+        if inner.cache.contains(bucket) || !inner.prefetched.insert(bucket) {
+            continue;
+        }
+        inner.timeline_turn = !inner.timeline_turn;
+        inner.speculative = true;
+        return Some(bucket);
+    }
+    inner.prefetch.clear();
+    None
+}
+
+async fn worker(
+    inner_arc: Arc<Mutex<Inner>>,
+    spawn_lock: Arc<Mutex<()>>,
+    worker_id: u64,
+    app: tauri::AppHandle,
+) {
     loop {
-        let (bucket, url, session, pending, shadow) = {
+        let (bucket, url, headers, session, pending, shadow) = {
             let mut inner = inner_arc.lock().await;
             if inner.active_worker != Some(worker_id) {
                 return;
             }
-            let bucket = match inner.wanted.take() {
+            let bucket = match next_bucket(&mut inner) {
                 Some(b) => b,
                 None => {
                     inner.active_worker = None;
                     return;
                 }
             };
+            inner.in_flight = Some(bucket);
             if inner.cache.contains(bucket) {
                 continue;
             }
@@ -380,11 +561,13 @@ async fn worker(inner_arc: Arc<Mutex<Inner>>, spawn_lock: Arc<Mutex<()>>, worker
             (
                 bucket,
                 url,
+                inner.headers.clone(),
                 session,
                 inner.pending.clone(),
                 inner.shadow.is_some(),
             )
         };
+        let job_started = Instant::now();
         if !shadow {
             let _spawn_guard = spawn_lock.lock().await;
             let should_spawn = {
@@ -396,16 +579,32 @@ async fn worker(inner_arc: Arc<Mutex<Inner>>, spawn_lock: Arc<Mutex<()>>, worker
             if !should_spawn {
                 let mut inner = inner_arc.lock().await;
                 if inner.active_worker == Some(worker_id) {
+                    if inner.session.as_deref() == Some(session.as_str()) && inner.shadow.is_some()
+                    {
+                        if !inner.speculative {
+                            inner.wanted.get_or_insert(bucket);
+                        } else if inner.prefetch_allowed {
+                            inner.prefetched.remove(&bucket);
+                            inner.prefetch.push_front(bucket);
+                        }
+                        continue;
+                    }
                     inner.active_worker = None;
                 }
                 return;
             }
-            let new_shadow = match spawn_shadow(&url, &session, pending.clone()).await {
+            let new_shadow = match spawn_shadow(&url, &session, pending.clone(), &headers).await {
                 Ok(shadow) => shadow,
                 Err(_) => {
                     let mut inner = inner_arc.lock().await;
                     if inner.active_worker == Some(worker_id) {
                         inner.active_worker = None;
+                        inner.in_flight = None;
+                        let failed = inner.wanted.take().unwrap_or(bucket);
+                        let _ = app.emit(
+                            "thumb-ready",
+                            json!({"session": session, "bucket": failed, "uri": null}),
+                        );
                     }
                     return;
                 }
@@ -423,7 +622,7 @@ async fn worker(inner_arc: Arc<Mutex<Inner>>, spawn_lock: Arc<Mutex<()>>, worker
                 drop_shadow(&mut stale).await;
             }
         }
-        let (writer_tx, dir, request_id, seek_notify) = {
+        let (bucket, writer_tx, dir, request_id, seek_notify, filter_ready, wanted_notify) = {
             let mut inner = inner_arc.lock().await;
             if inner.active_worker != Some(worker_id)
                 || inner.session.as_deref() != Some(session.as_str())
@@ -434,20 +633,75 @@ async fn worker(inner_arc: Arc<Mutex<Inner>>, spawn_lock: Arc<Mutex<()>>, worker
                 return;
             }
             let request_id = inner.next_request_id;
-            inner.next_request_id += 1;
+            inner.next_request_id += 3;
+            // Startup may have taken seconds; serve the latest hover position first.
+            let bucket = if let Some(wanted) = inner.wanted.take() {
+                inner.speculative = false;
+                wanted
+            } else {
+                bucket
+            };
+            if inner.speculative && !inner.prefetch_allowed {
+                continue;
+            }
+            inner.in_flight = Some(bucket);
             let Some(shadow) = inner.shadow.as_ref() else {
                 inner.active_worker = None;
                 return;
             };
             (
+                bucket,
                 shadow.writer_tx.clone(),
                 shadow.cache_dir.clone(),
                 request_id,
                 shadow.seek_notify.clone(),
+                shadow.filter_ready.clone(),
+                inner.wanted_notify.clone(),
             )
         };
-        let uri =
-            generate_thumb(bucket, &writer_tx, &dir, request_id, &pending, &seek_notify).await;
+        // A newer position arrived while this one was being set up; skip it so
+        // the seek is spent on what the pointer is actually over.
+        if inner_arc.lock().await.wanted.is_some() {
+            continue;
+        }
+        let started = Instant::now();
+        // Distant jumps cancel the running seek; nearby moves let it finish.
+        // The UI already shows a nearby cached frame and marks it approximate,
+        // so restarting a multi-second remote seek on every small move is waste.
+        let cancelled = {
+            let inner_arc = inner_arc.clone();
+            let wanted_notify = wanted_notify.clone();
+            async move {
+                loop {
+                    wanted_notify.notified().await;
+                    let wanted = inner_arc.lock().await.wanted;
+                    if should_cancel(wanted, bucket) {
+                        return;
+                    }
+                }
+            }
+        };
+        tokio::pin!(cancelled);
+        let generation = generate_thumb(
+            bucket,
+            &writer_tx,
+            &dir,
+            request_id,
+            &pending,
+            &seek_notify,
+            &filter_ready,
+        );
+        let uri = tokio::select! {
+            result = generation => result,
+            _ = &mut cancelled => ThumbResult::Superseded,
+        };
+        // Cancelling during metadata/screenshot IPC must also release its waiter.
+        if matches!(uri, ThumbResult::Superseded) {
+            let mut pending = pending.lock().await;
+            for id in request_id..request_id + 3 {
+                pending.remove(&id);
+            }
+        }
         let mut inner = inner_arc.lock().await;
         if inner.active_worker != Some(worker_id)
             || inner.session.as_deref() != Some(session.as_str())
@@ -457,8 +711,49 @@ async fn worker(inner_arc: Arc<Mutex<Inner>>, spawn_lock: Arc<Mutex<()>>, worker
             }
             return;
         }
-        if let Ok(u) = uri {
-            inner.cache.insert(bucket, u);
+        if !inner.speculative {
+            let outcome = match &uri {
+                ThumbResult::Ready(_) => "ready",
+                ThumbResult::Failed => "failed",
+                ThumbResult::Superseded => "superseded",
+            };
+            eprintln!(
+                "[harbor/thumbs] target_sec={} startup_ms={} decode_ms={} outcome={}",
+                bucket * 2,
+                started.duration_since(job_started).as_millis(),
+                started.elapsed().as_millis(),
+                outcome
+            );
+        }
+        match uri {
+            ThumbResult::Ready(u) => {
+                inner.cache.insert(bucket, u.clone());
+                let _ = app.emit(
+                    "thumb-ready",
+                    json!({"session": session, "bucket": bucket, "uri": u}),
+                );
+            }
+            ThumbResult::Failed => {
+                let _ = app.emit(
+                    "thumb-ready",
+                    json!({"session": session, "bucket": bucket, "uri": null}),
+                );
+            }
+            ThumbResult::Superseded => {}
+        }
+        inner.in_flight = None;
+        let pause = inner.speculative && inner.wanted.is_none();
+        let wake = wanted_notify.notified();
+        tokio::pin!(wake);
+        wake.as_mut().enable();
+        drop(inner);
+        // Register before releasing the lock so a foreground request cannot
+        // miss the wake-up and wait through the background cooldown.
+        if pause {
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(250)) => {},
+                _ = wake => {},
+            }
         }
     }
 }
@@ -470,8 +765,10 @@ async fn generate_thumb(
     request_id: u64,
     pending: &Pending,
     seek_notify: &Arc<Notify>,
-) -> Result<String, String> {
+    filter_ready: &OnceCell<()>,
+) -> ThumbResult {
     use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+    let started = Instant::now();
     let target_time = (bucket as f64) * BUCKET_SECONDS;
     let thumb_path = cache_dir.join(format!("{}.jpg", bucket));
     let thumb_str = thumb_path.to_string_lossy().to_string();
@@ -479,15 +776,90 @@ async fn generate_thumb(
     let restart = seek_notify.notified();
     tokio::pin!(restart);
     restart.as_mut().enable();
-    send_ipc_message(
+    if send_ipc_message(
         writer_tx,
-        json!({"command": ["seek", target_time, "absolute", "keyframes"]}),
+        json!({"command": ["seek", target_time, "absolute+keyframes"]}),
         Duration::from_millis(REQUEST_TIMEOUT_MS),
     )
-    .await?;
-    let _ = tokio::time::timeout(Duration::from_millis(SEEK_WAIT_MS), restart).await;
+    .await
+    .is_err()
+    {
+        return ThumbResult::Failed;
+    }
+    // The worker cancels this future on a distant move; a nearby move leaves
+    // the seek running so its frame can be shown.
+    if tokio::time::timeout(Duration::from_millis(SEEK_WAIT_MS), restart)
+        .await
+        .is_err()
+    {
+        return ThumbResult::Failed;
+    }
 
-    let (done_tx, done_rx) = oneshot::channel::<Result<(), String>>();
+    let seek_ms = started.elapsed().as_millis();
+    // Read metadata from the decoder that already opened the stream instead of
+    // opening it a second time with ffprobe (especially costly for remote media).
+    if filter_ready
+        .get_or_try_init(|| async {
+            let gamma = ipc_request(
+                writer_tx,
+                pending,
+                request_id + 1,
+                json!(["get_property", "video-params/gamma"]),
+            )
+            .await?;
+            if matches!(gamma.as_str(), Some("pq" | "hlg")) {
+                ipc_request(
+                    writer_tx,
+                    pending,
+                    request_id + 2,
+                    json!(["set_property", "vf", thumb_filter(true)]),
+                )
+                .await?;
+            }
+            Ok::<(), String>(())
+        })
+        .await
+        .is_err()
+    {
+        return ThumbResult::Failed;
+    }
+
+    if ipc_request(
+        writer_tx,
+        pending,
+        request_id,
+        json!(["screenshot-to-file", thumb_str, "video"]),
+    )
+    .await
+    .is_err()
+    {
+        return ThumbResult::Failed;
+    }
+    let Ok(bytes) = tokio::fs::read(&thumb_path).await else {
+        return ThumbResult::Failed;
+    };
+    let _ = tokio::fs::remove_file(&thumb_path).await;
+    if bytes.is_empty() {
+        return ThumbResult::Failed;
+    }
+    if started.elapsed() >= Duration::from_secs(1) {
+        eprintln!(
+            "[harbor/thumbs] slow_frame target_sec={} seek_ms={} capture_ms={}",
+            target_time,
+            seek_ms,
+            started.elapsed().as_millis().saturating_sub(seek_ms)
+        );
+    }
+    ThumbResult::Ready(format!("data:image/jpeg;base64,{}", B64.encode(&bytes)))
+}
+
+async fn ipc_request(
+    writer_tx: &mpsc::Sender<Value>,
+    pending: &Pending,
+    request_id: u64,
+    command: Value,
+) -> Result<Value, String> {
+    let (done_tx, done_rx) = oneshot::channel();
     {
         let mut p = pending.lock().await;
         p.insert(request_id, done_tx);
@@ -495,7 +867,7 @@ async fn generate_thumb(
     if let Err(error) = send_ipc_message(
         writer_tx,
         json!({
-            "command": ["screenshot-to-file", thumb_str.clone(), "video"],
+            "command": command,
             "request_id": request_id,
         }),
         Duration::from_millis(REQUEST_TIMEOUT_MS),
@@ -514,19 +886,10 @@ async fn generate_thumb(
     }
 
     match result {
-        Ok(Ok(Ok(()))) => {
-            let bytes = tokio::fs::read(&thumb_path)
-                .await
-                .map_err(|e| format!("read: {}", e))?;
-            let _ = tokio::fs::remove_file(&thumb_path).await;
-            if bytes.is_empty() {
-                return Err("screenshot empty".to_string());
-            }
-            Ok(format!("data:image/jpeg;base64,{}", B64.encode(&bytes)))
-        }
+        Ok(Ok(Ok(data))) => Ok(data),
         Ok(Ok(Err(e))) => Err(e),
         Ok(Err(_)) => Err("request canceled".to_string()),
-        Err(_) => Err("screenshot timeout".to_string()),
+        Err(_) => Err("mpv IPC request timeout".to_string()),
     }
 }
 
@@ -542,9 +905,19 @@ impl ThumbsState {
             let mut inner = self.inner.lock().await;
             let shadow = inner.shadow.take();
             inner.url = None;
+            inner.headers = None;
             inner.session = None;
             inner.cache.clear();
+            inner.prefetch.clear();
+            inner.prefetch_allowed = false;
+            inner.timeline.clear();
+            inner.timeline_initialized = false;
+            inner.timeline_turn = false;
+            inner.prefetched.clear();
+            inner.speculative = false;
+            inner.wanted_notify.notify_waiters();
             inner.wanted = None;
+            inner.in_flight = None;
             inner.active_worker = None;
             shadow
         };
@@ -562,38 +935,6 @@ pub(crate) fn shutdown(app: &tauri::AppHandle) {
     tauri::async_runtime::block_on(state.stop());
 }
 
-async fn is_hdr_source(url: &str) -> bool {
-    let Some(ffprobe) = crate::transcode::locate_ffprobe() else {
-        return false;
-    };
-    let mut cmd = tokio::process::Command::new(&ffprobe);
-    cmd.args([
-        "-v",
-        "error",
-        "-select_streams",
-        "v:0",
-        "-show_entries",
-        "stream=color_transfer,color_primaries,color_space",
-        "-of",
-        "default=nw=1:nk=1",
-        url,
-    ])
-    .stdin(Stdio::null())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    crate::proc_guard::configure_command(&mut cmd);
-    let probe = tokio::time::timeout(Duration::from_secs(8), cmd.output()).await;
-    let Ok(Ok(out)) = probe else {
-        return false;
-    };
-    let s = String::from_utf8_lossy(&out.stdout).to_ascii_lowercase();
-    s.contains("smpte2084") || s.contains("arib-std-b67") || s.contains("bt2020")
-}
-
 fn thumb_filter(hdr: bool) -> String {
     if !hdr {
         return format!("scale={}:-2", THUMB_WIDTH);
@@ -605,17 +946,26 @@ tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,scale={
     )
 }
 
-async fn spawn_shadow(url: &str, session: &str, pending: Pending) -> Result<Shadow, String> {
+async fn spawn_shadow(
+    url: &str,
+    session: &str,
+    pending: Pending,
+    headers: &Option<HashMap<String, String>>,
+) -> Result<Shadow, String> {
     let bin = locate_mpv().ok_or_else(|| "mpv not found".to_string())?;
-    let hdr = is_hdr_source(url).await;
     let pipe = shadow_pipe(session);
     let dir = cache_dir(session);
     tokio::fs::create_dir_all(&dir)
         .await
         .map_err(|e| format!("cache dir: {}", e))?;
 
-    let args: Vec<String> = vec![
+    // Use the same HTTP identity as the player. Some hosts serve a signed URL
+    // differently (or much slower) for a header-less, mpv-user-agent request.
+    let (user_agent, header_fields) = crate::mpv::stream_http_options(headers);
+
+    let mut args: Vec<String> = vec![
         format!("--input-ipc-server={}", pipe),
+        format!("--user-agent={}", user_agent),
         "--no-config".into(),
         "--no-audio".into(),
         "--no-sub".into(),
@@ -626,15 +976,27 @@ async fn spawn_shadow(url: &str, session: &str, pending: Pending) -> Result<Shad
         "--load-scripts=no".into(),
         "--ytdl=no".into(),
         "--cache=yes".into(),
+        // Retain packets already read, but do not download playback-sized buffers
+        // for every speculative thumbnail seek.
+        "--cache-secs=0".into(),
+        "--demuxer-readahead-secs=0".into(),
+        "--cache-pause=no".into(),
         "--demuxer-max-bytes=32MiB".into(),
-        format!("--vf={}", thumb_filter(hdr)),
+        // A single frame is all a preview needs. Frame-threaded decoding batches
+        // frames (and their packets) before the first one comes out, which made
+        // seeks over the network wait for far more data than necessary.
+        "--vd-lavc-threads=1".into(),
+        format!("--vf={}", thumb_filter(false)),
         "--screenshot-format=jpg".into(),
         format!("--screenshot-jpeg-quality={}", SCREENSHOT_QUALITY),
         "--screenshot-tag-colorspace=no".into(),
         "--hr-seek=no".into(),
-        "--".into(),
-        url.to_string(),
     ];
+    if !header_fields.is_empty() {
+        args.push(format!("--http-header-fields={}", header_fields.join(",")));
+    }
+    args.push("--".into());
+    args.push(url.to_string());
 
     let mut cmd = Command::new(&bin);
     cmd.kill_on_drop(true);
@@ -670,6 +1032,7 @@ async fn spawn_shadow(url: &str, session: &str, pending: Pending) -> Result<Shad
         cache_dir: dir,
         pipe,
         seek_notify,
+        filter_ready: Arc::new(OnceCell::new()),
     })
 }
 
@@ -696,7 +1059,7 @@ fn handle_line(line: &str, pending: &Pending, seek_notify: &Arc<Notify>) {
         let mut p = pending.lock().await;
         if let Some(tx) = p.remove(&id) {
             let _ = tx.send(if error == "success" {
-                Ok(())
+                Ok(v.get("data").cloned().unwrap_or(Value::Null))
             } else {
                 Err(error)
             });
@@ -830,9 +1193,143 @@ fn spawn_ipc(
 
 #[cfg(test)]
 mod cache_tests {
-    use super::{send_ipc_message, ThumbCache, ThumbsState};
+    use super::{
+        handle_line, ipc_request, next_bucket, send_ipc_message, should_cancel, timeline_buckets,
+        ThumbCache, ThumbsState, PREFETCH_MAX_ATTEMPTS,
+    };
     use serde_json::json;
     use std::time::Duration;
+
+    #[tokio::test]
+    async fn ipc_metadata_response_preserves_data_and_reports_errors() {
+        let pending = Default::default();
+        let notify = Default::default();
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<serde_json::Value>(1);
+        let reply = async {
+            let message = rx.recv().await.unwrap();
+            assert_eq!(
+                message["command"],
+                json!(["get_property", "video-params/gamma"])
+            );
+            handle_line(
+                r#"{"request_id":1,"error":"success","data":"pq"}"#,
+                &pending,
+                &notify,
+            );
+        };
+        let (result, ()) = tokio::join!(
+            ipc_request(
+                &tx,
+                &pending,
+                1,
+                json!(["get_property", "video-params/gamma"])
+            ),
+            reply
+        );
+        assert_eq!(result, Ok(json!("pq")));
+        assert!(pending.lock().await.is_empty());
+
+        let reply = async {
+            rx.recv().await.unwrap();
+            handle_line(
+                r#"{"request_id":2,"error":"property unavailable"}"#,
+                &pending,
+                &notify,
+            );
+        };
+        let (result, ()) = tokio::join!(
+            ipc_request(
+                &tx,
+                &pending,
+                2,
+                json!(["get_property", "video-params/gamma"])
+            ),
+            reply
+        );
+        assert_eq!(result, Err("property unavailable".into()));
+        assert!(pending.lock().await.is_empty());
+    }
+
+    #[test]
+    fn nearby_moves_keep_a_running_seek_and_far_moves_cancel_it() {
+        assert!(!should_cancel(Some(99), 100));
+        assert!(!should_cancel(Some(100), 100));
+        assert!(!should_cancel(Some(105), 100));
+        assert!(should_cancel(Some(106), 100));
+        assert!(should_cancel(None, 100));
+    }
+
+    #[test]
+    fn timeline_spreads_coverage_before_filling_gaps() {
+        let buckets = timeline_buckets(7200.0);
+        assert_eq!(buckets.len(), 180);
+        let first: Vec<_> = buckets.iter().take(3).copied().collect();
+        assert_eq!(first, vec![1800, 900, 2700]);
+        let mut sorted: Vec<_> = buckets.into_iter().collect();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), 180);
+        assert!(sorted.windows(2).all(|pair| pair[1] - pair[0] <= 20));
+        assert!(sorted.iter().all(|bucket| *bucket < 3600));
+    }
+
+    #[tokio::test]
+    async fn timeline_progresses_between_nearby_jobs_and_survives_suspension() {
+        let state = ThumbsState::new();
+        let mut inner = state.inner.lock().await;
+        inner.prefetch_allowed = true;
+        inner.prefetch.extend([1, 2, 3]);
+        inner.timeline.extend([100, 200]);
+        assert_eq!(next_bucket(&mut inner), Some(1));
+        assert_eq!(next_bucket(&mut inner), Some(100));
+        inner.prefetch_allowed = false;
+        assert_eq!(next_bucket(&mut inner), None);
+        inner.prefetch_allowed = true;
+        inner.wanted = Some(9);
+        assert_eq!(next_bucket(&mut inner), Some(9));
+        assert_eq!(next_bucket(&mut inner), Some(200));
+    }
+
+    #[tokio::test]
+    async fn foreground_preempts_prefetch_and_cached_background_is_skipped() {
+        let state = ThumbsState::new();
+        let mut inner = state.inner.lock().await;
+        inner.prefetch_allowed = true;
+        inner.prefetch.extend([10, 11]);
+        inner.cache.insert(10, "cached".into());
+        inner.wanted = Some(20);
+        assert_eq!(next_bucket(&mut inner), Some(20));
+        assert!(!inner.speculative);
+        assert_eq!(next_bucket(&mut inner), Some(11));
+        assert!(inner.speculative);
+        assert_eq!(next_bucket(&mut inner), None);
+    }
+
+    #[tokio::test]
+    async fn speculative_budget_never_blocks_foreground_requests() {
+        let state = ThumbsState::new();
+        let mut inner = state.inner.lock().await;
+        inner.prefetch_allowed = true;
+        inner.prefetched.extend(0..PREFETCH_MAX_ATTEMPTS as u32);
+        inner.prefetch.push_back(500);
+        assert_eq!(next_bucket(&mut inner), None);
+        inner.wanted = Some(500);
+        assert_eq!(next_bucket(&mut inner), Some(500));
+        assert!(!inner.speculative);
+    }
+
+    #[tokio::test]
+    async fn disabled_prefetch_and_repeated_attempts_do_not_decode() {
+        let state = ThumbsState::new();
+        let mut inner = state.inner.lock().await;
+        inner.prefetch.push_back(10);
+        assert_eq!(next_bucket(&mut inner), None);
+        inner.prefetch_allowed = true;
+        inner.prefetched.insert(10);
+        inner.prefetch.extend([10, 12]);
+        assert_eq!(next_bucket(&mut inner), Some(12));
+        assert_eq!(next_bucket(&mut inner), None);
+    }
 
     #[test]
     fn cache_evicts_least_recently_used_entry() {

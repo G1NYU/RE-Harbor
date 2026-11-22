@@ -28,7 +28,7 @@ export async function universeLogo(query: string): Promise<string | null> {
     if (malId == null) return null;
     const kitsuId = await externalToKitsu("myanimelist", malId).catch(() => null);
     if (kitsuId == null) return null;
-    const art = await fetchTvdbArtwork({ kitsuId });
+    const art = await fetchTvdbArtwork({ kind: "tv", kitsuId });
     const logo = art.clearLogos[0] ?? null;
     if (logo) {
       cache.set(key, logo);

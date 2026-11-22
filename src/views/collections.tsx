@@ -9,6 +9,7 @@ import { layoutHasGlobalBack } from "@/lib/theme";
 import { tmdbSearchCollections, type CollectionHit } from "@/lib/providers/tmdb";
 import { useSettings } from "@/lib/settings";
 import { useScrollMemory, useView } from "@/lib/view";
+import { useSessionState } from "@/lib/session-state";
 import { useT } from "@/lib/i18n";
 import { useCategoryFeed } from "./collections/use-category-feed";
 
@@ -25,8 +26,8 @@ export function CollectionsView() {
   const scrollRef = useRef<HTMLElement>(null);
   useScrollMemory("collections", scrollRef);
 
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<string>("All");
+  const [query, setQuery] = useSessionState("collections.query", "");
+  const [category, setCategory] = useSessionState<string>("collections.category", "All");
   const [stuck, setStuck] = useState(false);
   const stickySentinelRef = useRef<HTMLDivElement>(null);
   const searchActive = query.trim().length >= 2;
@@ -71,10 +72,10 @@ export function CollectionsView() {
     const el = stickySentinelRef.current;
     const root = scrollRef.current;
     if (!el || !root) return;
-    const io = new IntersectionObserver(
-      (entries) => setStuck(!entries[0]?.isIntersecting),
-      { root, rootMargin: "-104px 0px 0px 0px" },
-    );
+    const io = new IntersectionObserver((entries) => setStuck(!entries[0]?.isIntersecting), {
+      root,
+      rootMargin: "-104px 0px 0px 0px",
+    });
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -103,7 +104,10 @@ export function CollectionsView() {
                 const fresh = batch.filter(
                   (h) =>
                     !seen.has(h.id) &&
-                    !(remoteQuery === FEED_QUERY && curatedNames.has(stripSuffix(h.name).toLowerCase())),
+                    !(
+                      remoteQuery === FEED_QUERY &&
+                      curatedNames.has(stripSuffix(h.name).toLowerCase())
+                    ),
                 );
                 return [...prev, ...fresh];
               });
@@ -237,7 +241,9 @@ export function CollectionsView() {
 
           {!searchActive && category !== "All" && (
             <section className="flex flex-col gap-5">
-              <p className="text-[13px] text-ink-subtle">{t("More {category}", { category: t(category) })}</p>
+              <p className="text-[13px] text-ink-subtle">
+                {t("More {category}", { category: t(category) })}
+              </p>
               {catFeed.hits.length > 0 && (
                 <div className="grid grid-cols-2 gap-5 lg:grid-cols-3 2xl:grid-cols-4">
                   {catFeed.hits.map((h) => (
@@ -264,7 +270,9 @@ export function CollectionsView() {
               {catFeed.done && (
                 <p className="py-4 text-center text-[12.5px] text-ink-subtle">
                   {catFeed.hits.length > 0
-                    ? t("That's every {category} collection we could find.", { category: t(category) })
+                    ? t("That's every {category} collection we could find.", {
+                        category: t(category),
+                      })
                     : t("No more found for this category.")}
                 </p>
               )}

@@ -40,7 +40,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "Lencana kualitas",
   "music.dock.part.source": "Sumber",
   "music.dock.part.time": "Waktu",
-  "music.dock.part.queue": "Antrean",
+  "music.dock.part.queue": "Antrean mendengarkan",
   "music.dock.part.like": "Suka",
 
   "music.now.colors": "Warna album",

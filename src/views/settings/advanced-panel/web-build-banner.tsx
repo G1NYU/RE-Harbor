@@ -7,7 +7,7 @@ import { HARBOR_API_BASE } from "@/lib/config/endpoints";
 import { ROW_DESC } from "../shared";
 
 const DOWNLOAD_URL = `${HARBOR_API_BASE}/download`;
-const SOURCE_URL = "https://github.com/harborstremio/harbor";
+const SOURCE_URL = "https://github.com/HarborCommunity/Harbor";
 
 const BANNER_BTN =
   "flex h-11 w-fit items-center gap-2 rounded-[8px] px-4 text-[15px] font-semibold transition-transform hover:scale-[1.02] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";

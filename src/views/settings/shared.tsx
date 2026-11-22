@@ -43,6 +43,7 @@ export type SectionId =
   | "theme"
   | "badges"
   | "awardIcons"
+  | "dmNotifications"
   | "webhooks"
   | "bug"
   | "support"
@@ -230,12 +231,14 @@ export function RowControl({ span, children }: { span?: boolean; children: React
 
 export function Section({
   title,
+  id,
   subtitle,
   newId,
   bare,
   children,
 }: {
   title: string;
+  id?: string;
   subtitle?: string;
   newId?: string;
   bare?: boolean;
@@ -285,7 +288,7 @@ export function Section({
     <SectionRegistryContext.Provider value={registry}>
       <SectionFlagsContext.Provider value={flags}>
         <section
-          id={settingsAnchor(title)}
+          id={id ?? settingsAnchor(title)}
           className={
             bare
               ? "scroll-mt-[72px]"
@@ -532,6 +535,7 @@ export function ToggleRow({
   note,
   preview,
   newId,
+  badge,
   warn,
 }: {
   label: string;
@@ -543,6 +547,7 @@ export function ToggleRow({
   note?: string;
   preview?: React.ReactNode;
   newId?: string;
+  badge?: React.ReactNode;
   warn?: string;
 }) {
   const locked = !!lockReason;
@@ -607,6 +612,7 @@ export function ToggleRow({
       >
         <RowTitle>
           <span className="min-w-0">{label}</span>
+          {badge}
           {newId && <NewBadge id={newId} />}
           {locked && !leading && (
             <Lock size={14} strokeWidth={2.4} className="shrink-0 text-ink-subtle" />

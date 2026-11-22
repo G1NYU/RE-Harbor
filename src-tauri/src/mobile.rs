@@ -126,6 +126,7 @@ pub fn run() {
             download::download_cancel,
             crate::download_files::download_file_info,
             crate::download_files::download_delete_file,
+            crate::download_files::download_remove_empty_folder,
             crate::download_files::harbor_download_dir,
             diagnostics::diagnostics_collect,
             diagnostics::diagnostics_cleanup,

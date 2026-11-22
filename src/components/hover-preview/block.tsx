@@ -8,6 +8,7 @@ import { toggleWatchlist, useInWatchlist } from "@/lib/watchlist";
 import { useLocalizedOverview } from "@/lib/use-localized-overview";
 import { ImdbIcon } from "../icons/imdb-icon";
 import { MalLogo } from "../icons/mal-logo";
+import { FriendReviewBadges } from "../ratings/friend-review-badges";
 
 function DecisionLine({ data }: { data: PreviewData }) {
   const parts: ReactNode[] = [];
@@ -30,7 +31,7 @@ function DecisionLine({ data }: { data: PreviewData }) {
   return (
     <div
       data-stagger="1"
-      className="truncate text-[12.5px] font-medium tabular-nums text-ink-muted"
+      className="min-w-0 truncate text-[12.5px] font-medium tabular-nums text-ink-muted"
     >
       {parts.flatMap((p, i) =>
         i === 0
@@ -56,8 +57,8 @@ function WatchlistToggle({ data }: { data: PreviewData }) {
     <button
       type="button"
       tabIndex={-1}
-      title={active ? t("In watchlist") : t("Add to watchlist")}
-      aria-label={active ? t("In watchlist") : t("Add to watchlist")}
+      title={active ? t("In library") : t("Save to library")}
+      aria-label={active ? t("In library") : t("Save to library")}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
@@ -97,7 +98,15 @@ export function PreviewBlock({ data, onDetails }: { data: PreviewData; onDetails
     : t("Details");
   return (
     <div className="flex flex-col gap-3 px-5 pb-4 pt-4">
-      <DecisionLine data={data} />
+      <div className="flex min-h-7 items-center gap-3">
+        <DecisionLine data={data} />
+        <FriendReviewBadges
+          metaId={data.meta.id}
+          kind={data.meta.type}
+          className="ms-auto shrink-0 gap-1"
+          avatarSize={26}
+        />
+      </div>
       {synopsis && (
         <p data-stagger="2" className="line-clamp-3 text-[13.5px] leading-[1.5] text-ink-muted">
           {synopsis}

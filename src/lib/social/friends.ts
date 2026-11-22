@@ -1,12 +1,15 @@
 import { socialGet, socialPost } from "./client";
+import type { PresenceStatus } from "./presence";
 
-export type FriendEdge = { id: string; status: string };
+export type FriendEdge = { id: string; status: string; requesterId?: string; addresseeId?: string };
 export type Friend = {
+  id?: string;
   handle: string;
   alias: string;
   avatarUrl?: string;
   slogan?: string;
   online?: boolean;
+  presence?: PresenceStatus;
   status?: string;
 };
 export type PendingRequest = {
@@ -34,12 +37,13 @@ export function removeFriend(handle: string): Promise<{ ok: boolean }> {
 
 export function fetchFriends(signal?: AbortSignal): Promise<Friend[]> {
   return socialGet<{ friends?: Friend[] } | Friend[]>("/social/friends", signal).then((d) =>
-    Array.isArray(d) ? d : d.friends ?? [],
+    Array.isArray(d) ? d : (d.friends ?? []),
   );
 }
 
 export function fetchPendingRequests(signal?: AbortSignal): Promise<PendingRequest[]> {
-  return socialGet<{ pending?: PendingRequest[] } | PendingRequest[]>("/social/friends/pending", signal).then((d) =>
-    Array.isArray(d) ? d : d.pending ?? [],
-  );
+  return socialGet<{ pending?: PendingRequest[] } | PendingRequest[]>(
+    "/social/friends/pending",
+    signal,
+  ).then((d) => (Array.isArray(d) ? d : (d.pending ?? [])));
 }

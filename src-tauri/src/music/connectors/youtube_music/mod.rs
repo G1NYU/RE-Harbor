@@ -1,4 +1,5 @@
 mod artist;
+pub(crate) mod auth;
 mod catalog;
 #[cfg(test)]
 mod clients;
@@ -10,14 +11,13 @@ mod parse;
 mod player;
 mod rows;
 mod ytdlp;
-mod ytdlp_update;
 mod video_page;
 
 use super::super::connector::{ConnectorHealth, HealthCell, MusicConnector};
 use super::super::{
     MusicAlbumRef, MusicArtistRef, MusicCatalogItem, MusicCatalogKind, MusicCatalogPage,
-    MusicCatalogRow, MusicConnection, MusicPlaylistRef, MusicSearchResults, MusicStationRef,
-    MusicStream, MusicTrack, MusicVideoStream,
+    MusicCatalogRow, MusicConnection, MusicPlaylistImport, MusicPlaylistRef, MusicSearchResults,
+    MusicStationRef, MusicStream, MusicTrack, MusicVideoStream,
 };
 use async_trait::async_trait;
 
@@ -50,6 +50,16 @@ impl MusicConnector for YouTubeMusicConnector {
 
     fn name(&self) -> &str {
         "YouTube Music"
+    }
+
+    async fn library_rows(&self, app: &tauri::AppHandle) -> Result<Vec<MusicCatalogRow>, String> {
+        auth::ensure(app, false).await;
+        if auth::current().is_none() {
+            return Err("Sign in to YouTube Music to open its library".to_string());
+        }
+        let result = catalog::library_rows(&self.client, app).await;
+        self.record(&result);
+        result
     }
 
     async fn search(
@@ -120,12 +130,26 @@ impl MusicConnector for YouTubeMusicConnector {
     }
 
     async fn browse_home(&self, app: &tauri::AppHandle) -> Result<Vec<MusicCatalogRow>, String> {
-        let (home, charts) = tokio::join!(
+        // A signed-in tab turns these same shelves into the listener's own home. Look for the
+        // session once; without one the call stays anonymous exactly as before.
+        auth::ensure(app, false).await;
+        let signed_in = auth::current().is_some();
+        let (home, charts, liked, playlists) = tokio::join!(
             catalog::home_rows(&self.client, app),
-            catalog::chart_rows(&self.client, app)
+            catalog::chart_rows(&self.client, app),
+            catalog::liked_row(&self.client, app, signed_in),
+            catalog::library_playlists(&self.client, app, signed_in)
         );
         self.record(&home);
-        let mut rows = home?;
+        let mut rows = Vec::new();
+        // The account's own shelves lead the provider's home, matching the Spotify layout.
+        if let Some(liked) = liked.ok().flatten() {
+            rows.push(liked);
+        }
+        if let Some(playlists) = playlists.ok().flatten() {
+            rows.push(playlists);
+        }
+        rows.extend(home?);
         if let Ok(charts) = charts {
             rows.extend(charts);
         }
@@ -174,6 +198,27 @@ impl MusicConnector for YouTubeMusicConnector {
         result
     }
 
+    async fn playlist_page(
+        &self,
+        app: &tauri::AppHandle,
+        playlist: &MusicPlaylistRef,
+        cursor: Option<&str>,
+    ) -> Result<MusicCatalogPage, String> {
+        let result = catalog::playlist_page(&self.client, app, playlist, cursor).await;
+        self.record(&result);
+        result
+    }
+
+    async fn import_playlist(
+        &self,
+        app: &tauri::AppHandle,
+        playlist_id: &str,
+    ) -> Result<MusicPlaylistImport, String> {
+        let result = catalog::import_playlist(&self.client, app, playlist_id).await;
+        self.record(&result);
+        result
+    }
+
     async fn station_tracks(
         &self,
         app: &tauri::AppHandle,
@@ -189,6 +234,9 @@ impl MusicConnector for YouTubeMusicConnector {
         app: &tauri::AppHandle,
         track: &MusicTrack,
     ) -> Result<MusicStream, String> {
+        // A cold start can begin playback before the Music home has restored the session; the
+        // stream must not silently fall back to anonymous extraction in that window.
+        auth::ensure(app, false).await;
         let result = catalog::stream(app, track).await;
         self.record(&result);
         result
@@ -198,8 +246,28 @@ impl MusicConnector for YouTubeMusicConnector {
         &self,
         app: &tauri::AppHandle,
         track: &MusicTrack,
+        max_height: Option<u32>,
     ) -> Result<MusicVideoStream, String> {
-        catalog::video_stream(app, track).await
+        auth::ensure(app, false).await;
+        catalog::video_stream(app, track, max_height).await
+    }
+
+    async fn connect(
+        &self,
+        app: &tauri::AppHandle,
+        _fields: &std::collections::HashMap<String, String>,
+    ) -> Result<MusicConnection, String> {
+        let session = auth::session_from(app).await?;
+        auth::set(session);
+        auth::record_opt_in(app);
+        self.health.set(ConnectorHealth::Healthy);
+        Ok(self.connection())
+    }
+
+    async fn disconnect(&self, app: &tauri::AppHandle) -> Result<(), String> {
+        auth::clear();
+        auth::forget(app);
+        Ok(())
     }
 
     fn set_health(&self, health: ConnectorHealth) {
@@ -219,14 +287,24 @@ impl MusicConnector for YouTubeMusicConnector {
             ConnectorHealth::Offline => "error",
             _ => "connected",
         };
-        MusicConnection::new(
+        let mut connection = MusicConnection::new(
             "youtube",
             "YouTube Music",
             "streaming",
             status,
             &["search", "browse", "play"],
         )
-        .anonymous()
+        .anonymous();
+        if let Some(session) = auth::current() {
+            connection.account = Some(
+                session
+                    .account
+                    .clone()
+                    .unwrap_or_else(|| "YouTube Music".to_string()),
+            );
+            connection.detail = Some("Using your signed-in YouTube Music session".to_string());
+        }
+        connection
     }
 }
 

@@ -1,4 +1,5 @@
 import { Check, Eye } from "lucide-react";
+import { EpisodeReleaseCountdown } from "@/components/episode-release-countdown";
 import { Play } from "@/components/icons/play-filled";
 import { HoverTooltip } from "@/components/hover-tooltip";
 import { useEffect, useMemo, useState } from "react";
@@ -13,9 +14,11 @@ import { SPOILER_TEXT_CLASS, SPOILER_THUMB_CLASS, type SpoilerMask } from "@/lib
 import { useView } from "@/lib/view";
 import { useLocalAwareSeriesPlay } from "@/lib/local-library/use-series-play";
 import { useT } from "@/lib/i18n";
+import { bidiIsolate } from "@/lib/bidi";
 import { prefetchSegments } from "@/lib/skip-intro";
 import { NewBadge, UpcomingBadge } from "./badges";
 import { EpisodeDownloadButton } from "./episode-download-button";
+import { EpisodeReviewsButton } from "./episode-reviews-dialog";
 import { isNewEpisode, isUpcomingEpisode } from "./helpers";
 
 export function EpisodeRow({
@@ -59,13 +62,17 @@ export function EpisodeRow({
     return out;
   }, [tmdbStill, cinemetaThumbnail]);
   const [imgIdx, setImgIdx] = useState(0);
+  const candidatesKey = candidates.join("\n");
   useEffect(() => {
+    // A late Cinemeta/TVDB still must retry the primary, not stay on a fallback.
     setImgIdx(0);
-  }, [ep.id]);
-  const still = candidates[imgIdx];
+  }, [ep.id, candidatesKey]);
+  const still = candidates[Math.min(imgIdx, Math.max(0, candidates.length - 1))];
   const watchedAgo = progress.startedAt > 0 ? formatRelativeWatched(progress.startedAt) : "";
   const resolvedImdbId = useMemo(() => {
-    const v = cinemetaVideos?.find((x) => x.season === ep.seasonNumber && x.episode === ep.episodeNumber);
+    const v = cinemetaVideos?.find(
+      (x) => x.season === ep.seasonNumber && x.episode === ep.episodeNumber,
+    );
     return v?.id ?? undefined;
   }, [cinemetaVideos, ep.seasonNumber, ep.episodeNumber]);
   const playEpisode = {
@@ -92,7 +99,10 @@ export function EpisodeRow({
           playEpisodeLocalAware({
             meta,
             episode: playEpisode,
-            opts: { autoPlay: settings.instantPlay || settings.seasonSourceLock, resume: !progress.watched && progress.ratio > 0.01 },
+            opts: {
+              autoPlay: settings.instantPlay || settings.seasonSourceLock,
+              resume: !progress.watched && progress.ratio > 0.01,
+            },
             imdbId: seriesImdbId,
             videos: cinemetaVideos,
           })
@@ -107,7 +117,7 @@ export function EpisodeRow({
               seed={String(ep.id)}
               ratio="landscape"
               lazy
-              onError={() => setImgIdx((i) => i + 1)}
+              onError={() => setImgIdx((i) => Math.min(i + 1, Math.max(0, candidates.length - 1)))}
             />
           </div>
           <div className="absolute inset-0 flex items-center justify-center bg-canvas/40 opacity-0 transition-opacity group-hover:opacity-100">
@@ -140,18 +150,19 @@ export function EpisodeRow({
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <h4 className="flex items-center gap-2 truncate text-[16px] font-semibold text-ink">
             <span className={`truncate ${spoiler?.title ? SPOILER_TEXT_CLASS : ""}`}>
-              {ep.name || t("Episode {n}", { n: ep.episodeNumber })}
+              {ep.name || t("Episode {n}", { n: ep.orderNumber ?? ep.episodeNumber })}
             </span>
             {isUpcomingEpisode(ep) ? <UpcomingBadge /> : isNewEpisode(ep) && <NewBadge />}
           </h4>
           <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-ink-subtle">
             <span>
               {[
-                `S${ep.seasonNumber} E${ep.episodeNumber}`,
+                `S${ep.orderSeason ?? ep.seasonNumber} E${ep.orderNumber ?? ep.episodeNumber}`,
                 ep.runtime ? t("{n} min", { n: ep.runtime }) : null,
                 formatAirDate(ep.airDate) || null,
               ]
-                .filter(Boolean)
+                .filter((part): part is string => Boolean(part))
+                .map(bidiIsolate)
                 .join("  ·  ")}
             </span>
             {progress.watched && watchedAgo && (
@@ -163,8 +174,10 @@ export function EpisodeRow({
               </span>
             )}
           </p>
-          {ep.overview && (
+          <EpisodeReleaseCountdown date={ep.airDate} />
+          {settings.showEpisodeDescription && ep.overview && (
             <p
+              dir="auto"
               className={`line-clamp-2 text-[13.5px] leading-relaxed text-ink-muted ${
                 spoiler?.desc ? SPOILER_TEXT_CLASS : ""
               }`}
@@ -174,6 +187,13 @@ export function EpisodeRow({
           )}
         </div>
       </button>
+      <EpisodeReviewsButton
+        meta={meta}
+        seriesImdbId={seriesImdbId}
+        season={ep.seasonNumber}
+        episode={ep.episodeNumber}
+        episodeTitle={ep.name || undefined}
+      />
       <HoverTooltip label={t("Episode details")} align="center" className="shrink-0 self-center">
         <button
           type="button"

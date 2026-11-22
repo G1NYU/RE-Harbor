@@ -38,7 +38,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "गुणवत्ता बैज",
   "music.dock.part.source": "स्रोत",
   "music.dock.part.time": "समय",
-  "music.dock.part.queue": "कतार",
+  "music.dock.part.queue": "सुनने की कतार",
   "music.dock.part.like": "पसंद",
 
   "music.now.colors": "एल्बम के रंग",

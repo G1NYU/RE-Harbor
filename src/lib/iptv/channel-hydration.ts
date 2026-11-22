@@ -1,3 +1,4 @@
+import { addonOnlyMetadata } from "@/lib/metadata-policy";
 import { lruSet } from "@/lib/cache";
 import { safeFetch as fetch } from "@/lib/safe-fetch";
 import type { Meta } from "@/lib/cinemeta";
@@ -53,7 +54,10 @@ function persist() {
   } catch {}
 }
 
-function queryForChannel(channelName: string): { query: string | null; preferType: "movie" | "series" | null } {
+function queryForChannel(channelName: string): {
+  query: string | null;
+  preferType: "movie" | "series" | null;
+} {
   const memoed = channelToQuery.get(channelName);
   if (memoed !== undefined) {
     return { query: memoed, preferType: null };
@@ -64,6 +68,7 @@ function queryForChannel(channelName: string): { query: string | null; preferTyp
 }
 
 export function getCachedHydration(channelName: string): Meta | null | undefined {
+  if (addonOnlyMetadata()) return undefined;
   loadCache();
   const { query } = queryForChannel(channelName);
   if (!query) return null;
@@ -73,6 +78,7 @@ export function getCachedHydration(channelName: string): Meta | null | undefined
 }
 
 export function hydrateChannel(channelName: string): Promise<Meta | null> {
+  if (addonOnlyMetadata()) return Promise.resolve(null);
   loadCache();
   const { query, preferType } = queryForChannel(channelName);
   if (!query) return Promise.resolve(null);
@@ -117,10 +123,7 @@ async function doHydrate(
   return null;
 }
 
-async function fetchFullMeta(
-  type: "movie" | "series",
-  id: string,
-): Promise<Meta | null> {
+async function fetchFullMeta(type: "movie" | "series", id: string): Promise<Meta | null> {
   try {
     const res = await fetch(`${CINEMETA}/meta/${type}/${id}.json`);
     if (!res.ok) return null;
@@ -132,12 +135,46 @@ async function fetchFullMeta(
 }
 
 const BRAND_WORDS = new Set([
-  "discovery", "paramount", "legend", "history", "national", "geographic",
-  "cinema", "cinemax", "showtime", "starz", "bravo", "syfy", "universal",
-  "disney", "nickelodeon", "cartoon", "comedy", "drama", "action", "family",
-  "kids", "movies", "movie", "series", "hits", "classics", "westerns",
-  "horror", "thriller", "romance", "documentary", "entertainment", "max",
-  "epic", "pluto", "peacock", "crackle", "tubi", "roku", "fandango",
+  "discovery",
+  "paramount",
+  "legend",
+  "history",
+  "national",
+  "geographic",
+  "cinema",
+  "cinemax",
+  "showtime",
+  "starz",
+  "bravo",
+  "syfy",
+  "universal",
+  "disney",
+  "nickelodeon",
+  "cartoon",
+  "comedy",
+  "drama",
+  "action",
+  "family",
+  "kids",
+  "movies",
+  "movie",
+  "series",
+  "hits",
+  "classics",
+  "westerns",
+  "horror",
+  "thriller",
+  "romance",
+  "documentary",
+  "entertainment",
+  "max",
+  "epic",
+  "pluto",
+  "peacock",
+  "crackle",
+  "tubi",
+  "roku",
+  "fandango",
 ]);
 
 function pickBestMatch(list: Meta[], query: string): Meta | null {

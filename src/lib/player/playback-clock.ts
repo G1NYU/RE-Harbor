@@ -4,6 +4,9 @@ import type { PlayerStatus } from "./bridge";
 let positionSec = 0;
 let bufferedSec = 0;
 let downloadedFraction = 0;
+// Whether the cached fraction above describes a local P2P transfer. The player's
+// cache dot only exposes the P2P cache state, never the plain HTTP buffer.
+let downloadedFromP2p = false;
 const listeners = new Set<() => void>();
 let clockNotification: ReturnType<typeof setTimeout> | null = null;
 const CLOCK_NOTIFY_MS = 100;
@@ -37,6 +40,12 @@ export function setPlaybackDownloaded(fraction: number) {
   const clamped = fraction > 1 ? 1 : fraction < 0 ? 0 : fraction;
   if (clamped === downloadedFraction) return;
   downloadedFraction = clamped;
+  notifyClock();
+}
+
+export function setPlaybackDownloadedFromP2p(fromP2p: boolean) {
+  if (fromP2p === downloadedFromP2p) return;
+  downloadedFromP2p = fromP2p;
   notifyClock();
 }
 
@@ -126,6 +135,18 @@ export function usePlaybackDownloadedGated(active: boolean): number {
     active ? subscribePlaybackClock : NEVER,
     () => downloadedFraction,
     () => downloadedFraction,
+  );
+}
+
+export function getPlaybackDownloadedFromP2p(): boolean {
+  return downloadedFromP2p;
+}
+
+export function usePlaybackDownloadedFromP2pGated(active: boolean): boolean {
+  return useSyncExternalStore(
+    active ? subscribePlaybackClock : NEVER,
+    () => downloadedFromP2p,
+    () => downloadedFromP2p,
   );
 }
 

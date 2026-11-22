@@ -8,6 +8,7 @@ import { useAnilist } from "@/lib/anilist/provider";
 import { resolveAnilistMediaId } from "@/lib/anilist/sync";
 import type { MediaListStatus } from "@/lib/anilist/types";
 import { useT } from "@/lib/i18n";
+import { notifyTrackerStatusChanged, useTrackerStatusVersion } from "@/lib/tracker-status-events";
 
 const STATUS_LABELS: Record<MediaListStatus, string> = {
   CURRENT: "Watching",
@@ -30,9 +31,11 @@ const STATUS_ORDER: MediaListStatus[] = [
 export function AddToAnilistButton({ harborId, title }: { harborId: string; title: string }) {
   const t = useT();
   const { isConnected } = useAnilist();
+  const trackerStatusVersion = useTrackerStatusVersion();
   const [mediaId, setMediaId] = useState<number | null>(null);
   const [entryId, setEntryId] = useState<number | null>(null);
   const [status, setStatus] = useState<MediaListStatus | null>(null);
+  const [ready, setReady] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [entryLists, setEntryLists] = useState<string[]>([]);
   const [availableLists, setAvailableLists] = useState<string[]>([]);
@@ -47,6 +50,7 @@ export function AddToAnilistButton({ harborId, title }: { harborId: string; titl
 
   useEffect(() => {
     if (!isConnected) return;
+    setReady(false);
     let cancelled = false;
     let timer: number | undefined;
     (async () => {
@@ -57,21 +61,28 @@ export function AddToAnilistButton({ harborId, title }: { harborId: string; titl
         return;
       }
       setMediaId(id);
+      // A failed request is not proof that the anime is absent from the list.
+      // Keep the button hidden until the service confirms a real entry or null.
       const info = await fetchListEntry(id).catch(() => null);
       if (cancelled) return;
-      setEntryId(info?.entry?.id ?? null);
-      setStatus(info?.entry?.status ?? null);
-      setPrivacy(info?.entry?.private ?? false);
-      setEntryLists(info?.entry?.customLists ?? []);
-      setAvailableLists(info?.customLists ?? []);
+      if (!info) {
+        if (attempt < 2) timer = window.setTimeout(() => setAttempt((a) => a + 1), 15000);
+        return;
+      }
+      setEntryId(info.entry?.id ?? null);
+      setStatus(info.entry?.status ?? null);
+      setPrivacy(info.entry?.private ?? false);
+      setEntryLists(info.entry?.customLists ?? []);
+      setAvailableLists(info.customLists ?? []);
+      setReady(true);
     })();
     return () => {
       cancelled = true;
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [harborId, isConnected, attempt]);
+  }, [harborId, isConnected, attempt, trackerStatusVersion]);
 
-  if (!isConnected || mediaId == null) return null;
+  if (!isConnected || mediaId == null || !ready) return null;
 
   const setTo = async (next: MediaListStatus) => {
     setBusy(true);
@@ -82,6 +93,7 @@ export function AddToAnilistButton({ harborId, title }: { harborId: string; titl
       const saved = await saveListEntry({ mediaId, status: next });
       setEntryId(saved.id);
       setStatus(saved.status);
+      notifyTrackerStatusChanged();
     } catch {
       setStatus(prev);
     } finally {
@@ -102,7 +114,8 @@ export function AddToAnilistButton({ harborId, title }: { harborId: string; titl
     setEntryLists([]);
     setMenuOpen(false);
     try {
-      await deleteListEntry(prevEntry);
+      if (!(await deleteListEntry(prevEntry))) throw new Error("AniList did not confirm removal.");
+      notifyTrackerStatusChanged();
     } catch {
       setStatus(prevStatus);
       setEntryId(prevEntry);
@@ -145,14 +158,22 @@ export function AddToAnilistButton({ harborId, title }: { harborId: string; titl
 
   if (status == null) {
     return (
-      <HoverTooltip label={t("Add {title} to AniList", { title })} align="center" className="shrink-0">
+      <HoverTooltip
+        label={t("Add {title} to AniList", { title })}
+        align="center"
+        className="shrink-0"
+      >
         <button
           type="button"
           disabled={busy}
           onClick={() => void setTo("PLANNING")}
           className="flex h-12 items-center gap-2.5 rounded-full bg-canvas/80 px-6 text-[15px] font-medium text-ink transition-[transform,background-color] duration-200 hover:bg-canvas/95 active:scale-[0.98] disabled:opacity-60"
         >
-          <img src={anilistLogo} alt="" className="h-[18px] w-[18px] rounded-[3px] object-contain" />
+          <img
+            src={anilistLogo}
+            alt=""
+            className="h-[18px] w-[18px] rounded-[3px] object-contain"
+          />
           <Plus size={16} strokeWidth={2.2} className="-ms-1" />
           {t("Add to AniList")}
         </button>
@@ -176,7 +197,12 @@ export function AddToAnilistButton({ harborId, title }: { harborId: string; titl
           className={`text-ink-muted transition-transform ${menuOpen ? "rotate-180" : ""}`}
         />
       </button>
-      <AnchoredMenu anchorRef={btnRef} open={menuOpen} onClose={() => setMenuOpen(false)} width={224}>
+      <AnchoredMenu
+        anchorRef={btnRef}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        width={224}
+      >
         <div className="overflow-hidden rounded-2xl border border-edge bg-raised py-1.5 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]">
           {STATUS_ORDER.map((s) => (
             <button

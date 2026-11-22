@@ -42,22 +42,6 @@ export function ResumePromptArt() {
   );
 }
 
-export function RememberStreamArt() {
-  const t = useT();
-  return (
-    <Frame>
-      <div className="relative h-[74px] rounded-[4px] bg-elevated">
-        <span className="absolute inset-x-3 top-2.5 h-6 rounded-[3px] bg-canvas" />
-        <span className="harbor-art-fly absolute inset-x-3 bottom-3 flex h-6 items-center gap-1.5 rounded-[3px] bg-ink px-2">
-          <span className="h-[3px] w-10 rounded-full bg-canvas" />
-          <span className="h-[3px] w-5 rounded-full bg-canvas" />
-        </span>
-      </div>
-      <Caption text={t("Replays the exact source you used last time.")} />
-    </Frame>
-  );
-}
-
 export function SeasonLockArt() {
   const t = useT();
   return (

@@ -23,6 +23,9 @@ export type PendingEpisode = {
   imdbSeason?: number;
   imdbEpisode?: number;
   tvdbEpisodeId?: number;
+  /** An already verified native anime entry retained for safe pending replay. */
+  sourceMetaId?: string;
+  kitsuStreamId?: string;
 };
 
 export type PendingWatch = {
@@ -111,6 +114,13 @@ function cleanEpisode(ep: PendingEpisodeInput): PendingEpisode | undefined {
   ) {
     out.tvdbEpisodeId = ep.tvdbEpisodeId;
   }
+  if (typeof ep.sourceMetaId === "string" &&
+      /^(?:kitsu|mal|anilist|anidb):[1-9]\d*$/.test(ep.sourceMetaId))
+    out.sourceMetaId = ep.sourceMetaId;
+  if (typeof ep.kitsuStreamId === "string" &&
+      /^kitsu:[1-9]\d*:[1-9]\d*$/.test(ep.kitsuStreamId) &&
+      (!out.sourceMetaId || ep.kitsuStreamId.startsWith(`${out.sourceMetaId}:`)))
+    out.kitsuStreamId = ep.kitsuStreamId;
   return out;
 }
 
@@ -122,6 +132,8 @@ export type PendingEpisodeInput =
       imdbSeason?: number;
       imdbEpisode?: number;
       tvdbEpisodeId?: number;
+      sourceMetaId?: string;
+      kitsuStreamId?: string;
     }
   | undefined
   | null;

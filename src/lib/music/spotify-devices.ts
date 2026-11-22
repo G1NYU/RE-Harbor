@@ -22,6 +22,15 @@ export function setSpotifyPlaybackTarget(device: string | null): Promise<void> {
 }
 
 /** Spotify refuses playback on a device it has marked restricted, so it cannot be a target. */
-export function selectableSpotifyDevices(devices: readonly SpotifyDevice[]): SpotifyDevice[] {
-  return devices.filter((device) => !device.restricted && device.id.trim().length > 0);
+export function selectableSpotifyDevices(
+  devices: readonly SpotifyDevice[],
+  managedSoloistName?: string | null,
+): SpotifyDevice[] {
+  const managed = managedSoloistName?.trim().toLocaleLowerCase();
+  return devices.filter(
+    (device) =>
+      !device.restricted &&
+      device.id.trim().length > 0 &&
+      (!managed || device.name.trim().toLocaleLowerCase() !== managed),
+  );
 }

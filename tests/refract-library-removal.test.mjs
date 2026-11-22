@@ -107,21 +107,33 @@ test("Library removal revalidates the account during an asynchronous lookup", as
   assert.equal(h.writes.length, 0);
 });
 
-test("VOID Library Stremio removals dispatch Refract after successful provider writes", () => {
+test("Library Stremio, Nuvio and local removals all dispatch the captured Refract removal", () => {
   const source = readFileSync(
     new URL("../src/views/library/watchlist-tab.tsx", import.meta.url),
     "utf8",
   );
   const removeStart = source.indexOf("const handleRemove =");
   const localStart = source.indexOf("const handleRemoveLocal");
+  const localEnd = source.indexOf("useEffect(() => {", localStart);
   const remove = source.slice(removeStart, localStart);
-  const local = source.slice(localStart, source.indexOf("useEffect(() => {", localStart));
-  assert.equal(remove.split("prepareRefractLibraryRemoval(").length - 1, 1);
-  assert.equal(remove.split("syncRefractRemoval()").length - 1, 1);
-  assert.ok(
-    remove.includes("for (const l of twins) removeFromWatchlist(l.id);"),
-    "Stremio twin removal must precede Refract dispatch",
+  const local = source.slice(localStart, localEnd);
+  assert.equal(
+    (remove.match(/prepareRefractLibraryRemoval\(/g) || []).length,
+    2,
+    "Nuvio and Stremio removals must both capture the Refract account",
   );
-  assert.ok(remove.indexOf("syncRefractRemoval()") > remove.indexOf("for (const l of twins)"));
-  assert.ok(local.includes("toggleWatchlist("), "local removals retain the existing sync path");
+  assert.equal(
+    (remove.match(/syncRefractRemoval\(\)/g) || []).length,
+    2,
+    "Nuvio and Stremio removals must both trigger Refract synchronization",
+  );
+  assert.equal(
+    (local.match(/syncRefractRemoval\(\)/g) || []).length,
+    2,
+    "local removals must trigger Refract in both provider modes",
+  );
+  assert.match(
+    remove,
+    /for \(const l of twins\) removeFromWatchlist\(l.id\);\s*syncRefractRemoval\(\)/,
+  );
 });

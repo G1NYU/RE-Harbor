@@ -169,7 +169,8 @@ const settingsFill: Record<string, string> = {
     "Harbor lädt automatisch eine Untertitelspur in dieser Sprache, sofern eine vorhanden ist. Du kannst die zweite Untertitelspur für ein einzelnes Video auch über das Untertitelmenü im Player festlegen oder entfernen.",
   "Harbor needs a TMDB key for artwork, rows and collections. It is free.":
     "Harbor benötigt einen TMDB-Schlüssel für Bilder, Reihen und Sammlungen. Er ist kostenlos.",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Harbor startet seine P2P-Engine normalerweise beim Programmstart, damit der erste P2P-Stream schneller eine Verbindung herstellt. Dadurch bleibt ein DHT-Knoten aktiv und kommuniziert mit dem Netzwerk, auch wenn du gerade nichts ansiehst. Aktiviere dies bei einer volumenbasierten oder eingeschränkten Verbindung: Die Engine startet dann erst, wenn du tatsächlich zum ersten Mal einen P2P-Stream abspielst. Wird beim nächsten Programmstart wirksam.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Harbor startet seine P2P-Engine normalerweise beim Programmstart, damit der erste P2P-Stream schneller eine Verbindung herstellt. Dadurch bleibt ein DHT-Knoten aktiv und kommuniziert mit dem Netzwerk, auch wenn du gerade nichts ansiehst. Aktiviere dies bei einer volumenbasierten oder eingeschränkten Verbindung: Die Engine startet dann erst, wenn du tatsächlich zum ersten Mal einen P2P-Stream abspielst. Wird beim nächsten Programmstart wirksam.",
   "Harbor on other devices": "Harbor auf anderen Geräten",
   "Harbor plays IPTV from your own provider. Add a playlist and the guide fills in.":
     "Harbor spielt IPTV von deinem eigenen Anbieter ab. Füge eine Wiedergabeliste hinzu, dann füllt sich der Programmführer.",
@@ -459,7 +460,7 @@ const settingsFill: Record<string, string> = {
     "Dein Avatar, dein Name und dein Benutzername in ganz Harbor.",
   "Your own private {name}, bundled with Debridge": "Dein privates {name}, zusammen mit Debridge",
   "cancel anytime": "jederzeit kündbar",
-  "https://sync.harbor.site": "https://sync.harbor.site",
+  "https://sync.harborcommunity.site": "https://sync.harborcommunity.site",
   packs: "Pakete",
   "with your @handle in the body so we can match it to your account.":
     "mit deinem @handle im Text, damit wir die Nachricht deinem Konto zuordnen können.",

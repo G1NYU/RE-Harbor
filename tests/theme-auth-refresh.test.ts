@@ -5,6 +5,7 @@ import ts from "typescript";
 
 function harness() {
   const values = new Map<string, string>();
+  let failSessionWrites = false;
   const view = new EventTarget();
   Object.assign(globalThis, {
     window: view,
@@ -32,6 +33,13 @@ function harness() {
     "@/lib/safe-fetch": {
       safeFetch: async () => new Promise<Response>((resolve) => pending.push(resolve)),
     },
+    "@/lib/storage-recovery": {
+      persistCritical: (key: string, value: string) => {
+        if (failSessionWrites) return false;
+        values.set(key, value);
+        return true;
+      },
+    },
   };
   const output = ts.transpileModule(
     readFileSync(new URL("../src/lib/theme-auth.ts", import.meta.url), "utf8"),
@@ -55,8 +63,43 @@ function harness() {
     pending[index](
       Response.json({ token: `fixture-renewed-${name}`, refresh: `fixture-rotated-${name}` }),
     );
-  return { auth, select, login, resolve, pending, values };
+  return {
+    auth,
+    select,
+    login,
+    resolve,
+    pending,
+    values,
+    blockSessionWrites: (blocked: boolean) => {
+      failSessionWrites = blocked;
+    },
+  };
 }
+
+test("a failed durable write rejects Harbor login instead of losing the session on restart", () => {
+  const h = harness();
+  h.blockSessionWrites(true);
+  assert.throws(() => h.login("author-a"), /Could not save your Harbor sign-in/);
+  assert.equal(h.auth.currentAuthor(), null);
+  assert.equal(h.values.has("harbor.theme-session.a"), false);
+
+  h.blockSessionWrites(false);
+  h.login("author-a");
+  assert.equal(JSON.parse(h.values.get("harbor.theme-session.a")!).user.id, "author-a");
+  h.auth.reloadSession(true);
+  assert.equal(h.auth.currentAuthor()?.id, "author-a");
+});
+
+test("a refresh cannot claim success when its rotated credentials failed to persist", async () => {
+  const h = harness();
+  h.login("author-a");
+  const refresh = h.auth.refreshToken();
+  h.blockSessionWrites(true);
+  h.resolve(0, "author-a");
+  assert.equal(await refresh, false);
+  assert.equal(h.auth.authToken(), "fixture-access-author-a");
+  assert.equal(JSON.parse(h.values.get("harbor.theme-session.a")!).refresh, "fixture-refresh-author-a");
+});
 
 test("a token refresh cannot apply an old profile's credentials to a newly active account", async () => {
   const h = harness();

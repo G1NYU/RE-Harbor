@@ -20,7 +20,7 @@ import { RecordingPill } from "@/chrome/recording-pill";
 import { SleepTimerButton } from "@/chrome/sleep-timer-button";
 import {
   effectiveBinding,
-  eventToBinding,
+  findHotkeyMatch,
   formatBindingForDisplay,
   shouldHandleGlobalKeyboardEvent,
 } from "@/lib/hotkeys";
@@ -87,28 +87,53 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   const preview = useThemePreview();
   const fullscreen = useWindowFullscreen();
   const maxed = useMaximized();
-  const [scrolled, setScrolled] = useState(false);
-  const scrolledRef = useRef(false);
+  const blurRef = useRef<HTMLDivElement>(null);
+  const scrollBlur =
+    !chromeHidden &&
+    view !== "settings" &&
+    (view === "music" || settings.topbarScrollBlur || settings.topbarAppearance === "transparent");
   useEffect(() => {
-    const onScroll = (e: Event) => {
-      const el = e.target;
-      if (!(el instanceof HTMLElement) || el.tagName !== "MAIN") return;
-      const next = el.scrollTop > 40;
-      if (next !== scrolledRef.current) {
-        scrolledRef.current = next;
-        setScrolled(next);
-      }
+    const blur = blurRef.current;
+    if (!scrollBlur || !blur) return;
+    let frame = 0;
+    let main: HTMLElement | null = document.querySelector(".harbor-layer-active main");
+    let scrolled = false;
+    const update = () => {
+      frame = 0;
+      const next = (main?.scrollTop ?? 0) > 40;
+      if (next === scrolled) return;
+      scrolled = next;
+      blur.style.opacity = next ? "1" : "0";
     };
-    document.addEventListener("scroll", onScroll, true);
-    return () => document.removeEventListener("scroll", onScroll, true);
-  }, []);
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target.tagName !== "MAIN") return;
+      if (target !== main) {
+        if (!target.closest(".harbor-layer-active")) return;
+        main = target;
+      }
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    blur.style.opacity = "0";
+    frame = requestAnimationFrame(update);
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+  }, [scrollBlur, topKind]);
   if (chromeHidden && !connecting) return null;
   const layout = kid ? "sidebar" : preview ? preview.layout : activeLayout(settings.theme);
   const onLiveRoot = topKind === "live" && liveHasSources;
   const sidebarHidden = connecting || view === "settings" || onLiveRoot || topKind === "picker";
   const inSettings = view === "settings";
   const hideSearch =
-    view === "music" || view === "games" || view === "addons" || connecting || topKind === "picker" || inSettings;
+    view === "music" ||
+    view === "games" ||
+    view === "addons" ||
+    connecting ||
+    topKind === "picker" ||
+    inSettings;
   const sidebarOffset =
     layout === "stremio"
       ? "ps-[80px]"
@@ -124,14 +149,15 @@ export function Topbar({ connecting = false }: { connecting?: boolean } = {}) {
   return (
     <header
       data-cleannav={settings.topbarAppearance === "transparent" ? "on" : undefined}
-      className={`pointer-events-none fixed inset-x-0 top-0 ${topKind === "picker" || connecting ? "z-[130]" : "z-[55]"} h-20`}
+      className={`pointer-events-none fixed inset-x-0 top-0 ${connecting ? "z-[130]" : "z-[55]"} h-20`}
     >
       {!inSettings && (view === "music" || settings.topbarAppearance === "transparent" || settings.topbarScrollBlur) && (
         <div
+          ref={blurRef}
           aria-hidden
           className="pointer-events-none absolute inset-0 transition-opacity duration-[350ms] ease-out"
           style={{
-            opacity: scrolled ? 1 : 0,
+            opacity: 0,
             // Transparent chrome needs an opaque backing on scroll over posters, tracks and breadcrumbs.
             background: view === "music" || settings.topbarAppearance === "transparent"
               ? "var(--color-canvas)"
@@ -467,18 +493,19 @@ function SearchPill() {
   const { setOpen } = useSearchActions();
   const { settings } = useSettings();
   const t = useT();
-  const binding = effectiveBinding("globalSearchFocus", settings.hotkeys ?? {});
+  const hotkeys = settings.hotkeys;
+  const binding = effectiveBinding("globalSearchFocus", hotkeys ?? {});
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!shouldHandleGlobalKeyboardEvent(e)) return;
-      if (eventToBinding(e) !== binding) return;
+      if (findHotkeyMatch(e, hotkeys ?? {}, "Global") !== "globalSearchFocus") return;
       e.preventDefault();
       setOpen(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [binding, setOpen]);
+  }, [hotkeys, setOpen]);
 
   const pill = (
     <button

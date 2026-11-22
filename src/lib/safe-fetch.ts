@@ -76,11 +76,14 @@ const PROXY_HOSTS = new Set([
   "openlibrary.org",
   "covers.openlibrary.org",
   "graphql.anilist.co",
+  "graphql.imdb.com",
+  "api.graphql.imdb.com",
   "www.googleapis.com",
   "www.wikidata.org",
   "api.deepseek.com",
   "api.deezer.com",
   "api.igdb.com",
+  "api.nexusmods.com",
   "api.steampowered.com",
   "images.igdb.com",
   "store.steampowered.com",
@@ -105,12 +108,15 @@ const DEV_PROXY_HOSTS = new Set([
   "kick.com",
   "prosettings.net",
   "api.steampowered.com",
+  "api.nexusmods.com",
   "store.steampowered.com",
   "steamcommunity.com",
   "www.speedrun.com",
   "partner.steamgames.com",
   "help.steampowered.com",
   "graphql.anilist.co",
+  "graphql.imdb.com",
+  "api.graphql.imdb.com",
   "openlibrary.org",
   "covers.openlibrary.org",
   "www.googleapis.com",
@@ -166,8 +172,14 @@ function rewriteForWeb(url: string, init?: RequestInit): { url: string; init?: R
     PROXY_HOSTS.has(parsed.hostname) || PROXY_SUFFIXES.some((s) => parsed.hostname.endsWith(s));
   if (!proxiable) return { url, init };
   const localDev = /^(?:localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
-  if (!webProxyAvailable() && !(localDev && DEV_PROXY_HOSTS.has(parsed.hostname)))
-    return { url, init };
+  const isHarborStremio = /(^|\.)harborstremio\.com$/i.test(window.location.hostname);
+  const isImdbGraphql =
+    parsed.hostname === "api.graphql.imdb.com" || parsed.hostname === "graphql.imdb.com";
+  const proxyAllowed =
+    webProxyAvailable() ||
+    (localDev && DEV_PROXY_HOSTS.has(parsed.hostname)) ||
+    (isHarborStremio && isImdbGraphql);
+  if (!proxyAllowed) return { url, init };
 
   const proxied = `/api-proxy/${parsed.hostname}${parsed.pathname}${parsed.search}`;
   if (!init?.headers) return { url: proxied, init };
@@ -219,6 +231,7 @@ async function invokeHarborFetch(
   timeoutMs = 30000,
   maxResponseBytes?: number,
   allowLocalNetwork = false,
+  allowImageChallenge = false,
 ): Promise<HarborFetchResponse> {
   countCrossing("harborFetch", input);
   const headers: Record<string, string> = {};
@@ -238,12 +251,25 @@ async function invokeHarborFetch(
       headers[k] = v;
     });
   }
-  const binaryBody =
+  let binaryBody =
     init?.body instanceof ArrayBuffer
       ? new Uint8Array(init.body)
       : ArrayBuffer.isView(init?.body)
         ? new Uint8Array(init.body.buffer, init.body.byteOffset, init.body.byteLength)
         : undefined;
+  if (!binaryBody && typeof FormData !== "undefined" && init?.body instanceof FormData) {
+    try {
+      const dummy = new Response(init.body);
+      const ct = dummy.headers.get("content-type");
+      if (ct && !headers["content-type"] && !headers["Content-Type"]) {
+        headers["content-type"] = ct;
+      }
+      const buf = await dummy.arrayBuffer();
+      binaryBody = new Uint8Array(buf);
+    } catch (e) {
+      console.warn("[safeFetch] failed to encode FormData body", e);
+    }
+  }
   const body =
     typeof init?.body === "string"
       ? init.body
@@ -267,6 +293,7 @@ async function invokeHarborFetch(
       credentialHandle,
       publicNetworkOnly,
       allowLocalNetwork,
+      allowImageChallenge,
       followRedirects:
         init?.redirect === "manual" || init?.redirect === "error" ? false : undefined,
     },
@@ -290,6 +317,7 @@ async function tauriHarborFetch(
   timeoutMs = 30000,
   maxResponseBytes?: number,
   allowLocalNetwork = false,
+  allowImageChallenge = false,
 ): Promise<Response> {
   const resp = await invokeHarborFetch(
     input,
@@ -298,6 +326,7 @@ async function tauriHarborFetch(
     timeoutMs,
     maxResponseBytes,
     allowLocalNetwork,
+    allowImageChallenge,
   );
   const responseHeaders = new Headers(
     resp.headers ?? (resp.contentType ? { "content-type": resp.contentType } : {}),
@@ -490,20 +519,22 @@ function directAttempt(host: string, input: string, init?: RequestInit): Promise
   );
 }
 
-function tauriStringFetch(input: string, init?: RequestInit): Promise<Response> {
+function tauriStringFetch(input: string, init?: RequestInit, timeoutMs = 30000): Promise<Response> {
+  if (init?.signal?.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+  const deadlineMs = timeoutMs + 5_000;
   const directHost = hasSensitiveRequestHeaders(init?.headers) ? null : directHostFor(input);
   if (directHost) {
     countCrossing("direct", input);
-    return withDeadline(directAttempt(directHost, input, init), init?.signal);
+    return withDeadline(directAttempt(directHost, input, init), init?.signal, deadlineMs);
   }
   const exec = isIdempotent(init?.method)
-    ? tauriHarborFetch(input, init).catch((e: unknown) => {
-        if (isCancellation(e)) throw e;
+    ? tauriHarborFetch(input, init, undefined, timeoutMs).catch((e: unknown) => {
+        if (init?.signal?.aborted || isCancellation(e)) throw e;
         if (!shouldFallbackToPluginHttp(e, init)) throw e;
         return pluginHttpFetch(input, init);
       })
-    : tauriHarborFetch(input, init);
-  return withDeadline(exec, init?.signal);
+    : tauriHarborFetch(input, init, undefined, timeoutMs);
+  return withDeadline(exec, init?.signal, deadlineMs);
 }
 
 function webStringFetch(input: string, init?: RequestInit): Promise<Response> {
@@ -511,7 +542,11 @@ function webStringFetch(input: string, init?: RequestInit): Promise<Response> {
   return fetch(rewritten.url, rewritten.init);
 }
 
-export const safeFetch: typeof fetch = (input, init) => {
+function safeFetchInternal(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs = 30000,
+): Promise<Response> {
   const target = urlOf(input);
   if (isBlockedUrl(target)) {
     noteBlocked();
@@ -522,10 +557,10 @@ export const safeFetch: typeof fetch = (input, init) => {
     return Promise.reject(new TrackerBlockedError(host));
   }
   if (isTauri) {
-    if (typeof input === "string") return tauriStringFetch(input, init);
-    if (input instanceof URL) return tauriStringFetch(input.href, init);
+    if (typeof input === "string") return tauriStringFetch(input, init, timeoutMs);
+    if (input instanceof URL) return tauriStringFetch(input.href, init, timeoutMs);
     return materializeRequest(input, init).then((request) =>
-      tauriStringFetch(request.url, request.init),
+      tauriStringFetch(request.url, request.init, timeoutMs),
     );
   }
   if (typeof input === "string") return webStringFetch(input, init);
@@ -533,9 +568,24 @@ export const safeFetch: typeof fetch = (input, init) => {
   return materializeRequest(input, init).then((request) =>
     webStringFetch(request.url, request.init),
   );
-};
+}
 
-export function safeFetchLocal(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export const safeFetch: typeof fetch = (input, init) => safeFetchInternal(input, init);
+
+/** Same policy and bridge as safeFetch, with a caller-owned native deadline. */
+export function safeFetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  timeoutMs: number,
+): Promise<Response> {
+  return safeFetchInternal(input, init, timeoutMs);
+}
+
+export function safeFetchLocal(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs = 30000,
+): Promise<Response> {
   const target = urlOf(input);
   if (isBlockedUrl(target)) {
     noteBlocked();
@@ -548,13 +598,13 @@ export function safeFetchLocal(input: RequestInfo | URL, init?: RequestInit): Pr
   if (isTauri) {
     const fetchPart =
       typeof input === "string"
-        ? tauriHarborFetch(input, init, undefined, 30000, undefined, true)
+        ? tauriHarborFetch(input, init, undefined, timeoutMs, undefined, true)
         : input instanceof URL
-          ? tauriHarborFetch(input.href, init, undefined, 30000, undefined, true)
+          ? tauriHarborFetch(input.href, init, undefined, timeoutMs, undefined, true)
           : materializeRequest(input, init).then((request) =>
-              tauriHarborFetch(request.url, request.init, undefined, 30000, undefined, true),
+              tauriHarborFetch(request.url, request.init, undefined, timeoutMs, undefined, true),
             );
-    return withDeadline(fetchPart, init?.signal);
+    return withDeadline(fetchPart, init?.signal, timeoutMs + 5_000);
   }
   if (typeof input === "string") return webStringFetch(input, init);
   if (input instanceof URL) return webStringFetch(input.href, init);
@@ -583,6 +633,7 @@ export function safeFetchBytes(
   timeoutMs = 30000,
   maxResponseBytes?: number,
   allowLocalNetwork = false,
+  allowImageChallenge = false,
 ): Promise<Response> {
   const target = typeof input === "string" ? input : input instanceof URL ? input.href : null;
   const policyHeaders = new Headers(init?.headers as HeadersInit | undefined);
@@ -612,8 +663,8 @@ export function safeFetchBytes(
     return Promise.reject(new TrackerBlockedError(new URL(target).hostname));
   }
   return withDeadline(
-    tauriHarborFetch(target, init, "base64", timeoutMs, maxResponseBytes, allowLocalNetwork),
+    tauriHarborFetch(target, cleanInit, "base64", timeoutMs, maxResponseBytes, allowLocalNetwork, allowImageChallenge),
     init?.signal,
-    timeoutMs + 5_000,
+    timeoutMs + (allowImageChallenge ? 110_000 : 5_000),
   );
 }

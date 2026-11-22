@@ -33,11 +33,19 @@ pub async fn search(
         };
         let token = continuation(&response)
             .filter(|token| previous.as_ref().and_then(|c| c.token.as_ref()) != Some(token));
-        (
-            catalog::video_results_kind(&response, usize::MAX, false),
-            token,
-            0,
-        )
+        let mut tracks = catalog::video_results_kind(&response, usize::MAX, false);
+        // The first page also asks the general search for its top result: the official video
+        // is often pinned there even when the videos shelf omits it.
+        if previous.is_none() {
+            if let Ok(general) = client.search(app, query, "").await {
+                if let Some(card) = catalog::card_video(&general) {
+                    let id = card.source_id.clone();
+                    tracks.retain(|track| track.source_id != id);
+                    tracks.insert(0, card);
+                }
+            }
+        }
+        (tracks, token, 0)
     };
     let next = token
         .map(|token| {

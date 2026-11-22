@@ -1,8 +1,23 @@
 import type { JSX } from "react";
-import { Captions, CaptionsOff, Loader2, Maximize, Minimize, Wallpaper } from "@/components/icons/music-icons";
+import {
+  Captions,
+  CaptionsOff,
+  ChevronUp,
+  Loader2,
+  Maximize,
+  Minimize,
+  Wallpaper,
+} from "@/components/icons/music-icons";
 import { useT } from "@/lib/i18n";
+import { Dropdown } from "@/components/dropdown";
 import { setMusicAppearance, useMusicAppearance } from "@/lib/music/appearance";
 import { lyricIndexAt, type LyricLine } from "@/lib/music/lyrics";
+import {
+  MUSIC_VIDEO_QUALITIES,
+  setMusicVideoSessionQuality,
+  useMusicVideoQuality,
+  type MusicVideoQuality,
+} from "@/lib/music/video-quality";
 import "./music-video-surface.css";
 
 export type MusicVideoControlsProps = {
@@ -13,6 +28,7 @@ export type MusicVideoControlsProps = {
   fullscreen: boolean;
   onToggleFullscreen: () => void;
   expanded?: boolean;
+  availableHeights?: number[];
 };
 
 export type MusicVideoLyricLine = { index: number; text: string };
@@ -37,9 +53,19 @@ export function MusicVideoControls({
   fullscreen,
   onToggleFullscreen,
   expanded,
+  availableHeights = [],
 }: MusicVideoControlsProps): JSX.Element {
   const t = useT();
   const appearance = useMusicAppearance();
+  const quality = useMusicVideoQuality();
+  // Only offer ceilings this upload actually has; a 1080p video must not list 2160p.
+  const qualities =
+    availableHeights.length > 0
+      ? MUSIC_VIDEO_QUALITIES.filter(
+          (option) => option === "auto" || availableHeights.includes(Number(option)),
+        )
+      : MUSIC_VIDEO_QUALITIES;
+  const shownQuality = qualities.includes(quality) ? quality : "auto";
   const unavailable = lyricsState === "unavailable";
   const loading = lyricsState === "loading";
   const line = lyricsState === "on" ? musicVideoLyricLine(lyrics, currentTime) : null;
@@ -77,6 +103,18 @@ export function MusicVideoControls({
             <Captions size={19} aria-hidden />
           )}
         </button>
+        <Dropdown
+          value={shownQuality}
+          size="xs"
+          ariaLabel={t("Video quality")}
+          className="music-video-quality-select"
+          menuClassName="music-video-quality-menu"
+          onChange={(next) => setMusicVideoSessionQuality(next as MusicVideoQuality)}
+          options={qualities.map((option) => ({
+            value: option,
+            label: option === "auto" ? t("Auto") : `${option}p`,
+          }))}
+        />
         {expanded && !fullscreen && (
           <button
             type="button"
@@ -84,9 +122,22 @@ export function MusicVideoControls({
             aria-pressed={appearance.immersive}
             aria-label={t("Immersive")}
             title={t("Immersive")}
-            onClick={() => setMusicAppearance({ immersive: !appearance.immersive })}
+            onClick={() => setMusicAppearance({ immersive: !appearance.immersive, theatre: false })}
           >
             <Wallpaper size={19} aria-hidden />
+          </button>
+        )}
+        {!fullscreen && (
+          <button
+            type="button"
+            className="music-video-chrome-button"
+            data-state={appearance.theatre ? "on" : undefined}
+            aria-pressed={appearance.theatre}
+            aria-label={t("Theatre mode")}
+            title={t("Theatre mode")}
+            onClick={() => setMusicAppearance({ theatre: !appearance.theatre, immersive: false })}
+          >
+            <ChevronUp size={19} aria-hidden />
           </button>
         )}
         <button

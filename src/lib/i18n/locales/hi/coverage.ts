@@ -1,4 +1,6 @@
 const coverage: Record<string, string> = {
+  "Waiting for {name}…": "{name} की प्रतीक्षा की जा रही है…",
+  "Keeping the source you were watching.": "वही स्रोत रखा जा रहा है जो आप देख रहे थे।",
   "Sound descriptions": "ध्वनि विवरण",
   "Hide sound effects and speaker names": "ध्वनि प्रभाव और वक्ताओं के नाम छिपाएँ",
   "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
@@ -1478,6 +1480,33 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "NYT Books API कुंजी",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "चुनें कि Harbor सीधे और debrid स्रोतों, peer-to-peer टोरेंट को प्राथमिकता दे या दोनों दिखाए।",
+  "Largest first": "सबसे बड़े पहले",
+  "Smallest first": "सबसे छोटे पहले",
+  "Default order": "डिफ़ॉल्ट क्रम",
+  "Sort sources: {value}": "स्रोत क्रमबद्ध करें: {value}",
+  "Show keyboard shortcuts": "कीबोर्ड शॉर्टकट दिखाएं",
+  "Show or hide the list of player shortcuts.": "प्लेयर शॉर्टकट की सूची दिखाएं या छिपाएं।",
+  "Press {key} to close. Change these in Settings.": "बंद करने के लिए {key} दबाएं। इन्हें सेटिंग्स में बदलें।",
+  "Cycle audio tracks": "ऑडियो ट्रैक बदलें",
+  "Switch to the next available audio track.": "अगले उपलब्ध ऑडियो ट्रैक पर जाएं।",
+  "Smaller subtitles": "छोटे सबटाइटल",
+  "Decrease the subtitle text size.": "सबटाइटल टेक्स्ट का आकार घटाएं।",
+  "Larger subtitles": "बड़े सबटाइटल",
+  "Increase the subtitle text size.": "सबटाइटल टेक्स्ट का आकार बढ़ाएं।",
+  "Audio: {name}": "ऑडियो: {name}",
+  "Subtitle size: {size}": "सबटाइटल आकार: {size}",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

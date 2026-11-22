@@ -64,7 +64,7 @@
   padding: 8px 16px;
   border-radius: 6px;
   background: var(--color-elevated);
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 .music-video-placeholder button:hover {
   background: var(--color-raised);
@@ -277,3 +277,51 @@
     transition: none;
   }
 }
+
+/* The fullscreen stage is a non-interactive media frame; browser focus rings on it and on the
+   media nodes show up as stray blue lines along the viewport edge. Controls keep their rings. */
+[data-music-video-fullscreen-stage],
+[data-music-video-fullscreen-stage]:focus,
+[data-music-video-fullscreen-stage]:focus-visible,
+[data-music-video-fullscreen-stage]:fullscreen,
+[data-music-video-fullscreen-stage] .music-video-surface:focus,
+[data-music-video-fullscreen-stage] .music-video-surface:focus-visible,
+[data-music-video-fullscreen-stage] video:focus,
+[data-music-video-fullscreen-stage] video:focus-visible,
+[data-music-video-fullscreen-stage] audio:focus,
+[data-music-video-fullscreen-stage] audio:focus-visible {
+  outline: none !important;
+  border: 0;
+}
+[data-music-video-fullscreen-stage] {
+  overflow: hidden;
+}
+[data-music-video-fullscreen-stage] input[type="range"]:focus-visible {
+  outline: none !important;
+}
+[data-music-video-fullscreen-stage]
+  .group:has(input[type="range"]:focus-visible)
+  > span:nth-child(2) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+
+
+.music-video-quality-select {
+  width: auto;
+  min-width: 86px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.music-video-surface:hover .music-video-quality-select,
+.music-video-quality-select:focus-within {
+  opacity: 1;
+}
+.music-video-quality-select > button {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+.music-video-quality-select > button:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+

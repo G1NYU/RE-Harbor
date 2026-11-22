@@ -5,7 +5,12 @@ import { advanceFocus } from "@/lib/keyboard-navigation";
 import { pushBackHandler } from "@/lib/back-intercept";
 import { getDirection, isBackKey } from "@/lib/keyboard-navigation/geometry";
 
-export type DropdownOption = { value: string; label: string; left?: ReactNode; dir?: "ltr" | "rtl" | "auto" };
+export type DropdownOption = {
+  value: string;
+  label: string;
+  left?: ReactNode;
+  dir?: "ltr" | "rtl" | "auto";
+};
 
 const MENU_MAX = 320;
 const GAP = 6;
@@ -22,6 +27,8 @@ type MenuBox = {
 
 export function Dropdown({
   value,
+  selectedValues,
+  selectionLabel,
   options,
   onChange,
   placeholder,
@@ -29,15 +36,19 @@ export function Dropdown({
   className = "",
   menuClassName = "",
   size = "md",
+  disabled = false,
 }: {
   value: string;
+  selectedValues?: string[];
+  selectionLabel?: string;
   options: DropdownOption[];
   onChange: (value: string) => void;
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
   menuClassName?: string;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState<MenuBox | null>(null);
@@ -59,11 +70,14 @@ export function Dropdown({
     if (!open) return;
     // The shell handles Back before window key listeners. Give this open menu
     // priority so keyboard/controller Back cannot also leave the current page.
-    const removeBack = pushBackHandler(() => { close(true); return true; });
-    const onDown = (e: MouseEvent) => {
+    const removeBack = pushBackHandler(() => {
+      close(true);
+      return true;
+    });
+    const onDown = (e: Event) => {
       const t = e.target as Node;
       if (ref.current?.contains(t) || listRef.current?.contains(t)) return;
-      close(holdsFocus());
+      close(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (!isBackKey(e)) return;
@@ -71,11 +85,17 @@ export function Dropdown({
       e.stopImmediatePropagation();
       close(true);
     };
-    document.addEventListener("mousedown", onDown);
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("click", onDown, true);
+    document.addEventListener("focusin", onDown, true);
     window.addEventListener("keydown", onKey, true);
     return () => {
       removeBack();
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("click", onDown, true);
+      document.removeEventListener("focusin", onDown, true);
       window.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
@@ -93,19 +113,29 @@ export function Dropdown({
       const maxWidth = Math.min(MENU_MAX, window.innerWidth - EDGE * 2);
       const minWidth = Math.min(r.width, maxWidth);
       const width = Math.min(maxWidth, Math.max(minWidth, menu?.offsetWidth ?? minWidth));
-      const natural = menu?.offsetHeight ?? options.length * (size === "sm" ? 36 : 40) + 8;
-      const below = window.innerHeight - r.bottom - GAP - EDGE;
-      const above = r.top - GAP - EDGE;
+      const natural =
+        menu?.scrollHeight ||
+        menu?.offsetHeight ||
+        options.length * (size === "xs" ? 32 : size === "sm" ? 36 : 40) + 8;
+      const below = Math.max(0, window.innerHeight - r.bottom - GAP - EDGE);
+      const above = Math.max(0, r.top - GAP - EDGE);
       const up = natural > below && above > below;
-      const maxHeight = Math.max(120, Math.min(360, window.innerHeight * 0.6, up ? above : below));
-      const top = up ? Math.max(EDGE, r.top - GAP - Math.min(natural, maxHeight)) : r.bottom + GAP;
+      const maxHeight = Math.max(0, Math.min(360, window.innerHeight * 0.6, up ? above : below));
+      const height = Math.min(natural, maxHeight);
+      const top = up ? r.top - GAP - height : r.bottom + GAP;
       const rtl = getComputedStyle(el).direction === "rtl";
       const anchored = rtl ? r.right - width : r.left;
       const left = Math.min(
         Math.max(EDGE, anchored),
         Math.max(EDGE, window.innerWidth - width - EDGE),
       );
-      setBox({ top, left, minWidth, maxWidth, maxHeight, up });
+      const next = { top, left, minWidth, maxWidth, maxHeight, up };
+      setBox((previous) =>
+        previous &&
+        Object.entries(next).every(([key, value]) => previous[key as keyof MenuBox] === value)
+          ? previous
+          : next,
+      );
     };
     place();
     let raf = 0;
@@ -116,10 +146,20 @@ export function Dropdown({
         place();
       });
     };
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(reflow) : null;
+    if (ref.current) observer?.observe(ref.current);
+    if (listRef.current) observer?.observe(listRef.current);
+    const dialog = ref.current?.closest('[role="dialog"]');
+    if (dialog) observer?.observe(dialog);
+    dialog?.addEventListener("animationend", reflow, true);
+    dialog?.addEventListener("transitionend", reflow, true);
     window.addEventListener("resize", reflow);
     window.addEventListener("scroll", reflow, true);
     return () => {
       if (raf) cancelAnimationFrame(raf);
+      observer?.disconnect();
+      dialog?.removeEventListener("animationend", reflow, true);
+      dialog?.removeEventListener("transitionend", reflow, true);
       window.removeEventListener("resize", reflow);
       window.removeEventListener("scroll", reflow, true);
     };
@@ -128,7 +168,12 @@ export function Dropdown({
   const placed = box != null;
   useLayoutEffect(() => {
     if (!open || !placed) return;
-    listRef.current?.querySelector('[data-selected="true"]')?.scrollIntoView({ block: "nearest" });
+    const menu = listRef.current;
+    const selected = menu?.querySelector<HTMLElement>('[data-selected="true"]');
+    if (!menu || !selected) return;
+    if (selected.offsetTop < menu.scrollTop) menu.scrollTop = selected.offsetTop;
+    else if (selected.offsetTop + selected.offsetHeight > menu.scrollTop + menu.clientHeight)
+      menu.scrollTop = selected.offsetTop + selected.offsetHeight - menu.clientHeight;
   }, [open, placed]);
 
   const entered = useRef(false);
@@ -180,23 +225,44 @@ export function Dropdown({
       <button
         ref={btnRef}
         type="button"
+        disabled={disabled}
         onClick={() => {
           spinChevron(!open);
           if (open) close(holdsFocus());
           else setOpen(true);
         }}
-        aria-label={ariaLabel ? `${ariaLabel}: ${selected?.label ?? placeholder ?? ""}` : undefined}
+        aria-label={
+          ariaLabel
+            ? `${ariaLabel}: ${selectionLabel ?? selected?.label ?? placeholder ?? ""}`
+            : undefined
+        }
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`flex w-full items-center justify-between gap-3 rounded-md outline-none transition-colors ${
-          size === "sm" ? "h-9 px-3 text-[12.5px]" : "h-11 px-3.5 text-[13.5px]"
-        } ${open ? "bg-raised" : "bg-canvas hover:bg-elevated"}`}
+        className={`flex w-full items-center justify-between gap-3 outline-none transition-colors disabled:cursor-default disabled:opacity-45 ${
+          size === "xs"
+            ? "h-7 rounded-full px-3 text-[12.5px] font-semibold ring-1 ring-edge"
+            : size === "sm"
+              ? "h-9 rounded-md px-3 text-[12.5px]"
+              : "h-11 rounded-md px-3.5 text-[13.5px]"
+        } ${
+          open
+            ? "bg-raised"
+            : size === "xs"
+              ? "bg-elevated hover:bg-raised"
+              : "bg-canvas hover:bg-elevated"
+        }`}
       >
         <span
           className={`flex min-w-0 items-center gap-2 ${selected ? "text-ink" : "text-ink-subtle"}`}
         >
           {selected?.left}
-          <span className="truncate" dir={selected?.dir} title={selected?.dir ? selected.label : undefined}>{selected?.label ?? placeholder ?? ""}</span>
+          <span
+            className="truncate"
+            dir={selected?.dir}
+            title={selected?.dir ? selected.label : undefined}
+          >
+            {selectionLabel ?? selected?.label ?? placeholder ?? ""}
+          </span>
         </span>
         <span
           ref={chevRef}
@@ -212,6 +278,7 @@ export function Dropdown({
           <div
             ref={listRef}
             role="listbox"
+            aria-multiselectable={selectedValues ? true : undefined}
             aria-label={ariaLabel}
             data-dropdown-menu
             data-settings-menu={btnRef.current?.closest(".harbor-settings-shell") ? "" : undefined}
@@ -230,7 +297,7 @@ export function Dropdown({
             }`}
           >
             {options.map((o, i) => {
-              const active = o.value === value;
+              const active = selectedValues ? selectedValues.includes(o.value) : o.value === value;
               return (
                 <button
                   key={o.value}
@@ -243,11 +310,15 @@ export function Dropdown({
                   data-selected={active}
                   onClick={() => {
                     onChange(o.value);
-                    close(true);
+                    if (!selectedValues) close(true);
                   }}
                   style={{ animationDelay: `${Math.min(i, 8) * 22}ms` }}
                   className={`animate-item-in flex w-full items-center justify-between gap-3 rounded-[4px] px-3 text-start outline-none transition-colors ${
-                    size === "sm" ? "h-9 text-[12.5px]" : "h-10 text-[13.5px]"
+                    size === "xs"
+                      ? "h-8 text-[12.5px]"
+                      : size === "sm"
+                        ? "h-9 text-[12.5px]"
+                        : "h-10 text-[13.5px]"
                   } ${
                     active
                       ? "bg-ink font-semibold text-canvas"
@@ -256,7 +327,9 @@ export function Dropdown({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     {o.left}
-                    <span className="truncate" dir={o.dir} title={o.dir ? o.label : undefined}>{o.label}</span>
+                    <span className="truncate" dir={o.dir} title={o.dir ? o.label : undefined}>
+                      {o.label}
+                    </span>
                   </span>
                   {active && (
                     <Check size={15} strokeWidth={2.4} className="animate-badge-pop shrink-0" />

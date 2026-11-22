@@ -86,6 +86,22 @@ export function takeMusicPlayRequest(): { track: MusicTrack; queue: MusicTrack[]
   return request;
 }
 
+export const MUSIC_VIDEO_EVENT = "harbor:music-video";
+let pendingVideo: { track: MusicTrack; queue: MusicTrack[] } | null = null;
+/**
+ * A video row must reach the video surface, but catalog cards play through the shared playback
+ * hook, which only knows the audio source picker. This carries the request up to the Music view.
+ */
+export function requestMusicVideo(track: MusicTrack, queue: MusicTrack[] = []) {
+  pendingVideo = { track, queue };
+  window.dispatchEvent(new Event(MUSIC_VIDEO_EVENT));
+}
+export function takeMusicVideoRequest(): { track: MusicTrack; queue: MusicTrack[] } | null {
+  const request = pendingVideo;
+  pendingVideo = null;
+  return request;
+}
+
 export const MUSIC_LIBRARY_EVENT = "harbor:music-library";
 export type MusicLibraryRequest = {
   view?: string;

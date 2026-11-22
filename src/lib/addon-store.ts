@@ -19,7 +19,35 @@ const LEGACY_DISABLED_KEY = "harbor.addons.disabled";
 
 const DEFAULT_ADDONS: Array<{ id: string; transportUrl: string }> = [];
 
+function isNuvioProviderActive(): boolean {
+  try {
+    return (
+      typeof localStorage !== "undefined" &&
+      (localStorage.getItem("harbor.account-provider") === "nuvio" ||
+        localStorage.getItem("harbor.settings.shared")?.includes('"accountProvider":"nuvio"') ===
+          true)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getNuvioSlot(): number {
+  try {
+    const raw =
+      localStorage.getItem("harbor.nuvio.state.v1") || localStorage.getItem("harbor.nuvio.state");
+    if (raw) {
+      const idx = JSON.parse(raw)?.activeProfileIndex;
+      if (typeof idx === "number" && idx >= 1 && idx <= 6) return idx;
+    }
+  } catch {}
+  return 1;
+}
+
 function activeProfileId(): string {
+  if (isNuvioProviderActive()) {
+    return `nuvio-${getNuvioSlot()}`;
+  }
   try {
     const raw = localStorage.getItem(PROFILES_KEY);
     if (!raw) return "";
@@ -122,22 +150,15 @@ async function pushToStremio(
   if (!authKey) return true;
   try {
     const current = await userAddons(authKey);
-    const id = addon.manifest.id;
     const replaced = new Set(replacedUrls.filter((u) => u !== addon.transportUrl));
-    // Only remove entries that are actually being replaced (same id, same transport
-    // URL, or an explicitly replaced transport URL), so an update keeps the addon's
-    // place in the collection rather than pushing a fresh copy to the end.
+    // Match by transport URL only: two installs of one manifest id (Torrentio with
+    // two debrid configs, say) are separate addons here and in Stremio. Removing
+    // every same-id entry would wipe the user's other instance off their account.
     const insertIndex = current.findIndex(
-      (a) =>
-        a.manifest.id === id ||
-        a.transportUrl === addon.transportUrl ||
-        replaced.has(a.transportUrl),
+      (a) => a.transportUrl === addon.transportUrl || replaced.has(a.transportUrl),
     );
     const filtered = current.filter(
-      (a) =>
-        a.manifest.id !== id &&
-        a.transportUrl !== addon.transportUrl &&
-        !replaced.has(a.transportUrl),
+      (a) => a.transportUrl !== addon.transportUrl && !replaced.has(a.transportUrl),
     );
     let next: Addon[];
     if (mode === "uninstall") {
@@ -296,6 +317,25 @@ export function setAddonEnabled(transportUrl: string, enabled: boolean): void {
   if (enabled) set.delete(transportUrl);
   else set.add(transportUrl);
   saveDisabledAddons(set);
+
+  if (isNuvioProviderActive()) {
+    import("@/lib/nuvio/nuvio-sync")
+      .then(
+        ({
+          resolveEffectiveNuvioAddonSlot,
+          readCachedNuvioAddons,
+          writeCachedNuvioAddons,
+          pushAddonsToNuvio,
+        }) => {
+          const slot = resolveEffectiveNuvioAddonSlot();
+          const current = readCachedNuvioAddons(slot);
+          const updated = current.map((a) => (a.url === transportUrl ? { ...a, enabled } : a));
+          writeCachedNuvioAddons(slot, updated);
+          void pushAddonsToNuvio(slot, updated);
+        },
+      )
+      .catch(() => {});
+  }
 }
 
 export function filterEnabled<T extends { transportUrl: string }>(items: T[]): T[] {
@@ -369,13 +409,47 @@ function validateManifest(
   return { ok: true, manifest: obj as Addon["manifest"] };
 }
 
-export async function fetchManifestAt(transportUrl: string): Promise<Addon["manifest"]> {
+const pendingManifests = new Map<string, Promise<Addon["manifest"]>>();
+const manifestCooldowns = new Map<string, { until: number; error: Error }>();
+
+export function fetchManifestAt(transportUrl: string): Promise<Addon["manifest"]> {
+  const pending = pendingManifests.get(transportUrl);
+  if (pending) return pending;
+  const cooldown = manifestCooldowns.get(transportUrl);
+  if (cooldown && cooldown.until > Date.now()) return Promise.reject(cooldown.error);
+  manifestCooldowns.delete(transportUrl);
+  const request = fetchManifestUncached(transportUrl).finally(() => {
+    pendingManifests.delete(transportUrl);
+  });
+  pendingManifests.set(transportUrl, request);
+  return request;
+}
+
+async function fetchManifestUncached(transportUrl: string): Promise<Addon["manifest"]> {
   // A self-hosted addon lives on loopback/LAN, which the guarded bridge fetch
   // rejects outright ("blocked internal target"). The URL came from the user, so
   // it may reach the local network — public URLs keep the DNS-rebinding guard.
   const doFetch = isLocalNetworkUrl(transportUrl) ? safeFetchLocal : fetch;
   const res = await doFetch(transportUrl, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`Manifest fetch failed (HTTP ${res.status}). Check the URL.`);
+  if (!res.ok) {
+    const error = new Error(`Manifest fetch failed (HTTP ${res.status}). Check the URL.`);
+    if (res.status === 429) {
+      // Profile switches and picker retries must honor the same server cooldown.
+      const retryAfter = res.headers?.get("retry-after")?.trim();
+      const seconds = retryAfter ? Number(retryAfter) : NaN;
+      const until =
+        Number.isFinite(seconds) && seconds >= 0
+          ? Date.now() + seconds * 1000
+          : retryAfter
+            ? Date.parse(retryAfter)
+            : NaN;
+      manifestCooldowns.set(transportUrl, {
+        until: Number.isFinite(until) && until > Date.now() ? until : Date.now() + 60_000,
+        error,
+      });
+    }
+    throw error;
+  }
   let json: unknown;
   try {
     json = await res.json();
@@ -397,9 +471,16 @@ export async function installAddon(id: string, transportUrl: string): Promise<Ad
   const manifest = await fetchManifestAt(transportUrl);
   const canonicalId = manifest.id || id;
   const before = loadInstalled();
-  // Deduplicate by ID (handles URL changes during updates) and by URL (re-installs)
-  const next = before.filter((a) => a.id !== canonicalId && a.transportUrl !== transportUrl);
-  const replaced = before.filter((a) => a.id === canonicalId || a.transportUrl === transportUrl);
+  // Deduplicate by URL (re-installs) and, for a lone install, by ID (URL changed during
+  // an update). With two instances already installed there is no way to tell which one
+  // a new configuration is meant to replace, so it is added as another instance.
+  const replaceSameId = before.filter((a) => a.id === canonicalId).length <= 1;
+  const next = before.filter(
+    (a) => a.transportUrl !== transportUrl && (!replaceSameId || a.id !== canonicalId),
+  );
+  const replaced = before.filter(
+    (a) => a.transportUrl === transportUrl || (replaceSameId && a.id === canonicalId),
+  );
   const replacedUrls = replaced.map((a) => a.transportUrl);
   if (replaced.length > 0) {
     preserveOrderOnReplace(replacedUrls, transportUrl);
@@ -407,29 +488,43 @@ export async function installAddon(id: string, transportUrl: string): Promise<Ad
   next.push({ id: canonicalId, transportUrl, installedAt: Date.now(), manifest });
   saveInstalled(next);
   const addon: Addon = { manifest, transportUrl };
-  await pushToStremio(addon, "install", replacedUrls);
+  if (isNuvioProviderActive()) {
+    const { resolveEffectiveNuvioAddonSlot, addAddonToNuvio } =
+      await import("@/lib/nuvio/nuvio-sync");
+    const slot = resolveEffectiveNuvioAddonSlot();
+    await addAddonToNuvio(slot, { url: transportUrl, name: manifest.name || canonicalId });
+    window.dispatchEvent(new CustomEvent("harbor:nuvio-addons-changed"));
+  } else {
+    await pushToStremio(addon, "install", replacedUrls);
+  }
   return addon;
 }
 
 export async function installFromUrl(
   rawUrl: string,
-  options: { replaceId?: string } = {},
+  options: { replaceUrl?: string; newInstance?: boolean } = {},
 ): Promise<InstallResult> {
   const parsed = parseAddonUrl(rawUrl);
   if (parsed.kind === "error") throw new Error(parsed.message);
   const manifest = await fetchManifestAt(parsed.url);
   const id = manifest.id;
   const before = loadInstalled();
-  const replaceId = options.replaceId && options.replaceId !== id ? options.replaceId : null;
-  const replacedById = before.some((a) => a.id === id);
-  const replacedByOld = replaceId != null && before.some((a) => a.id === replaceId);
-  // Deduplicate by ID (updates), URL (re-installs), or explicit replaceId
+  const replaceUrl = options.replaceUrl !== parsed.url ? options.replaceUrl : undefined;
+  // One manifest id can be installed more than once (Torrentio with two debrid
+  // configs), so an install only replaces an entry when the caller says which one,
+  // or when the exact same URL is being re-installed. A configure page hands back a
+  // fresh URL for its existing instance, hence replaceUrl.
+  const sameUrl = (a: InstalledAddon) => a.transportUrl === parsed.url;
+  const sameReplaceUrl = (a: InstalledAddon) => replaceUrl != null && a.transportUrl === replaceUrl;
+  const sameIdCount = before.filter((a) => a.id === id).length;
+  // Without a replace context (a deep link, say) the id fallback is safe only when a
+  // single instance exists; two copies give no way to tell which one was meant.
+  const replaceSameId = options.newInstance !== true && replaceUrl == null && sameIdCount <= 1;
   const next = before.filter(
-    (a) => a.id !== id && a.transportUrl !== parsed.url && (!replaceId || a.id !== replaceId),
+    (a) => !sameUrl(a) && !sameReplaceUrl(a) && (!replaceSameId || a.id !== id),
   );
   const replaced = before.filter(
-    (a) =>
-      a.id === id || a.transportUrl === parsed.url || (replaceId != null && a.id === replaceId),
+    (a) => sameUrl(a) || sameReplaceUrl(a) || (replaceSameId && a.id === id),
   );
   const replacedUrls = replaced.map((a) => a.transportUrl);
   if (replaced.length > 0) {
@@ -438,8 +533,17 @@ export async function installFromUrl(
   next.push({ id, transportUrl: parsed.url, installedAt: Date.now(), manifest });
   saveInstalled(next);
   const addon: Addon = { manifest, transportUrl: parsed.url };
-  const syncedToStremio = await pushToStremio(addon, "install", replacedUrls);
-  return { addon, syncedToStremio, replaced: replacedById || replacedByOld };
+  let synced = false;
+  if (isNuvioProviderActive()) {
+    const { resolveEffectiveNuvioAddonSlot, addAddonToNuvio } =
+      await import("@/lib/nuvio/nuvio-sync");
+    const slot = resolveEffectiveNuvioAddonSlot();
+    synced = await addAddonToNuvio(slot, { url: parsed.url, name: manifest.name || id });
+    window.dispatchEvent(new CustomEvent("harbor:nuvio-addons-changed"));
+  } else {
+    synced = await pushToStremio(addon, "install", replacedUrls);
+  }
+  return { addon, syncedToStremio: synced, replaced: replaced.length > 0 };
 }
 
 export async function uninstallAddon(id: string, transportUrl?: string): Promise<void> {
@@ -456,18 +560,36 @@ export async function uninstallAddon(id: string, transportUrl?: string): Promise
     for (const a of removed) if (disabled.delete(a.transportUrl)) touched = true;
     if (touched) saveDisabledAddons(disabled);
   }
-  const authKey = readAuthKey();
-  if (!authKey) return;
-  const current = await userAddons(authKey).catch(() => [] as Addon[]);
-  const filtered = transportUrl
-    ? current.filter((a) => a.transportUrl !== transportUrl)
-    : current.filter((a) => a.manifest.id !== id);
-  if (filtered.length !== current.length) {
-    await setUserAddons(authKey, filtered).catch(() => {});
+  const targetUrl = transportUrl || (removed[0]?.transportUrl ?? null);
+  if (isNuvioProviderActive()) {
+    if (targetUrl) {
+      const { resolveEffectiveNuvioAddonSlot, deleteAddonFromNuvio } =
+        await import("@/lib/nuvio/nuvio-sync");
+      const slot = resolveEffectiveNuvioAddonSlot();
+      await deleteAddonFromNuvio(slot, targetUrl);
+      window.dispatchEvent(new CustomEvent("harbor:nuvio-addons-changed"));
+    }
+  } else {
+    const authKey = readAuthKey();
+    if (!authKey) return;
+    const current = await userAddons(authKey).catch(() => [] as Addon[]);
+    const filtered = transportUrl
+      ? current.filter((a) => a.transportUrl !== transportUrl)
+      : current.filter((a) => a.manifest.id !== id);
+    if (filtered.length !== current.length) {
+      await setUserAddons(authKey, filtered).catch(() => {});
+    }
   }
 }
 
 export async function fetchInstalledAddons(): Promise<Addon[]> {
+  if (isNuvioProviderActive()) {
+    try {
+      const { fetchNuvioAddons } = await import("@/lib/nuvio/nuvio-sync");
+      const nuvioList = await fetchNuvioAddons().catch(() => [] as Addon[]);
+      if (nuvioList.length > 0) return nuvioList;
+    } catch {}
+  }
   const list = loadInstalled();
   if (list.length === 0) return [];
   const tasks = list.map(async (entry): Promise<Addon | null> => {

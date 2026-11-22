@@ -336,7 +336,8 @@ const catalogJL: Record<string, string> = {
   "Live preview": "लाइव प्रीव्यू",
   "Live preview is on. Done and Save both keep what you've picked as your Custom theme. Reset reverts the editor to the saved palette.":
     "लाइव प्रीव्यू चालू है। ‘हो गया’ और ‘सेव’, दोनों आपके चुने हुए विकल्पों को आपकी कस्टम थीम के रूप में रखते हैं। रीसेट करने पर एडिटर सेव किए गए पैलेट पर लौट जाता है।",
-  "Live state of Harbor's own P2P engine on this machine.": "इस मशीन पर Harbor के अपने P2P इंजन की लाइव स्थिति।",
+  "Live state of Harbor's own P2P engine on this machine.":
+    "इस मशीन पर Harbor के अपने P2P इंजन की लाइव स्थिति।",
   "Live streams that actually work.": "लाइव स्ट्रीम जो सच में काम करती हैं।",
   "Live sync": "लाइव सिंक",
   "Live web": "लाइव वेब",
@@ -352,8 +353,8 @@ const catalogJL: Record<string, string> = {
   "Load more": "और लोड करें",
   "Load more comments": "और टिप्पणियाँ लोड करें",
   "Load more threads": "और थ्रेड लोड करें",
-  "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.":
-    "फ़ीचर्ड हीरो के लिए सबसे हाई-रिज़ॉल्यूशन आर्टवर्क लोड करें। इससे ज़्यादा बैंडविड्थ इस्तेमाल होती है।",
+  "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.":
+    "फ़ीचर्ड हीरो, डिटेल पेज के हीरो और सोर्स पिकर के बिना-ब्लर बैकग्राउंड के लिए सबसे हाई-रिज़ॉल्यूशन आर्टवर्क लोड करें। इससे ज़्यादा बैंडविड्थ और वीडियो मेमोरी इस्तेमाल होती है।",
   "Loaded {loaded} of {total} movies...": "{total} में से {loaded} फ़िल्में लोड हुईं...",
   "Loaded {loaded} of {total} shows...": "{total} में से {loaded} शो लोड हुए...",
   "Loaded {name}": "{name} लोड हुआ",

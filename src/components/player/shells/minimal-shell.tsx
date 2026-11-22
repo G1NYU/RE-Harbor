@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { FullscreenClock } from "@/components/player/fullscreen-clock";
 import { isLivePlaybackSrc } from "@/lib/player/live-src";
 import { LiveBadge, GoToLive, LiveSeekBar } from "../transport/live-controls";
+import { useReportPlayerControlsInset } from "@/lib/player/controls-inset";
 
 export function MinimalShell({
   snap,
@@ -21,6 +22,8 @@ export function MinimalShell({
   title,
 }: PlayerShellProps) {
   const t = useT();
+  const controlsRef = useRef<HTMLDivElement>(null);
+  useReportPlayerControlsInset(controlsRef, visible && !pipMode);
   if (pipMode) return null;
 
   const playing = snap.status === "playing";
@@ -42,6 +45,7 @@ export function MinimalShell({
         </div>
       )}
       <div
+        ref={controlsRef}
         className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col gap-2 bg-gradient-to-t from-black/70 to-transparent px-8 pb-5 pt-12 transition-opacity duration-300 ${
           visible ? "opacity-100" : "opacity-0"
         }`}
@@ -69,20 +73,32 @@ export function MinimalShell({
             <span className="truncate text-[14px] font-semibold text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
               {title}
             </span>
-            {live ? <LiveBadge /> : <MinimalTime durationSec={snap.durationSec} visible={visible} />}
+            {live ? (
+              <LiveBadge />
+            ) : (
+              <MinimalTime durationSec={snap.durationSec} visible={visible} />
+            )}
           </div>
           <button
             onClick={onFullscreen}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-md transition-colors hover:bg-black/85"
             aria-label={fullscreen ? t("Exit fullscreen") : t("Fullscreen")}
           >
-            {fullscreen ? <Minimize size={16} strokeWidth={2.2} /> : <Maximize size={16} strokeWidth={2.2} />}
+            {fullscreen ? (
+              <Minimize size={16} strokeWidth={2.2} />
+            ) : (
+              <Maximize size={16} strokeWidth={2.2} />
+            )}
           </button>
         </div>
-        {live ? <>
-          <GoToLive durationSec={snap.durationSec} onSeek={onSeek} />
-          <LiveSeekBar durationSec={snap.durationSec} active={visible} onSeek={onSeek} />
-        </> : <MinimalTrack durationSec={snap.durationSec} visible={visible} onSeek={onSeek} />}
+        {live ? (
+          <>
+            <GoToLive durationSec={snap.durationSec} onSeek={onSeek} />
+            <LiveSeekBar durationSec={snap.durationSec} active={visible} onSeek={onSeek} />
+          </>
+        ) : (
+          <MinimalTrack durationSec={snap.durationSec} visible={visible} onSeek={onSeek} />
+        )}
       </div>
     </>
   );

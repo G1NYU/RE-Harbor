@@ -1,3 +1,5 @@
+import seekSteps from "./ko/seek-steps";
+import reviews from "./ko/reviews";
 import playOrders from "./ko/play-orders";
 import gameRomLibrary from "./ko/game-rom-library";
 import gameNotes from "./ko/game-notes";
@@ -80,6 +82,7 @@ import contextActionsFallback from "./context-actions-fallback";
 import ebookSources from "./ko/ebook-sources";
 import settingsRefinements from "./ko/settings-refinements";
 import coverage from "./ko/coverage";
+import subtitles from "./ko/subtitles";
 import catalog01 from "./ko/catalog-01";
 import catalog02 from "./ko/catalog-02";
 import catalog03 from "./ko/catalog-03";
@@ -97,6 +100,8 @@ import currentTail from "./ko/current-tail";
 import plugins from "./ko/plugins";
 import brands from "./ko/brands";
 import bpSports from "./ko/bp-sports";
+import queueBasket from "./ko/queue-basket";
+import liveWeb from "./ko/live-web";
 
 import nytTv from "./ko/nyt-tv";
 
@@ -274,6 +279,7 @@ const ko: Record<string, string> = {
 
   ...ebookSources,
   ...coverage,
+  ...subtitles,
   ...catalog01,
   ...catalog02,
   ...catalog03,
@@ -367,6 +373,66 @@ const ko: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
+  "Refract sync": "Refract 동기화",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "시청 기록과 Harbor 시청 목록의 변경 사항을 Refract와 동기화합니다.",
+  "Refract personal API key": "Refract 개인 API 키",
+  "Verifying...": "확인 중…",
+  "Connect Refract": "Refract 연결",
+  "Refract key saved in Harbor's secret store":
+    "Refract 키가 Harbor의 보안 저장소에 저장되어 있습니다",
+  "Sync watched history and watchlist": "시청 기록 및 시청 목록 동기화",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Harbor의 시청 기록과 시청 목록 변경 사항을 Refract로 전송합니다. Harbor의 기본 프로필만 동기화됩니다.",
+  "Retry pending watches": "대기 중인 시청 기록 다시 전송",
+  "Disconnect Refract": "Refract 연결 해제",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Refract({identity})에 연결되었습니다. 시청 기록 동기화가 활성화되었습니다.",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Refract /v1/me에서 키를 확인하지 못했습니다. 권한과 연결 상태를 확인하세요.",
+  "Disconnected from Refract.": "Refract 연결이 해제되었습니다.",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Refract에서 profile:read, library:read, library:write 및 history:write 권한이 있는 개인 API 키를 생성하세요. 키를 공유하거나 커밋하지 마세요.",
+  "Automatic watch threshold": "자동 시청 기록 기준",
+  "After {count} minutes": "{count}분 후",
+  "{count}% (default)": "{count}% (기본값)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "재생 시간이 선택한 시간 또는 비율에 도달하면 영화나 에피소드를 Refract에 기록합니다. 재생 위치를 기준 이후로 이동해도 기록됩니다. 조기 기록은 부분 시청이 아닌 시청 완료로 처리됩니다. Harbor 자체의 시청 완료 기준은 변경되지 않습니다.",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract 시청 예정",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "동기화가 활성화된 동안 시청 목록의 추가 및 삭제가 자동으로 전송됩니다. library:write 권한이 필요하며, 필요하면 갱신된 키로 다시 연결하세요. 기존 Refract 기록과 다른 라이브러리 상태는 유지됩니다.",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "전송 완료 {sent}개 · 대기 중 {pending}개 · 일치 항목 없음 {failed}개",
+  "Unmatched items": "일치하는 항목을 찾지 못한 콘텐츠",
+  "Refract queue full; unable to save another watch":
+    "Refract 대기열이 가득 차 추가 시청 기록을 저장할 수 없습니다",
+  "No verified IMDb/TMDB/TVDB identity": "확인된 IMDb/TMDB/TVDB ID가 없습니다",
+  "Movie not found in Refract": "Refract에서 영화를 찾을 수 없습니다",
+  "Episode not found; verify season numbering":
+    "에피소드를 찾을 수 없습니다. 시즌 번호를 확인하세요",
+  "Last watched item sent successfully": "최근 시청 기록을 전송했습니다",
+  "Unknown error": "알 수 없는 오류",
+  "Some items could not be matched or sent": "일부 항목을 일치시키거나 전송하지 못했습니다",
+  "Refract denied access; check key and permissions":
+    "Refract가 접근을 거부했습니다. 키와 권한을 확인하세요",
+  "Network error; retry scheduled": "네트워크 오류. 재시도가 예약되었습니다",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "이 작품에 확인된 IMDb/TMDB/TVDB ID가 없습니다.",
+  "Refract could not uniquely identify this title.":
+    "Refract가 이 작품을 고유하게 식별하지 못했습니다.",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract가 기존 라이브러리 항목 또는 시청 기록을 보존했습니다.",
+  "Added to Refract Plan to Watch.": "Refract 시청 예정 목록에 추가했습니다.",
+  "Removed from Refract Plan to Watch.": "Refract 시청 예정 목록에서 제거했습니다.",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "Refract 시청 목록에는 library:write 권한이 필요합니다. 해당 권한이 있는 키로 다시 연결하세요.",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract가 시청 목록 변경을 확인하지 못했습니다. 다시 시도하세요.",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default ko;

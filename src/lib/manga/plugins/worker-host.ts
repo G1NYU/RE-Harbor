@@ -1,5 +1,10 @@
 import { SANDBOX_SOURCE } from "./sandbox";
-import { runPluginGrpc, runPluginHttp, type PluginHttpPolicy } from "./host-http";
+import {
+  runPluginGrpc,
+  runPluginHttp,
+  TEXT_CHALLENGE_TIMEOUT,
+  type PluginHttpPolicy,
+} from "./host-http";
 import { serializeHtml } from "./host-parse";
 import type {
   InstalledPlugin,
@@ -11,6 +16,7 @@ import type {
 } from "./types";
 
 type Pending = {
+
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -25,7 +31,10 @@ export type PluginWorkerOptions = {
   httpPolicy?: PluginHttpPolicy & { sameSiteHeaders?: boolean };
   readyTimeoutMs?: number;
   denyHttp?: boolean;
+  callTimeoutMs?: number;
 };
+
+export const INTERACTIVE_PLUGIN_TIMEOUT_MS = TEXT_CHALLENGE_TIMEOUT + 5_000;
 
 const MAX_CONCURRENT_HTTP = 6;
 const MAX_GLOBAL_HTTP = 16;
@@ -104,11 +113,14 @@ export class PluginWorker {
     if (signal?.aborted) throw abortError();
     const id = "c" + ++this.seq;
     return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.calls.delete(id);
-        this.crash(method + " timed out");
-        reject(new Error(method + " timed out"));
-      }, timeoutMs);
+      const timer = setTimeout(
+        () => {
+          this.calls.delete(id);
+          this.crash(method + " timed out");
+          reject(new Error(method + " timed out"));
+        },
+        Math.max(timeoutMs, this.opts.callTimeoutMs ?? 0),
+      );
       const pending: Pending = { resolve, reject, timer, signal };
       if (signal) {
         pending.onAbort = () => this.cancel(id, method);

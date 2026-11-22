@@ -1,3 +1,5 @@
+import seekSteps from "./ru/seek-steps";
+import reviews from "./ru/reviews";
 import playOrders from "./ru/play-orders";
 import gameRomLibrary from "./ru/game-rom-library";
 import gameNotes from "./ru/game-notes";
@@ -82,6 +84,7 @@ import settingsRefinements from "./ru/settings-refinements";
 import gap from "./ru/gap";
 import experimentalUpdates from "./ru/experimental-updates";
 import coverage from "./ru/coverage";
+import subtitles from "./ru/subtitles";
 import uiFallback from "./ui-fallback";
 import chrome from "./ru/chrome";
 import common from "./ru/common";
@@ -124,6 +127,8 @@ import surfaces5 from "./ru/surfaces5";
 import plugins from "./ru/plugins";
 import brands from "./ru/brands";
 import bpSports from "./ru/bp-sports";
+import queueBasket from "./ru/queue-basket";
+import liveWeb from "./ru/live-web";
 
 import nytTv from "./ru/nyt-tv";
 
@@ -302,8 +307,9 @@ const ru: Record<string, string> = {
   ...contextActionsFallback,
 
   ...ebookSources,
-  ...coverage,
   ...uiFallback,
+  ...coverage,
+  ...subtitles,
   ...gap,
   ...chrome,
   ...common,
@@ -422,6 +428,66 @@ const ru: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
+  "Refract sync": "Синхронизация с Refract",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "Синхронизируйте историю просмотров и изменения списка «Хочу посмотреть» в Harbor с Refract.",
+  "Refract personal API key": "Личный API-ключ Refract",
+  "Verifying...": "Проверка…",
+  "Connect Refract": "Подключить Refract",
+  "Refract key saved in Harbor's secret store":
+    "Ключ Refract сохранён в защищённом хранилище Harbor",
+  "Sync watched history and watchlist": "Синхронизировать историю просмотров и список просмотра",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "Отправляйте историю просмотров и изменения списка просмотра из Harbor в Refract. Синхронизируется только основной профиль Harbor.",
+  "Retry pending watches": "Повторить отправку ожидающих записей о просмотрах",
+  "Disconnect Refract": "Отключить Refract",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "Подключено к Refract ({identity}). Синхронизация истории просмотров включена.",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "Не удалось проверить ключ через Refract /v1/me. Проверьте разрешения и подключение.",
+  "Disconnected from Refract.": "Refract отключён.",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "Создайте личный API-ключ в Refract с разрешениями profile:read, library:read, library:write и history:write. Никогда не делитесь ключом и не добавляйте его в коммиты.",
+  "Automatic watch threshold": "Порог автоматической записи просмотра",
+  "After {count} minutes": "Через {count} мин.",
+  "{count}% (default)": "{count}% (по умолчанию)",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "Записывайте фильм или эпизод в Refract, когда воспроизведение достигнет выбранного времени или процента. Перемотка за порог также учитывается. Ранняя запись отмечает контент как просмотренный, а не частично просмотренный. Порог завершения просмотра в Harbor не изменяется.",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract: хочу посмотреть",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "Добавление и удаление элементов списка просмотра отправляется автоматически, пока синхронизация включена. Требуется разрешение library:write; при необходимости подключитесь заново с обновлённым ключом. Существующая история Refract и другие статусы библиотеки сохраняются.",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "Отправлено: {sent} · Ожидает: {pending} · Не сопоставлено: {failed}",
+  "Unmatched items": "Несопоставленные элементы",
+  "Refract queue full; unable to save another watch":
+    "Очередь Refract заполнена; невозможно сохранить ещё один просмотр",
+  "No verified IMDb/TMDB/TVDB identity": "Нет подтверждённого идентификатора IMDb/TMDB/TVDB",
+  "Movie not found in Refract": "Фильм не найден в Refract",
+  "Episode not found; verify season numbering": "Эпизод не найден; проверьте нумерацию сезонов",
+  "Last watched item sent successfully": "Последняя запись о просмотре успешно отправлена",
+  "Unknown error": "Неизвестная ошибка",
+  "Some items could not be matched or sent":
+    "Не удалось сопоставить или отправить некоторые элементы",
+  "Refract denied access; check key and permissions":
+    "Refract отказал в доступе; проверьте ключ и разрешения",
+  "Network error; retry scheduled": "Ошибка сети; запланирована повторная попытка",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "Для этого произведения нет подтверждённого идентификатора IMDb/TMDB/TVDB.",
+  "Refract could not uniquely identify this title.":
+    "Refract не удалось однозначно идентифицировать это произведение.",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract сохранил существующую запись в библиотеке или истории просмотров.",
+  "Added to Refract Plan to Watch.": "Добавлено в список «Хочу посмотреть» в Refract.",
+  "Removed from Refract Plan to Watch.": "Удалено из списка «Хочу посмотреть» в Refract.",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "Для списка просмотра Refract требуется разрешение library:write. Подключитесь заново с ключом, имеющим это разрешение.",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract не удалось подтвердить изменение списка просмотра. Повторите попытку.",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default ru;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
+import { animeArtworkKind } from "../src/lib/providers/anime-format.ts";
 
 function load(file, mocks) {
   const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
@@ -72,7 +73,13 @@ function artworkFixture() {
     react: h.react,
     "react/jsx-runtime": runtime,
     "@/lib/settings": { useSettings: () => ({ settings: {} }) },
+    "@/lib/i18n": { useT: () => (text) => text },
+    "@/lib/card-anime": { isCardAnimeId: (id) => /^(kitsu|mal|anilist|anidb|simkl):/.test(id) },
+    "@/lib/anime-awards": { parseAwardYear: () => undefined, findTopAward: () => null },
+    "@/components/card-award": { useClassicAwardWin: () => null },
+    "@/components/card-status-badges": { stackTop: () => "top-2" },
     "@/lib/img-size": { sizeImageUrl: (url) => url },
+    "@/lib/providers/anime-format": { animeArtworkKind },
     "@/lib/providers/anime-hero-art-static": {
       peekStaticHeroArt: (id) => cached.get(id),
       ensureStaticHeroArt: async () => {},
@@ -86,7 +93,20 @@ function artworkFixture() {
     cached,
     pending,
     image(m) {
-      return h.render(TvCardArtwork, { meta: m, posterSrc: m.poster }).props.children[0].props;
+      return h.render(TvCardArtwork, {
+        meta: m,
+        posterSrc: m.poster,
+        sharedState: {
+          showTop10: false,
+          inCinema: false,
+          rerun: false,
+          newBadge: null,
+          hasDub: false,
+          watched: false,
+          inWatchlist: false,
+          inLocalLibrary: false,
+        },
+      }).props.children[0].props;
     },
   };
 }
@@ -150,11 +170,12 @@ const addon = (id, resources = ["meta"]) => ({
 });
 function metadataFixture(remote = async () => [], local = []) {
   return load("src/lib/meta-resource.ts", {
+    "./metadata-addons": { providesMetadata: (a) => a.manifest.resources.includes("meta") },
     "./addons": {
-      userAddons: remote,
+      cachedUserAddons: remote,
       addonAccepts: (a, resource) => a.manifest.resources.includes(resource),
     },
-    "./addon-store": { loadInstalled: () => local },
+    "./addon-store": { loadInstalled: () => local, filterEnabled: (items) => items },
   });
 }
 
@@ -196,8 +217,12 @@ test("provider warning does not retain a previous account result during a switch
   });
   const warning = () => {
     const tree = h.render(ProvidersTab, {});
-    const titlesSection = tree.props.children[3];
-    return titlesSection.props.children.props.children[0].props.warn;
+    const titlesSection = tree.props.children.find(
+      (child) => child?.props?.title === "Titles and descriptions",
+    );
+    return titlesSection.props.children.props.children.find(
+      (row) => row?.props?.label === "Use Cinemeta for title metadata",
+    ).props.warn;
   };
   assert.ok(warning());
   h.flush();

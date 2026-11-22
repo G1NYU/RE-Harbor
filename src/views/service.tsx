@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { PickCard } from "@/components/pick-card";
-import { Row } from "@/components/row";
+import { Row, usePosterRow } from "@/components/row";
 import { ServiceLogo } from "@/components/service-logo";
 import { TopRankCard } from "@/components/top-rank-card";
 import { SERVICES } from "@/lib/providers/streaming";
@@ -15,6 +15,8 @@ import { useT } from "@/lib/i18n";
 export function ServiceView({ service }: { service: StreamingService }) {
   const t = useT();
   const { settings } = useSettings();
+  const sizing = usePosterRow();
+  const minCardWidth = Math.max(72, Math.round(sizing.min * settings.posterScale));
   const meta = SERVICES[service];
   const [category, setCategory] = useState<Category>(CATEGORIES[0]);
   const scrollRef = useRef<HTMLElement>(null);
@@ -50,7 +52,10 @@ export function ServiceView({ service }: { service: StreamingService }) {
               <ServiceLogo service={service} height={56} />
             </div>
             <p className="max-w-xl text-[14.5px] leading-relaxed text-ink-muted">
-              {t("The most-watched movies and series on {name} right now in {region}.", { name: meta.name, region: settings.region })}
+              {t("The most-watched movies and series on {name} right now in {region}.", {
+                name: meta.name,
+                region: settings.region,
+              })}
             </p>
           </div>
         </div>
@@ -61,9 +66,17 @@ export function ServiceView({ service }: { service: StreamingService }) {
 
       <div className="px-12 pt-10">
         {loading && (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-9">
+          <div
+            className="grid gap-x-5 gap-y-9"
+            style={{
+              gridTemplateColumns: `repeat(auto-fill,minmax(min(100%, ${minCardWidth}px),1fr))`,
+            }}
+          >
             {Array.from({ length: 18 }).map((_, i) => (
-              <div key={i} className="aspect-[2/3] animate-pulse rounded-xl border border-edge-soft bg-elevated/30" />
+              <div
+                key={i}
+                className="aspect-[2/3] animate-pulse rounded-xl border border-edge-soft bg-elevated/30"
+              />
             ))}
           </div>
         )}
@@ -76,7 +89,11 @@ export function ServiceView({ service }: { service: StreamingService }) {
               <>
                 {bucket.movies.length >= 10 ? (
                   <>
-                    <Row title={t("Top 10 Movies on {name}", { name: meta.name })} min={180} shape="rank">
+                    <Row
+                      title={t("Top 10 Movies on {name}", { name: meta.name })}
+                      min={180}
+                      shape="rank"
+                    >
                       {bucket.movies.slice(0, 10).map((m, i) => (
                         <TopRankCard key={m.id} meta={m} rank={i + 1} />
                       ))}
@@ -98,7 +115,11 @@ export function ServiceView({ service }: { service: StreamingService }) {
                 ) : null}
                 {bucket.series.length >= 10 ? (
                   <>
-                    <Row title={t("Top 10 Series on {name}", { name: meta.name })} min={180} shape="rank">
+                    <Row
+                      title={t("Top 10 Series on {name}", { name: meta.name })}
+                      min={180}
+                      shape="rank"
+                    >
                       {bucket.series.slice(0, 10).map((m, i) => (
                         <TopRankCard key={m.id} meta={m} rank={i + 1} />
                       ))}
@@ -126,7 +147,12 @@ export function ServiceView({ service }: { service: StreamingService }) {
         {!loading && category.id !== "all" && (
           <>
             {merged.length > 0 ? (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-9">
+              <div
+                className="grid gap-x-5 gap-y-9"
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill,minmax(min(100%, ${minCardWidth}px),1fr))`,
+                }}
+              >
                 {merged.map((m) => (
                   <PickCard key={m.id} meta={m} />
                 ))}
@@ -252,7 +278,11 @@ function ScrollArrow({
           : "pointer-events-none opacity-0"
       }`}
     >
-      {side === "left" ? <ChevronLeft size={16} strokeWidth={2.4} /> : <ChevronRight size={16} strokeWidth={2.4} />}
+      {side === "left" ? (
+        <ChevronLeft size={16} strokeWidth={2.4} />
+      ) : (
+        <ChevronRight size={16} strokeWidth={2.4} />
+      )}
     </button>
   );
 }
@@ -270,13 +300,7 @@ function EdgeFade({ side, visible }: { side: "left" | "right"; visible: boolean 
   );
 }
 
-function CategoryFab({
-  active,
-  onChange,
-}: {
-  active: Category;
-  onChange: (c: Category) => void;
-}) {
+function CategoryFab({ active, onChange }: { active: Category; onChange: (c: Category) => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
 

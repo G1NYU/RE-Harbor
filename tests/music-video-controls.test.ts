@@ -28,8 +28,28 @@ function load(): Controls {
     (name: string) => {
       if (name === "@/lib/music/lyrics") return lyrics;
       if (name === "@/lib/i18n") return { useT: () => (key: string) => key };
+      if (name === "@/lib/music/video-quality")
+        return {
+          cycleMusicVideoQuality: () => {},
+          useMusicVideoQuality: () => "auto",
+          MUSIC_VIDEO_QUALITIES: ["auto", "2160", "1080"],
+          setDefaultMusicVideoQuality: () => {},
+          useDefaultMusicVideoQuality: () => "auto",
+          setMusicVideoSessionQuality: () => {},
+        };
+      if (name === "@/components/dropdown") return { Dropdown: () => null };
       if (name === "@/lib/music/appearance")
         return { setMusicAppearance: () => {}, useMusicAppearance: () => ({ immersive: false }) };
+      if (name === "@/components/icons/music-icons")
+        return {
+          Captions: icon,
+          CaptionsOff: icon,
+          ChevronUp: icon,
+          Loader2: icon,
+          Maximize: icon,
+          Minimize: icon,
+          Wallpaper: icon,
+        };
       if (name === "lucide-react") return new Proxy({}, { get: () => icon });
       if (name === "react/jsx-runtime" || name === "react")
         return { jsx: () => null, jsxs: () => null, Fragment: null };

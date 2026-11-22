@@ -26,6 +26,7 @@ export const SECTION_ICONS: Record<SectionId, string> = {
   theme: "Palette",
   badges: "BadgeCheck",
   awardIcons: "Trophy",
+  dmNotifications: "MessageSquare",
   webhooks: "Webhook",
   bug: "Bug",
   support: "Heart",

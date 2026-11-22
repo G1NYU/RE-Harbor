@@ -1,3 +1,5 @@
+import seekSteps from "./zh/seek-steps";
+import reviews from "./zh/reviews";
 import playOrders from "./zh/play-orders";
 import gameRomLibrary from "./zh/game-rom-library";
 import gameNotes from "./zh/game-notes";
@@ -80,6 +82,7 @@ import contextActionsFallback from "./context-actions-fallback";
 import ebookSources from "./zh/ebook-sources";
 import settingsRefinements from "./zh/settings-refinements";
 import coverage from "./zh/coverage";
+import subtitles from "./zh/subtitles";
 import sweepA from "./zh/sweep-a";
 import sweepB from "./zh/sweep-b";
 import sweepC from "./zh/sweep-c";
@@ -99,6 +102,8 @@ import system from "./zh/system";
 import plugins from "./zh/plugins";
 import brands from "./zh/brands";
 import bpSports from "./zh/bp-sports";
+import queueBasket from "./zh/queue-basket";
+import liveWeb from "./zh/live-web";
 
 import nytTv from "./zh/nyt-tv";
 
@@ -267,6 +272,7 @@ const zh: Record<string, string> = {
 
   ...ebookSources,
   ...coverage,
+  ...subtitles,
   ...sweepA,
   ...sweepB,
   ...sweepC,
@@ -361,6 +367,61 @@ const zh: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
+  "Refract sync": "Refract 同步",
+  "Sync watched history and Harbor watchlist changes with Refract.":
+    "将观看记录和 Harbor 待看列表的变更同步到 Refract。",
+  "Refract personal API key": "Refract 个人 API 密钥",
+  "Verifying...": "正在验证…",
+  "Connect Refract": "连接 Refract",
+  "Refract key saved in Harbor's secret store": "Refract 密钥已保存在 Harbor 的安全凭据存储中",
+  "Sync watched history and watchlist": "同步观看记录和待看列表",
+  "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
+    "将 Harbor 的观看记录和待看列表变更发送到 Refract。仅同步 Harbor 的主用户档案。",
+  "Retry pending watches": "重试待发送的观看记录",
+  "Disconnect Refract": "断开 Refract 连接",
+  "Connected to Refract ({identity}). Watched history sync is enabled.":
+    "已连接到 Refract（{identity}）。观看记录同步已启用。",
+  "Could not verify the key via Refract /v1/me. Check permissions and connectivity.":
+    "无法通过 Refract /v1/me 验证密钥。请检查权限和网络连接。",
+  "Disconnected from Refract.": "已断开与 Refract 的连接。",
+  "Create a personal API key in Refract with profile:read, library:read, library:write and history:write. Never share or commit the key.":
+    "在 Refract 中创建具有 profile:read、library:read、library:write 和 history:write 权限的个人 API 密钥。切勿分享密钥或将其提交到代码仓库。",
+  "Automatic watch threshold": "自动记录观看的阈值",
+  "After {count} minutes": "{count} 分钟后",
+  "{count}% (default)": "{count}%（默认）",
+  "Log a movie or episode in Refract when playback reaches the selected time or percentage. Seeking past it also qualifies. Early logging counts as watched in Refract, not partially watched. Harbor's own completion threshold is unchanged.":
+    "播放达到所选时长或百分比时，将电影或剧集记录到 Refract。跳转至阈值之后也会触发记录。提前记录会在 Refract 中标记为已观看，而非部分观看。Harbor 自身的观看完成阈值保持不变。",
+  "Harbor → Refract Plan to Watch": "Harbor → Refract 待看列表",
+  "New watchlist additions and removals are sent automatically while sync is enabled. Requires library:write; reconnect with an updated key if needed. Existing Refract history and other library statuses are preserved.":
+    "启用同步后，待看列表中的新增和移除操作会自动发送。需要 library:write 权限；如有必要，请使用更新后的密钥重新连接。现有 Refract 历史记录和其他媒体库状态将保留。",
+  "{sent} sent · {pending} pending · {failed} unmatched":
+    "已发送 {sent} 项 · 待发送 {pending} 项 · 未匹配 {failed} 项",
+  "Unmatched items": "未匹配的项目",
+  "Refract queue full; unable to save another watch": "Refract 队列已满，无法保存更多观看记录",
+  "No verified IMDb/TMDB/TVDB identity": "没有经过验证的 IMDb/TMDB/TVDB 标识",
+  "Movie not found in Refract": "在 Refract 中未找到该电影",
+  "Episode not found; verify season numbering": "未找到该剧集，请检查季编号",
+  "Last watched item sent successfully": "最近的观看记录已成功发送",
+  "Unknown error": "未知错误",
+  "Some items could not be matched or sent": "部分条目无法匹配或发送",
+  "Refract denied access; check key and permissions": "Refract 拒绝访问，请检查密钥和权限",
+  "Network error; retry scheduled": "网络错误，已安排重试",
+  "No verified IMDb/TMDB/TVDB identity is available for this title.":
+    "此作品没有经过验证的 IMDb/TMDB/TVDB 标识。",
+  "Refract could not uniquely identify this title.": "Refract 无法唯一识别此作品。",
+  "Refract preserved an existing library entry or viewing history.":
+    "Refract 保留了现有的媒体库条目或观看历史。",
+  "Added to Refract Plan to Watch.": "已添加到 Refract 的计划观看列表。",
+  "Removed from Refract Plan to Watch.": "已从 Refract 的计划观看列表移除。",
+  "Refract watchlist requires library:write. Reconnect with a key that has this scope.":
+    "Refract 观看列表需要 library:write 权限。请使用具有此权限的密钥重新连接。",
+  "Refract could not confirm the watchlist change. Try again.":
+    "Refract 无法确认观看列表的更改，请重试。",
+  "Refract HTTP {status}": "Refract HTTP {status}",
 };
 
 export default zh;

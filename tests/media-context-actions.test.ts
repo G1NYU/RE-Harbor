@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 import type { Meta } from "../src/lib/cinemeta.ts";
+import { refractMappedEpisodes } from "../src/lib/refract/identity.ts";
 
 type Actions = typeof import("../src/lib/media-context-actions.ts");
 const movie = { id: "tt123", type: "movie", name: "Fixture" } as Meta;
@@ -11,6 +12,7 @@ const series = { ...movie, type: "series" } as Meta;
 function harness() {
   const calls: Array<{ provider: string; value: unknown }> = [];
   const fetches: string[] = [];
+  const watchEvents: unknown[][] = [];
   let profile = { activeId: "fixture", settingsLinked: false };
   let full: Meta = {
     ...series,
@@ -48,7 +50,20 @@ function harness() {
     },
     "./membership-operations": { captureMembershipProfile: () => profile },
     "./auth": { readActiveStremioAuthKey: () => "fixture-auth" },
-    "./stremio": { ANIME_CLOUD_ID: /^(kitsu|mal|anilist|anidb):/ },
+    "./stremio": {
+      ANIME_CLOUD_ID: /^(kitsu|mal|anilist|anidb):/,
+      cloudWriteId: (id: string, resolved: string | null) => resolved ?? id,
+      libraryGetOne: async () => null,
+    },
+    "./cw-dismiss": { dismissCw: async (...value: unknown[]) => step("dismiss")(...value) },
+    "./local-cw": {
+      clearLocalCw: (...value: unknown[]) => calls.push({ provider: "clear-local-cw", value }),
+    },
+    "./resume": {
+      clearResume: (...value: unknown[]) => calls.push({ provider: "clear-resume", value }),
+    },
+    "./feed/external-cw": { listExternalCw: () => [], removeExternalCwItem: () => {} },
+    "./tracker-status-events": { notifyTrackerStatusChanged: () => {} },
     "./watchlist": {
       setLocalWatchlistAcknowledged: step("local-watchlist"),
       clearWatchlistAggregate: step("aggregate"),
@@ -66,8 +81,13 @@ function harness() {
       recordManualWatchedMeta: () => {},
     },
     "./playback-history": { savePlayback: () => {} },
-    "./watch-events": { recordWatchEvent: () => {} },
+    "./watch-events": { recordWatchEvent: (...args: unknown[]) => watchEvents.push(args) },
+    "./refract/identity": { refractMappedEpisodes },
     "./media-provider-actions": {
+      dropProviderWrites: () => [
+        { provider: "Trakt", run: () => step("trakt-drop")(true) },
+        { provider: "Simkl", run: () => step("simkl-drop")(true) },
+      ],
       watchlistProviderWrites: (_input: unknown, on: boolean) => [
         { provider: "Trakt", run: () => step("trakt-watchlist")(on) },
         {
@@ -82,7 +102,21 @@ function harness() {
       ],
       watchedProviderWrites: (_meta: unknown, on: boolean, options: unknown) => [
         { provider: "Trakt", run: () => step("trakt-watched")(on, options) },
-        { provider: "Simkl", run: () => step("simkl-watched")(on, options) },
+        {
+          provider: "Simkl",
+          preflight: async () => {
+            if (!failures.has("watched-confirm")) return undefined;
+            const allowed = !!(options as { allowSimklLibraryRemoval?: boolean } | undefined)
+              ?.allowSimklLibraryRemoval;
+            return allowed
+              ? undefined
+              : {
+                  reason: "Confirm the Simkl removal.",
+                  confirmation: "simkl-library-removal" as const,
+                };
+          },
+          run: () => step("simkl-watched")(on, options),
+        },
       ],
     },
   };
@@ -103,6 +137,7 @@ function harness() {
     actions: module.exports as Actions,
     calls,
     fetches,
+    watchEvents,
     failures,
     setFull: (next: Meta) => {
       full = next;
@@ -200,6 +235,31 @@ test("skipping an unsafe provider keeps confirmed safe changes and reports it", 
   assert.equal(
     h.calls.some((c) => c.provider === "aggregate"),
     false,
+  );
+});
+
+test("a confirmation-required provider write makes no changes until it is confirmed", async () => {
+  const h = harness();
+  h.failures.add("watched-confirm");
+  const blocked = await h.actions.setContextWatched(movie, false, {
+    onUnsafeProvider: "block",
+  });
+  assert.equal(blocked.noChanges, true);
+  assert.equal(blocked.confirmation, "simkl-library-removal");
+  assert.deepEqual(h.calls, []);
+  const allowed = await h.actions.setContextWatched(movie, false, {
+    onUnsafeProvider: "block",
+    allowSimklLibraryRemoval: true,
+  });
+  assert.equal(allowed.noChanges, undefined);
+  assert.equal(allowed.confirmation, undefined);
+  assert.deepEqual(
+    allowed.outcomes.map((outcome) => [outcome.provider, outcome.status]),
+    [
+      ["Harbor", "updated"],
+      ["Trakt", "updated"],
+      ["Simkl", "updated"],
+    ],
   );
 });
 
@@ -375,4 +435,33 @@ test("verified anime unwatch clears only the mapped IMDb episode alias", async (
       ["tt123", [{ season: 2, episode: 1 }], false],
     ],
   );
+});
+
+test("unverified native anime coordinates stay local and are not forwarded to Refract", async () => {
+  const h = harness();
+  await h.actions.setContextWatched({ ...series, id: "kitsu:10" }, true, {
+    imdbId: "tt123",
+    episode: { season: 1, episode: 13 },
+  });
+  assert.equal(h.watchEvents.length, 1);
+  assert.equal(h.watchEvents[0][1], undefined);
+  assert.deepEqual(h.calls.find((c) => c.provider === "local-episodes")?.value, [
+    "kitsu:10",
+    [{ season: 1, episode: 13 }],
+    true,
+  ]);
+});
+
+test("verified native anime coordinates reach Refract without guessing episode numbers", async () => {
+  const h = harness();
+  await h.actions.setContextWatched({ ...series, id: "kitsu:10" }, true, {
+    imdbId: "tt123",
+    episode: { season: 1, episode: 13 },
+    providerEpisode: { season: 2, episode: 1 },
+  });
+  assert.equal(h.watchEvents.length, 1);
+  assert.deepEqual(h.watchEvents[0][1], {
+    externalId: "tt123",
+    episodes: [{ season: 2, episode: 1 }],
+  });
 });

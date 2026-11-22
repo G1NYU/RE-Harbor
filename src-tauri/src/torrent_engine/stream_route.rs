@@ -1,10 +1,11 @@
 use std::io::SeekFrom;
 use std::path::Path as FsPath;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::body::Body;
 use axum::extract::{Json, Path, RawQuery, State};
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Router;
@@ -13,6 +14,16 @@ use librqbit::api::TorrentIdOrHash;
 use librqbit::Session;
 use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+/// How long a cold stream may go without delivering its first byte before the
+/// response fails fast with a distinct error. Without this the player blocks on
+/// a read forever (its network timeout is minutes long) and the retry/next-source
+/// path never fires even when the swarm has no useful peers.
+const FIRST_BYTE_WAIT: Duration = Duration::from_secs(12);
+/// Seeks into an undownloaded region can legitimately take longer than a start.
+const SEEK_FIRST_BYTE_WAIT: Duration = Duration::from_secs(30);
+/// Bytes demanded up front before headers are sent.
+const FIRST_BYTE_CHUNK: usize = 64 * 1024;
 
 pub fn router(session: Arc<Session>) -> Router {
     Router::new()
@@ -140,20 +151,22 @@ async fn h_remote_stream(
     Path((hash, file_id)): Path<(String, usize)>,
     RawQuery(query): RawQuery,
     headers: HeaderMap,
+    method: Method,
 ) -> Response {
     let trackers = trackers_from_query(query);
     if let Err(e) = super::ensure_added(&session, &hash, trackers, Some(file_id)).await {
         return (StatusCode::NOT_FOUND, e).into_response();
     }
-    stream_file(&session, &hash, file_id, &headers).await
+    stream_file(&session, &hash, file_id, &headers, method == Method::HEAD).await
 }
 
 async fn h_stream(
     State(session): State<Arc<Session>>,
     Path((hash, file_id)): Path<(String, usize)>,
     headers: HeaderMap,
+    method: Method,
 ) -> Response {
-    stream_file(&session, &hash, file_id, &headers).await
+    stream_file(&session, &hash, file_id, &headers, method == Method::HEAD).await
 }
 
 async fn stream_file(
@@ -161,9 +174,10 @@ async fn stream_file(
     hash: &str,
     file_id: usize,
     headers: &HeaderMap,
+    is_head: bool,
 ) -> Response {
     match super::run_session(session, async {
-        Ok(stream_file_inner(session, hash, file_id, headers).await)
+        Ok(stream_file_inner(session, hash, file_id, headers, is_head).await)
     })
     .await
     {
@@ -177,6 +191,7 @@ async fn stream_file_inner(
     hash: &str,
     file_id: usize,
     headers: &HeaderMap,
+    is_head: bool,
 ) -> Response {
     let Ok(id) = TorrentIdOrHash::parse(hash) else {
         return (StatusCode::BAD_REQUEST, "bad hash").into_response();
@@ -204,7 +219,7 @@ async fn stream_file_inner(
         .ok()
         .flatten()
         .unwrap_or("application/octet-stream");
-    let mut stream = match handle.stream(file_id) {
+    let mut stream = match handle.clone().stream(file_id) {
         Ok(s) => s,
         Err(e) => return (StatusCode::NOT_FOUND, format!("{e:#}")).into_response(),
     };
@@ -229,6 +244,54 @@ async fn stream_file_inner(
         return (StatusCode::INTERNAL_SERVER_ERROR, "seek failed").into_response();
     }
     let to_take = end - start;
+    // Request the first chunk before sending headers so a dead swarm fails fast
+    // with an error the player can act on, instead of an endless buffering read.
+    let mut prefix: Vec<u8> = Vec::new();
+    if !is_head && to_take > 0 {
+        let wait = if start == 0 {
+            FIRST_BYTE_WAIT
+        } else {
+            SEEK_FIRST_BYTE_WAIT
+        };
+        let want = to_take.min(FIRST_BYTE_CHUNK as u64) as usize;
+        let mut buf = vec![0u8; want];
+        match tokio::time::timeout(wait, stream.read(&mut buf[..want])).await {
+            Ok(Ok(n)) if n > 0 => {
+                buf.truncate(n);
+                prefix = buf;
+            }
+            Ok(Ok(_)) => {
+                return (StatusCode::BAD_GATEWAY, "stream ended before first byte").into_response()
+            }
+            Ok(Err(error)) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("stream read failed: {error}"),
+                )
+                    .into_response()
+            }
+            Err(_) => {
+                let stats = handle.stats();
+                let peers = stats
+                    .live
+                    .as_ref()
+                    .map(|live| live.snapshot.peer_stats.live)
+                    .unwrap_or(0);
+                eprintln!(
+                    "[torrent-engine] stream first byte timed out hash={hash} file={file_id} start={start} peers={peers} progress_kb={}",
+                    stats.progress_bytes / 1024
+                );
+                let mut response =
+                    (StatusCode::SERVICE_UNAVAILABLE, "engine-no-useful-peers").into_response();
+                response.headers_mut().insert(
+                    "x-harbor-stream-error",
+                    HeaderValue::from_static("no-useful-peers"),
+                );
+                return response;
+            }
+        }
+    }
+    let remaining = to_take.saturating_sub(prefix.len() as u64);
     let mut out = HeaderMap::new();
     out.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     out.insert(header::CONTENT_TYPE, HeaderValue::from_static(ct));
@@ -242,10 +305,14 @@ async fn stream_file_inner(
             HeaderValue::from_str(&format!("bytes {}-{}/{}", start, end - 1, len)).unwrap(),
         );
     }
-    let body = Body::from_stream(
-        tokio_util::io::ReaderStream::with_capacity(stream.take(to_take), 65536)
-            .take_until(session.cancellation_token().clone().cancelled_owned()),
-    );
+    let cancellation = session.cancellation_token().clone().cancelled_owned();
+    let prefix_stream = futures_util::stream::once(async move {
+        Ok::<Vec<u8>, std::io::Error>(prefix)
+    });
+    let rest = tokio_util::io::ReaderStream::with_capacity(stream.take(remaining), 65536)
+        .take_until(cancellation)
+        .map(|item| item.map(|chunk| chunk.to_vec()));
+    let body = Body::from_stream(prefix_stream.chain(rest));
     (status, out, body).into_response()
 }
 

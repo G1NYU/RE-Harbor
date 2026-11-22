@@ -3,7 +3,16 @@ import { UiIcon } from "@/components/ui-icon";
 import { PopIcon } from "@/components/pop-icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CoverImg } from "@/components/cover-img";
-import { Award, BookOpen, ChevronLeft, Flame, RotateCcw, Sparkles, Star } from "lucide-react";
+import {
+  Award,
+  BookOpen,
+  ChevronLeft,
+  Flame,
+  Repeat2,
+  RotateCcw,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 const COLLECTION_ICON: Record<string, LucideIcon> = {
@@ -16,7 +25,12 @@ import { useT } from "@/lib/i18n";
 import { Poster } from "@/components/poster";
 import { mangaBackdrop } from "@/lib/manga/backdrop";
 import { collectionsForTitle } from "@/lib/manga/collections";
-import { useIsMangaFavorite, useMangaFavorites } from "@/lib/manga-favorites";
+import {
+  mangaFavoriteFailureMessage,
+  useIsMangaFavorite,
+  useMangaFavorites,
+} from "@/lib/manga-favorites";
+import { emitListToast } from "@/components/lists/list-toast";
 import { useMangaProgressEntry, type MangaProgressEntry } from "@/lib/manga-progress";
 import { chapterNumberKey } from "@/lib/manga/chapter-identity";
 import {
@@ -46,8 +60,10 @@ import {
   useMangaUpdates,
 } from "./mangaupdates-info";
 import { TopMangaModal } from "./top-manga-modal";
+import { MangaMatchPicker } from "@/views/collections/manga-match-picker";
 import { decodeMangaId } from "@/lib/manga/sources/suwayomi/model";
 import { suwayomiBaseForSource } from "@/lib/manga/sources/suwayomi/auth-registry";
+import type { SuwayomiSource } from "@/lib/manga/sources/suwayomi/provider";
 import { cachedSuwayomiSources } from "./manga-browse/langs";
 import { sourceDisplayName } from "./manga-browse/all-extensions";
 import { pushActivityHint } from "@/lib/discord/activity-hint";
@@ -174,6 +190,7 @@ export function MangaDetail({
   onBack,
   onOpenManga,
   onOpenDownloads,
+  onBrowseExtension,
   scrollRoot,
   downloadRequest,
 }: {
@@ -187,6 +204,7 @@ export function MangaDetail({
   onBack: () => void;
   onOpenManga: (id: string) => void;
   onOpenDownloads?: () => void;
+  onBrowseExtension: (source: SuwayomiSource, baseUrl: string) => void;
   scrollRoot?: React.RefObject<HTMLElement | null>;
   downloadRequest?: number;
 }) {
@@ -196,12 +214,20 @@ export function MangaDetail({
   const [detailPending, setDetailPending] = useState(true);
   const [chaptersPending, setChaptersPending] = useState(true);
   const [retryTick, setRetryTick] = useState(0);
+  const [chapterRefreshTick, setChapterRefreshTick] = useState(0);
+  const chaptersMangaId = useRef<string | null>(null);
   const langInitRef = useRef(false);
   const [selectedLang, setSelectedLang] = useState("en");
   const [backdrop, setBackdrop] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [topMangaOpen, setTopMangaOpen] = useState(false);
-  const [extInfo, setExtInfo] = useState<{ name: string; icon?: string } | null>(null);
+  const [pickSourceOpen, setPickSourceOpen] = useState(false);
+  const [extInfo, setExtInfo] = useState<{
+    name: string;
+    icon?: string;
+    source: SuwayomiSource;
+    baseUrl: string;
+  } | null>(null);
   const chaptersRef = useRef<HTMLDivElement>(null);
   const focusedDownloadRequest = useRef<number | undefined>(undefined);
   const focusChapters = () => {
@@ -226,7 +252,8 @@ export function MangaDetail({
   }, [downloadRequest, detailPending, detail, chapters.length, mangaId]);
 
   const favorites = useMangaFavorites();
-  const isFavorite = useIsMangaFavorite(mangaId);
+  const favoriteSourceId = useMemo(() => decodeMangaId(mangaId)?.sourceId, [mangaId]);
+  const isFavorite = useIsMangaFavorite(mangaId, favoriteSourceId);
   const progress = useMangaProgressEntry(mangaId, detail?.title);
 
   useEffect(() => {
@@ -240,7 +267,13 @@ export function MangaDetail({
       .then((list) => {
         if (!alive) return;
         const source = list.find((s) => s.id === parsed.sourceId);
-        if (source) setExtInfo({ name: sourceDisplayName(source), icon: source.iconUrl });
+        if (source)
+          setExtInfo({
+            name: sourceDisplayName(source),
+            icon: source.iconUrl,
+            source,
+            baseUrl: base,
+          });
       })
       .catch(() => {});
     return () => {
@@ -251,9 +284,7 @@ export function MangaDetail({
   useEffect(() => {
     let cancelled = false;
     setDetail(null);
-    setChapters([]);
     setDetailPending(true);
-    setChaptersPending(true);
     setBackdrop(null);
     setExpanded(false);
     langInitRef.current = false;
@@ -267,15 +298,34 @@ export function MangaDetail({
         if (!cancelled) setDetailPending(false);
       });
 
-    streamChapters(mangaId, (chunk) => {
-      if (cancelled || chunk.length === 0) return;
-      setChapters((prev) => [...prev, ...chunk]);
-      if (!langInitRef.current) {
-        langInitRef.current = true;
-        const ls = chapterLanguages(chunk);
-        setSelectedLang(ls.find((l) => l.code === "en")?.code ?? ls[0]?.code ?? "en");
-      }
-    })
+    return () => {
+      cancelled = true;
+    };
+  }, [mangaId, retryTick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let received = false;
+    if (chaptersMangaId.current !== mangaId) {
+      chaptersMangaId.current = mangaId;
+      setChapters([]);
+    }
+    setChaptersPending(true);
+    streamChapters(
+      mangaId,
+      (chunk) => {
+        if (cancelled || chunk.length === 0) return;
+        const first = !received;
+        received = true;
+        setChapters((prev) => (first ? chunk : [...prev, ...chunk]));
+        if (!langInitRef.current) {
+          langInitRef.current = true;
+          const ls = chapterLanguages(chunk);
+          setSelectedLang(ls.find((l) => l.code === "en")?.code ?? ls[0]?.code ?? "en");
+        }
+      },
+      { refresh: true },
+    )
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setChaptersPending(false);
@@ -284,7 +334,7 @@ export function MangaDetail({
     return () => {
       cancelled = true;
     };
-  }, [mangaId, retryTick]);
+  }, [mangaId, retryTick, chapterRefreshTick]);
 
   useEffect(() => {
     if (!detail?.title) return;
@@ -456,9 +506,11 @@ export function MangaDetail({
 
               <div className="flex flex-wrap items-center gap-2">
                 {extInfo && (
-                  <span
+                  <button
+                    type="button"
                     title={t("Source extension")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-elevated/60 px-3 py-1 text-[13px] font-medium text-ink ring-1 ring-edge-soft backdrop-blur-sm"
+                    onClick={() => onBrowseExtension(extInfo.source, extInfo.baseUrl)}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-elevated/60 px-3 py-1 text-[13px] font-medium text-ink ring-1 ring-edge-soft backdrop-blur-sm transition-colors hover:bg-elevated hover:ring-edge active:scale-[0.98] motion-reduce:active:scale-100"
                   >
                     {extInfo.icon && (
                       <img
@@ -471,7 +523,7 @@ export function MangaDetail({
                       />
                     )}
                     {extInfo.name}
-                  </span>
+                  </button>
                 )}
                 {pills.map((p) => (
                   <span
@@ -501,7 +553,7 @@ export function MangaDetail({
                     return (
                       <span
                         key={c.id}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-elevated/60 py-1 pl-2 pr-2.5 text-[12px] font-medium text-accent ring-1 ring-edge-soft backdrop-blur-sm"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-elevated/60 py-1 ps-2 pe-2.5 text-[12px] font-medium text-accent ring-1 ring-edge-soft backdrop-blur-sm"
                       >
                         <Icon size={12.5} strokeWidth={2.4} />
                         {t(c.badge)}
@@ -546,15 +598,18 @@ export function MangaDetail({
                   type="button"
                   aria-pressed={isFavorite}
                   aria-label={isFavorite ? t("Remove favorite") : t("Add favorite")}
-                  onClick={() =>
-                    detail &&
-                    favorites.toggle({
+                  onClick={() => {
+                    if (!detail) return;
+                    const result = favorites.toggle({
                       id: mangaId,
                       title: detail.title,
                       altTitle: detail.altTitle,
                       cover: detail.cover,
-                    })
-                  }
+                      sourceId: favoriteSourceId,
+                    });
+                    const message = mangaFavoriteFailureMessage(result, t);
+                    if (message) emitListToast(message, "error");
+                  }}
                   className={`group flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-[transform,background-color] duration-200 active:scale-[0.94] ${
                     isFavorite
                       ? "bg-accent/20 text-accent hover:bg-accent/22"
@@ -582,6 +637,17 @@ export function MangaDetail({
                   altTitle={detail?.altTitle}
                   cover={detail?.cover}
                 />
+                {detail && (
+                  <button
+                    type="button"
+                    aria-label={t("Find on your sources")}
+                    title={t("Find on your sources")}
+                    onClick={() => setPickSourceOpen(true)}
+                    className="group flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-ink transition-[transform,background-color] duration-200 hover:bg-white/[0.10] active:scale-[0.94]"
+                  >
+                    <Repeat2 size={19} strokeWidth={2.2} />
+                  </button>
+                )}
                 {onOpenDownloads && (
                   <button
                     type="button"
@@ -656,11 +722,14 @@ export function MangaDetail({
           mangaCover={detail?.cover}
           animeEndChapter={coverage?.endChapter}
           pending={chaptersPending}
+          onRefresh={() => setChapterRefreshTick((n) => n + 1)}
           scrollRoot={scrollRoot}
         />
       </div>
 
-      {detail?.title && <MangaRecommendedRail title={detail.title} onOpen={onOpenManga} />}
+      {detail?.title && (
+        <MangaRecommendedRail mangaId={mangaId} title={detail.title} onOpen={onOpenManga} />
+      )}
 
       <TopMangaModal
         open={topMangaOpen}
@@ -670,6 +739,17 @@ export function MangaDetail({
           onOpenManga(id);
         }}
       />
+
+      {pickSourceOpen && detail && (
+        <MangaMatchPicker
+          name={detail.title}
+          onSelect={(id) => {
+            setPickSourceOpen(false);
+            onOpenManga(id);
+          }}
+          onClose={() => setPickSourceOpen(false)}
+        />
+      )}
     </div>
   );
 }

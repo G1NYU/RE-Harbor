@@ -1,3 +1,4 @@
+import { addonBaseUrl, addonResourceUrl } from "@/lib/addon-url";
 import { isCollectionCatalog, type Addon, type CatalogDef } from "./addons";
 import type { Meta } from "./cinemeta";
 import { safeFetch } from "./safe-fetch";
@@ -9,6 +10,29 @@ const MAX_CATALOGS = 24;
 // applied, so this is a ceiling for that aggregate rather than a size any single response reaches.
 const AIOMETADATA_SEARCH_CAP = 100;
 
+type SearchCatalogReader = (url: string) => Promise<Meta[] | null>;
+
+async function readSearchCatalog(url: string, signal?: AbortSignal): Promise<Meta[] | null> {
+  signal?.throwIfAborted();
+  const res = await safeFetch(url, { headers: { Accept: "application/json" }, signal });
+  if (!res.ok) return null;
+  const { metas } = (await res.json()) as { metas?: Meta[] };
+  return (metas ?? []).slice(0, AIOMETADATA_SEARCH_CAP);
+}
+
+// Share one parsed response between the combined Movies/Series rows and the
+// addon's own row. A new search or retry starts with a fresh reader.
+export function createAddonSearchCatalogReader(signal?: AbortSignal): SearchCatalogReader {
+  const requests = new Map<string, Promise<Meta[] | null>>();
+  return (url) => {
+    const pending = requests.get(url);
+    if (pending) return pending;
+    const request = readSearchCatalog(url, signal);
+    requests.set(url, request);
+    return request;
+  };
+}
+
 function isAioMetadataAddon(id: string | undefined): boolean {
   return id != null && /^(?:com\.aio\.metadata|aio-metadata)$/i.test(id);
 }
@@ -18,7 +42,7 @@ function addonOrigin(addon: Addon) {
     id: addon.manifest.id,
     name: addon.manifest.name,
     logo: addon.manifest.logo,
-    base: addon.transportUrl.replace(/\/manifest\.json$/, ""),
+    base: addonBaseUrl(addon.transportUrl),
   };
 }
 
@@ -46,6 +70,7 @@ function catalogIsSearchable(c: CatalogDef | undefined | null): boolean {
 export async function searchAddonCatalogs(
   addons: Addon[],
   query: string,
+  readCatalog = readSearchCatalog,
 ): Promise<{ movies: Meta[]; series: Meta[] }> {
   const q = query.trim();
   if (!q) return { movies: [], series: [] };
@@ -74,15 +99,16 @@ export async function searchAddonCatalogs(
 
   const settled = await Promise.allSettled(
     targets.map(async ({ addon, type, id, collection }) => {
-      const base = addon.transportUrl.replace(/\/manifest\.json$/, "");
-      const url = `${base}/catalog/${type}/${id}/search=${encodeURIComponent(q)}.json`;
-      const res = await safeFetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) return { type, collection, metas: [] as Meta[], origin: addonOrigin(addon) };
-      const json = (await res.json()) as { metas?: Meta[] };
+      const base = addonBaseUrl(addon.transportUrl);
+      const url = addonResourceUrl(
+        base,
+        `catalog/${type}/${id}/search=${encodeURIComponent(q)}.json`,
+      );
+      const metas = await readCatalog(url);
       return {
         type,
         collection,
-        metas: (json.metas ?? []).slice(
+        metas: (metas ?? []).slice(
           0,
           isAioMetadataAddon(addon.manifest.id) ? AIOMETADATA_SEARCH_CAP : CAP_PER_CATALOG,
         ),
@@ -99,8 +125,9 @@ export async function searchAddonCatalogs(
     for (const m of r.value.metas) {
       if (!m?.id || seen.has(m.id)) continue;
       seen.add(m.id);
-      const tagged = {
+      const tagged: Meta = {
         ...m,
+        type: m.type || (r.value.type === "series" ? "series" : "movie"),
         addonOrigin: r.value.origin,
         ...(r.value.collection ? { isCollection: true } : null),
       };
@@ -176,11 +203,12 @@ async function mapLimit<T, R>(
   items: T[],
   limit: number,
   fn: (item: T) => Promise<R>,
+  signal?: AbortSignal,
 ): Promise<R[]> {
-  const out = new Array<R>(items.length);
+  const out: R[] = [];
   let next = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    for (;;) {
+    while (!signal?.aborted) {
       const i = next++;
       if (i >= items.length) return;
       out[i] = await fn(items[i]);
@@ -195,9 +223,11 @@ export async function searchAddonGroups(
   query: string,
   onGroup?: (group: AddonResultGroup) => void,
   onQuery?: (query: AddonQuery) => void,
+  readCatalog = readSearchCatalog,
+  signal?: AbortSignal,
 ): Promise<AddonResultGroup[]> {
   const q = query.trim();
-  if (!q) return [];
+  if (!q || signal?.aborted) return [];
 
   const byAddon = new Map<
     string,
@@ -224,19 +254,26 @@ export async function searchAddonGroups(
   // set that renumbers under a viewer already stepping through it.
   if (onQuery) {
     for (const { addon } of entries) {
+      if (signal?.aborted) return [];
       const o = addonOrigin(addon);
       onQuery({ id: o.id, name: o.name, logo: o.logo, state: "pending", metas: [] });
     }
   }
   const startedAt = Date.now();
   const remainingBudget = () => ALL_GROUPS_BUDGET_MS - (Date.now() - startedAt);
-  const groups = await mapLimit(entries, GROUP_CONCURRENCY, async ({ addon, targets }): Promise<AddonResultGroup> => {
+  const groups = await mapLimit(
+    entries,
+    GROUP_CONCURRENCY,
+    async ({ addon, targets }): Promise<AddonResultGroup> => {
       const origin = addonOrigin(addon);
       const cap = isAioMetadataAddon(origin.id) ? AIOMETADATA_SEARCH_CAP : CAP_PER_GROUP;
       const base = origin.base;
       const settled = await Promise.allSettled(
         targets.map(async ({ type, id, collection }) => {
-          const url = `${base}/catalog/${type}/${id}/search=${encodeURIComponent(q)}.json`;
+          const url = addonResourceUrl(
+            base,
+            `catalog/${type}/${id}/search=${encodeURIComponent(q)}.json`,
+          );
           // An IPTV catalog scanning tens of thousands of titles can take ~9s, so the
           // budget is generous. It exists only so one unreachable addon cannot hang
           // the whole results section.
@@ -245,19 +282,15 @@ export async function searchAddonGroups(
           // through to a bare fetch with no signal on the web and on the plugin-http
           // path, so an addon that returns headers and then stalls its body left this
           // promise unsettled forever, and with it the addon's "pending" row.
-          const read = withDeadline(
-            (async () => {
-              const res = await safeFetch(url, { headers: { Accept: "application/json" } });
-              if (!res.ok) return null;
-              return (await res.json()) as { metas?: Meta[] };
-            })(),
+          const metas = await withDeadline(
+            readCatalog(url, signal),
             Math.min(GROUP_TIMEOUT_MS, remainingBudget()),
           );
-          const json = await read;
-          if (!json) return { collection, answered: false, metas: [] as Meta[] };
-          return { collection, answered: true, metas: (json.metas ?? []).slice(0, cap) };
+          if (!metas) return { collection, answered: false, metas: [] as Meta[] };
+          return { collection, answered: true, metas: metas.slice(0, cap) };
         }),
       );
+      signal?.throwIfAborted();
       const seen = new Set<string>();
       const metas: Meta[] = [];
       let answered = false;
@@ -293,6 +326,8 @@ export async function searchAddonGroups(
         metas,
       });
       return group;
-  });
+    },
+    signal,
+  );
   return groups.filter((g) => g.metas.length > 0);
 }

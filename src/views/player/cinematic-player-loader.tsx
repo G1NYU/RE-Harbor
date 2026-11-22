@@ -1,3 +1,4 @@
+import { markPlaybackTrace } from "@/lib/perf/playback-trace";
 import { useEffect, useRef, useState } from "react";
 import { HarborLoader } from "@/components/harbor-loader";
 import { CustomArtwork } from "@/components/custom-artwork";
@@ -90,6 +91,9 @@ export function CinematicPlayerLoader({
   const showing =
     forceShow ||
     (!everPlayedRef.current && !failed && snap.errorCode == null && snap.status !== "ended");
+  useEffect(() => {
+    if (showing) markPlaybackTrace(src.playbackTraceId, "loader-shown");
+  }, [showing, src.playbackTraceId]);
   const done = !showing && snap.errorCode == null;
   const [mounted, setMounted] = useState(showing);
   useEffect(() => {

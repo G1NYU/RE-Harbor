@@ -6,6 +6,7 @@ import { anilistToMal } from "@/lib/providers/anime-mapping";
 import { getAnimeCwId } from "@/lib/anime-cw-ids";
 import { isDetectedAnime } from "@/lib/anime-detect";
 import { simklRequest, SimklApiError } from "./client";
+import { notifyTrackerProgress } from "@/lib/tracker-progress-events";
 import {
   buildAnimeBody,
   buildBody,
@@ -112,17 +113,25 @@ export async function simklScrobble(
   episode: EpisodeRef,
   progress: number,
   info?: ScrobbleInfo,
+  verifiedOnly = false,
 ): Promise<boolean> {
   const profile = activeProfileId();
   const session = getSession();
   const owned = () => session != null && getSession() === session && activeProfileId() === profile;
   if (!owned()) return false;
+  const done = (value: boolean): boolean => {
+    if (value && action === "stop") notifyTrackerProgress("simkl");
+    return value;
+  };
   const body = buildBody(metaId, episode, progress, info);
   const isAnimeNode = body != null && "anime" in body;
   // A named anime entry stays the priority the existing path established.
+  if (verifiedOnly && !isAnimeNode) return false;
   if (isAnimeNode) {
     const currentId = animeBodyEntryId(body);
-    if (currentId) {
+    // An independently verified episode must not be replaced by a second,
+    // heuristic cour lookup. Its owner was already proven by the local pack.
+    if (currentId && !verifiedOnly) {
       const entry = await resolveTrackerAnimeEntry(metaId, {
         season: episode?.season,
         episode: episode?.episode,
@@ -134,10 +143,10 @@ export async function simklScrobble(
       // send the sequel that actually aired the episode instead.
       if (entry && entry.id !== currentId && entry.baseId === currentId) {
         const animeBody = await animeBodyForEntry(entry.id, entry.episode, progress);
-        if (animeBody && (await post(action, animeBody))) return true;
+        if (animeBody && (await post(action, animeBody))) return done(true);
       }
     }
-    if (await post(action, body)) return true;
+    if (await post(action, body)) return done(true);
   } else if (body && catalogAnimeRow(metaId)) {
     // An anime row whose episode could not name its entry must not be scrobbled
     // against the umbrella catalog entry. Resolve the cour that aired it first.
@@ -150,14 +159,14 @@ export async function simklScrobble(
     if (!owned()) return false;
     if (entry) {
       const animeBody = await animeBodyForEntry(entry.id, entry.episode, progress);
-      if (animeBody && (await post(action, animeBody))) return true;
+      if (animeBody && (await post(action, animeBody))) return done(true);
     }
-    if (await post(action, body)) return true;
+    if (await post(action, body)) return done(true);
   } else if (body) {
-    if (await post(action, body)) return true;
+    if (await post(action, body)) return done(true);
   }
-  if (!owned()) return false;
+  if (!owned() || (verifiedOnly && isAnimeNode)) return false;
   const retry = await fallbackBody(metaId, episode, progress);
   if (!owned() || !retry) return false;
-  return post(action, retry);
+  return done(await post(action, retry));
 }

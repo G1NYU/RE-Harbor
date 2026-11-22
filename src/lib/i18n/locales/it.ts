@@ -1,3 +1,5 @@
+import seekSteps from "./it/seek-steps";
+import reviews from "./it/reviews";
 import playOrders from "./it/play-orders";
 import gameRomLibrary from "./it/game-rom-library";
 import gameNotes from "./it/game-notes";
@@ -92,9 +94,12 @@ import catalog10 from "./it/catalog-10";
 import catalog11 from "./it/catalog-11";
 import catalog12 from "./it/catalog-12";
 import coverage from "./it/coverage";
+import subtitles from "./it/subtitles";
 import plugins from "./it/plugins";
 import brands from "./it/brands";
 import bpSports from "./it/bp-sports";
+import queueBasket from "./it/queue-basket";
+import liveWeb from "./it/live-web";
 
 import nytTv from "./it/nyt-tv";
 
@@ -286,6 +291,7 @@ const it: Record<string, string> = {
   ...catalog11,
   ...catalog12,
   ...coverage,
+  ...subtitles,
   ...settingsRefinements,
   ...plugins,
   ...brands,
@@ -365,6 +371,10 @@ const it: Record<string, string> = {
   ...gameRomLibrary,
   ...gameNotes,
   ...playOrders,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
   "Refract sync": "Sincronizzazione Refract",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "Sincronizza la cronologia di visione e le modifiche alla lista da guardare di Harbor con Refract.",
@@ -373,8 +383,7 @@ const it: Record<string, string> = {
   "Connect Refract": "Collega Refract",
   "Refract key saved in Harbor's secret store":
     "Chiave Refract salvata nell'archivio sicuro di Harbor",
-  "Sync watched history and watchlist":
-    "Sincronizza cronologia di visione e lista da guardare",
+  "Sync watched history and watchlist": "Sincronizza cronologia di visione e lista da guardare",
   "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
     "Invia la cronologia di visione e le modifiche alla lista da guardare da Harbor a Refract. Viene sincronizzato solo il profilo principale di Harbor.",
   "Retry pending watches": "Riprova a inviare le visioni in sospeso",

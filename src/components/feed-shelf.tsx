@@ -1,6 +1,6 @@
 import type { Meta } from "@/lib/cinemeta";
 import { PickCard } from "./pick-card";
-import { Row, usePosterRow } from "./row";
+import { Row, RowSkeletonCard, usePosterRow } from "./row";
 
 export type ShelfMeta = {
   id: string;
@@ -28,11 +28,8 @@ export function FeedShelf({
   if (items === null) {
     return (
       <Row {...sizing} title={<ShelfTitle shelf={shelf} />} scrollKey={scrollKey} alwaysActive>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className={`${sizing.shape === "landscape" ? "aspect-[16/9]" : "aspect-[2/3]"} rounded-xl bg-elevated/35`}
-          />
+        {Array.from({ length: 6 }, (_, i) => (
+          <RowSkeletonCard key={i} shape={sizing.shape} />
         ))}
       </Row>
     );

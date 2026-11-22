@@ -1,3 +1,5 @@
+import { isNuvioProviderActive } from "@/lib/active-profile-id";
+import { persistCritical } from "./storage-recovery";
 import { purgeGameNotes } from "./games/game-notes";
 import {
   createContext,
@@ -9,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { HiddenTabs } from "./lockable-tabs";
+import { anyTabLocked, type HiddenTabs } from "./lockable-tabs";
 import type { ContentFilters } from "./settings";
 import { isRemovedBuiltinAvatar } from "./avatars/catalog";
 import { deleteProfileBgImage } from "./theme-storage";
@@ -19,6 +21,18 @@ import { configureRosterStore } from "./profile-sync/roster-store";
 import { noteProfileDeleted } from "./profile-sync/roster-section";
 import { refuseProfileSelect } from "./profile-sync/profile-lock";
 import type { LocalProfileLike } from "./profile-sync/types";
+import type { NuvioProfile } from "./nuvio/nuvio-types";
+import { loadNuvioState } from "./nuvio/nuvio-client";
+import {
+  clearNuvioSessionUnlocks,
+  isNuvioProfileUnlocked,
+  setActiveNuvioProfile,
+  resolveNuvioAvatar,
+  updateNuvioProfile,
+  deleteNuvioProfile,
+  transferPrimaryNuvioProfile,
+  getCachedNuvioPinHash,
+} from "./nuvio/nuvio-profiles";
 
 export const PROFILE_COLORS = [
   "#7dd3fc",
@@ -34,6 +48,45 @@ export const PROFILE_COLORS = [
 ] as const;
 
 export type ProfileColor = string;
+
+export function defaultNuvioHarborProfile(slot = 1): Profile {
+  return {
+    id: `nuvio-${slot}`,
+    name: slot === 1 ? "Primary" : `Profile ${slot}`,
+    avatar: null,
+    color: PROFILE_COLORS[(slot - 1) % PROFILE_COLORS.length],
+    isPrimary: slot === 1,
+    shareStremioWith: null,
+    passwordHash: null,
+    hideContent: null,
+    lockedTabs: null,
+    kid: null,
+    createdAt: Date.now(),
+  };
+}
+
+function nuvioProfileToHarborProfile(p: NuvioProfile): Profile {
+  let lockedTabs: HiddenTabs | null = null;
+  try {
+    const raw = localStorage.getItem(`harbor.nuvio.locked-tabs.${p.profile_index}`);
+    if (raw) lockedTabs = JSON.parse(raw);
+  } catch {
+    /* ignore */
+  }
+  return {
+    id: `nuvio-${p.profile_index}`,
+    name: p.name || `Profile ${p.profile_index}`,
+    avatar: resolveNuvioAvatar(p),
+    color: p.avatar_color_hex || PROFILE_COLORS[(p.profile_index - 1) % PROFILE_COLORS.length],
+    isPrimary: p.profile_index === 1,
+    shareStremioWith: null,
+    passwordHash: p.pin_enabled ? getCachedNuvioPinHash(p.profile_index) || "pin-protected" : null,
+    hideContent: null,
+    lockedTabs,
+    kid: p.is_kids ? { age: 7, curfewMinutes: null, parentPinHash: null } : null,
+    createdAt: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+  };
+}
 
 export type KidConfig = {
   age: number;
@@ -66,6 +119,7 @@ const PROFILE_KEY_PREFIXES = [
   "harbor.manga.match.anilist.v1.",
   "harbor.localwatchlist.v1.",
   "harbor.settings.",
+  "harbor.nuvio.profile-map.",
   "harbor.trakt.session.v1.",
   "harbor.simkl.session.v1.",
   "harbor.anilist.session.v1.",
@@ -91,7 +145,11 @@ const PROFILE_KEY_PREFIXES = [
 ];
 
 function purgeProfileStorage(id: string): void {
-  try { purgeGameNotes(id); } catch { /* Keep the existing profile cleanup best-effort. */ }
+  try {
+    purgeGameNotes(id);
+  } catch {
+    /* Keep the existing profile cleanup best-effort. */
+  }
   try {
     for (const prefix of PROFILE_KEY_PREFIXES) localStorage.removeItem(`${prefix}${id}`);
     localStorage.removeItem(`harbor.games.search-history.v1:${encodeURIComponent(id)}`);
@@ -126,13 +184,15 @@ function adoptProfile(
     passwordHash: next.passwordHash ?? prev?.passwordHash ?? null,
     hideContent: (next.hideContent as ContentFilters | null) ?? null,
     lockedTabs: (next.lockedTabs as HiddenTabs | null) ?? null,
-    kid: next.kid
-      ? {
-          age: next.kid.age,
-          curfewMinutes: next.kid.curfewMinutes,
-          parentPinHash: next.kid.parentPinHash ?? prev?.kid?.parentPinHash ?? null,
-        }
-      : null,
+    kid: next.isPrimary
+      ? null
+      : next.kid
+        ? {
+            age: next.kid.age,
+            curfewMinutes: next.kid.curfewMinutes,
+            parentPinHash: next.kid.parentPinHash ?? prev?.kid?.parentPinHash ?? null,
+          }
+        : null,
     settingsLinked: next.settingsLinked !== false,
     createdAt: next.createdAt,
   };
@@ -162,7 +222,8 @@ export type PickerView =
   | { kind: "list" }
   | { kind: "create" }
   | { kind: "edit"; profileId: string }
-  | { kind: "unlock"; profileId: string };
+  | { kind: "unlock"; profileId: string }
+  | { kind: "unlock-for-edit"; profileId: string };
 
 type ProfilesValue = {
   profiles: Profile[];
@@ -188,6 +249,8 @@ type ProfilesValue = {
   ) => void;
   deleteProfile: (id: string) => void;
   setPrimary: (id: string) => void;
+  isCurrentProfileLocked: () => boolean;
+  clearSessionUnlocks: () => void;
 };
 
 const STORAGE_KEY = "harbor.profiles.v1";
@@ -237,7 +300,17 @@ export function isPlaceholderName(name: string | null | undefined): boolean {
 function defaultPrimaryName(): string {
   try {
     const existing = localStorage.getItem(TOGETHER_NAME_KEY)?.trim();
-    if (existing && !isPlaceholderName(existing)) return existing;
+    if (existing && !isPlaceholderName(existing)) {
+      try {
+        const nuvio = loadNuvioState();
+        const matchesNuvio = nuvio.profiles.some(
+          (p) => p.name && p.name.trim().toLowerCase() === existing.toLowerCase(),
+        );
+        if (!matchesNuvio) return existing;
+      } catch {
+        return existing;
+      }
+    }
   } catch {
     return generateGuestName();
   }
@@ -324,6 +397,28 @@ export function readActiveProfileIdentity(): {
   color: string;
 } | null {
   try {
+    if (isNuvioProviderActive()) {
+      const nuvioState = loadNuvioState();
+      const slot = nuvioState.activeProfileIndex || 1;
+      const active =
+        nuvioState.profiles.find((p) => p.profile_index === slot) || nuvioState.profiles[0];
+      if (active) {
+        return {
+          id: `nuvio-${active.profile_index}`,
+          name: active.name || `Profile ${active.profile_index}`,
+          avatar: resolveNuvioAvatar(active),
+          color:
+            active.avatar_color_hex ||
+            PROFILE_COLORS[(active.profile_index - 1) % PROFILE_COLORS.length],
+        };
+      }
+      return {
+        id: "nuvio-1",
+        name: "Primary",
+        avatar: null,
+        color: PROFILE_COLORS[0],
+      };
+    }
     const { profiles, activeId } = readState();
     if (!profiles.length) return null;
     const active =
@@ -343,6 +438,26 @@ export function readAllProfilesIdentity(): Array<{
   color: string;
 }> {
   try {
+    if (isNuvioProviderActive()) {
+      const nuvioState = loadNuvioState();
+      if (nuvioState.profiles.length > 0) {
+        return nuvioState.profiles.map((p) => ({
+          id: `nuvio-${p.profile_index}`,
+          name: p.name || `Profile ${p.profile_index}`,
+          avatar: resolveNuvioAvatar(p),
+          color:
+            p.avatar_color_hex || PROFILE_COLORS[(p.profile_index - 1) % PROFILE_COLORS.length],
+        }));
+      }
+      return [
+        {
+          id: "nuvio-1",
+          name: "Primary",
+          avatar: null,
+          color: PROFILE_COLORS[0],
+        },
+      ];
+    }
     return readState().profiles.map((p) => ({
       id: p.id,
       name: p.name,
@@ -362,15 +477,30 @@ function readState(): ProfilesState {
     if (!parsed || !Array.isArray(parsed.profiles)) {
       return { profiles: [], activeId: null };
     }
-    const primary = parsed.profiles.find((p) => p.isPrimary);
-    const primaryId = primary?.id ?? null;
+    if (parsed.profiles.length === 0) {
+      return { profiles: [], activeId: null };
+    }
+
+    // Determine the single true primary profile (must be adult, non-kid)
+    let primaryIndex = parsed.profiles.findIndex((p) => p.isPrimary && !p.kid);
+    if (primaryIndex === -1) {
+      primaryIndex = parsed.profiles.findIndex((p) => !p.kid);
+    }
+    if (primaryIndex === -1) {
+      primaryIndex = 0;
+    }
+    const primaryId = parsed.profiles[primaryIndex]?.id ?? null;
+
     const fallbackName = defaultPrimaryName();
     const identity = readSettingsIdentity();
     const legacyParental = readLegacyParental();
-    const migrated = parsed.profiles.map((p) => {
+    const migrated = parsed.profiles.map((p, idx) => {
       const next = { ...p };
+      const isThisPrimary = idx === primaryIndex;
+      next.isPrimary = isThisPrimary;
+
       if (typeof p.shareStremioWith === "undefined") {
-        next.shareStremioWith = p.isPrimary ? null : primaryId;
+        next.shareStremioWith = isThisPrimary ? null : primaryId;
       }
       if (typeof p.passwordHash === "undefined") {
         next.passwordHash = null;
@@ -379,9 +509,9 @@ function readState(): ProfilesState {
         next.hideContent = null;
       }
       if (typeof p.lockedTabs === "undefined") {
-        next.lockedTabs = p.isPrimary ? legacyParental.hiddenTabs : null;
+        next.lockedTabs = isThisPrimary ? legacyParental.hiddenTabs : null;
       }
-      if (typeof p.kid === "undefined" || p.kid == null) {
+      if (isThisPrimary || typeof p.kid === "undefined" || p.kid == null) {
         next.kid = null;
       } else {
         next.kid = {
@@ -390,8 +520,27 @@ function readState(): ProfilesState {
           parentPinHash: p.kid.parentPinHash ?? null,
         };
       }
-      if (p.isPrimary) {
-        if (isPlaceholderName(p.name)) next.name = fallbackName;
+      if (isThisPrimary) {
+        if (isPlaceholderName(p.name)) {
+          next.name = fallbackName;
+        } else {
+          try {
+            const nuvio = loadNuvioState();
+            const matchesNuvio = nuvio.profiles.some(
+              (np) => np.name && np.name.trim().toLowerCase() === p.name.trim().toLowerCase(),
+            );
+            if (matchesNuvio) {
+              const existingTogether = localStorage.getItem(TOGETHER_NAME_KEY)?.trim();
+              if (
+                !existingTogether ||
+                existingTogether.toLowerCase() === p.name.trim().toLowerCase()
+              ) {
+                localStorage.removeItem(TOGETHER_NAME_KEY);
+                next.name = fallbackName;
+              }
+            }
+          } catch {}
+        }
         if (identity.color) next.color = identity.color;
         if (
           p.avatar == null &&
@@ -413,7 +562,12 @@ function readState(): ProfilesState {
       }
       return next;
     });
-    return { profiles: migrated, activeId: parsed.activeId };
+
+    const activeId = migrated.some((p) => p.id === parsed.activeId)
+      ? parsed.activeId
+      : (migrated[primaryIndex]?.id ?? null);
+
+    return { profiles: migrated, activeId };
   } catch {
     return { profiles: [], activeId: null };
   }
@@ -421,7 +575,7 @@ function readState(): ProfilesState {
 
 function writeState(state: ProfilesState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    persistCritical(STORAGE_KEY, JSON.stringify(state));
   } catch {
     return;
   }
@@ -475,9 +629,36 @@ export function CompanionProfilesProvider({ children }: { children: ReactNode })
     const mainWindowOnly = (): never => {
       throw new Error("Profile changes must be made in the main Harbor window");
     };
+    const isNuvio = isNuvioProviderActive();
+    const nuvioState = isNuvio ? loadNuvioState() : null;
+    const activeNuvio = nuvioState
+      ? nuvioState.profiles.find((p) => p.profile_index === (nuvioState.activeProfileIndex || 1)) ||
+        nuvioState.profiles[0] ||
+        null
+      : null;
+    const effectiveActiveProfile = isNuvio
+      ? activeNuvio
+        ? nuvioProfileToHarborProfile(activeNuvio)
+        : defaultNuvioHarborProfile(1)
+      : (state.profiles.find((p) => p.id === state.activeId) ?? null);
+    const effectiveProfiles = isNuvio
+      ? nuvioState && nuvioState.profiles.length > 0
+        ? [...nuvioState.profiles]
+            .sort((a, b) => a.profile_index - b.profile_index)
+            .map(nuvioProfileToHarborProfile)
+        : [defaultNuvioHarborProfile(1)]
+      : state.profiles;
+    const effectiveActiveId = isNuvio
+      ? activeNuvio
+        ? `nuvio-${activeNuvio.profile_index}`
+        : "nuvio-1"
+      : state.activeId;
+
     return {
       ...state,
-      activeProfile: state.profiles.find((p) => p.id === state.activeId) ?? null,
+      profiles: effectiveProfiles,
+      activeId: effectiveActiveId,
+      activeProfile: effectiveActiveProfile,
       pickerOpen: false,
       pickerView: { kind: "list" },
       sessionUnlockedIds: new Set(),
@@ -489,6 +670,8 @@ export function CompanionProfilesProvider({ children }: { children: ReactNode })
       updateProfile: mainWindowOnly,
       deleteProfile: mainWindowOnly,
       setPrimary: mainWindowOnly,
+      isCurrentProfileLocked: () => false,
+      clearSessionUnlocks: mainWindowOnly,
     };
   }, [state]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -520,14 +703,70 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     }
     migrateLegacyStremioAuth(loaded.profiles);
     const def = launchDefault(loaded.profiles);
-    return def ? { ...loaded, activeId: def.id } : loaded;
+    const resolved = def ? { ...loaded, activeId: def.id } : loaded;
+    writeState(resolved);
+    return resolved;
   });
+
   const [pickerOpen, setPickerOpen] = useState<boolean>(() => {
+    let provider = "stremio";
+    let defaultProfileId = "";
+    let nuvioDefaultId = "";
+    try {
+      const explicit = localStorage.getItem("harbor.account-provider");
+      if (explicit) provider = explicit;
+      for (const key of ["harbor.settings.shared", "harbor.settings", "harbor.settings.v1"]) {
+        const rawSettings = localStorage.getItem(key);
+        if (rawSettings) {
+          const s = JSON.parse(rawSettings);
+          if (!explicit && s.accountProvider) provider = s.accountProvider;
+          if (s.defaultProfileId) defaultProfileId = s.defaultProfileId;
+          if (s.nuvioDefaultProfileId) nuvioDefaultId = s.nuvioDefaultProfileId;
+        }
+      }
+    } catch {}
+
+    // Always challenge PIN / open picker on launch if active profile is PIN-locked
+    if (provider === "nuvio") {
+      const nuvioState = loadNuvioState();
+      const slot = nuvioState.activeProfileIndex || 1;
+      const target = nuvioState.profiles.find((p) => p.profile_index === slot);
+      if (target?.pin_enabled) {
+        return true;
+      }
+    } else {
+      const target = state.profiles.find((p) => p.id === state.activeId) || state.profiles[0];
+      if (target?.passwordHash) {
+        return true;
+      }
+    }
+
+    const interval = readProfilePromptInterval();
+    if (interval === "never") return false;
+
+    if (provider === "nuvio") {
+      const nuvioState = loadNuvioState();
+      if (nuvioState.profiles.length <= 1) return false;
+      const targetDefault = nuvioDefaultId || defaultProfileId;
+      if (targetDefault) {
+        const num = Number(targetDefault);
+        const p = nuvioState.profiles.find((x) => x.profile_index === num);
+        if (p && !p.pin_enabled) {
+          setActiveNuvioProfile(num);
+          return false;
+        }
+      }
+      if (interval === "launch") {
+        const wasShown = pickerPromptShownThisRun;
+        pickerPromptShownThisRun = true;
+        return !wasShown;
+      }
+      return Date.now() - readLastProfileSelectAt() >= intervalMinutes(interval) * 60000;
+    }
+
     if (state.activeId == null) return true;
     if (state.profiles.length <= 1) return false;
     if (launchDefault(state.profiles)) return false;
-    const interval = readProfilePromptInterval();
-    if (interval === "never") return false;
     if (interval === "launch") {
       const wasShown = pickerPromptShownThisRun;
       pickerPromptShownThisRun = true;
@@ -542,10 +781,60 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new CustomEvent("harbor:profiles-updated"));
   }, [state]);
 
-  const activeProfile = useMemo(
-    () => state.profiles.find((p) => p.id === state.activeId) ?? null,
-    [state.profiles, state.activeId],
-  );
+  const [nuvioState, setNuvioState] = useState(() => loadNuvioState());
+  const [isNuvio, setIsNuvio] = useState(() => isNuvioProviderActive());
+
+  useEffect(() => {
+    const onProviderChange = () => {
+      setIsNuvio(isNuvioProviderActive());
+      setNuvioState(loadNuvioState());
+    };
+    const onNuvioSync = () => {
+      setNuvioState(loadNuvioState());
+    };
+    window.addEventListener("harbor:account-provider-changed", onProviderChange);
+    window.addEventListener("harbor:nuvio-state-changed", onNuvioSync);
+    window.addEventListener("harbor:nuvio-profile-changed", onNuvioSync);
+    window.addEventListener("harbor:nuvio-profiles-updated", onNuvioSync);
+    return () => {
+      window.removeEventListener("harbor:account-provider-changed", onProviderChange);
+      window.removeEventListener("harbor:nuvio-state-changed", onNuvioSync);
+      window.removeEventListener("harbor:nuvio-profile-changed", onNuvioSync);
+      window.removeEventListener("harbor:nuvio-profiles-updated", onNuvioSync);
+    };
+  }, []);
+
+  const activeNuvio = useMemo(() => {
+    if (!isNuvio) return null;
+    const slot = nuvioState.activeProfileIndex || 1;
+    return (
+      nuvioState.profiles.find((p) => p.profile_index === slot) || nuvioState.profiles[0] || null
+    );
+  }, [isNuvio, nuvioState.profiles, nuvioState.activeProfileIndex]);
+
+  const effectiveActiveProfile = useMemo(() => {
+    if (isNuvio) {
+      return activeNuvio ? nuvioProfileToHarborProfile(activeNuvio) : defaultNuvioHarborProfile(1);
+    }
+    return state.profiles.find((p) => p.id === state.activeId) ?? null;
+  }, [isNuvio, activeNuvio, state.profiles, state.activeId]);
+
+  const effectiveProfiles = useMemo(() => {
+    if (isNuvio) {
+      const sorted = [...nuvioState.profiles].sort((a, b) => a.profile_index - b.profile_index);
+      return sorted.length > 0
+        ? sorted.map(nuvioProfileToHarborProfile)
+        : [defaultNuvioHarborProfile(1)];
+    }
+    return state.profiles;
+  }, [isNuvio, nuvioState.profiles, state.profiles]);
+
+  const effectiveActiveId = useMemo(() => {
+    if (isNuvio) {
+      return activeNuvio ? `nuvio-${activeNuvio.profile_index}` : "nuvio-1";
+    }
+    return state.activeId;
+  }, [isNuvio, activeNuvio, state.activeId]);
 
   const [sessionUnlockedIds, setSessionUnlockedIds] = useState<Set<string>>(() => new Set());
   // Read through refs so the gate can see current state without giving selectProfile a
@@ -555,7 +844,56 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
   const unlockedRef = useRef(sessionUnlockedIds);
   unlockedRef.current = sessionUnlockedIds;
 
+  const isCurrentProfileLocked = useCallback(() => {
+    const isNuvio = isNuvioProviderActive();
+    if (isNuvio) {
+      const nuvioState = loadNuvioState();
+      const slot = nuvioState.activeProfileIndex || 1;
+      const target = nuvioState.profiles.find((p) => p.profile_index === slot);
+      return Boolean(target?.pin_enabled && !isNuvioProfileUnlocked(slot));
+    } else {
+      const target = profilesRef.current.find((p) => p.id === state.activeId);
+      return Boolean(target?.passwordHash && !unlockedRef.current.has(target.id));
+    }
+  }, [state.activeId]);
+
+  const clearSessionUnlocks = useCallback(() => {
+    setSessionUnlockedIds(new Set());
+    clearNuvioSessionUnlocks();
+  }, []);
+
+  // When switching account provider mode (Stremio <-> Nuvio), clear unlock state and force "Who's watching?"
+  useEffect(() => {
+    let timer: number | null = null;
+    const onProviderChange = (e: Event) => {
+      clearSessionUnlocks();
+      setPickerViewState({ kind: "list" });
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.skipPicker) {
+        const target = state.profiles.find((p) => p.id === state.activeId) || state.profiles[0];
+        if (!target?.passwordHash) return;
+      }
+      // Slight delay for smooth visual transition so UI switch settles first
+      timer = window.setTimeout(() => {
+        setPickerOpen(true);
+      }, 150);
+    };
+    window.addEventListener("harbor:account-provider-changed", onProviderChange);
+    return () => {
+      window.removeEventListener("harbor:account-provider-changed", onProviderChange);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [clearSessionUnlocks]);
+
   const selectProfile = useCallback((id: string, opts?: { unlocked?: boolean }) => {
+    if (isNuvioProviderActive() || id.startsWith("nuvio-")) {
+      const match = id.match(/\d+/);
+      const slot = match ? parseInt(match[0], 10) : 1;
+      setActiveNuvioProfile(slot, opts);
+      setPickerOpen(false);
+      setPickerViewState({ kind: "list" });
+      return true;
+    }
     // THE GATE LIVES HERE, not in the UI. It used to be duplicated in picker-modal and
     // use-account-menu, and RemoteOpenBridge has neither: it calls selectProfile(id)
     // straight off a harbor:remote-set-profile event, so a paired phone walked past
@@ -587,7 +925,32 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     const onFocus = () => {
       if (pickerOpen) return;
       const mins = intervalMinutes(readProfilePromptInterval());
-      if (mins <= 0 || state.activeId == null || state.profiles.length <= 1) return;
+      if (mins <= 0) return;
+      let provider = "stremio";
+      try {
+        const explicit = localStorage.getItem("harbor.account-provider");
+        if (explicit) provider = explicit;
+        else {
+          for (const key of ["harbor.settings.shared", "harbor.settings", "harbor.settings.v1"]) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed.accountProvider) {
+                provider = parsed.accountProvider;
+                break;
+              }
+            }
+          }
+        }
+      } catch {}
+
+      if (provider === "nuvio") {
+        const nuvioState = loadNuvioState();
+        if (nuvioState.profiles.length <= 1) return;
+      } else {
+        if (state.activeId == null || state.profiles.length <= 1) return;
+      }
+
       if (Date.now() - readLastProfileSelectAt() >= mins * 60000) {
         setPickerViewState({ kind: "list" });
         setPickerOpen(true);
@@ -603,9 +966,12 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
   }, []);
   const setPickerView = useCallback((view: PickerView) => setPickerViewState(view), []);
   const closePicker = useCallback(() => {
+    if (isCurrentProfileLocked()) {
+      return;
+    }
     setPickerOpen(false);
     setPickerViewState({ kind: "list" });
-  }, []);
+  }, [isCurrentProfileLocked]);
 
   const createProfile = useCallback<ProfilesValue["createProfile"]>(
     ({ name, avatar, color, kid }) => {
@@ -631,22 +997,68 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
   );
 
   const updateProfile = useCallback<ProfilesValue["updateProfile"]>((id, patch) => {
-    setState((s) => ({
-      ...s,
-      profiles: s.profiles.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              ...patch,
-              name: patch.name != null ? patch.name.trim().slice(0, 32) || p.name : p.name,
+    if (isNuvioProviderActive() || id.startsWith("nuvio-")) {
+      const match = id.match(/\d+/);
+      const slot = match ? parseInt(match[0], 10) : loadNuvioState().activeProfileIndex || 1;
+      const nuvioPatch: any = {};
+      if (patch.name !== undefined) nuvioPatch.name = patch.name;
+      if (patch.color !== undefined) nuvioPatch.avatarColorHex = patch.color;
+      if (patch.avatar !== undefined) nuvioPatch.avatarUrl = patch.avatar;
+      if (patch.kid !== undefined) nuvioPatch.is_kids = Boolean(patch.kid);
+      if (patch.lockedTabs !== undefined) {
+        if (patch.lockedTabs && anyTabLocked(patch.lockedTabs)) {
+          localStorage.setItem(
+            `harbor.nuvio.locked-tabs.${slot}`,
+            JSON.stringify(patch.lockedTabs),
+          );
+        } else {
+          localStorage.removeItem(`harbor.nuvio.locked-tabs.${slot}`);
+        }
+        window.dispatchEvent(new Event("harbor:nuvio-profiles-updated"));
+      }
+      updateNuvioProfile(slot, nuvioPatch);
+      return;
+    }
+    setState((s) => {
+      const isTargetPrimary = s.profiles.find((p) => p.id === id)?.isPrimary;
+      if (isTargetPrimary && patch.avatar !== undefined) {
+        try {
+          for (const key of ["harbor.settings.shared", "harbor.settings", "harbor.settings.v1"]) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              parsed.harborAvatar = patch.avatar;
+              localStorage.setItem(key, JSON.stringify(parsed));
             }
-          : p,
-      ),
-    }));
+          }
+        } catch {}
+      }
+      return {
+        ...s,
+        profiles: s.profiles.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                ...patch,
+                kid: p.isPrimary ? null : patch.kid !== undefined ? patch.kid : p.kid,
+                name: patch.name != null ? patch.name.trim().slice(0, 32) || p.name : p.name,
+              }
+            : p,
+        ),
+      };
+    });
   }, []);
 
   const deleteProfile = useCallback<ProfilesValue["deleteProfile"]>(
     (id) => {
+      if (isNuvioProviderActive() || id.startsWith("nuvio-")) {
+        const match = id.match(/\d+/);
+        if (match) {
+          const slot = parseInt(match[0], 10);
+          void deleteNuvioProfile(slot);
+        }
+        return;
+      }
       const target = state.profiles.find((p) => p.id === id);
       if (!target || target.isPrimary) return;
       // Before the purge, while the id map still resolves. Without a tombstone the
@@ -688,26 +1100,40 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setPrimary = useCallback<ProfilesValue["setPrimary"]>((id) => {
+    if (isNuvioProviderActive() || id.startsWith("nuvio-")) {
+      const match = id.match(/\d+/);
+      if (match) {
+        const slot = parseInt(match[0], 10);
+        void transferPrimaryNuvioProfile(slot);
+      }
+      return;
+    }
     setState((s) => {
-      if (!s.profiles.some((p) => p.id === id && !p.isPrimary)) return s;
-      return {
+      if (!s.profiles.some((p) => p.id === id && !p.isPrimary && !p.kid)) return s;
+      const nextProfiles = s.profiles.map((p) =>
+        p.id === id
+          ? { ...p, isPrimary: true, kid: null, shareStremioWith: null }
+          : p.isPrimary
+            ? { ...p, isPrimary: false }
+            : p,
+      );
+      const nextState = {
         ...s,
-        profiles: s.profiles.map((p) =>
-          p.id === id
-            ? { ...p, isPrimary: true, shareStremioWith: null }
-            : p.isPrimary
-              ? { ...p, isPrimary: false }
-              : p,
-        ),
+        profiles: nextProfiles,
       };
+      writeState(nextState);
+      return nextState;
     });
+    window.dispatchEvent(new CustomEvent("harbor:profiles-updated"));
+    window.dispatchEvent(new CustomEvent("harbor:active-profile-changed"));
+    window.dispatchEvent(new CustomEvent("harbor:secondary-privileges-changed"));
   }, []);
 
   const value = useMemo<ProfilesValue>(
     () => ({
-      profiles: state.profiles,
-      activeId: state.activeId,
-      activeProfile,
+      profiles: effectiveProfiles,
+      activeId: effectiveActiveId,
+      activeProfile: effectiveActiveProfile,
       pickerOpen,
       pickerView,
       openPicker,
@@ -719,11 +1145,13 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       updateProfile,
       deleteProfile,
       setPrimary,
+      isCurrentProfileLocked,
+      clearSessionUnlocks,
     }),
     [
-      state.profiles,
-      state.activeId,
-      activeProfile,
+      effectiveProfiles,
+      effectiveActiveId,
+      effectiveActiveProfile,
       pickerOpen,
       pickerView,
       sessionUnlockedIds,
@@ -735,6 +1163,8 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       updateProfile,
       deleteProfile,
       setPrimary,
+      isCurrentProfileLocked,
+      clearSessionUnlocks,
     ],
   );
 
@@ -749,6 +1179,63 @@ export function useProfiles(): ProfilesValue {
 
 export function useActiveKid(): KidConfig | null {
   const { activeProfile } = useProfiles();
+  const [nuvioKid, setNuvioKid] = useState<KidConfig | null>(() => {
+    try {
+      if (isNuvioProviderActive()) {
+        const slot = loadNuvioState().activeProfileIndex || 1;
+        if (slot === 1) {
+          localStorage.removeItem("harbor.nuvio.kid.1");
+          return null;
+        }
+        const raw = localStorage.getItem(`harbor.nuvio.kid.${slot}`);
+        return raw ? JSON.parse(raw) : null;
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    const update = () => {
+      try {
+        if (isNuvioProviderActive()) {
+          const slot = loadNuvioState().activeProfileIndex || 1;
+          if (slot === 1) {
+            localStorage.removeItem("harbor.nuvio.kid.1");
+            setNuvioKid(null);
+            return;
+          }
+          const raw = localStorage.getItem(`harbor.nuvio.kid.${slot}`);
+          setNuvioKid(raw ? JSON.parse(raw) : null);
+          return;
+        }
+      } catch {}
+      setNuvioKid(null);
+    };
+
+    window.addEventListener("harbor:nuvio-profile-changed", update);
+    window.addEventListener("harbor:nuvio-state-changed", update);
+    window.addEventListener("harbor:nuvio-profiles-updated", update);
+    window.addEventListener("harbor:account-provider-changed", update);
+    window.addEventListener("harbor:settings-changed", update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener("harbor:nuvio-profile-changed", update);
+      window.removeEventListener("harbor:nuvio-state-changed", update);
+      window.removeEventListener("harbor:nuvio-profiles-updated", update);
+      window.removeEventListener("harbor:account-provider-changed", update);
+      window.removeEventListener("harbor:settings-changed", update);
+      window.removeEventListener("storage", update);
+    };
+  }, []);
+
+  if (isNuvioProviderActive()) {
+    return nuvioKid;
+  }
+
+  if (activeProfile?.isPrimary) {
+    return null;
+  }
+
   return activeProfile?.kid ?? null;
 }
 

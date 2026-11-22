@@ -122,7 +122,12 @@ async function downloadPackViaEngine(
 ): Promise<SeasonDownloadResult | null> {
   const hash = stream.infoHash;
   if (!hash) return null;
-  const added = await torrentEngineAdd(magnetFromHash(hash), trackersFromSources(stream.sources));
+  const added = await torrentEngineAdd(
+    magnetFromHash(hash),
+    trackersFromSources(stream.sources),
+    undefined,
+    "download",
+  );
   if (!added || added.files.length === 0 || signal.aborted) return null;
 
   const result: SeasonDownloadResult = { total: targets.length, queued: 0, failed: 0 };

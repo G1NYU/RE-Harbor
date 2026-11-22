@@ -1,7 +1,7 @@
 import { ChevronsRight, FastForward, X } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import { AdSkipIcon } from "@/components/icons/adskip-icon";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SkipSegment } from "@/lib/skip-intro";
 import type { SpoilerMask } from "@/lib/spoilers";
 import type { PlayEpisode } from "@/lib/view";
@@ -13,78 +13,53 @@ import { ThreeLiquidGlassSurface } from "@/components/ThreeLiquidGlassSurface";
 export function SkipPill({
   engine,
   segment,
+  progress,
   hasNextEp,
   nextEp,
   nextEpMask,
   remainingSec,
   leadSec,
   visible,
-  countdownSec = 0,
   onSkip,
   onNextEpisode,
   onCancelAutoNext,
-  onDismiss,
 }: {
   engine: "html5" | "mpv";
   segment: SkipSegment | null;
+  progress: number;
   hasNextEp: boolean;
   nextEp: PlayEpisode | null;
   nextEpMask?: SpoilerMask;
   remainingSec: number;
   leadSec?: number;
   visible: boolean;
-  countdownSec?: number;
   onSkip: () => void;
   onNextEpisode: () => void;
   onCancelAutoNext?: () => void;
-  onDismiss?: () => void;
 }) {
   const t = useT();
   const [mounted, setMounted] = useState<SkipSegment | null>(segment);
   const [show, setShow] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const hasCountdown = countdownSec > 0;
-  const hasNextEpisodeTarget = hasNextEp && !!nextEp;
-  const [timeLeft, setTimeLeft] = useState(hasCountdown ? countdownSec : 0);
-  const isMountedOutroNext = mounted?.kind === "outro" && hasNextEpisodeTarget;
-  const shouldCountdown = hasCountdown && !isMountedOutroNext;
 
   useEffect(() => {
     if (segment) {
       setMounted(segment);
-      const isNextEpisodePrompt = segment.kind === "outro" && hasNextEpisodeTarget;
-      setTimeLeft(hasCountdown && !isNextEpisodePrompt ? countdownSec : 0);
       const id = window.requestAnimationFrame(() => setShow(true));
       return () => window.cancelAnimationFrame(id);
     }
     setShow(false);
     const timer = window.setTimeout(() => setMounted(null), 240);
     return () => window.clearTimeout(timer);
-  }, [
-    segment?.kind,
-    segment?.startSec,
-    segment?.endSec,
-    hasCountdown,
-    countdownSec,
-    hasNextEpisodeTarget,
-  ]);
+  }, [segment?.kind, segment?.startSec, segment?.endSec]);
 
+  // The segment clears one render before the exit animation ends, and the
+  // container has already moved on to the next segment by then. Hold the last
+  // value so the line finishes full instead of snapping back to empty.
+  const progressRef = useRef(progress);
   useEffect(() => {
-    if (!shouldCountdown || timeLeft <= 0 || hovered || !mounted) return;
-    const intervalMs = 50;
-    const timer = window.setInterval(() => {
-      setTimeLeft((previous) => {
-        const next = previous - intervalMs / 1000;
-        if (next <= 0) {
-          window.clearInterval(timer);
-          onDismiss?.();
-          return 0;
-        }
-        return next;
-      });
-    }, intervalMs);
-    return () => window.clearInterval(timer);
-  }, [hovered, mounted, onDismiss, shouldCountdown, timeLeft]);
+    if (segment) progressRef.current = progress;
+  }, [segment, progress]);
+  const barProgress = segment ? progress : progressRef.current;
 
   if (!mounted) return null;
 
@@ -119,15 +94,10 @@ export function SkipPill({
   const action = isOutroNext ? onNextEpisode : onSkip;
   const Icon = isOutroNext ? ChevronsRight : FastForward;
   const isMpv = engine === "mpv";
-  const countdownProgress = shouldCountdown
-    ? Math.max(0, Math.min(1, 1 - timeLeft / countdownSec))
-    : 0;
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={`pointer-events-none absolute end-7 z-30 flex items-center gap-2 transition-all duration-200 ease-out ${
+      className={`pointer-events-none absolute end-7 z-30 flex items-center transition-all duration-200 ease-out ${
         visible && show
           ? "bottom-44 opacity-100 translate-y-0"
           : "bottom-40 opacity-0 translate-y-2"
@@ -156,7 +126,7 @@ export function SkipPill({
           <button
             type="button"
             onClick={action}
-            className="inline-flex h-full w-full items-center gap-2 rounded-full bg-transparent px-5 pb-[2px] text-[14px] font-semibold text-white transition-transform active:scale-[0.97]"
+            className="relative inline-flex h-full w-full items-center gap-2 rounded-full bg-transparent px-5 pb-[2px] text-[14px] font-semibold text-white transition-transform active:scale-[0.97]"
           >
             {isAd ? (
               <AdSkipIcon className="h-[18px] w-[18px]" />
@@ -164,54 +134,22 @@ export function SkipPill({
               <Icon size={18} strokeWidth={2.2} />
             )}
             {label}
+            {/* Inside the pill, flush to its bottom edge. The surface clips the
+                ends along the corner radius, so the line reads as the button's
+                own bottom edge instead of a bar floating under it. */}
+            <span
+              dir="ltr"
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-white/15"
+            >
+              <span
+                className="block h-full w-full origin-left bg-white transition-transform duration-100 ease-linear motion-reduce:transition-none"
+                style={{ transform: `scaleX(${barProgress})` }}
+              />
+            </span>
           </button>
         </ThreeLiquidGlassSurface>
-        {shouldCountdown && (
-          <div
-            dir="ltr"
-            className="pointer-events-none absolute inset-x-4 bottom-[3px] z-30 h-[2.5px] overflow-hidden rounded-full bg-white/20"
-          >
-            <div
-              className="h-full rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.95)]"
-              style={{
-                width: `${countdownProgress * 100}%`,
-                transition: hovered ? "none" : "width 50ms linear",
-              }}
-            />
-          </div>
-        )}
       </div>
-      {onDismiss && !isOutroNext && (
-        <ThreeLiquidGlassSurface
-          radius="9999px"
-          shaderRadius={0.48}
-          intensity={0.3}
-          refractionStrength={0.08}
-          interactive={false}
-          alwaysActive
-          experimentalStyle={{
-            background: isMpv ? "rgba(8,12,18,0.35)" : "transparent",
-            backdropFilter: "blur(18px) saturate(1.25)",
-            WebkitBackdropFilter: "blur(18px) saturate(1.25)",
-          }}
-          style={{
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.05)",
-          }}
-          className="pointer-events-auto h-9 w-9 shrink-0"
-          surfaceClassName="border border-white/[0.08]"
-          contentClassName="flex h-full w-full"
-        >
-          <button
-            type="button"
-            onClick={onDismiss}
-            aria-label={t("Hide this Skip button")}
-            title={t("Hide this Skip button")}
-            className="flex h-full w-full items-center justify-center rounded-full bg-transparent text-white/70 transition-[color,transform] hover:text-white active:scale-[0.97]"
-          >
-            <X size={16} strokeWidth={2.4} />
-          </button>
-        </ThreeLiquidGlassSurface>
-      )}
     </div>
   );
 }

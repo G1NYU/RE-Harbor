@@ -751,7 +751,8 @@ const catalog03: Record<string, string> = {
   "Fast Hands": "Mani veloci",
   "Fast Mouth": "Parlantina veloce",
   "Fast · recommended for chapters": "Veloce · consigliato per i capitoli",
-  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.": "Più veloce e silenzioso del P2P, se paghi già Usenet. Configuralo nella pagina dell'Add-on e incolla l'URL del manifest restituito.",
+  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.":
+    "Più veloce e silenzioso del P2P, se paghi già Usenet. Configuralo nella pagina dell'Add-on e incolla l'URL del manifest restituito.",
   "Favicon must be an https URL.": "La favicon deve essere un URL https.",
   Favorite: "Aggiungi ai preferiti",
   "Favorite Anime": "Anime preferiti",
@@ -791,7 +792,8 @@ const catalog03: Record<string, string> = {
   Feishin: "Feishin",
   "Fetches DuckDuckGo results and feeds top hits into the model prompt.":
     "Recupera i risultati di DuckDuckGo e inserisce i più rilevanti nel prompt del modello.",
-  "Fetches a small public test file over P2P, then reports UDP and HTTPS egress, DHT bootstrap and tracker reachability step by step.": "Scarica un piccolo file pubblico di prova tramite P2P, poi verifica passo dopo passo il traffico in uscita UDP e HTTPS, l'avvio DHT e la raggiungibilità dei tracker.",
+  "Fetches a small public test file over P2P, then reports UDP and HTTPS egress, DHT bootstrap and tracker reachability step by step.":
+    "Scarica un piccolo file pubblico di prova tramite P2P, poi verifica passo dopo passo il traffico in uscita UDP e HTTPS, l'avvio DHT e la raggiungibilità dei tracker.",
   "Fetching library index…": "Recupero dell'indice della libreria…",
   "Fetching {n} items…": "Recupero di {n} elementi…",
   "Fetching {n} items…#few": "Recupero di {n} elementi…#few",
@@ -947,8 +949,8 @@ const catalog03: Record<string, string> = {
   "Font name can only use letters, numbers, and spaces.":
     "Il nome del carattere può contenere solo lettere, numeri e spazi.",
   "Font tokens": "Token dei caratteri",
-  "For Application URL anything works, for example https://harbor.site. TMDB never visits it.":
-    "Come URL dell'applicazione va bene qualsiasi indirizzo, ad esempio https://harbor.site. TMDB non lo visiterà mai.",
+  "For Application URL anything works, for example https://harborcommunity.site. TMDB never visits it.":
+    "Come URL dell'applicazione va bene qualsiasi indirizzo, ad esempio https://harborcommunity.site. TMDB non lo visiterà mai.",
   "For Everyone": "Per tutti",
   "For a link or image you usually want an attribute:":
     "Per un link o un'immagine, di solito serve un attributo:",
@@ -1203,6 +1205,8 @@ const catalog03: Record<string, string> = {
   "Go to ep": "Vai all'ep.",
   "Go to episode": "Vai all'episodio",
   "Go to live": "Vai alla diretta",
+  "Episode pages": "Pagine degli episodi",
+  "Go to page": "Vai alla pagina",
   "Go to page {page}": "Vai alla pagina {page}",
   "Go to pages {pages}": "Vai alle pagine {pages}",
   "Go to show": "Vai alla serie",
@@ -1211,9 +1215,12 @@ const catalog03: Record<string, string> = {
   "Golden Globes": "Premi Golden Globe",
   "Golden Lion": "Leone d'oro",
   "Golden Years": "Anni d'oro",
-  "Cached source resolution and direct download links.": "Risoluzione delle fonti in cache e link di download diretto.",
-  "Cached source resolution and cloud library access.": "Risoluzione delle fonti in cache e accesso alla libreria cloud.",
-  "Both shows direct, debrid, and peer-to-peer results together. Direct/debrid keeps P2P results out of the way unless nothing else is available. P2P puts them first.": "Entrambi mostra insieme i risultati diretti, debrid e peer-to-peer. Diretto/debrid tiene in disparte i risultati P2P finché è disponibile altro. P2P li mette per primi.",
+  "Cached source resolution and direct download links.":
+    "Risoluzione delle fonti in cache e link di download diretto.",
+  "Cached source resolution and cloud library access.":
+    "Risoluzione delle fonti in cache e accesso alla libreria cloud.",
+  "Both shows direct, debrid, and peer-to-peer results together. Direct/debrid keeps P2P results out of the way unless nothing else is available. P2P puts them first.":
+    "Entrambi mostra insieme i risultati diretti, debrid e peer-to-peer. Diretto/debrid tiene in disparte i risultati P2P finché è disponibile altro. P2P li mette per primi.",
 };
 
 export default catalog03;

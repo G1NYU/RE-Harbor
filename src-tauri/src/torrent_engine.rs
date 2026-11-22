@@ -1,6 +1,8 @@
 mod cache_sweep;
 mod dht_boot;
 mod lifecycle;
+#[cfg(test)]
+mod live_tests;
 mod netcheck;
 mod selftest;
 mod stream_route;
@@ -10,7 +12,7 @@ use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use librqbit::api::TorrentIdOrHash;
 use librqbit::dht::Dht;
@@ -27,6 +29,7 @@ use librqbit::dht::PersistentDhtConfig;
 use librqbit::{SessionOptions, SessionPersistenceConfig};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::net::TcpListener;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
@@ -77,6 +80,18 @@ const LAN_FALLBACK_PORTS: [u16; 10] = [
 const CACHE_SWEEP_INITIAL_DELAY_SECS: u64 = 60;
 const CACHE_SWEEP_INTERVAL_SECS: u64 = 30 * 60;
 const FILE_SELECTION_TIMEOUT_SECS: u64 = 12;
+// The side DHT is an extra peer source, not a prerequisite. Waiting on it before
+// adding the torrent puts dead DHT time on the player's startup path.
+const SIDE_DHT_SEED_BUDGET: Duration = Duration::from_millis(250);
+// Prefetch the first 8 MiB so the demuxer probe and the first GOP are ready, and
+// the last 2 MiB because MP4 puts the moov atom and MKV often puts its cues at
+// the end of the file. Both are requested as soon as the file selection is
+// committed, so they overlap player startup instead of waiting for its first
+// HTTP request.
+const PRIME_HEAD_BYTES: u64 = 8 * 1024 * 1024;
+const PRIME_TAIL_BYTES: u64 = 2 * 1024 * 1024;
+const PRIME_READ_BUF: usize = 64 * 1024;
+const PRIME_TIMEOUT: Duration = Duration::from_secs(30);
 static CACHE_SWEEP_RUNNING: AtomicBool = AtomicBool::new(false);
 
 struct CacheSweepGuard;
@@ -112,10 +127,11 @@ async fn expire_session_torrents(dir: &std::path::Path, retention_hours: u64) ->
     };
     let now = std::time::SystemTime::now();
     let max_age = Duration::from_secs(retention_hours.saturating_mul(3600));
-    let live: Vec<(String, Vec<std::path::PathBuf>)> = session.with_torrents(|torrents| {
+    let live: Vec<(String, bool, Vec<std::path::PathBuf>)> = session.with_torrents(|torrents| {
         torrents
             .map(|(_id, handle)| {
                 let info_hash = format!("{:?}", handle.info_hash());
+                let paused = handle.is_paused();
                 let paths = handle
                     .with_metadata(|m| {
                         m.file_infos
@@ -124,14 +140,15 @@ async fn expire_session_torrents(dir: &std::path::Path, retention_hours: u64) ->
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default();
-                (info_hash, paths)
+                (info_hash, paused, paths)
             })
             .collect()
     });
 
     let mut expired = 0_u64;
-    for (info_hash, paths) in live {
-        if paths.is_empty() {
+    for (info_hash, paused, paths) in live {
+        // A playing or downloading torrent is never expired; its files are in use.
+        if !paused || paths.is_empty() {
             continue;
         }
         let stale = if retention_hours == 0 {
@@ -182,6 +199,10 @@ fn spawn_cache_sweeper(app: AppHandle) -> CacheSweeper {
                     );
                 }
                 let cancelled_for_sweep = cancelled_for_task.clone();
+                // Never delete the cache of a torrent that is still streaming:
+                // the sweep only sees file names, so map the active torrents to
+                // their first-level cache entries and pass them as protected.
+                let protected = active_cache_roots();
                 let result = tokio::task::spawn_blocking(move || {
                     if CACHE_SWEEP_RUNNING
                         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -195,6 +216,7 @@ fn spawn_cache_sweeper(app: AppHandle) -> CacheSweeper {
                         retention,
                         max_gb,
                         &cancelled_for_sweep,
+                        &protected,
                     ))
                 })
                 .await;
@@ -241,6 +263,47 @@ fn current_side_dht() -> Option<Dht> {
         .side_dht
         .clone()
         .filter(|dht| !dht.cancellation_token().is_cancelled())
+}
+
+/// First path component of every active torrent's files: the engine cache
+/// sweep can then skip those entries instead of deleting data a player is using.
+fn active_cache_roots() -> Vec<String> {
+    let Some(session) = current_session() else {
+        return Vec::new();
+    };
+    session.with_torrents(|torrents| {
+        torrents
+            .filter(|(_id, handle)| !handle.is_paused())
+            .flat_map(|(_id, handle)| {
+                handle
+                    .with_metadata(|metadata| {
+                        metadata
+                            .file_infos
+                            .iter()
+                            .filter_map(|file| {
+                                file.relative_filename
+                                    .iter()
+                                    .next()
+                                    .map(|part| part.to_string_lossy().into_owned())
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
+async fn seed_side_dht(magnet: &str) -> (Vec<SocketAddr>, Duration) {
+    let Some(dht) = current_side_dht() else {
+        return (Vec::new(), Duration::ZERO);
+    };
+    if dht_boot::node_count(&dht) == 0 {
+        return (Vec::new(), Duration::ZERO);
+    }
+    let started = Instant::now();
+    let peers = dht_boot::seed_peers(&dht, magnet, 40, SIDE_DHT_SEED_BUDGET).await;
+    (peers, started.elapsed())
 }
 
 async fn run_session<T>(
@@ -311,7 +374,7 @@ async fn new_session(
 ) -> Result<Arc<Session>, String> {
     let guard = cancellation.clone().drop_guard();
     let mut options =
-        crate::p2p_android::session_options(dir, full, dht, persist_dht, trackers::as_url_set());
+        crate::p2p_android::session_options(dir, full, dht, persist_dht, trackers::fallback_url_set());
     options.cancellation_token = Some(cancellation);
     let session = Session::new_with_opts(dir.to_path_buf(), options)
         .await
@@ -343,7 +406,17 @@ async fn new_session(
                 config_filename: Some(dir.join("dht.json")),
                 dump_interval: None,
             }),
-            trackers: trackers::as_url_set(),
+            // No session-wide tracker set: every torrent carries its stream's own
+            // trackers (or the curated fallback), so junk peers from unrelated
+            // trackers do not flood the connection queue.
+            // Restored (paused) torrents have no per-add peer options, so the
+            // session defaults must already use the streaming cadence: short
+            // connect attempts and a read/write timeout that fails a stuck peer.
+            peer_opts: Some(PeerConnectionOptions {
+                connect_timeout: Some(Duration::from_secs(3)),
+                read_write_timeout: Some(Duration::from_secs(10)),
+                keep_alive_interval: None,
+            }),
             listen_port_range: if full { Some(16881..16931) } else { None },
             enable_upnp_port_forwarding: full,
             ..Default::default()
@@ -471,6 +544,14 @@ async fn init(app: AppHandle, cancellation: CancellationToken) -> Result<(), Str
         "DHT_QUERIES_PER_SECOND",
         crate::p2p_android::DHT_QUERIES_PER_SECOND,
     );
+    // 128 peers per torrent plus DHT sockets can exhaust the default descriptor
+    // limit once several torrents stream at the same time.
+    #[cfg(unix)]
+    {
+        if let Err(error) = librqbit::try_increase_nofile_limit() {
+            eprintln!("[torrent-engine] could not raise the file descriptor limit: {error:#}");
+        }
+    }
     let cfg = read_config(&app);
     let dir = engine_dir(&app, &cfg)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -676,7 +757,7 @@ pub fn torrent_engine_status() -> EngineStatusDto {
 }
 
 fn merge_trackers(trackers: Vec<String>) -> Vec<String> {
-    trackers::merge_into(trackers)
+    trackers::with_fallback(trackers)
 }
 
 async fn wait_for_torrent_initialization(
@@ -720,7 +801,9 @@ async fn add_result_from_handle(
     already_managed: bool,
     file_idx: Option<usize>,
 ) -> Result<AddResult, String> {
+    let init_started = Instant::now();
     wait_for_torrent_initialization(session, &handle, !already_managed).await?;
+    let init_ms = init_started.elapsed().as_millis();
     let files = handle
         .with_metadata(|m| {
             m.file_infos
@@ -741,12 +824,18 @@ async fn add_result_from_handle(
     let narrow_idx = file_idx
         .filter(|&i| i < files.len())
         .or_else(|| files.iter().max_by_key(|f| f.length).map(|f| f.idx));
+    let narrow_started = Instant::now();
     if let Some(idx) = narrow_idx {
         let only: HashSet<usize> = HashSet::from([idx]);
         if let Err(error) = update_only_files_bounded(session, &handle, &only).await {
             eprintln!("[torrent-engine] initial file narrowing failed: {error}");
         }
     }
+    let narrow_ms = narrow_started.elapsed().as_millis();
+    eprintln!(
+        "[torrent-engine] files timing: already_managed={already_managed} init_ms={init_ms} narrow_ms={narrow_ms} files={} narrow_idx={narrow_idx:?}",
+        files.len()
+    );
     let port = current_port().ok_or_else(|| "engine port unavailable".to_string())?;
     Ok(AddResult {
         info_hash: format!("{:?}", handle.info_hash()),
@@ -762,7 +851,9 @@ pub async fn torrent_engine_add(
     magnet: String,
     trackers: Vec<String>,
     file_idx: Option<usize>,
+    origin: Option<String>,
 ) -> Result<AddResult, String> {
+    let origin = origin.as_deref().unwrap_or("unknown");
     let session = ensure_session(&app).await?;
     run_session(&session, async {
         if let Some(info_hash) = dht_boot::info_hash_from_magnet(&magnet) {
@@ -770,27 +861,30 @@ pub async fn torrent_engine_add(
                 return add_result_from_handle(&session, handle, true, file_idx).await;
             }
         }
-        let seed = match current_side_dht() {
-            Some(d) => dht_boot::seed_peers(&d, magnet.as_str(), 40, Duration::from_secs(3)).await,
-            None => Vec::new(),
-        };
+        let add_started = Instant::now();
+        let (seed, seed_took) = seed_side_dht(&magnet).await;
+        let seeded_peers = seed.len();
         // librqbit ignores AddTorrentOptions.trackers for magnets, so splice the
-        // per-stream trackers directly into the magnet URI to guarantee they announce.
-        let magnet = trackers::embed_into_magnet(&magnet, &trackers);
+        // per-stream trackers directly into the magnet URI to guarantee they
+        // announce. The curated fallback is only used when the source has none.
+        let resolved_trackers = trackers::with_fallback(trackers.clone());
+        let magnet = trackers::embed_into_magnet(&magnet, &resolved_trackers);
         let opts = AddTorrentOptions {
             overwrite: true,
             paused: true,
+            skip_initial_check: true,
             only_files: file_idx.map(|i| vec![i]),
-            trackers: Some(merge_trackers(trackers)),
+            trackers: Some(resolved_trackers),
             initial_peers: (!seed.is_empty()).then_some(seed),
             peer_opts: Some(PeerConnectionOptions {
                 connect_timeout: Some(Duration::from_secs(4)),
                 read_write_timeout: Some(Duration::from_secs(10)),
                 keep_alive_interval: None,
             }),
-            force_tracker_interval: Some(Duration::from_secs(300)),
+            force_tracker_interval: Some(Duration::from_secs(120)),
             ..Default::default()
         };
+        let add_call_started = Instant::now();
         let added = timeout(
             Duration::from_secs(60),
             session.add_torrent(AddTorrent::from_url(magnet.as_str()), Some(opts)),
@@ -798,6 +892,7 @@ pub async fn torrent_engine_add(
         .await
         .map_err(|_| "metadata timed out: no peers reached in 60s".to_string())?
         .map_err(|e| format!("{e:#}"))?;
+        let add_took = add_call_started.elapsed();
         let (handle, already_managed) = match added {
             AddTorrentResponse::AlreadyManaged(_, handle) => (handle, true),
             AddTorrentResponse::Added(_, handle) => (handle, false),
@@ -805,7 +900,21 @@ pub async fn torrent_engine_add(
                 return Err("torrent added as list-only".to_string());
             }
         };
-        add_result_from_handle(&session, handle, already_managed, file_idx).await
+        let files_started = Instant::now();
+        let result = add_result_from_handle(&session, handle, already_managed, file_idx).await;
+        let files_took = files_started.elapsed();
+        if let Ok(result) = &result {
+            eprintln!(
+                "[torrent-engine] add timing: origin={origin} hash={} seeded_peers={} seed_ms={} add_ms={} files_ms={} total_ms={}",
+                result.info_hash,
+                seeded_peers,
+                seed_took.as_millis(),
+                add_took.as_millis(),
+                files_took.as_millis(),
+                add_started.elapsed().as_millis()
+            );
+        }
+        result
     })
     .await
 }
@@ -825,28 +934,25 @@ pub(crate) async fn ensure_added(
         let handle = match session.get(id) {
             Some(h) => h,
             None => {
-                // build_magnet() yields a bare magnet; splice per-stream trackers into
-                // it so librqbit announces them (it drops AddTorrentOptions.trackers for
-                // magnets - the only peer path when UDP/DHT are blocked).
-                let magnet = trackers::embed_into_magnet(&build_magnet(hash), &trackers);
-                let seed = match current_side_dht() {
-                    Some(d) => {
-                        dht_boot::seed_peers(&d, magnet.as_str(), 40, Duration::from_secs(3)).await
-                    }
-                    None => Vec::new(),
-                };
+                // build_magnet() yields a bare magnet; splice the resolved
+                // trackers into it so librqbit announces them (it drops
+                // AddTorrentOptions.trackers for magnets - the only peer path
+                // when UDP/DHT are blocked).
+                let resolved_trackers = trackers::with_fallback(trackers);
+                let magnet = trackers::embed_into_magnet(&build_magnet(hash), &resolved_trackers);
+                let (seed, _) = seed_side_dht(&magnet).await;
                 let opts = AddTorrentOptions {
                     overwrite: true,
                     paused: true,
                     only_files: file_idx.map(|i| vec![i]),
-                    trackers: Some(merge_trackers(trackers)),
+                    trackers: Some(resolved_trackers),
                     initial_peers: (!seed.is_empty()).then_some(seed),
                     peer_opts: Some(PeerConnectionOptions {
                         connect_timeout: Some(Duration::from_secs(4)),
                         read_write_timeout: Some(Duration::from_secs(10)),
                         keep_alive_interval: None,
                     }),
-                    force_tracker_interval: Some(Duration::from_secs(300)),
+                    force_tracker_interval: Some(Duration::from_secs(120)),
                     ..Default::default()
                 };
                 let added = timeout(
@@ -959,6 +1065,197 @@ pub fn stop_lan_server() {
     st.lan_port = None;
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct PeerDiag {
+    live: usize,
+    queued: usize,
+    connecting: usize,
+    seeders: usize,
+    downloaded: u64,
+    down_mbps: f64,
+}
+
+fn peer_diag(handle: &Arc<ManagedTorrent>) -> PeerDiag {
+    let stats = handle.stats();
+    match stats.live.as_ref() {
+        Some(live) => PeerDiag {
+            live: live.snapshot.peer_stats.live,
+            queued: live.snapshot.peer_stats.queued,
+            connecting: live.snapshot.peer_stats.connecting,
+            seeders: live.snapshot.peer_stats.seeders,
+            downloaded: live.snapshot.downloaded_and_checked_bytes,
+            down_mbps: live.download_speed.mbps,
+        },
+        None => PeerDiag {
+            downloaded: stats.progress_bytes,
+            ..Default::default()
+        },
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct PrimeLeg {
+    pub bytes: u64,
+    pub first_byte: Duration,
+    pub elapsed: Duration,
+    /// Peer state when the first byte arrived: separates "slow swarm" from
+    /// "one blocked piece while the rest of the torrent was already flowing".
+    pub first_byte_peers: usize,
+    pub first_byte_downloaded: u64,
+}
+
+#[derive(Debug)]
+pub(crate) struct PrimeReport {
+    pub head: Result<PrimeLeg, String>,
+    pub tail: Result<PrimeLeg, String>,
+    pub total: Duration,
+    pub before: PeerDiag,
+    pub after: PeerDiag,
+}
+
+// Reads one contiguous range of the selected file through the streaming priority
+// path. Dropping the returned stream releases the demand on the torrent.
+async fn prime_range(
+    handle: &Arc<ManagedTorrent>,
+    file_idx: usize,
+    from_end: bool,
+    bytes: u64,
+) -> Result<PrimeLeg, String> {
+    let mut stream = handle
+        .clone()
+        .stream(file_idx)
+        .map_err(|error| format!("{error:#}"))?;
+    let len = stream.len();
+    if len == 0 {
+        return Ok(PrimeLeg::default());
+    }
+    let (offset, want) = if from_end {
+        let want = bytes.min(len);
+        (len - want, want)
+    } else {
+        (0, bytes.min(len))
+    };
+    let started = Instant::now();
+    if offset > 0 {
+        stream
+            .seek(std::io::SeekFrom::Start(offset))
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    let mut buf = vec![0u8; PRIME_READ_BUF];
+    let mut read = 0_u64;
+    let mut first_byte = None;
+    let mut first_byte_peers = 0;
+    let mut first_byte_downloaded = 0;
+    while read < want {
+        let step = (want - read).min(PRIME_READ_BUF as u64) as usize;
+        let n = stream
+            .read(&mut buf[..step])
+            .await
+            .map_err(|error| error.to_string())?;
+        if n == 0 {
+            break;
+        }
+        read += n as u64;
+        if first_byte.is_none() {
+            first_byte = Some(started.elapsed());
+            let diag = peer_diag(handle);
+            first_byte_peers = diag.live;
+            first_byte_downloaded = diag.downloaded;
+        }
+    }
+    Ok(PrimeLeg {
+        bytes: read,
+        first_byte: first_byte.unwrap_or_else(|| started.elapsed()),
+        elapsed: started.elapsed(),
+        first_byte_peers,
+        first_byte_downloaded,
+    })
+}
+
+// Head and tail are demanded concurrently: an MP4 player asks for the moov atom
+// at the end of the file on its very first request, while MKV/HEVC probes read
+// from the start. Interleaving both keeps either container's probe from waiting
+// on the other.
+pub(crate) async fn prime_stream_head_tail(
+    handle: &Arc<ManagedTorrent>,
+    file_idx: usize,
+) -> PrimeReport {
+    let before = peer_diag(handle);
+    let started = Instant::now();
+    let head = prime_range(handle, file_idx, false, PRIME_HEAD_BYTES);
+    let tail = prime_range(handle, file_idx, true, PRIME_TAIL_BYTES);
+    let (head, tail) = tokio::join!(head, tail);
+    PrimeReport {
+        head,
+        tail,
+        total: started.elapsed(),
+        before,
+        after: peer_diag(handle),
+    }
+}
+
+fn describe_prime_leg(leg: &Result<PrimeLeg, String>) -> String {
+    match leg {
+        Ok(leg) => format!(
+            "{}B/ttfb{}ms/{}ms@peers{}/{downloaded}B",
+            leg.bytes,
+            leg.first_byte.as_millis(),
+            leg.elapsed.as_millis(),
+            leg.first_byte_peers,
+            downloaded = leg.first_byte_downloaded,
+        ),
+        Err(error) => error.clone(),
+    }
+}
+
+fn spawn_stream_prime(handle: Arc<ManagedTorrent>, file_idx: usize) {
+    tokio::spawn(async move {
+        let info_hash = format!("{:?}", handle.info_hash());
+        match timeout(PRIME_TIMEOUT, prime_stream_head_tail(&handle, file_idx)).await {
+            Ok(report) => {
+                let downloaded = report
+                    .after
+                    .downloaded
+                    .saturating_sub(report.before.downloaded);
+                let seconds = report.total.as_secs_f64();
+                let avg_mbps = if seconds > 0.0 {
+                    downloaded as f64 / seconds / (1024.0 * 1024.0)
+                } else {
+                    0.0
+                };
+                let piece_kb = handle
+                    .with_metadata(|metadata| metadata.info.piece_length / 1024)
+                    .unwrap_or_default();
+                eprintln!(
+                    "[torrent-engine] prime hash={info_hash} file={file_idx} piece_kb={piece_kb} head={} tail={} total_ms={} peers={}->{} queued={} connecting={} seeders={} downloaded_kb={} avg_MBps={avg_mbps:.2} down_MBps={:.2}",
+                    describe_prime_leg(&report.head),
+                    describe_prime_leg(&report.tail),
+                    report.total.as_millis(),
+                    report.before.live,
+                    report.after.live,
+                    report.before.queued,
+                    report.before.connecting,
+                    report.before.seeders,
+                    downloaded / 1024,
+                    report.after.down_mbps
+                )
+            }
+            Err(_) => {
+                let diag = peer_diag(&handle);
+                eprintln!(
+                    "[torrent-engine] prime hash={info_hash} file={file_idx} timed out after {}ms peers={} queued={} connecting={} downloaded_kb={}",
+                    PRIME_TIMEOUT.as_millis(),
+                    diag.live,
+                    diag.queued,
+                    diag.connecting,
+                    diag.downloaded / 1024
+                )
+            }
+        }
+    });
+}
+
 #[tauri::command]
 pub async fn torrent_engine_select(info_hash: String, file_idx: usize) -> Result<(), String> {
     let session = current_session().ok_or_else(|| "engine not ready".to_string())?;
@@ -967,6 +1264,17 @@ pub async fn torrent_engine_select(info_hash: String, file_idx: usize) -> Result
         let handle = session.get(id).ok_or_else(|| "no torrent".to_string())?;
         let only: HashSet<usize> = HashSet::from([file_idx]);
         update_only_files_bounded(&session, &handle, &only).await?;
+        // Peer discovery previously started only when the player issued its first
+        // HTTP request, which is after mpv init and the resume lookup. Starting it
+        // here lets tracker/DHT discovery, peer connects, and the head/tail
+        // prefetch run while the player boots.
+        if handle.is_paused() {
+            session
+                .unpause(&handle)
+                .await
+                .map_err(|error| format!("{error:#}"))?;
+        }
+        spawn_stream_prime(handle.clone(), file_idx);
         Ok(())
     })
     .await

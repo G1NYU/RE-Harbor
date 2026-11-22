@@ -48,7 +48,7 @@ function frontSlides(metas: Meta[], opts: AnimeFilterOpts): Meta[] {
 }
 
 function malHeroMeta(it: MalHeroItem): Meta | null {
-  const art = peekStaticHeroArt(it.id);
+  const art = peekStaticHeroArt(it.id, it.format === "MOVIE" ? "movie" : "tv");
   if (!art?.bg) return null;
   return {
     id: it.id,
@@ -184,7 +184,16 @@ export function useBpAnimeHero(
       .finally(() => {
         buildingRef.current = false;
       });
-  }, [rowsByKey, seed, hero.metas.length, anilistTrending, settings.tmdbKey, filterSig, buildHosted, filterOpts]);
+  }, [
+    rowsByKey,
+    seed,
+    hero.metas.length,
+    anilistTrending,
+    settings.tmdbKey,
+    filterSig,
+    buildHosted,
+    filterOpts,
+  ]);
 
   const slides = useMemo(() => {
     void poolVersion;

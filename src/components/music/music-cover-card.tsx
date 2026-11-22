@@ -72,11 +72,18 @@ export function MusicCardBadgeChip({ badge }: { badge: MusicCardBadge }) {
   if (badge.kind === "connector") {
     const glyph = badge.label ?? connectorGlyph(badge.connectorId);
     if (!glyph) return null;
-    const service = badge.connectorId === "catalog" ? badge.itemId?.split(":")[0] ?? "catalog" : badge.connectorId;
+    const service =
+      badge.connectorId === "catalog"
+        ? (badge.itemId?.split(":")[0] ?? "catalog")
+        : badge.connectorId;
     const label = badge.label ?? sourceLabel(service);
     return (
       <HoverTooltip label={label} side="top" align="center" className="inline-flex shrink-0">
-        <span aria-label={label} data-music-source={service} className={`${base} bg-accent-soft text-ink`}>
+        <span
+          aria-label={label}
+          data-music-source={service}
+          className={`${base} bg-accent-soft text-ink`}
+        >
           {glyph}
         </span>
       </HoverTooltip>
@@ -156,9 +163,10 @@ export function MusicCoverCard({
   const artwork = useMemo(() => catalogCoverArt(item.id, cover), [item.id, cover]);
   const chip = badge === undefined ? autoBadge(item) : badge;
   const activate = onOpen ?? onPlay;
-  const playLabel = item.kind === "track"
-    ? t("music.playTrack", { title: heading, artist: caption })
-    : t("music.card.playItem", { title: heading });
+  const playLabel =
+    item.kind === "track"
+      ? t("music.playTrack", { title: heading, artist: caption })
+      : t("music.card.playItem", { title: heading });
   const label = !onOpen && onPlay ? playLabel : t("music.card.openItem", { title: heading });
 
   return (
@@ -188,7 +196,9 @@ export function MusicCoverCard({
               />
             )}
             {overlay}
-            {item.kind === "track" && (loading || status.current) && <MusicNowPlayingMark loading={loading} paused={status.paused}/>}
+            {item.kind === "track" && (loading || status.current) && (
+              <MusicNowPlayingMark loading={loading} paused={status.paused} />
+            )}
           </span>
           <span className="mt-[9px] flex min-w-0 items-center gap-[5px]">
             <span className="truncate text-[13px] font-semibold text-ink" title={heading}>
@@ -222,7 +232,11 @@ export function MusicCoverCard({
               }}
             >
               {loading ? (
-                <LoaderCircle size={20} aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
+                <LoaderCircle
+                  size={20}
+                  aria-hidden="true"
+                  className="animate-spin motion-reduce:animate-none"
+                />
               ) : (
                 <Play size={20} aria-hidden="true" />
               )}

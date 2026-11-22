@@ -101,7 +101,8 @@ function socialToCenter(n: SocialNotif): CenterNotif {
   return {
     id: `s:${n.id}`,
     source: "social",
-    kind: n.type,
+    kind:
+      n.type === "friend-request" && n.title === "Request accepted" ? "friend-accepted" : n.type,
     title: n.title || (n.type === "comment" ? t("New profile comment") : t("Notification")),
     body: n.body || undefined,
     edgeId: isRequest ? n.entityId : undefined,

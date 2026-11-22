@@ -3,6 +3,7 @@ import type { SocialKey } from "@/lib/social/socials";
 import type { RatingsSummary } from "@/lib/ratings/types";
 import type { FavoriteMedia } from "@/lib/providers/favorites-types";
 import type { PresenceStatus } from "@/lib/social/presence";
+import type { ProfileCardAppearance } from "@/lib/social/profile-card-appearance-types";
 
 export type SocialEntry = { service: SocialKey; value: string };
 
@@ -57,6 +58,7 @@ export type ProfileWatching = {
 export type FriendsVisibility = "everyone" | "friends" | "only_me";
 
 export type ProfileSummary = {
+  id?: string;
   handle: string;
   alias: string;
   avatarUrl?: string;
@@ -73,8 +75,10 @@ export type ProfileSummary = {
   customUrl?: string;
   online: boolean;
   presence?: PresenceStatus;
+  status?: PresenceStatus;
   watching?: ProfileWatching;
-  memberSince: string;
+  memberSince?: string;
+  showJoinDate?: boolean;
   counts: ProfileCounts;
   showcase?: ShowcaseItem;
   ratings?: RatingsSummary;
@@ -112,6 +116,9 @@ export type ProfileSummary = {
   canvasHeight?: number;
   hideTopBanner?: boolean;
   hideCardTitles?: boolean;
+  dmPolicy?: "everyone" | "friends";
+  /** Card-only appearance. Never used to paint the profile page itself. */
+  profileCard?: ProfileCardAppearance;
 };
 
 export type SimklPublished = {
@@ -211,6 +218,7 @@ export type ProfileSettingsInput = {
   shareActivity: boolean;
   friendsVisibility: FriendsVisibility;
   private: boolean;
+  showJoinDate?: boolean;
 };
 
 export type CustomizationInput = {

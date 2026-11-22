@@ -15,15 +15,17 @@ const hook = read("src/views/player/hooks/use-content-advisory.ts");
 const overlays = read("src/views/player/stage-overlays.tsx");
 const overlayLayers = read("src/views/player/player-overlay-layers.tsx");
 
-test("content advisory uses a quiet borderless presentation", () => {
-  assert.match(toast, /start-6 top-20/);
+test("content advisory restores the compact September design with current timing", () => {
+  assert.match(toast, /start-6 top-24/);
   assert.match(toast, /bg-black\/70/);
   assert.match(toast, /const HOLD_MS = 8_000/);
   assert.match(toast, /const HOVER_TAIL_MS = 2_500/);
-  assert.doesNotMatch(
-    toast,
-    /border-t|shadow-\[|backdrop-blur|rounded-xl|harbor-content-advisory-row/,
-  );
+  assert.match(toast, /w-fit min-w-\[238px\]/);
+  assert.match(toast, /rounded-xl border border-white\/10/);
+  assert.match(toast, /backdrop-blur-xl/);
+  assert.match(toast, /ShieldAlert/);
+  assert.match(toast, /level <= rank \? style\.bar/);
+  assert.match(toast, /harbor-content-advisory-row/);
   assert.doesNotMatch(toast, /h-\[2px\] bg-white\/10/);
   assert.doesNotMatch(toast, /start-4 top-44|w-\[286px\]|bg-black\/80/);
 });
@@ -63,8 +65,8 @@ test("content advisory keeps hover, dismiss, and accessibility safeguards withou
 test("content advisory keeps its preview and component compatibility contracts", () => {
   assert.equal(existsSync(at("src/views/settings/player-layout-panel/advisory-preview.tsx")), true);
   assert.match(panel, /import \{ AdvisoryPreview \} from "\.\/advisory-preview"/);
-  assert.match(panel, /preview=\{<AdvisoryPreview \/>\}/);
-  assert.match(preview, /<ContentAdvisoryToast preview/);
+  assert.match(panel, /<AdvisoryPreview \/>/);
+  assert.match(preview, /<ContentAdvisoryToast\s+preview/);
   assert.match(toast, /useSettings/);
   assert.match(toast, /settings\.contentAdvisoryTheme === "monochrome"/);
   assert.match(toast, /mpaRating\?: string \| null/);
@@ -77,8 +79,8 @@ test("content advisory avoids occupied player corners", () => {
   assert.match(overlayLayers, /const topRightOccupied = roomAvatarTopRight \|\| roomChatTopRight/);
   assert.match(overlayLayers, /topRightOccupied[\s\S]*\? "top-center"[\s\S]*: "top-end"/);
   assert.match(overlays, /position=\{contentAdvisoryPosition\}/);
-  assert.match(toast, /position === "top-end"[\s\S]*end-6 top-20/);
-  assert.match(toast, /position === "top-center"[\s\S]*start-1\/2 top-20/);
+  assert.match(toast, /position === "top-end"[\s\S]*end-6 top-24/);
+  assert.match(toast, /position === "top-center"[\s\S]*start-1\/2 top-24/);
 });
 
 test("content advisory keeps IMDb fetching and PiP suppression", () => {
@@ -110,6 +112,6 @@ test("profile background adapts slider units and reloads when the picker opens",
   assert.match(picker, /setDim\(pct\);\s*void savePickerBgDim\(pct\);/);
   assert.match(
     modal,
-    /if \(!pickerOpen\) return;\s*let alive = true;[\s\S]*loadPickerBg\(\)[\s\S]*\}, \[pickerOpen\]\)/,
+    /if \(!pickerOpen\) return;\s*let alive = true;[\s\S]*loadPickerBg\(mode\)[\s\S]*\}, \[pickerOpen, isNuvio\]\)/,
   );
 });

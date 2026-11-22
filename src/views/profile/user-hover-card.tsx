@@ -10,21 +10,16 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { requestOpenProfile } from "@/lib/social/open-profile";
-import { regionFlagSrc } from "@/lib/region-flags";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { useT } from "@/lib/i18n";
 import { useContextMenuActions } from "@/lib/context-menu";
 import { userContextTarget } from "./context-targets";
-import {
-  PRESENCE_META,
-  presenceStatusLabel,
-  resolvePresence,
-  type PresenceStatus,
-} from "@/lib/social/presence";
-import { fetchBadges, fetchSummary } from "./profile-api";
+import type { PresenceStatus } from "@/lib/social/presence";
+import { fetchBadges } from "./profile-api";
+import { loadProfileCardSummary, useProfileCardSummary } from "@/lib/social/profile-card-summary";
+import { ProfileCardPanel } from "./profile-card-panel";
 import { orderShownBadges } from "./badge-catalog";
 import { HoverTooltip } from "@/components/hover-tooltip";
-import { Avatar, VerifiedCheck } from "./profile-bits";
 import { useSelfAvatar } from "./use-self-avatar";
 import type { Badge, ProfileSummary } from "./profile-types";
 
@@ -40,7 +35,10 @@ function loadCard(handle: string): Promise<CardData> {
   if (cached && Date.now() - cached.at < TTL) return Promise.resolve(cached.data);
   const pending = inflight.get(key);
   if (pending) return pending;
-  const req = Promise.all([fetchSummary(key), fetchBadges(key).catch(() => [] as Badge[])])
+  const req = Promise.all([
+    loadProfileCardSummary(key),
+    fetchBadges(key).catch(() => [] as Badge[]),
+  ])
     .then(([summary, badges]) => {
       const data: CardData = { summary, badges };
       cache.set(key, { data, at: Date.now() });
@@ -197,6 +195,7 @@ export function ProfileHoverCard({
   const [failed, setFailed] = useState(false);
   const [placed, setPlaced] = useState<{ top: number; left: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const { summary: sharedSummary } = useProfileCardSummary(handle, cardRef);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,15 +219,12 @@ export function ProfileHoverCard({
       leftSlot >= 12 ? leftSlot : Math.min(anchor.right + gap, window.innerWidth - CARD_W - 12);
     const top = Math.max(12, Math.min(anchor.top, window.innerHeight - h - 12));
     setPlaced({ top, left });
-  }, [anchor, data, failed]);
+  }, [anchor, data, sharedSummary, failed]);
 
-  const summary = data?.summary;
-  const presence = presenceOverride ?? resolvePresence(summary?.presence, summary?.online);
+  const summary = sharedSummary ?? data?.summary;
   const badges = orderShownBadges(data?.badges ?? [], data?.summary?.shownBadges);
   const mine = !!self.handle && self.handle.toLowerCase() === key;
   const cardAvatar = mine ? (self.avatar ?? summary?.avatarUrl) : summary?.avatarUrl;
-  const bio = summary?.slogan?.trim();
-  const locationFlag = summary?.location ? regionFlagSrc(summary.location) : null;
 
   return createPortal(
     <div
@@ -249,108 +245,33 @@ export function ProfileHoverCard({
         top: placed?.top ?? anchor.bottom + 8,
         visibility: placed ? "visible" : "hidden",
       }}
-      className={`fixed z-[260] cursor-pointer overflow-hidden rounded-[20px] border border-edge bg-elevated/95 shadow-[0_28px_70px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl ${
+      className={`fixed z-[260] cursor-pointer overflow-hidden rounded-[20px] shadow-[0_28px_70px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl ${
         reduced ? "" : "animate-popover-in"
       }`}
     >
-      <div className="relative h-[72px] w-full">
-        {summary?.bannerUrl ? (
-          <img
-            src={summary.bannerUrl}
-            alt=""
-            draggable={false}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-accent/25 via-raised to-surface" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-elevated/95 to-transparent" />
-      </div>
-
-      <div className="px-4 pb-4">
-        <div className="-mt-9 mb-2.5 flex items-end justify-between">
-          <span className="rounded-full bg-elevated p-[3px]">
-            <Avatar
-              src={cardAvatar}
-              size={60}
-              dotClass={PRESENCE_META[presence].dot}
-              alias={summary?.alias ?? handle}
-            />
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <span className="truncate font-display text-[17px] font-semibold text-ink">
-            {summary?.alias ?? `@${handle}`}
-          </span>
-          {summary?.verified && <VerifiedCheck size={16} />}
-        </div>
-        <div className="mt-0.5 truncate text-[12.5px] text-ink-subtle">
-          @{summary?.handle ?? handle}
-        </div>
-
-        {summary ? (
-          <>
-            <div className="mt-2 flex items-center gap-2 text-[11.5px] text-ink-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${PRESENCE_META[presence].dot}`} />
-                {t(presenceStatusLabel(presence))}
-              </span>
-              {summary.location && (
-                <>
-                  <span className="text-ink-subtle">·</span>
-                  {locationFlag ? (
-                    <img
-                      src={locationFlag}
-                      alt={summary.location}
-                      title={summary.location}
-                      draggable={false}
-                      style={{
-                        height: 12,
-                        width: 18,
-                        borderRadius: 2,
-                        objectFit: "cover",
-                        boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.4)",
-                      }}
-                    />
-                  ) : (
-                    <span className="truncate">{summary.location}</span>
-                  )}
-                </>
+      <ProfileCardPanel
+        profile={{
+          ...summary,
+          handle: summary?.handle ?? handle,
+          alias: summary?.alias ?? handle,
+          avatarUrl: cardAvatar,
+        }}
+        presence={presenceOverride}
+        loading={!summary && !failed}
+        failed={failed && !summary}
+        badges={
+          badges.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {badges.slice(0, 6).map((badge) => (
+                <BadgeDot key={badge.id} badge={badge} />
+              ))}
+              {badges.length > 6 && (
+                <span className="text-[11px] text-ink-subtle">+{badges.length - 6}</span>
               )}
             </div>
-
-            {badges.length > 0 && (
-              <div className="mt-3 flex items-center gap-1.5">
-                {badges.slice(0, 6).map((b) => (
-                  <BadgeDot key={b.id} badge={b} />
-                ))}
-                {badges.length > 6 && (
-                  <span className="text-[11px] font-medium text-ink-subtle">
-                    +{badges.length - 6}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {bio && (
-              <p className="mt-3 border-t border-edge-soft/60 pt-3 text-[12.5px] leading-relaxed text-ink-muted line-clamp-3">
-                {bio}
-              </p>
-            )}
-          </>
-        ) : failed ? (
-          <p className="mt-3 text-[12px] text-ink-subtle">
-            {t("Preview unavailable. Click to open profile.")}
-          </p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            <div className={`h-3 w-24 rounded bg-raised ${reduced ? "" : "animate-pulse"}`} />
-            <div className={`h-3 w-full rounded bg-raised ${reduced ? "" : "animate-pulse"}`} />
-            <div className={`h-3 w-3/4 rounded bg-raised ${reduced ? "" : "animate-pulse"}`} />
-          </div>
-        )}
-      </div>
+          ) : undefined
+        }
+      />
     </div>,
     document.body,
   );

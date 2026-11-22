@@ -16,7 +16,7 @@ test("dedicated styling stays scoped to music components", () => {
 
 test("roomier dock still announces its new height through existing clearance contract", () => {
   assert.match(dock, /const DOCK_HEIGHT = 88/);
-  assert.match(dock, /setProperty\("--harbor-music-dock"/);
+  assert.match(dock, /setProperty\(\s*"--harbor-music-dock"/);
   assert.match(dock, /--harbor-dock-gap/);
   assert.match(css, /inline-size:\s*56px;\s*block-size:\s*56px/);
 });

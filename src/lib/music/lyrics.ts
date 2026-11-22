@@ -73,14 +73,29 @@ function identity(track: MusicTrack): string {
 }
 
 async function json(url: string): Promise<unknown> {
-  try {
-    const response = await safeFetch(url, { headers: { Accept: "application/json" } });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await safeFetch(url, {
+        headers: { Accept: "application/json" },
+        // Search answers are 200-325 KB and have been measured at 1.5-3.9 s; 4 s aborted them.
+        signal: AbortSignal.timeout(8000),
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) {
+        // Do not turn throttling or permission failures into an immediate retry storm.
+        if (response.status < 500) throw new LyricsRequestError();
+        throw new Error("Lyrics service unavailable");
+      }
+      return await response.json();
+    } catch (error) {
+      if (attempt === 1 || error instanceof LyricsRequestError) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
   }
+  return null;
 }
+
+class LyricsRequestError extends Error {}
 
 function rowsOf(value: unknown): LrcRow[] {
   if (Array.isArray(value))
@@ -115,17 +130,58 @@ function chooseLyrics(rows: LrcRow[], target: number): LyricLine[] | null {
   return parsed.length > 0 ? parsed : null;
 }
 
+/**
+ * YouTube titles carry marketing chrome and often repeat the act, and LRCLIB rejects both.
+ * "LE SSERAFIM (르세라핌) 'Smart' OFFICIAL MV" has to become "Smart" before it is asked for.
+ */
+export function lyricTitle(title: string, artist: string): string {
+  let value = text(title).normalize("NFKC").trim();
+  const lead = text(artist).normalize("NFKC").trim();
+  if (lead && value.toLowerCase().startsWith(lead.toLowerCase())) value = value.slice(lead.length);
+  const cleaned = value
+    .replace(
+      /[\(\[]\s*(?:official[^\)\]]*|lyrics?[^\)\]]*|visuali[sz]er[^\)\]]*|audio|video|m\/v|mv)\s*[\)\]]/gi,
+      " ",
+    )
+    .replace(
+      /\b(?:official(?:\s+music)?(?:\s+(?:video|audio|mv|m\/v))?|lyrics?(?:\s+video)?|visuali[sz]er|m\/v|mv|color\s+coded)\b/gi,
+      " ",
+    )
+    // A performance label describes the take, not the words.
+    .replace(
+      /[\(\[]\s*(?:slowed|reverb|sped\s*up|remix|live|acoustic|instrumental|karaoke|cover|performance)[^\)\]]*[\)\]]/gi,
+      " ",
+    )
+    // Anything still bracketed is a translation or a reading, not part of the title.
+    .replace(/[\(\[]\s*[^\)\]]*[\)\]]/g, " ")
+    .replace(/["'“”‘’]/g, " ")
+    .replace(/^[\s\-–—:|]+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || text(title).trim();
+}
+
 async function fetchLyrics(track: MusicTrack): Promise<LyricLine[] | null> {
   const artist = text(track.artist).trim();
-  const title = text(track.title).trim();
+  const title = lyricTitle(track.title, artist);
   if (!artist || !title) return null;
   const duration = seconds(track.durationSeconds);
   const album = text(track.album).trim();
   const query = `artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`;
-  if (album && duration > 0) {
-    const exact = `${API}/get?${query}&album_name=${encodeURIComponent(album)}&duration=${Math.round(duration)}`;
-    const picked = chooseLyrics(rowsOf(await json(exact)), duration);
-    if (picked) return picked;
+  const attempts: (string | null)[] = [
+    album && duration > 0
+      ? `${API}/get?${query}&album_name=${encodeURIComponent(album)}&duration=${Math.round(duration)}`
+      : null,
+    duration > 0 ? `${API}/get?${query}&duration=${Math.round(duration)}` : `${API}/get?${query}`,
+    duration > 0 ? `${API}/get?${query}` : null,
+  ];
+  // The get endpoint is a tenth of the search payload even without an album. Providers like
+  // YouTube Music often put view counts in the album field, and their duration can be a few
+  // seconds off, so every get variant is cheaper than one rejected search.
+  for (const url of attempts) {
+    if (!url) continue;
+    const found = chooseLyrics(rowsOf(await json(url)), duration);
+    if (found) return found;
   }
   return chooseLyrics(rowsOf(await json(`${API}/search?${query}`)), duration);
 }
@@ -135,7 +191,11 @@ export function loadTrackLyrics(track: MusicTrack): Promise<LyricLine[] | null> 
   const key = identity(track);
   const held = cache.get(key);
   if (held) return held;
-  const pending = fetchLyrics(track).catch(() => null);
+  const pending = fetchLyrics(track).catch(() => {
+    // A failed request is not evidence that the song has no lyrics.
+    if (cache.get(key) === pending) cache.delete(key);
+    return null;
+  });
   cache.set(key, pending);
   if (cache.size > CACHE_MAX) {
     const oldest = cache.keys().next();

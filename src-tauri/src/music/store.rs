@@ -203,6 +203,29 @@ mod tests {
     }
 
     #[test]
+    fn artwork_survives_a_track_that_lacks_it() {
+        let database = MusicDb::in_memory();
+        let mut with_art = track("video-one", "One");
+        with_art.artwork = "https://example.test/cover.jpg".to_string();
+        add_recent(&database, &with_art).unwrap();
+        add_recent(&database, &track("video-one", "One")).unwrap();
+        assert_eq!(
+            recents(&database).unwrap()[0].artwork,
+            "https://example.test/cover.jpg"
+        );
+    }
+
+    #[test]
+    fn empty_youtube_artwork_falls_back_to_the_video_thumbnail() {
+        let database = MusicDb::in_memory();
+        add_recent(&database, &track("XLj72wrprlM", "FOREVER")).unwrap();
+        assert_eq!(
+            recents(&database).unwrap()[0].artwork,
+            "https://i.ytimg.com/vi/XLj72wrprlM/hq720.jpg"
+        );
+    }
+
+    #[test]
     fn video_kind_survives_collections_and_metadata_refresh() {
         let database = MusicDb::in_memory();
         let mut video = track("video-one", "One");

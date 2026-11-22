@@ -48,7 +48,7 @@ function parseId(id: string): { source: string; orig: string } {
 
 function subById(sourceId: string): MangaProvider {
   const subs = aggregateSubProviders();
-  return subs.find((s) => s.id === sourceId) ?? subs[0] ?? EMPTY_PROVIDER;
+  return subs.find((s) => s.id === sourceId) ?? EMPTY_PROVIDER;
 }
 
 export function routeById(id: string): { provider: MangaProvider; orig: string } | null {
@@ -69,7 +69,7 @@ async function mergeLists(
       withTimeout(
         fn(p).then((l) => l.map((m) => ({ ...m, id: prefixId(p.id, m.id) }))),
         [] as MangaSummary[],
-        timeout,
+        Math.max(timeout, p.requestTimeoutMs ?? 0),
       ).catch(() => [] as MangaSummary[]),
     ),
   );
@@ -93,6 +93,7 @@ export async function streamAll(
       withTimeout(
         fn(p).then((l) => l.map((m) => ({ ...m, id: prefixId(p.id, m.id) }))),
         [] as MangaSummary[],
+        Math.max(SOURCE_TIMEOUT, p.requestTimeoutMs ?? 0),
       )
         .catch(() => [] as MangaSummary[])
         .then((list) => {
@@ -110,6 +111,7 @@ export async function streamAggregateChapters(
   id: string,
   onChunk: (chs: MangaChapter[]) => void,
   ownHintId?: string,
+  opts?: { refresh?: boolean },
 ): Promise<void> {
   const subs = aggregateSubProviders();
   const sepIdx = id.indexOf(SEP);
@@ -119,12 +121,13 @@ export async function streamAggregateChapters(
   const orig = sepIdx !== -1 ? id.slice(sepIdx + SEP.length) : id;
   const ownP = subById(source);
   const ownChaptersP = ownP
-    .chapters(orig)
+    .chapters(orig, opts)
     .then((cs) => labelChapters(cs, ownP))
     .catch(() => [] as MangaChapter[]);
   const detail = await ownP.detail(orig).catch(() => null);
   const title = detail?.title;
-  const others = title ? subs.filter((p) => p.id !== ownP.id) : [];
+  // Alternate chapters are background discovery, not a request to verify other sources.
+  const others = title ? aggregateSubProviders(true).filter((p) => p.id !== ownP.id) : [];
   await Promise.all([
     ownChaptersP.then((chs) => {
       if (chs.length) onChunk(chs);
@@ -137,7 +140,7 @@ export async function streamAggregateChapters(
             title as string,
           );
           if (!hit) return;
-          const labeled = labelChapters(await p.chapters(hit.id).catch(() => []), p);
+          const labeled = labelChapters(await p.chapters(hit.id, opts).catch(() => []), p);
           if (labeled.length) onChunk(labeled);
         })(),
         undefined,
@@ -188,7 +191,7 @@ async function mergeSearchLists(query: string, opts?: SearchAllOpts): Promise<Ma
         items.map((item) => ({ ...item, id: prefixId(provider.id, item.id) })),
       ),
       [] as MangaSummary[],
-      30_000,
+      Math.max(30_000, provider.requestTimeoutMs ?? 0),
     ).then((items) => {
       lists.set(index, items);
       if (!opts?.exhaustive && !exactFound && pickSameTitle(items, query)) {
@@ -206,10 +209,16 @@ async function mergeSearchLists(query: string, opts?: SearchAllOpts): Promise<Ma
 async function mergeTags(): Promise<MangaTag[]> {
   const lists = await Promise.all(
     aggregateSubProviders().map((p) =>
-      withTimeout(p.tags?.() ?? Promise.resolve([]), [] as MangaTag[]).then((tags) =>
-        tags.map((tag) => tag.group === "Categories" && tag.id.startsWith("category:")
-          ? { ...tag, id: prefixId(p.id, tag.id) }
-          : tag),
+      withTimeout(
+        p.tags?.() ?? Promise.resolve([]),
+        [] as MangaTag[],
+        Math.max(SOURCE_TIMEOUT, p.requestTimeoutMs ?? 0),
+      ).then((tags) =>
+        tags.map((tag) =>
+          tag.group === "Categories" && tag.id.startsWith("category:")
+            ? { ...tag, id: prefixId(p.id, tag.id) }
+            : tag,
+        ),
       ),
     ),
   );
@@ -232,8 +241,13 @@ export function withProviderTag<T>(
 export const aggregateProvider: MangaProvider = {
   id: "all",
   name: "All Sources",
-  popular: (offset, tagId) => mergeLists((p) => withProviderTag(p, tagId, (tag) => p.popular(offset, tag))),
-  search: (query, offset, tagId) => mergeLists((p) => withProviderTag(p, tagId, (tag) => p.search(query, offset, tag))),
+  get requestTimeoutMs() {
+    return Math.max(0, ...aggregateSubProviders().map((p) => p.requestTimeoutMs ?? 0));
+  },
+  popular: (offset, tagId) =>
+    mergeLists((p) => withProviderTag(p, tagId, (tag) => p.popular(offset, tag))),
+  search: (query, offset, tagId) =>
+    mergeLists((p) => withProviderTag(p, tagId, (tag) => p.search(query, offset, tag))),
   searchAll: mergeSearchLists,
   detail: async (id) => {
     const { source, orig } = parseId(id);
@@ -249,7 +263,7 @@ export const aggregateProvider: MangaProvider = {
     const ownChs = labelChapters(await ownP.chapters(orig).catch(() => []), ownP);
     const title = detail?.title;
     if (!title) return ownChs;
-    const others = aggregateSubProviders().filter((p) => p.id !== source);
+    const others = aggregateSubProviders(true).filter((p) => p.id !== source);
     const extra = await Promise.all(
       others.map((p) =>
         withTimeout(

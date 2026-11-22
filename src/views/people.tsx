@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { useT } from "@/lib/i18n";
+import { useSessionState } from "@/lib/session-state";
 import { useScrollMemory, useView } from "@/lib/view";
 import {
   fetchRankManifest,
@@ -44,14 +45,17 @@ function heroHasArt(person: Person, source: RankSource): boolean {
 
 export function PeopleView({ init }: { init: PeopleInit }) {
   const t = useT();
-  const { openPerson, openMeta, openSettings } = useView();
+  const { openPerson, openMeta, openSettings, topKind } = useView();
   const scrollRef = useRef<HTMLElement>(null);
 
-  const [source, setSource] = useState<RankSource>(init?.source ?? "harbor");
-  const [dept, setDept] = useState<PeopleDept>(init?.dept ?? "Acting");
-  const [country, setCountry] = useState<string | null>(null);
-  const [genre, setGenre] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [source, setSource] = useSessionState<RankSource>(
+    "people.source",
+    init?.source ?? "harbor",
+  );
+  const [dept, setDept] = useSessionState<PeopleDept>("people.department", init?.dept ?? "Acting");
+  const [country, setCountry] = useSessionState<string | null>("people.country", null);
+  const [genre, setGenre] = useSessionState<string | null>("people.genre", null);
+  const [query, setQuery] = useSessionState<string>("people.query", "");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [explainOpen, setExplainOpen] = useState(false);
   const [countries, setCountries] = useState<Country[]>([]);
@@ -60,7 +64,8 @@ export function PeopleView({ init }: { init: PeopleInit }) {
   const [reloadNonce, setReloadNonce] = useState(0);
   const [solid, setSolid] = useState(false);
 
-  useScrollMemory("people", scrollRef);
+  const active = topKind === "people";
+  useScrollMemory("people", scrollRef, active);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +91,15 @@ export function PeopleView({ init }: { init: PeopleInit }) {
     }
   }, [init?.nonce]);
 
+  const lastFilterKeyRef = useRef<string | null>(null);
   useEffect(() => {
+    const key = `${source}\u0000${dept}\u0000${country ?? ""}\u0000${genre ?? ""}`;
+    if (lastFilterKeyRef.current === null) {
+      lastFilterKeyRef.current = key;
+      return;
+    }
+    if (lastFilterKeyRef.current === key) return;
+    lastFilterKeyRef.current = key;
     setExpandedId(null);
     scrollRef.current?.scrollTo({ top: 0 });
   }, [source, dept, country, genre]);
@@ -104,7 +117,8 @@ export function PeopleView({ init }: { init: PeopleInit }) {
     () => (country ? countries.find((c) => c.iso === country) : undefined),
     [countries, country],
   );
-  const serverCountry = countryEntry?.file && countryEntry.code ? countryEntry.code.toLowerCase() : null;
+  const serverCountry =
+    countryEntry?.file && countryEntry.code ? countryEntry.code.toLowerCase() : null;
   const { status, people } = usePeopleRankings({
     source,
     dept,
@@ -126,7 +140,9 @@ export function PeopleView({ init }: { init: PeopleInit }) {
       return true;
     });
     if (genre) {
-      base = [...base].sort((a, b) => (b.genreScores?.[genre] ?? 0) - (a.genreScores?.[genre] ?? 0));
+      base = [...base].sort(
+        (a, b) => (b.genreScores?.[genre] ?? 0) - (a.genreScores?.[genre] ?? 0),
+      );
     }
     return base.map((p, i) => ({ ...p, rank: i + 1 }));
   }, [people, query, genre, country]);
@@ -144,7 +160,8 @@ export function PeopleView({ init }: { init: PeopleInit }) {
   const bands = useMemo(() => {
     const explained = source === "harbor" ? (filtered as HarborRankExplanation[]) : null;
     const rankedAll: Person[] = explained ? explained.filter((p) => p.score !== null) : filtered;
-    const body = heroShown && heroCandidate ? rankedAll.filter((p) => p.id !== heroCandidate.id) : rankedAll;
+    const body =
+      heroShown && heroCandidate ? rankedAll.filter((p) => p.id !== heroCandidate.id) : rankedAll;
     return presentBands(body.map((p) => p.rank));
   }, [filtered, source, heroShown, heroCandidate]);
 
@@ -211,7 +228,9 @@ export function PeopleView({ init }: { init: PeopleInit }) {
         <div className="sticky bottom-0 z-30 px-12 pb-4 pt-3">
           <div
             className={`rounded-2xl px-5 transition-colors duration-250 ease-out motion-reduce:transition-none ${
-              solid ? "bg-canvas/95 shadow-[0_-8px_28px_-16px_rgba(0,0,0,0.55)] ring-1 ring-edge-soft backdrop-blur" : "bg-transparent"
+              solid
+                ? "bg-canvas/95 shadow-[0_-8px_28px_-16px_rgba(0,0,0,0.55)] ring-1 ring-edge-soft backdrop-blur"
+                : "bg-transparent"
             }`}
           >
             <PeopleFilterBar
@@ -224,7 +243,11 @@ export function PeopleView({ init }: { init: PeopleInit }) {
               query={query}
               onQuery={setQuery}
               countries={countries}
-              resultCount={query.trim() || genre || country ? { shown: filtered.length, total: people.length } : null}
+              resultCount={
+                query.trim() || genre || country
+                  ? { shown: filtered.length, total: people.length }
+                  : null
+              }
             />
           </div>
         </div>

@@ -14,6 +14,14 @@ import {
 } from "lucide-react";
 import { socialPatch } from "@/lib/social/client";
 import {
+  CARD_MAX_BYTES,
+  removeCardBackground,
+  saveCardAppearance,
+  uploadCardBackground,
+  type CardAppearancePatch,
+} from "@/lib/social/profile-card-appearance";
+import { saveDmPolicy, useDmPrefs, type DmPolicy } from "@/lib/social/dm-preferences";
+import {
   audioTimes,
   formatClock,
   parseClockToSec,
@@ -23,6 +31,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useTogether } from "@/lib/together/provider";
 import { useProfiles } from "@/lib/profiles";
+import { isNuvioProviderActive } from "@/lib/active-profile-id";
 import { nameEquals } from "@/lib/account/name-sync";
 import { setPrivate } from "@/lib/social/privacy";
 import { useSettings } from "@/lib/settings";
@@ -36,6 +45,8 @@ import { ProfileCardsPicker } from "./profile-cards-picker";
 import { ProfileMedia } from "./profile-media";
 import { LocationSelect } from "./location-select";
 import { CustomizationPanel } from "./customization/customization-panel";
+import { ProfileThemePicker } from "./profile-theme-picker";
+import { ProfileCardColors } from "./profile-card-colors";
 import { AboutEditor } from "./customization/about-editor";
 import { useCustomUrlAvailability, type UrlStatus } from "./use-customurl-availability";
 import type {
@@ -314,6 +325,7 @@ export function ProfileSettings({
     shareActivity: summary.shareActivity ?? false,
     friendsVisibility: summary.friendsVisibility ?? "everyone",
     private: summary.private ?? false,
+    showJoinDate: summary.showJoinDate !== false,
   });
   const initialForm = useRef(form);
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm.current);
@@ -327,6 +339,12 @@ export function ProfileSettings({
   const [pickingCards, setPickingCards] = useState(false);
   const [pickingMinecraft, setPickingMinecraft] = useState(false);
   const [customizing, setCustomizing] = useState(false);
+  const dmPrefs = useDmPrefs();
+  const [dmBusy, setDmBusy] = useState<"policy" | null>(null);
+  const [dmError, setDmError] = useState<string | null>(null);
+  const [cardBusy, setCardBusy] = useState<"theme" | "accent" | "bg" | null>(null);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const cardRef = useRef<HTMLInputElement>(null);
   const badgeOptions = pickableBadges(badges ?? []);
   const canPickBadges =
     badgeOptions.length > 0 || summary.verified || summary.hideVerified === true;
@@ -358,6 +376,87 @@ export function ProfileSettings({
     }
   };
 
+  const changeDmPolicy = async (next: DmPolicy) => {
+    if (next === dmPrefs.policy || dmBusy) return;
+    setDmBusy("policy");
+    setDmError(null);
+    try {
+      await saveDmPolicy(next);
+    } catch {
+      setDmError(t("Could not update message privacy. Try again."));
+    } finally {
+      setDmBusy(null);
+    }
+  };
+
+  const applyCard = async (patch: CardAppearancePatch, kind: "theme" | "accent") => {
+    setCardBusy(kind);
+    setCardError(null);
+    try {
+      const next = await saveCardAppearance(patch);
+      onSaved(next);
+    } catch (error) {
+      setCardError(
+        error instanceof Error ? error.message : t("Could not update the card. Try again."),
+      );
+    } finally {
+      setCardBusy(null);
+    }
+  };
+
+  const pickCardBackground = async (file: File | undefined) => {
+    if (!file || cardBusy) return;
+    setCardBusy("bg");
+    setCardError(null);
+    try {
+      if (file.size > CARD_MAX_BYTES) {
+        setCardError(t("That file is too large. Use something under 8 MB."));
+        return;
+      }
+      const next = await uploadCardBackground(file);
+      onSaved(next);
+    } catch (e) {
+      setCardError((e as Error).message || t("Could not update the card background."));
+    } finally {
+      setCardBusy(null);
+      if (cardRef.current) cardRef.current.value = "";
+    }
+  };
+
+  const clearCardBackground = async () => {
+    if (cardBusy) return;
+    setCardBusy("bg");
+    setCardError(null);
+    try {
+      const next = await removeCardBackground();
+      onSaved(next);
+    } catch {
+      setCardError(t("Could not remove the card background."));
+    } finally {
+      setCardBusy(null);
+    }
+  };
+
+  const dmPolicyOpts: Array<{
+    id: DmPolicy;
+    label: string;
+    help: string;
+    icon: typeof Globe;
+  }> = [
+    {
+      id: "friends",
+      label: t("Friends only"),
+      help: t("Only people you have added can start a conversation"),
+      icon: Users,
+    },
+    {
+      id: "everyone",
+      label: t("Everyone"),
+      help: t("Anyone with your handle can start a conversation"),
+      icon: Globe,
+    },
+  ];
+
   const save = async (after?: () => void) => {
     if (!form.alias.trim()) {
       setSection("general");
@@ -372,13 +471,27 @@ export function ProfileSettings({
       const next = await saveSettings(form);
       const trimmed = form.alias.trim();
       if (trimmed && !nameEquals(trimmed, displayName)) setDisplayName(trimmed);
-      if (activeProfile && !activeProfile.kid && trimmed && trimmed !== activeProfile.name) {
+      if (
+        !isNuvioProviderActive() &&
+        activeProfile &&
+        activeProfile.isPrimary &&
+        !activeProfile.kid &&
+        trimmed &&
+        trimmed !== activeProfile.name
+      ) {
         updateProfile(activeProfile.id, { name: trimmed });
       }
       onSaved(next);
       (after ?? onClose)();
-    } catch {
-      setError(t("Could not save. Try again."));
+    } catch (error) {
+      setError(
+        t(
+          error instanceof Error &&
+            error.message === "Join-date privacy requires the latest backend deployment."
+            ? error.message
+            : "Could not save. Try again.",
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -531,7 +644,7 @@ export function ProfileSettings({
                       </Field>
                     </div>
 
-                    <Field label={t("Custom url")} hint="harbor.site/u/">
+                    <Field label={t("Custom url")} hint="harborcommunity.site/u/">
                       <div className="relative">
                         <input
                           value={form.customUrl}
@@ -580,6 +693,76 @@ export function ProfileSettings({
                     />
 
                     <ProfileMedia summary={summary} onSaved={onSaved} />
+
+                    <ProfileThemePicker summary={summary} onSaved={onSaved} />
+
+                    <div className="rounded-xl bg-elevated px-4 py-3.5 ring-1 ring-edge-soft">
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13.5px] font-medium text-ink">
+                            {t("Profile card appearance")}
+                          </div>
+                          <div className="mt-0.5 text-[12.5px] leading-relaxed text-ink-subtle">
+                            {t(
+                              "Choose your card colors and the shared background used on your profile and cards.",
+                            )}
+                          </div>
+                        </div>
+                        {cardBusy && (
+                          <Loader2 size={15} className="animate-spin text-ink-subtle" aria-hidden />
+                        )}
+                      </div>
+
+                      <ProfileCardColors
+                        profile={summary}
+                        busy={!!cardBusy}
+                        onApply={(patch) => applyCard(patch, "theme")}
+                      />
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={!!cardBusy}
+                          onClick={() => cardRef.current?.click()}
+                          className="flex h-9 items-center gap-1.5 rounded-md border border-edge-soft bg-surface/40 px-2.5 text-[12px] font-medium text-ink-muted transition-colors enabled:hover:text-ink disabled:opacity-60"
+                        >
+                          <ImageIcon size={14} />
+                          {summary.profileCard?.bgUrl || summary.bannerUrl
+                            ? t("Replace background")
+                            : t("Upload background")}
+                        </button>
+                        {(summary.profileCard?.bgUrl || summary.bannerUrl) && (
+                          <button
+                            type="button"
+                            disabled={!!cardBusy}
+                            onClick={() => void clearCardBackground()}
+                            className="flex h-9 items-center gap-1.5 rounded-md border border-edge-soft bg-surface/40 px-2.5 text-[12px] font-medium text-ink-muted transition-colors enabled:hover:text-ink disabled:opacity-60"
+                          >
+                            <X size={14} />
+                            {t("Remove")}
+                          </button>
+                        )}
+                        <input
+                          ref={cardRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(e) => void pickCardBackground(e.target.files?.[0])}
+                        />
+                      </div>
+                      <p className="mt-2 text-[11.5px] leading-relaxed text-ink-subtle">
+                        {t(
+                          "PNG, JPEG, WebP or GIF, up to 8 MB. An animated GIF keeps moving in the app and in the card image.",
+                        )}
+                      </p>
+                      {cardError && (
+                        <p
+                          className="mt-2 rounded-md bg-danger/10 px-3 py-2 text-[12px] text-danger"
+                          role="alert"
+                        >
+                          {cardError}
+                        </p>
+                      )}
+                    </div>
 
                     <ActionRow
                       title={t("Customize profile")}
@@ -756,6 +939,33 @@ export function ProfileSettings({
                       </button>
                     </div>
 
+                    <ActionRow
+                      title={t("Show join date")}
+                      desc={t(
+                        "Show when you joined Harbor on your profile, cards, and other public views.",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={form.showJoinDate !== false}
+                        aria-label={t("Show join date")}
+                        onClick={() => set("showJoinDate", form.showJoinDate === false)}
+                        style={{ minHeight: 0 }}
+                        className={
+                          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors " +
+                          (form.showJoinDate !== false ? "bg-accent" : "bg-edge")
+                        }
+                      >
+                        <span
+                          className={
+                            "block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 " +
+                            (form.showJoinDate !== false ? "translate-x-5" : "translate-x-0")
+                          }
+                        />
+                      </button>
+                    </ActionRow>
+
                     <div className="rounded-xl bg-elevated px-4 py-3.5 ring-1 ring-edge-soft">
                       <div className="min-w-0">
                         <div className="text-[13.5px] font-medium text-ink">
@@ -905,6 +1115,58 @@ export function ProfileSettings({
                         />
                       </button>
                     </div>
+
+                    <div className="rounded-xl bg-elevated px-4 py-3.5 ring-1 ring-edge-soft">
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13.5px] font-medium text-ink">
+                            {t("Who can message you")}
+                          </div>
+                          <div className="mt-0.5 text-[12.5px] leading-relaxed text-ink-subtle">
+                            {t(
+                              "Choose who can start a new conversation. Existing conversations stay open, and blocked accounts can never message you.",
+                            )}
+                          </div>
+                        </div>
+                        {dmBusy === "policy" && (
+                          <Loader2 size={15} className="animate-spin text-ink-subtle" aria-hidden />
+                        )}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {dmPolicyOpts.map((o) => {
+                          const on = dmPrefs.policy === o.id;
+                          const Icon = o.icon;
+                          return (
+                            <button
+                              key={o.id}
+                              type="button"
+                              disabled={!!dmBusy}
+                              onClick={() => void changeDmPolicy(o.id)}
+                              aria-pressed={on}
+                              className={`flex flex-col items-start gap-1 rounded-md border p-2.5 text-start transition-colors disabled:opacity-60 ${
+                                on
+                                  ? "border-ink bg-surface"
+                                  : "border-edge-soft bg-surface/40 hover:border-edge"
+                              }`}
+                            >
+                              <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+                                <Icon size={15} className={on ? "text-ink" : "text-ink-subtle"} />
+                                {o.label}
+                              </span>
+                              <span className="text-[11.5px] leading-snug text-ink-subtle">
+                                {o.help}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {dmError && (
+                      <p className="mt-3 text-[11.5px] text-danger" role="alert">
+                        {dmError}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

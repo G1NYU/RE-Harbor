@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { PlayerBridge, PlayerSnapshot } from "@/lib/player/bridge";
 import { writePlayerPrefs } from "@/lib/player-prefs";
 import { writePlayerVolume } from "@/lib/player-volume";
-import { effectiveBinding, eventToBinding, isTypingTarget, type HotkeyId } from "@/lib/hotkeys";
+import { createHotkeyMatcher, isPlayerHotkeyTarget, isTypingTarget } from "@/lib/hotkeys";
 import { isWindowsDesktop } from "@/lib/platform";
 import { isRtxHdrBlocked, isRtxVsrBlocked } from "@/lib/player/rtx-video-policy";
 import { mediaKeyGate } from "@/lib/media-session";
@@ -12,7 +12,10 @@ import { isAnyFullscreen, exitAnyFullscreen } from "@/lib/fullscreen-state";
 import { isBigPictureActive } from "@/lib/big-picture";
 import { getLeaveConfirm, openLeaveConfirm } from "@/lib/player/leave-confirm";
 import { isPlayerInteractionLocked } from "@/lib/player/interaction-lock";
+import { HOLD_SPEED_DELAY_MS, holdSpeedRate } from "@/lib/player/hold-speed";
+import { tracePlayback } from "@/lib/player/pause-trace";
 import { round2 } from "../player-utils";
+import { slowSpeedToggleRate, stepPlaybackRate } from "@/lib/seek-step";
 import { SFX } from "@/lib/sfx";
 
 export function useKeyboardShortcuts(params: {
@@ -30,7 +33,12 @@ export function useKeyboardShortcuts(params: {
   togglePip?: () => void;
   fullscreen: boolean;
   cycleSubtitles: () => void;
+  cycleAudio?: () => void;
+  onSubSize?: (direction: 1 | -1) => void;
   setShowStats: (updater: (prev: boolean) => boolean) => void;
+  showShortcuts: boolean;
+  setShowShortcuts: (updater: (prev: boolean) => boolean) => void;
+  canShowShortcuts?: () => boolean;
   metaId: string;
   svpActive: boolean;
   onNextEp?: () => void;
@@ -70,7 +78,12 @@ export function useKeyboardShortcuts(params: {
     toggleFullscreen,
     togglePip,
     cycleSubtitles,
+    cycleAudio,
+    onSubSize,
     setShowStats,
+    showShortcuts,
+    setShowShortcuts,
+    canShowShortcuts,
     metaId,
     svpActive,
     onNextEp,
@@ -102,6 +115,11 @@ export function useKeyboardShortcuts(params: {
   const seekForwardStepSec = settings.seekForwardStepSec;
   const seekBackStepShortSec = settings.seekBackStepShortSec;
   const seekForwardStepShortSec = settings.seekForwardStepShortSec;
+  const seekBackStepLongSec = settings.seekBackStepLongSec;
+  const seekForwardStepLongSec = settings.seekForwardStepLongSec;
+  const speedDownStep = settings.speedDownStep;
+  const speedUpStep = settings.speedUpStep;
+  const halfSpeedRate = settings.halfSpeedRate;
   const [subtitleOffsetSec, setSubtitleOffsetSec] = useState<number | null>(null);
   const subtitleOffsetTimerRef = useRef<number | null>(null);
   const showSubtitleOffset = (delaySec: number) => {
@@ -153,17 +171,16 @@ export function useKeyboardShortcuts(params: {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (document.querySelector('[data-harbor-player][data-detached="true"]') && !e.key.startsWith("Media")) return;
-      const dock = document.querySelector('[data-harbor-player][data-docked="true"]');
-      if (dock && !dock.contains(e.target as Node) && !e.key.startsWith("Media")) return;
+      if (!e.key.startsWith("Media") && !isPlayerHotkeyTarget(e)) return;
       if (isPlayerInteractionLocked()) {
         if (e.cancelable) e.preventDefault();
         return;
       }
       if (isTypingTarget(e)) return;
 
-      const binding = eventToBinding(e);
-      const match = (id: HotkeyId): boolean => effectiveBinding(id, overrides) === binding;
+      const match = createHotkeyMatcher(e, overrides, "Player");
+
+      if (e.key.startsWith("Media")) tracePlayback(`media-key-dom ${e.key}`);
 
       if (e.key === "MediaPlayPause") {
         e.preventDefault();
@@ -191,7 +208,19 @@ export function useKeyboardShortcuts(params: {
         return;
       }
 
+      // The panel is modal even when focus has drifted out of it: only the two
+      // bindings that dismiss it reach the player while it is open.
+      if (showShortcuts) {
+        if (match("playerClose") || match("playerShortcuts")) {
+          e.preventDefault();
+          if (!e.repeat) setShowShortcuts(() => false);
+        }
+        return;
+      }
+
       if (match("playerClose")) {
+        // A held key that just dismissed a panel must not go on to close playback.
+        if (e.repeat) return;
         if (getLeaveConfirm().open) return;
         if (drawMode) {
           setDrawMode(false);
@@ -237,8 +266,8 @@ export function useKeyboardShortcuts(params: {
           h.timer = null;
           h.engaged = true;
           setHoldSpeedActive(true);
-          bridgeRef.current?.setRate(Math.max(2, h.baseRate));
-        }, 350);
+          bridgeRef.current?.setRate(holdSpeedRate(h.baseRate));
+        }, HOLD_SPEED_DELAY_MS);
         return;
       }
       if (match("playerSeekBack10")) {
@@ -263,12 +292,12 @@ export function useKeyboardShortcuts(params: {
       }
       if (match("playerSeekBack30")) {
         e.preventDefault();
-        seekStep(-30);
+        seekStep(-seekBackStepLongSec);
         return;
       }
       if (match("playerSeekForward30")) {
         e.preventDefault();
-        seekStep(30);
+        seekStep(seekForwardStepLongSec);
         return;
       }
       if (match("playerFrameForward") && onFrameStep) {
@@ -406,16 +435,47 @@ export function useKeyboardShortcuts(params: {
         setShowStats((v) => !v);
         return;
       }
+      if (match("playerAudioCycle") && cycleAudio) {
+        e.preventDefault();
+        if (e.repeat) return;
+        cycleAudio();
+        return;
+      }
+      if (match("playerSubSizeDown") && onSubSize) {
+        e.preventDefault();
+        onSubSize(-1);
+        return;
+      }
+      if (match("playerSubSizeUp") && onSubSize) {
+        e.preventDefault();
+        onSubSize(1);
+        return;
+      }
+      if (match("playerShortcuts")) {
+        if (canShowShortcuts && !canShowShortcuts()) return;
+        e.preventDefault();
+        if (e.repeat) return;
+        setShowShortcuts(() => true);
+        return;
+      }
       if (match("playerSpeedDown")) {
         e.preventDefault();
-        const r = Math.max(0.25, +(snap.rate - 0.25).toFixed(2));
+        const r = stepPlaybackRate(snap.rate, -speedDownStep);
         bridgeRef.current?.setRate(r);
         writePlayerPrefs(metaId, { rate: r });
         return;
       }
       if (match("playerSpeedUp")) {
         e.preventDefault();
-        const r = Math.min(3, +(snap.rate + 0.25).toFixed(2));
+        const r = stepPlaybackRate(snap.rate, speedUpStep);
+        bridgeRef.current?.setRate(r);
+        writePlayerPrefs(metaId, { rate: r });
+        return;
+      }
+      if (match("playerHalfSpeed")) {
+        e.preventDefault();
+        if (e.repeat) return;
+        const r = slowSpeedToggleRate(snap.rate, halfSpeedRate);
         bridgeRef.current?.setRate(r);
         writePlayerPrefs(metaId, { rate: r });
         return;
@@ -551,6 +611,11 @@ export function useKeyboardShortcuts(params: {
     returnToPreview,
     togglePip,
     drawMode,
+    showShortcuts,
+    setShowShortcuts,
+    canShowShortcuts,
+    cycleAudio,
+    onSubSize,
     snap.muted,
     snap.volume,
     snap.rate,
@@ -561,6 +626,11 @@ export function useKeyboardShortcuts(params: {
     seekForwardStepSec,
     seekBackStepShortSec,
     seekForwardStepShortSec,
+    seekBackStepLongSec,
+    seekForwardStepLongSec,
+    speedDownStep,
+    speedUpStep,
+    halfSpeedRate,
     seekTo,
     toggleSwitcher,
     toggleEpisodePanel,
@@ -600,6 +670,7 @@ export function useKeyboardShortcuts(params: {
       const u1 = await listen<string>("harbor://media-key", (e) => {
         const m = mediaRef.current;
         const playing = m.status === "playing";
+        tracePlayback(`media-key ${e.payload} status=${m.status}`);
         switch (e.payload) {
           case "playpause":
             if (mediaKeyGate()) m.playPauseToggle();

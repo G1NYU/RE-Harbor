@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
-import { sanitizeSeekStep } from "../src/lib/seek-step.ts";
+import * as seekStep from "../src/lib/seek-step.ts";
 import * as language from "../src/lib/subtitles/language.ts";
 import { sanitizeScreensaverMedia } from "../src/lib/screensaver/media.ts";
 import * as controllerCursor from "../src/lib/gamepad/cursor.ts";
@@ -23,8 +23,9 @@ function fixture() {
       isKnownPreset: () => true,
     },
     "@/lib/subtitles/language": language,
+    "@/lib/player/audio-language": { ORIGINAL_AUDIO_LANG: "Original" },
     "@/lib/screensaver/media": { sanitizeScreensaverMedia },
-    "@/lib/seek-step": { sanitizeSeekStep },
+    "@/lib/seek-step": seekStep,
     "@/lib/ai-models": { migrateModelId: identity, providerTabFor: () => "openrouter" },
     "@/lib/local-time": {
       DEFAULT_FULLSCREEN_CLOCK_SIZE_PX: 18,
@@ -47,6 +48,10 @@ function fixture() {
         adoptionAttempts += 1;
         return adoptionWorks;
       },
+    },
+    "@/lib/library-groups": {
+      normalizeLibraryGroups: identity,
+      normalizeLibraryGroupSections: identity,
     },
   };
   function load(path: string): any {
@@ -100,9 +105,16 @@ test("saved official relay URLs migrate while custom relays and disabled setting
   const f = fixture();
   for (const old of ["wss://pub.harbor.site", "https://pub.harbor.site/", "pub.harbor.site"]) {
     f.data.set("harbor.settings", f.complete({ togetherRelayUrl: old }));
-    assert.equal(f.settings.loadStoredSettings().togetherRelayUrl, relayVersion.HARBOR_PUBLIC_RELAY);
+    assert.equal(
+      f.settings.loadStoredSettings().togetherRelayUrl,
+      relayVersion.HARBOR_PUBLIC_RELAY,
+    );
   }
-  for (const relay of ["", "wss://custom.example.test/base", "wss://pub.harbor.site.example.test"]) {
+  for (const relay of [
+    "",
+    "wss://custom.example.test/base",
+    "wss://pub.harborcommunity.site.example.test",
+  ]) {
     f.data.set("harbor.settings", f.complete({ togetherRelayUrl: relay }));
     assert.equal(f.settings.loadStoredSettings().togetherRelayUrl, relay);
   }

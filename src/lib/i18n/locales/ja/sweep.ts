@@ -41,6 +41,7 @@ const sweep: Record<string, string> = {
   "6-digit code": "6桁のコード",
   "64 neurons": "64ニューロン",
   "8 seconds": "8秒",
+  "10 seconds": "10秒",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1。パス数が半分で、低性能なグラフィックカードへの負荷を抑えられます。",
   "A Harbor account": "Harborアカウント",

@@ -31,12 +31,15 @@ test("audio-device-list churn only schedules a reload after the endpoint set set
   // A change that reverts before the debounce elapses is dropped.
   assert.match(
     mpv,
-    /!mustReload && observedAudioDeviceListSig === lastAudioDeviceListSig\) return;/,
+    /if \(!mustReload && observedAudioDeviceListSig === lastAudioDeviceListSig\) \{/,
   );
   // An empty enumeration stays comparable instead of counting as unusable.
   assert.match(mpv, /return names\.join\("\\n"\);/);
   // An unusable payload falls back to the legacy always-reload behavior.
-  assert.match(mpv, /sig == null\)\s*\{\s*\/\/ No usable list payload[^]*?scheduleAudioDeviceReload\(true\);/);
+  assert.match(
+    mpv,
+    /sig == null\)\s*\{\s*\/\/ No usable list payload[^]*?scheduleAudioDeviceReload\(true\);/,
+  );
 });
 
 test("the reload re-init guard is Windows-only while actively playing", () => {
@@ -49,8 +52,9 @@ test("the reload re-asserts the device then forces ao-reload on the current defa
   assert.match(schedule, /await applyAudioDevice\(/);
   assert.match(schedule, /stillCurrent\(\) && canReload\(\)/);
   assert.match(schedule, /cmd: \["ao-reload"\]/);
-  // ao-reload must appear after the Windows gate so it only fires on desktop.
-  assert.ok(schedule.indexOf("isWindowsDesktop()") < schedule.indexOf("ao-reload"));
+  // Every entry into the reload path is Windows-gated, so ao-reload only runs
+  // on desktop.
+  assert.match(schedule, /if \(!isWindowsDesktop\(\)\) return;/);
 });
 
 test("forced reloads re-anchor A/V when dynaudnorm is active", () => {
@@ -70,18 +74,45 @@ test("Rust allows the ao-reload command", () => {
   assert.match(mpvRs, /"ao-reload",/);
 });
 
+test("Windows validates the effective selected output before first media load", () => {
+  // The mpv.conf option is applied only after mpv initialization. Validating in
+  // the React device picker alone cannot prevent the first AO startup failure.
+  const start = mpvRs.indexOf("pub async fn mpv_start(");
+  const preflight = mpvRs.indexOf("fallback_missing_audio_device(&mpv);", start);
+  const extra = mpvRs.indexOf("apply_extra_mpv_options(&mpv, extra);", start);
+  const loadfile = mpvRs.indexOf('mpv_argv_command(&*mpv_arc, &["loadfile"', start);
+  assert.ok(start >= 0 && extra > start && preflight > extra && loadfile > preflight);
+  assert.match(mpvRs.slice(extra, preflight), /#\[cfg\(windows\)\]/);
+  assert.match(mpvRs, /if !audio_device_unavailable\(&selected, &available\)/);
+  assert.match(mpvRs, /mpv\.set_property\("audio-device", "auto"\)/);
+});
+
+test("missing-device fallback does not alter healthy audio reload paths", () => {
+  assert.match(mpvRs, /!devices\.is_empty\(\)/);
+  assert.match(mpvRs, /devices\.iter\(\)\.any\(\|device\| device\.name == selected\)/);
+  assert.doesNotMatch(
+    mpvRs.slice(
+      mpvRs.indexOf("fn fallback_missing_audio_device("),
+      mpvRs.indexOf("fn mpv_header_field("),
+    ),
+    /ao-reload|["']pause["']|["']seek["']/,
+  );
+  assert.match(schedule, /if \(!isWindowsDesktop\(\)\) return;/);
+});
+
 test("refocus reload waits for a long absence and removes both listeners on disposal", () => {
   assert.match(mpv, /const FOCUS_RELOAD_MIN_ABSENT_MS = 60_000/);
   assert.match(mpv, /const onWindowBlur = \(\) => \{\s*lastWindowBlur = Date.now\(\)/);
-  // Wake-from-sleep triggers are unconditional: they must not be dropped by
-  // the list-settle guard even when no device-list event carried them.
+  // Wake-from-sleep triggers only run for active playback and are marked
+  // speculative, so a pause before the timer fires cancels them. They must not
+  // count as a real endpoint change.
   assert.match(
     mpv,
-    /if \(document\.visibilityState !== "visible"\) return;\s*scheduleAudioDeviceReload\(true\)/,
+    /if \(document\.visibilityState !== "visible"\) return;\s*if \(snap\.status !== "playing"\) return;\s*scheduleAudioDeviceReload\(true, false\)/,
   );
   assert.match(
     mpv,
-    /Date.now\(\) - lastWindowBlur < FOCUS_RELOAD_MIN_ABSENT_MS\) return;\s*scheduleAudioDeviceReload\(true\)/,
+    /if \(snap\.status !== "playing"\) return;\s*if \(Date\.now\(\) - lastWindowBlur < FOCUS_RELOAD_MIN_ABSENT_MS\) return;\s*scheduleAudioDeviceReload\(true, false\)/,
   );
   for (const [event, callback] of [
     ["blur", "onWindowBlur"],
@@ -90,6 +121,35 @@ test("refocus reload waits for a long absence and removes both listeners on disp
     assert.ok(mpv.includes(`window.addEventListener("${event}", ${callback})`));
     assert.ok(mpv.includes(`window.removeEventListener("${event}", ${callback})`));
   }
+});
+
+test("a pending device change is applied by play before audio starts", () => {
+  // The pause=false property event arrives after mpv has already resumed. The
+  // recovery must happen in play(), while mpv is still paused, so the output
+  // re-init cannot underrun the first audio callback.
+  assert.match(
+    mpv,
+    /async play\([^)]*\) \{[\s\S]*?if \(pendingAudioDeviceReload && mpvStarted && snap\.status === "paused"\) \{[\s\S]*?await performAudioDeviceReload\(true\)[\s\S]*?name: "pause", value: false/,
+  );
+  // A bare pause=false must not re-arm a deferred recovery on top of resume.
+  assert.doesNotMatch(
+    mpv,
+    /if \(!data && pendingAudioDeviceReload\) scheduleAudioDeviceReload\(\);/,
+  );
+  // A speculative wake reset is dropped when playback pauses; a real endpoint
+  // change is kept for the next play.
+  assert.match(
+    mpv,
+    /if \(!pendingAudioDeviceChange\) \{\s*forceAudioDeviceReload = false;\s*pendingAudioDeviceReload = false;\s*\}/,
+  );
+});
+
+test("reasserting the current audio device does not reopen the output", () => {
+  assert.match(
+    mpv,
+    /const current = await invoke<string \| null>\("mpv_get_property", \{\s*name: "audio-device",\s*\}\)\.catch\(\(\) => null\);/,
+  );
+  assert.match(mpv, /if \(current === target\) return;/);
 });
 
 test("the reload continuation bails when the media moved on underneath it", () => {

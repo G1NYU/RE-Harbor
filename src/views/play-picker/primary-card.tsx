@@ -1,3 +1,4 @@
+import { PlayedLastBadge } from "./played-last-badge";
 import { Check, Download, ExternalLink, Loader2, Zap } from "lucide-react";
 import { Play } from "@/components/icons/play-filled";
 import { Flag } from "@/components/flag";
@@ -36,6 +37,7 @@ export function PrimaryCard({
   queued,
   inSession,
   isPreviouslyPlayed = false,
+  playedLast = false,
   match = null,
 }: {
   meta: Meta;
@@ -50,6 +52,7 @@ export function PrimaryCard({
   queued: boolean;
   inSession: boolean;
   isPreviouslyPlayed?: boolean;
+  playedLast?: boolean;
   match?: "same" | "close" | null;
 }) {
   const t = useT();
@@ -57,7 +60,7 @@ export function PrimaryCard({
   const cachedDebrids = debrids.filter((d) => stream.cached[d.slug]);
   const libraryDebrids = debrids.filter((d) => stream.inLibrary[d.slug]);
   const cachedDebrid = cachedDebrids[0] ?? null;
-  const externalOnly = !stream.url && !stream.infoHash && !!(stream.externalUrl || stream.ytId);
+  const externalOnly = !stream.url && !stream.infoHash && !!stream.externalUrl;
   const link = resolveStreamLink(stream);
   const addonCached = anyStreamCached(stream);
   const isCached =
@@ -151,6 +154,7 @@ export function PrimaryCard({
 
         <div className="flex min-w-0 flex-col justify-between gap-6">
           <div className="flex flex-col gap-4">
+            {playedLast && <PlayedLastBadge />}
             {knownLanguages.length > 0 ? (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 {knownLanguages.slice(0, 6).map((lang) => (

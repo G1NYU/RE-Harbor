@@ -2,30 +2,35 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { Segmented } from "@/views/settings/shared";
 
 export function EditFolderImagesModal({
   isOpen,
   onClose,
   initialCover,
   initialGif,
+  initialLayout,
   onSave,
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialCover: string | null;
   initialGif: string | null;
-  onSave: (cover: string, gif: string) => void;
+  initialLayout?: "CLASSIC" | "GRID";
+  onSave: (cover: string, gif: string, layout?: "CLASSIC" | "GRID") => void;
 }) {
   const t = useT();
   const [cover, setCover] = useState(initialCover || "");
   const [gif, setGif] = useState(initialGif || "");
+  const [layout, setLayout] = useState<"CLASSIC" | "GRID">(initialLayout || "CLASSIC");
 
   useEffect(() => {
     if (isOpen) {
       setCover(initialCover || "");
       setGif(initialGif || "");
+      setLayout(initialLayout || "CLASSIC");
     }
-  }, [isOpen, initialCover, initialGif]);
+  }, [isOpen, initialCover, initialGif, initialLayout]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -48,7 +53,9 @@ export function EditFolderImagesModal({
       <div className="flex w-full max-w-[420px] flex-col gap-6 rounded-3xl border border-edge-soft bg-elevated/95 px-8 py-8 shadow-[0_30px_80px_-25px_rgba(0,0,0,0.85)] animate-in zoom-in-95 fade-in duration-200">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-0.5">
-            <h2 className="text-[19px] font-medium tracking-tight text-ink">{t("Edit Folder Images")}</h2>
+            <h2 className="text-[19px] font-medium tracking-tight text-ink">
+              {t("Edit Folder Images")}
+            </h2>
           </div>
           <button
             onClick={onClose}
@@ -61,7 +68,9 @@ export function EditFolderImagesModal({
 
         <div className="flex flex-col gap-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-muted">{t("Cover Image URL")}</label>
+            <label className="mb-1.5 block text-sm font-medium text-ink-muted">
+              {t("Cover Image URL")}
+            </label>
             <input
               type="text"
               className="w-full rounded-lg border border-edge-soft bg-canvas/60 px-4 py-2.5 text-[14px] text-ink outline-none transition-colors focus:border-accent"
@@ -73,7 +82,9 @@ export function EditFolderImagesModal({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-muted">{t("Focus GIF URL")}</label>
+            <label className="mb-1.5 block text-sm font-medium text-ink-muted">
+              {t("Focus GIF URL")}
+            </label>
             <input
               type="text"
               className="w-full rounded-lg border border-edge-soft bg-canvas/60 px-4 py-2.5 text-[14px] text-ink outline-none transition-colors focus:border-accent"
@@ -81,6 +92,20 @@ export function EditFolderImagesModal({
               onChange={(e) => setGif(e.target.value)}
               placeholder="https://example.com/animation.gif"
               dir="ltr"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-ink-muted">
+              {t("Layout Style")}
+            </label>
+            <Segmented
+              value={layout}
+              onChange={setLayout}
+              options={[
+                { label: t("Classic"), value: "CLASSIC" },
+                { label: t("Grid"), value: "GRID" },
+              ]}
             />
           </div>
 
@@ -93,7 +118,7 @@ export function EditFolderImagesModal({
             </button>
             <button
               onClick={() => {
-                onSave(cover.trim(), gif.trim());
+                onSave(cover.trim(), gif.trim(), layout);
                 onClose();
               }}
               className="rounded-full bg-accent px-5 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"

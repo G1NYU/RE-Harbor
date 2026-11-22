@@ -5,6 +5,7 @@ import { CopyLinkButton, resolveStreamLink } from "@/components/player/copy-link
 import { FlagStack } from "@/components/flag";
 import { FormatBadge, RuleBadges, streamBadges } from "@/components/format-badge";
 import type { ScoredStream } from "@/lib/streams/types";
+import { useSettings } from "@/lib/settings";
 import { useT } from "@/lib/i18n";
 
 export function streamKey(s: ScoredStream): string {
@@ -26,7 +27,10 @@ export function isCurrentStream(
 
 const FLAG_EMOJI_RX = /[\u{1F1E6}-\u{1F1FF}]{2}/gu;
 function stripFlagEmoji(s: string): string {
-  return s.replace(FLAG_EMOJI_RX, "").replace(/\s{2,}/g, " ").trim();
+  return s
+    .replace(FLAG_EMOJI_RX, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function Equalizer() {
@@ -47,6 +51,8 @@ function Equalizer() {
 export function SwitcherRow({
   stream,
   addonLogo,
+  currentAddon,
+  currentName,
   onPick,
   resolving,
   isCurrent,
@@ -54,33 +60,46 @@ export function SwitcherRow({
 }: {
   stream: ScoredStream;
   addonLogo: string | null;
+  currentAddon?: { id: string; name: string } | null;
+  currentName?: string | null;
   onPick: () => void;
   resolving: boolean;
   isCurrent: boolean;
   match?: "same" | "close" | null;
 }) {
   const t = useT();
+  const { settings } = useSettings();
   const [expanded, setExpanded] = useState(false);
+  const [userToggled, setUserToggled] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const descRef = useRef<HTMLParagraphElement>(null);
 
-  const addonName = stream.addonName ?? t("Source");
-  const headline = stripFlagEmoji(stream.name?.trim() || addonName) || addonName;
+  const addonId = isCurrent && currentAddon ? currentAddon.id : stream.addonId;
+  const addonName =
+    isCurrent && currentAddon ? currentAddon.name : (stream.addonName ?? t("Source"));
+  const headlineSource = isCurrent && currentName ? currentName : stream.name?.trim() || addonName;
+  const headline = stripFlagEmoji(headlineSource) || addonName;
   const description = stripFlagEmoji(stream.title?.trim() || stream.description?.trim() || "");
   const badges = streamBadges(stream);
   const anchor = badges[0];
   const secondary = badges.slice(1);
   const langs = stream.audioLanguages ?? [];
   const link = resolveStreamLink(stream);
-  const filterReason = stream.reasons?.find((r) => r.signal.startsWith("filtered:"))?.signal.slice(9);
+  const filterReason = stream.reasons
+    ?.find((r) => r.signal.startsWith("filtered:"))
+    ?.signal.slice(9);
   const interactive = !isCurrent && !resolving;
 
   useLayoutEffect(() => {
     if (expanded) return;
     const el = descRef.current;
     if (!el) return;
-    setOverflows(el.scrollHeight > el.clientHeight + 1);
-  }, [description, expanded]);
+    const truncated = el.scrollHeight > el.clientHeight + 1;
+    setOverflows(truncated);
+    // Same setting the Stremio picker and Big Picture honor, applied after the
+    // clamped first measure so "Show less" still knows there is more to hide.
+    if (truncated && settings.fullStreamDescription && !userToggled) setExpanded(true);
+  }, [description, expanded, settings.fullStreamDescription, userToggled]);
 
   return (
     <li>
@@ -103,8 +122,10 @@ export function SwitcherRow({
               : "cursor-pointer hover:bg-canvas/50 focus-visible:bg-canvas/50"
         }`}
       >
-        {isCurrent && <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-accent" />}
-        <AddonLogo addonId={stream.addonId} addonName={addonName} manifestLogo={addonLogo} size="xl" />
+        {isCurrent && (
+          <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-accent" />
+        )}
+        <AddonLogo addonId={addonId} addonName={addonName} manifestLogo={addonLogo} size="xl" />
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="truncate text-[14px] font-semibold leading-snug text-ink">{headline}</p>
@@ -123,6 +144,7 @@ export function SwitcherRow({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                setUserToggled(true);
                 setExpanded((v) => !v);
               }}
               className="mt-0.5 inline-flex w-fit items-center gap-1 text-[11.5px] font-semibold text-ink-subtle transition-colors hover:text-ink"
@@ -149,7 +171,9 @@ export function SwitcherRow({
           {match && !isCurrent && (
             <span
               className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ring-1 ${
-                match === "same" ? "bg-accent-soft text-accent ring-accent/30" : "bg-raised text-ink-muted ring-edge-soft"
+                match === "same"
+                  ? "bg-accent-soft text-accent ring-accent/30"
+                  : "bg-raised text-ink-muted ring-edge-soft"
               }`}
             >
               {match === "same" ? t("Same file") : t("Close match")}

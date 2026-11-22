@@ -53,7 +53,8 @@ const SEASON_EP_RX = /\b[Ss](\d{1,2})[\s._-]?[Ee](\d{1,4})\b/;
 const SEASON_ONLY_RX = /\b(?:Season|S)[\s._-]?(\d{1,2})\b/i;
 const YEAR_RX = /(?:^|[^\d])((?:19|20)\d{2})(?:[^\d]|$)/;
 const RELEASE_GROUP_DASH_RX = /-([A-Za-z0-9_]+)(?:\.[a-z0-9]{2,4})?$/i;
-const ANIME_EP_RX = /(?:^|[\s._-])(?:Ep?(?:isode)?[\s._-]?)?(\d{1,4})(?:v\d)?(?=\s*(?:\[|\(|$|[\s._-]))/i;
+const ANIME_EP_RX =
+  /(?:^|[\s._-])(?:Ep?(?:isode)?[\s._-]?)?(\d{1,4})(?:v\d)?(?=\s*(?:\[|\(|$|[\s._-]))/i;
 const BATCH_RX = /\b(?:BATCH|COMPLETE|SEASON\s*PACK)\b/i;
 const RANGE_RX = /\b(\d{1,4})\s*[-~]\s*(\d{1,4})\b/;
 
@@ -99,6 +100,11 @@ function parseAnimeFilename(raw: string): AnitomyFields {
     .replace(/\([^)]*\)/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  if (out.episodeNumber == null) {
+    const bracketEpisode = working.match(/\[(\d{1,3})(?:v\d)?\]/i);
+    if (bracketEpisode) out.episodeNumber = Number(bracketEpisode[1]);
+  }
 
   if (out.episodeNumber == null) {
     const dash = stripped.match(/\s-\s(\d{1,4})(?:v\d)?(?:\s|$)/);

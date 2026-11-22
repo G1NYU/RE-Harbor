@@ -18,7 +18,7 @@ import type {
 } from "@/lib/media-server/types";
 import {
   readPlayback,
-  streamMatchesEntry,
+  findRememberedSourceMatch,
   streamMatchesSource,
   type PlaybackEntry,
 } from "@/lib/playback-history";
@@ -198,9 +198,8 @@ export function useBpStreams(params: { meta: Meta; episode?: PlayEpisode }): BpS
   // The remembered pick and the season lock are what "don't ask me again" means.
   // Neither was read back here, so both settings silently did nothing.
   const previousPlayback = useMemo(
-    () =>
-      settings.rememberLastStream ? readPlayback(meta.id, episode?.season, episode?.episode) : null,
-    [meta.id, episode?.season, episode?.episode, settings.rememberLastStream],
+    () => readPlayback(meta.id, episode?.season, episode?.episode),
+    [meta.id, episode?.season, episode?.episode],
   );
 
   const sourceEntry = useMemo(
@@ -222,7 +221,7 @@ export function useBpStreams(params: { meta: Meta; episode?: PlayEpisode }): BpS
     if (!rememberedEntry || pool.length === 0) return null;
     const match =
       rememberedEntry.kind === "playback"
-        ? (pool.find((s) => streamMatchesEntry(s, rememberedEntry.entry)) ?? null)
+        ? findRememberedSourceMatch(pool, rememberedEntry.entry)
         : (pool.find((s) => streamMatchesSource(s, rememberedEntry.entry)) ?? null);
     if (!match || isAnimeMetaId || !episode || rememberedEntry.kind === "source") return match;
     if (match.episode != null && match.episode !== episode.episode) return null;
@@ -243,6 +242,7 @@ export function useBpStreams(params: { meta: Meta; episode?: PlayEpisode }): BpS
     debrids,
     isCached,
     isAnimeRequest,
+    originalLanguage: meta.originalLanguage,
     hostMatch,
     pinned: rememberedStream,
     addonLogoFor,

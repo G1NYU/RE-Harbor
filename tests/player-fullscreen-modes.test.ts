@@ -19,6 +19,7 @@ function body(source: string, signature: string): string {
 const stateSource = read("../src/lib/fullscreen-state.ts");
 const hookSource = read("../src/views/player/hooks/use-fullscreen.ts");
 const settingsSource = read("../src/views/settings/quality-panel/window-options.tsx");
+const fullscreenRs = read("../src-tauri/src/fullscreen.rs");
 
 test("fullscreen state offers three distinct window modes", () => {
   assert.match(
@@ -57,6 +58,13 @@ test("the player reasserts the chosen mode instead of forcing true fullscreen", 
   assert.doesNotMatch(hookSource, /invoke\("window_fullscreen_enter"\)/);
   assert.match(stateSource, /export async function reassertFullscreenMode\(\)/);
   assert.match(stateSource, /if \(borderlessActive\) \{\s*await reassertBorderless\(\);/);
+});
+
+test("macOS fullscreen state comes from AppKit, not tao's stale flag", () => {
+  assert.match(fullscreenRs, /fn window_is_fullscreen/);
+  assert.match(fullscreenRs, /NSWindowStyleMask::FullScreen/);
+  assert.match(fullscreenRs, /let already_fs = window_is_fullscreen\(main\);/);
+  assert.match(fullscreenRs, /exit_native_fullscreen\(main\)\?;/);
 });
 
 test("a borderless session survives a stray DOM fullscreenchange", () => {

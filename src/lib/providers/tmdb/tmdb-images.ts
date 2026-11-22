@@ -7,8 +7,20 @@ import { imageLangParam, imageLangPriority, imageLangRank } from "./tmdb-image-l
 
 export type LogoEntry = { file_path: string; iso_639_1: string | null; vote_average?: number };
 
+type TmdbBackdropEntry = {
+  file_path: string;
+  iso_639_1?: string | null;
+  vote_average?: number;
+};
+
+export function textlessTmdbBackdrops(
+  entries: TmdbBackdropEntry[] | undefined,
+): TmdbBackdropEntry[] {
+  return entries?.filter((entry) => entry.iso_639_1 === null && !!entry.file_path) ?? [];
+}
+
 export type RawImages = {
-  backdrops?: Array<{ file_path: string; vote_average?: number }>;
+  backdrops?: TmdbBackdropEntry[];
   logos?: LogoEntry[];
   posters?: Array<{ file_path: string; vote_average?: number; iso_639_1?: string | null }>;
 };
@@ -123,8 +135,10 @@ export async function tmdbMovieImages(key: string, metaId: string): Promise<stri
   const data = await fetchMovieAssets(key, metaId);
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const b of (data?.backdrops ?? []).sort(
-    (a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0),
+  for (const b of [...(data?.backdrops ?? [])].sort(
+    (a, b) =>
+      Number(b.iso_639_1 === null) - Number(a.iso_639_1 === null) ||
+      (b.vote_average ?? 0) - (a.vote_average ?? 0),
   )) {
     const url = tmdbBackdropUrl(b.file_path);
     if (!url || seen.has(b.file_path)) continue;

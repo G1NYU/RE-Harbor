@@ -213,6 +213,27 @@ test("the CW card re-resolves when the title language changes", () => {
   // the card live, not wait for a remount, and must not re-run the artwork
   // hydration that shares the old effect.
   const src = readFileSync("src/components/continue-card.tsx", "utf8");
-  assert.match(src, /resolvePreferredAnimeTitle\(item\._id, settings\.animeTitleLanguage\)/);
-  assert.match(src, /\}, \[item\._id, settings\.animeTitleLanguage\]\);/);
+  assert.match(
+    src,
+    /resolvePreferredAnimeTitle\(\s*item\._id,\s*settings\.animeTitleLanguage,\s*\{[\s\S]*?\}\)\s*\.then/,
+  );
+  assert.match(
+    src,
+    /\},\s*\[\s*item\._id,\s*item\.state\?\.video_id,\s*item\.state\?\.season,\s*item\.state\?\.episode,\s*settings\.animeTitleLanguage,\s*animeIdsVersion,\s*detectedVersion,\s*effectiveKitsuVideo\?\.id,\s*titleKey,\s*sourceIdentity,?\s*\]\);/,
+  );
+});
+
+test("the CW card opens the resolved anime entry, not the catalog base", () => {
+  const src = readFileSync("src/components/continue-card.tsx", "utf8");
+  assert.match(
+    src,
+    /const animeEntry = kitsuId != null \? `kitsu:\$\{kitsuId\}` : getAnimeCwId\(item\._id\)/,
+  );
+  assert.match(src, /id: detailId/);
+});
+
+test("the CW card resolves the exact Kitsu cour before choosing its title", () => {
+  const src = readFileSync("src/components/continue-card.tsx", "utf8");
+  assert.match(src, /const titleVideoId = effectiveKitsuVideo\?\.id \?\? item\.state\?\.video_id/);
+  assert.match(src, /if \(nativeRow\) return;[\s\S]*?resolveCwAnimeVideo\(itemRef\.current, ep\)/);
 });

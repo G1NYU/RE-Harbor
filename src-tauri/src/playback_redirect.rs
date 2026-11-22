@@ -4,15 +4,13 @@ use std::{sync::OnceLock, time::Duration};
 const RESOLVE_BUDGET: Duration = Duration::from_millis(2500);
 const PLAYER_USER_AGENT: &str = "VLC/3.0.20 LibVLC/3.0.20";
 
+// The frontend limits probes to installed add-on hosts; native code only
+// rejects transports that cannot be a media redirect source.
 fn candidate(url: &Url) -> bool {
     url.scheme() == "https"
         && url.username().is_empty()
         && url.password().is_none()
         && url.port().is_none()
-        && matches!(
-            url.host_str(),
-            Some("addon.debridio.com" | "mediafusion.elfhosted.com")
-        )
 }
 
 fn client() -> Option<&'static Client> {
@@ -28,21 +26,26 @@ fn client() -> Option<&'static Client> {
         .as_ref()
 }
 
-async fn resolve(client: &Client, url: &str, budget: Duration) -> Option<String> {
+async fn resolve(
+    client: &Client,
+    url: &str,
+    budget: Duration,
+    public_only: bool,
+) -> Option<String> {
     tokio::time::timeout(budget, async {
         // GET matches the actual playback route; HEAD is rejected or handled
         // differently by some add-ons. Read headers only, then drop the body.
-        let response = crate::http_redirect::send_get(
-            client,
-            client
-                .get(url)
-                .header(header::USER_AGENT, PLAYER_USER_AGENT)
-                .header(header::RANGE, "bytes=0-0")
-                .header(header::ACCEPT_ENCODING, "identity"),
-            url,
-        )
-        .await
-        .ok()?;
+        let builder = client
+            .get(url)
+            .header(header::USER_AGENT, PLAYER_USER_AGENT)
+            .header(header::RANGE, "bytes=0-0")
+            .header(header::ACCEPT_ENCODING, "identity");
+        let result = if public_only {
+            crate::http_redirect::send_get_public(client, builder, url).await
+        } else {
+            crate::http_redirect::send_get(client, builder, url).await
+        };
+        let response = result.ok()?;
         if response.url().as_str() == url
             || response.status() != StatusCode::PARTIAL_CONTENT
             || response.headers().contains_key(header::SET_COOKIE)
@@ -87,7 +90,7 @@ pub async fn resolve_playback_redirect(url: String) -> Option<String> {
     if !candidate(&parsed) {
         return None;
     }
-    resolve(client()?, &url, RESOLVE_BUDGET).await
+    resolve(client()?, &url, RESOLVE_BUDGET, true).await
 }
 
 #[cfg(test)]
@@ -125,23 +128,36 @@ mod tests {
     }
 
     #[test]
-    fn only_measured_https_addon_origins_are_candidates() {
-        for host in ["addon.debridio.com", "mediafusion.elfhosted.com"] {
-            assert!(candidate(
-                &Url::parse(&format!("https://{host}/fixture/play")).unwrap()
-            ));
-            for url in [
-                format!("http://{host}/play"),
-                format!("https://{host}.example.org/play"),
-                format!("https://{host}:8443/play"),
-                format!("https://user:secret@{host}/play"),
-            ] {
-                assert!(!candidate(&Url::parse(&url).unwrap()));
-            }
+    fn candidates_are_plain_https_origins() {
+        for url in [
+            "https://addon.example.org/fixture/play",
+            "https://sooti.click/play",
+        ] {
+            assert!(candidate(&Url::parse(url).unwrap()), "{url}");
         }
-        assert!(!candidate(
-            &Url::parse("https://cdn.example.org/file.mkv").unwrap()
-        ));
+        for url in [
+            "http://addon.example.org/play",
+            "https://addon.example.org:8443/play",
+            "https://user:secret@addon.example.org/play",
+            "file:///tmp/play",
+        ] {
+            assert!(!candidate(&Url::parse(url).unwrap()), "{url}");
+        }
+    }
+
+    #[tokio::test]
+    async fn resolution_refuses_internal_targets_before_requesting() {
+        for url in [
+            "https://127.0.0.1/play",
+            "https://[::1]/play",
+            "https://localhost/play",
+        ] {
+            assert_eq!(
+                resolve_playback_redirect(url.to_string()).await,
+                None,
+                "{url}"
+            );
+        }
     }
 
     #[tokio::test]
@@ -182,6 +198,7 @@ mod tests {
             &test_client(),
             &format!("{}/play", server.url),
             Duration::from_secs(1),
+            false,
         )
         .await;
         assert_eq!(result, Some(format!("{}/file", server.url)));
@@ -223,7 +240,8 @@ mod tests {
                 resolve(
                     &test_client(),
                     &format!("{}/play", server.url),
-                    Duration::from_secs(1)
+                    Duration::from_secs(1),
+                    false
                 )
                 .await,
                 None
@@ -253,7 +271,8 @@ mod tests {
                 resolve(
                     &test_client(),
                     &format!("{}/{path}", server.url),
-                    Duration::from_millis(40)
+                    Duration::from_millis(40),
+                    false
                 )
                 .await,
                 None
@@ -262,7 +281,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn direct_media_is_not_substituted_and_unrecognized_origins_are_not_requested() {
+    async fn direct_media_is_not_substituted_and_non_https_targets_are_not_requested() {
         let server = serve(Router::new().route(
             "/file",
             get(|| async {
@@ -279,7 +298,7 @@ mod tests {
         .await;
         let url = format!("{}/file", server.url);
         assert_eq!(
-            resolve(&test_client(), &url, Duration::from_secs(1)).await,
+            resolve(&test_client(), &url, Duration::from_secs(1), false).await,
             None
         );
         assert_eq!(resolve_playback_redirect(url).await, None);

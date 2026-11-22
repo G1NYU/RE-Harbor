@@ -209,6 +209,8 @@ const catalog: Record<string, string> = {
   "Go to featured item {n}": "Buka item unggulan {n}",
   "Go to host": "Buka host",
   "Go to live": "Buka siaran langsung",
+  "Episode pages": "Halaman episode",
+  "Go to page": "Buka halaman",
   "Go to page {page}": "Buka halaman {page}",
   "Go to pages {pages}": "Buka halaman {pages}",
   "Go to show": "Buka acara",
@@ -306,7 +308,8 @@ const catalog: Record<string, string> = {
   "Hand-tuned colors. Edit them in the section above.":
     "Warna yang disesuaikan secara manual. Edit di bagian atas.",
   Handle: "Nama pengguna",
-  "Handles P2P playback and transcoding for this machine.": "Menangani pemutaran P2P dan transkode untuk perangkat ini.",
+  "Handles P2P playback and transcoding for this machine.":
+    "Menangani pemutaran P2P dan transkode untuk perangkat ini.",
   "Hang tight, won't be a sec.": "Tunggu sebentar, tidak akan lama.",
   "Hangout Comedy": "Komedi Santai",
   Harbor: "Harbor",
@@ -348,10 +351,10 @@ const catalog: Record<string, string> = {
     "Saat terbuka, Harbor memeriksa beberapa kali sehari dan memberi tahu Anda di sini.",
   "Harbor checks automatically every few hours.":
     "Harbor memeriksa secara otomatis setiap beberapa jam.",
-  "Harbor checks harbor.site for new versions and installs them in place.":
-    "Harbor memeriksa versi baru di harbor.site dan menginstalnya langsung.",
-  "Harbor checks harbor.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
-    "Harbor memeriksa versi baru di harbor.site dan menginstalnya langsung. Tidak ada yang diinstal sampai Anda memilihnya, dan pembaruan yang diabaikan tidak akan mengganggu Anda lagi.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place.":
+    "Harbor memeriksa versi baru di harborcommunity.site dan menginstalnya langsung.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
+    "Harbor memeriksa versi baru di harborcommunity.site dan menginstalnya langsung. Tidak ada yang diinstal sampai Anda memilihnya, dan pembaruan yang diabaikan tidak akan mengganggu Anda lagi.",
   "Harbor could not find these": "Harbor tidak dapat menemukan item berikut",
   "Harbor could not open its web server. Try again, or set this up on the TV.":
     "Harbor tidak dapat membuka server webnya. Coba lagi, atau siapkan ini di TV.",
@@ -430,7 +433,8 @@ const catalog: Record<string, string> = {
   "Harbor never hosts your books or source files.":
     "Harbor tidak pernah menghosting buku atau file sumber Anda.",
   "Harbor never hosts your books.": "Harbor tidak pernah menghosting buku Anda.",
-  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.": "Harbor biasanya memulai mesin P2P saat diluncurkan agar stream P2P pertama tersambung lebih cepat. Ini membuat node DHT terus berjalan dan berkomunikasi dengan jaringan meski Anda tidak menonton apa pun. Aktifkan opsi ini jika koneksi Anda berkuota atau terbatas: mesin baru akan dimulai saat Anda benar-benar memutar stream P2P untuk pertama kalinya. Berlaku pada peluncuran berikutnya.",
+  "Harbor normally starts its P2P engine at launch so the first P2P stream connects faster. That keeps a DHT node running and talking to the network even when you are not watching anything. Turn this on if you are on a metered or limited connection: the engine then starts the first time you actually play a P2P stream. Takes effect next launch.":
+    "Harbor biasanya memulai mesin P2P saat diluncurkan agar stream P2P pertama tersambung lebih cepat. Ini membuat node DHT terus berjalan dan berkomunikasi dengan jaringan meski Anda tidak menonton apa pun. Aktifkan opsi ini jika koneksi Anda berkuota atau terbatas: mesin baru akan dimulai saat Anda benar-benar memutar stream P2P untuk pertama kalinya. Berlaku pada peluncuran berikutnya.",
   "Harbor on other devices": "Harbor di perangkat lain",
   "Harbor on other devices (web app)": "Harbor di perangkat lain (aplikasi web)",
   "Harbor on the server display": "Harbor di layar server",
@@ -502,7 +506,8 @@ const catalog: Record<string, string> = {
     "Harbor dibuat dalam bahasa Inggris. Dukungan multibahasa masih terbatas, jadi addon Anda biasanya menemukan hal yang terlewat oleh filter Harbor sendiri. Jika Anda menggunakan bahasa lain dan ingin membantu, kode sumbernya terbuka.",
   "Harbor will mark what you finish as watched on Simkl and sync your plan-to-watch list.":
     "Harbor akan menandai tontonan yang Anda selesaikan sebagai sudah ditonton di Simkl dan menyinkronkan daftar rencana tontonan Anda.",
-  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.": "Harbor tidak akan memulai mesin P2P, menghubungi pelacak, atau menjalankan DHT. Gunakan ini jika Anda hanya menginginkan debrid dan tautan langsung. Nonaktifkan untuk mengaktifkan kembali streaming P2P.",
+  "Harbor will not start the P2P engine, contact trackers, or run DHT. Use this if you only want debrid and direct links. Turn off to re-enable P2P streaming.":
+    "Harbor tidak akan memulai mesin P2P, menghubungi pelacak, atau menjalankan DHT. Gunakan ini jika Anda hanya menginginkan debrid dan tautan langsung. Nonaktifkan untuk mengaktifkan kembali streaming P2P.",
   "Harbor will scrobble your playback to Trakt and sync your watchlist.":
     "Harbor akan mencatat pemutaran Anda ke Trakt dan menyinkronkan daftar tontonan Anda.",
   "Harbor would not be possible without Stremio. It is the foundation everything here is built on.":

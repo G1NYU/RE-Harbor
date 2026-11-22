@@ -170,6 +170,32 @@ impl ConnectorRegistry {
         candidates
     }
 
+    /// Candidate matches restricted to one connector. Playback asks only the preferred source
+    /// first, so a song that source already carries can start without waiting for every other
+    /// connector's search; the full fan-out then runs in the background for fallbacks.
+    pub async fn candidates_for(
+        &self,
+        app: &tauri::AppHandle,
+        track: &MusicTrack,
+        connector_id: &str,
+    ) -> Vec<MusicSourceCandidate> {
+        let original_id = track.connector_id.as_deref().unwrap_or("youtube");
+        if connector_id == original_id {
+            return Vec::new();
+        }
+        let Some(connector) = self
+            .get(connector_id)
+            .filter(|connector| connector.searchable() && connector.playable())
+            .filter(|connector| connector.health() != ConnectorHealth::Offline)
+        else {
+            return Vec::new();
+        };
+        let query = format!("{} {}", track.artist.trim(), track.title.trim());
+        let mut seen = HashSet::from([source_key(track)]);
+        self.matched_sources(app, track, &query, vec![connector], &mut seen)
+            .await
+    }
+
     async fn matched_sources(
         &self,
         app: &tauri::AppHandle,

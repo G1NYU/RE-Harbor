@@ -3,9 +3,13 @@ import { isStreamDead } from "@/lib/dead-streams";
 import { engineP2pEligible } from "@/lib/torrent/stremio-stream";
 import type { ScoredStream } from "@/lib/streams/types";
 import {
-  streamMatchesEntry,
+  streamMatchesPreferredSource,
+  streamMatchesPreferredSourceFallback,
   streamMatchesReleaseLineage,
   streamMatchesSource,
+  findPreferredSourceMatch,
+  findRememberedSourceMatch,
+  streamOfferedByAddon,
   type PlaybackEntry,
 } from "@/lib/playback-history";
 import type { SourceDescriptor } from "@/lib/together/protocol";
@@ -27,6 +31,7 @@ export function useAutoCandidates(args: {
   previousPlayback: PlaybackEntry | null;
   sourceEntry: PlaybackEntry | null;
   sourceEntryLineage?: boolean;
+  sourceEntryBestEffort?: boolean;
   isCached: (s: ScoredStream) => boolean;
   addons: Array<{ manifest?: { id?: string } }> | null;
   hasStrongAddon: boolean;
@@ -35,6 +40,7 @@ export function useAutoCandidates(args: {
   hostSource?: SourceDescriptor | null;
   prefer1080?: boolean;
   preferPacks?: boolean;
+  sourceEntryFirst?: boolean;
   season?: number | null;
   episode?: number | null;
   expectedTitle?: string | null;
@@ -47,6 +53,7 @@ export function useAutoCandidates(args: {
     previousPlayback,
     sourceEntry,
     sourceEntryLineage,
+    sourceEntryBestEffort,
     isCached,
     addons,
     hasStrongAddon,
@@ -55,6 +62,7 @@ export function useAutoCandidates(args: {
     hostSource,
     prefer1080,
     preferPacks,
+    sourceEntryFirst,
     season,
     episode,
     expectedTitle,
@@ -110,7 +118,12 @@ export function useAutoCandidates(args: {
     });
     const matchScores = hostSource ? buildMatchScores(filteredPicker.all, hostSource) : null;
     const previousMatch = previousPlayback
-      ? (filteredPicker.allRaw.find((s) => streamMatchesEntry(s, previousPlayback)) ?? null)
+      ? findRememberedSourceMatch(
+          filteredPicker.allRaw.filter(
+            (s) => !isStreamDead(s) && !isWatchHub(s) && !episodeConflict(s),
+          ),
+          previousPlayback,
+        )
       : null;
     for (const s of filteredPicker.all) s.nameAbsent = !nameKnown(s);
     const sorted = filteredPicker.all.slice().sort((a, b) => {
@@ -172,14 +185,47 @@ export function useAutoCandidates(args: {
       seen.add(k);
       out.push(s);
     };
-    const matchSource = sourceEntryLineage ? streamMatchesReleaseLineage : streamMatchesSource;
+    const matchSource = sourceEntryBestEffort
+      ? streamMatchesPreferredSource
+      : sourceEntryLineage
+        ? streamMatchesReleaseLineage
+        : streamMatchesSource;
+    const eligibleSourceStreams = filteredPicker.allRaw.filter(
+      (s) => !isStreamDead(s) && !isWatchHub(s) && !episodeConflict(s) && (isCached(s) || !!s.url),
+    );
     const sourceMatch = sourceEntry
-      ? (filteredPicker.allRaw.find((s) => matchSource(s, sourceEntry)) ?? null)
+      ? findPreferredSourceMatch(eligibleSourceStreams, sourceEntry, matchSource)
+      : null;
+    const fallbackSourceMatch =
+      sourceEntry && sourceEntryBestEffort
+        ? findPreferredSourceMatch(
+            eligibleSourceStreams,
+            sourceEntry,
+            streamMatchesPreferredSourceFallback,
+          )
+        : null;
+    // When the exact source is unavailable at the remembered quality, prefer
+    // another stream at that quality over a same-group release at a different
+    // resolution. The remembered addon still wins ties.
+    const preferredQuality = sourceEntry?.resolution
+      ? (filteredPicker.all.find(
+          (s) =>
+            s.resolution === sourceEntry.resolution &&
+            (!sourceEntry.addonId || streamOfferedByAddon(s, sourceEntry.addonId)),
+        ) ??
+        filteredPicker.all.find((s) => s.resolution === sourceEntry.resolution) ??
+        null)
       : null;
     const instantPlayable = (s: ScoredStream | null) => !!s && (isCached(s) || !!s.url);
     if (!matchScores) {
+      // The exact remembered file wins for the episode it belongs to; the
+      // series lineage only fills in when no same-episode memory exists. A
+      // season lock is an explicit choice and stays first.
+      if (!sourceEntryFirst && instantPlayable(previousMatch)) push(previousMatch);
       if (instantPlayable(sourceMatch)) push(sourceMatch);
-      if (instantPlayable(previousMatch)) push(previousMatch);
+      if (instantPlayable(fallbackSourceMatch)) push(fallbackSourceMatch);
+      if (instantPlayable(preferredQuality)) push(preferredQuality);
+      if (sourceEntryFirst && instantPlayable(previousMatch)) push(previousMatch);
     }
     for (const s of sorted) push(s);
     if (out.length > 0) return out;
@@ -195,6 +241,7 @@ export function useAutoCandidates(args: {
     previousPlayback,
     sourceEntry,
     sourceEntryLineage,
+    sourceEntryBestEffort,
     isCached,
     addons,
     hasStrongAddon,
@@ -203,6 +250,7 @@ export function useAutoCandidates(args: {
     hostSource,
     prefer1080,
     preferPacks,
+    sourceEntryFirst,
     season,
     episode,
     expectedTitle,

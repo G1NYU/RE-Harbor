@@ -36,10 +36,13 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.show": "Show player bar",
   "music.dock.parts.title": "Bottom bar",
   "music.dock.parts.body": "Choose which controls appear in the player bar.",
+  "music.dock.autoHide": "Automatically hide the music player bar",
+  "music.dock.autoHideHelp":
+    "When enabled, the bar slides down after 2 seconds without interaction. Move your cursor to the bottom edge to bring it back. Off by default.",
   "music.dock.part.quality": "Quality badge",
   "music.dock.part.source": "Source",
   "music.dock.part.time": "Time",
-  "music.dock.part.queue": "Queue",
+  "music.dock.part.queue": "Listening queue",
   "music.dock.part.like": "Like",
 
   "music.now.colors": "Album colors",

@@ -177,7 +177,8 @@ const extra: Record<string, string> = {
   "Browse channels": "Duyệt kênh",
   "Buffer fill": "Mức đầy bộ đệm",
   "Reveal the dot on hover": "Hiện chấm khi di chuột",
-  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Chấm không vướng mắt và xuất hiện khi bạn trỏ vào thanh. Tắt tuỳ chọn này để chấm luôn hiển thị.",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.":
+    "Chấm không vướng mắt và xuất hiện khi bạn trỏ vào thanh. Tắt tuỳ chọn này để chấm luôn hiển thị.",
   "Buffer fill brightness": "Độ sáng mức đầy bộ đệm",
   Build: "Tạo",
   "Build a named filter once, then apply it in the source picker to hide everything that doesn't match. Each filter ANDs its dimensions and ignores any you leave blank.":
@@ -222,7 +223,8 @@ const extra: Record<string, string> = {
     "Kết nối dịch vụ debrid (Real-Debrid, TorBox, AllDebrid) để xem HD ngay mà không phải chờ.",
   "Connect MyAnimeList": "Kết nối MyAnimeList",
   "Connect your MyAnimeList account": "Kết nối tài khoản MyAnimeList",
-  "Connect your Trakt account to leave comments and reviews.": "Kết nối tài khoản Trakt để để lại bình luận và đánh giá.",
+  "Connect your Trakt account to leave comments and reviews.":
+    "Kết nối tài khoản Trakt để để lại bình luận và đánh giá.",
   "Connected as {username}": "Đã kết nối với tên {username}",
   "Connected as @{user}": "Đã kết nối với tên @{user}",
   "Connected as @{username}": "Đã kết nối với tên @{username}",
@@ -239,7 +241,8 @@ const extra: Record<string, string> = {
   "Continue from last watched": "Tiếp tục từ nội dung xem gần nhất",
   "Continue in your browser...": "Tiếp tục trong trình duyệt...",
   "Copy diagnostics": "Sao chép thông tin chẩn đoán",
-  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.": "Sao chép thông tin chẩn đoán sẽ lấy trạng thái engine và cài đặt P2P dưới dạng JSON, tiện để dán vào báo cáo lỗi. Thư mục engine chứa bộ nhớ đệm DHT (dht.json) và dữ liệu truyền đang hoạt động.",
+  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.":
+    "Sao chép thông tin chẩn đoán sẽ lấy trạng thái engine và cài đặt P2P dưới dạng JSON, tiện để dán vào báo cáo lỗi. Thư mục engine chứa bộ nhớ đệm DHT (dht.json) và dữ liệu truyền đang hoạt động.",
   "Copy your Harbor watchlist over to Trakt, or pull your Trakt watchlist into Harbor. Safe to run again, Trakt skips anything it already has.":
     "Sao chép danh sách xem Harbor sang Trakt hoặc nhập danh sách xem Trakt vào Harbor. Có thể chạy lại an toàn, Trakt sẽ bỏ qua mọi nội dung đã có.",
   "Corner radius": "Độ bo góc",
@@ -250,8 +253,8 @@ const extra: Record<string, string> = {
   "Couldn't connect to MyAnimeList": "Không thể kết nối với MyAnimeList",
   "Couldn't load this list. Check the URL and try again.":
     "Không thể tải danh sách này. Hãy kiểm tra URL rồi thử lại.",
-  "Couldn't reach harbor.site to load earlier builds. Check your connection and try again.":
-    "Không thể kết nối với harbor.site để tải các bản dựng trước. Hãy kiểm tra kết nối rồi thử lại.",
+  "Couldn't reach GitHub to load earlier builds. Check your connection and try again.":
+    "Không thể kết nối với GitHub để tải các bản dựng trước. Hãy kiểm tra kết nối rồi thử lại.",
   "Couldn't reach Trakt": "Không thể kết nối với Trakt",
   "Couldn't reach Trakt. Check your connection and try again.":
     "Không thể kết nối với Trakt. Hãy kiểm tra kết nối rồi thử lại.",
@@ -728,8 +731,8 @@ const extra: Record<string, string> = {
     "Hiển thị nhanh lớp phủ âm lượng khi bạn thay đổi âm lượng trong lúc các nút điều khiển trình phát đang ẩn, để thay đổi bằng bàn phím và con lăn luôn hiển thị.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Hiển thị nút Bỏ qua khi phát quảng cáo chèn đã nhận diện và nút báo cáo nhỏ trên nội dung mới phát hành để bạn đánh dấu quảng cáo cần xem xét.",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Hiển thị nút Bỏ qua phần mở đầu / Bỏ qua phần giới thiệu cuối phim khi Harbor phát hiện. Tắt tùy chọn này để không bao giờ hiển thị. Bạn cũng có thể nhấn X trên nút để ẩn mục bị nhận diện sai trong phần còn lại của tập.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Hiển thị nút Bỏ qua phần mở đầu / Bỏ qua phần giới thiệu cuối phim khi Harbor phát hiện. Tắt tùy chọn này để không bao giờ hiển thị. Nút tự ẩn khi phần mở đầu hoặc phần giới thiệu cuối phim kết thúc, hoặc sau độ trễ bên dưới.",
   "Show an “on disk” badge on cards": "Hiển thị nhãn “trên ổ đĩa” trên thẻ",
   "Show audience score on cards": "Hiển thị điểm khán giả trên thẻ",
   "Show comments on detail pages": "Hiển thị bình luận trên trang chi tiết",
@@ -758,7 +761,8 @@ const extra: Record<string, string> = {
   "Show the full notes for this build": "Hiển thị ghi chú đầy đủ cho bản dựng này",
   "Show the IMDb rating and synopsis on episodes across the list, grid, and panel layouts.":
     "Hiển thị điểm IMDb và tóm tắt nội dung của các tập trong bố cục danh sách, lưới và bảng.",
-  "Show the report button on every P2P stream, not just likely new releases.": "Hiển thị nút báo cáo trên mọi luồng P2P, không chỉ các phim có khả năng mới phát hành.",
+  "Show the report button on every P2P stream, not just likely new releases.":
+    "Hiển thị nút báo cáo trên mọi luồng P2P, không chỉ các phim có khả năng mới phát hành.",
   "Show the Skip button": "Hiển thị nút Bỏ qua",
   "Show title": "Hiển thị tiêu đề",
   "Show TMDB score on cards": "Hiển thị điểm TMDB trên thẻ",

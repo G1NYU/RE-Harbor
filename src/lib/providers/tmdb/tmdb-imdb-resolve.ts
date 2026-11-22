@@ -44,7 +44,7 @@ export function tmdbImdbCached(metaId?: string): string | null | undefined {
   if (metaId.startsWith("tt")) return metaId;
   if (!metaId.startsWith("tmdb:")) return undefined;
   loadImdbCache();
-  return imdbCache.has(metaId) ? imdbCache.get(metaId) ?? null : undefined;
+  return imdbCache.has(metaId) ? (imdbCache.get(metaId) ?? null) : undefined;
 }
 
 export function subscribeTmdbImdb(metaId: string, fn: () => void): () => void {
@@ -130,10 +130,26 @@ function notifyTmdb(imdbId: string) {
   tmdbSubs.get(imdbId)?.forEach((fn) => fn());
 }
 
+/** Records an ID pair supplied together by a metadata provider. */
+export function rememberTmdbImdbPair(tmdbId: string, imdbId: string): void {
+  if (!/^tmdb:(movie|tv):[1-9]\d*$/.test(tmdbId) || !/^tt\d+$/.test(imdbId)) return;
+  loadImdbCache();
+  loadTmdbCache();
+  if (imdbCache.get(tmdbId) === imdbId && tmdbCache.get(imdbId) === tmdbId) return;
+  lruSet(imdbCache, tmdbId, imdbId, IMDB_CACHE_MAX);
+  lruSet(tmdbCache, imdbId, tmdbId, TMDB_CACHE_MAX);
+  if (typeof window !== "undefined") {
+    persistImdbSoon();
+    persistTmdbSoon();
+  }
+  notifyImdb(tmdbId);
+  notifyTmdb(imdbId);
+}
+
 export function tmdbFromImdbCached(imdbId?: string): string | null | undefined {
   if (!imdbId || !imdbId.startsWith("tt")) return undefined;
   loadTmdbCache();
-  return tmdbCache.has(imdbId) ? tmdbCache.get(imdbId) ?? null : undefined;
+  return tmdbCache.has(imdbId) ? (tmdbCache.get(imdbId) ?? null) : undefined;
 }
 
 export function subscribeImdbTmdb(imdbId: string, fn: () => void): () => void {

@@ -8,7 +8,8 @@ export default {
   "games.sidebar.customOrder": "ترتيبي",
   "games.sidebar.arrange": "ترتيب الشريط الجانبي",
   "games.sidebar.resetFilters": "إعادة ضبط عوامل التصفية",
-  "games.sidebar.arrangeNote": "اسحب أو استخدم الأسهم لإعادة الترتيب. ثبّت ألعابك المفضلة أو أخفِ عناصر من هذا الشريط.",
+  "games.sidebar.arrangeNote":
+    "اسحب أو استخدم الأسهم لإعادة الترتيب. ثبّت ألعابك المفضلة أو أخفِ عناصر من هذا الشريط.",
   "games.sidebar.saveFailed": "تعذّر حفظ تفضيلات الشريط الجانبي. تسري التغييرات لهذه الجلسة.",
   "games.sidebar.move": "نقل {name}",
   "games.sidebar.up": "نقل {name} لأعلى",
@@ -19,11 +20,12 @@ export default {
   "games.sidebar.hide": "إخفاء {name} من الشريط",
   "games.sidebar.pinned": "مثبّتة",
   "games.dock.welcomeTitle": "هل تريد إظهار تبويب الألعاب؟",
-  "games.dock.welcomeNote": "صل إلى ألعابك بمجرد تمرير المؤشر. يمكنك إيقافه في أي وقت من الإعدادات ← السمة والمظهر ← الواجهة.",
+  "games.dock.welcomeNote":
+    "صل إلى ألعابك بمجرد تمرير المؤشر. يمكنك إيقافه في أي وقت من الإعدادات ← السمة والمظهر ← الواجهة.",
   "games.dock.welcomeEnable": "إظهار تبويب الألعاب",
   "games.dock.welcomeDismiss": "ليس الآن",
-  "games.dock.settingTitle": "مكتبة الألعاب السريعة",
-  "games.dock.settingNote": "إظهار تبويب خافت عند الحافة للوصول السريع إلى ألعابك. معطّل افتراضيًا.",
+  "games.dock.settingTitle": "المكتبة السريعة",
+  "games.dock.settingNote": "إظهار تبويب خافت عند الحافة للوصول السريع إلى مكتبتك. معطّل افتراضيًا.",
   "games.dock.launchError": "تعذّر فتح اللعبة. تحقّق من تثبيتها والمشغّل، ثم حاول مجددًا.",
   "games.dock.launcher": "المشغّلات",
   "games.dock.client": "فتح في {launcher}",
@@ -75,5 +77,5 @@ export default {
   "games.badge.unavailable": "الملفات غير متاحة",
   "games.badge.notInstalled": "غير مثبّت",
   "games.home.libraryFirstTitle": "فتح الألعاب في مكتبتك",
-  "games.home.libraryFirstNote": "ابدأ من مكتبتك بدلاً من استكشاف في كل مرة تفتح الألعاب."
+  "games.home.libraryFirstNote": "ابدأ من مكتبتك بدلاً من استكشاف في كل مرة تفتح الألعاب.",
 };

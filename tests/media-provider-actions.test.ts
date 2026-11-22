@@ -42,6 +42,8 @@ function harness() {
   const id = (id: string) =>
     /^tt\d+$/.test(id) ? { ok: true, target: { kind: "movie", ids: { imdb: id } } } : { ok: false };
   const mocks: Record<string, unknown> = {
+    "./active-profile-id": { activeProfileIsPrimary: () => true },
+    "./refract/client": { getRefractKey: () => null, refractEnabled: () => false },
     "./cinemeta": { meta: async () => null },
     "./auth": { readActiveStremioAuthKey: () => null },
     "./stremio": { ANIME_CLOUD_ID: /^(kitsu|mal|anilist|anidb):/ },
@@ -53,14 +55,45 @@ function harness() {
     "./simkl/client": { simklRequest: request("Simkl") },
     "./simkl/session": { isAuthenticated: () => true },
     "./anilist/session": { isAuthenticated: () => animeAccounts },
+    "./anilist/sync": { resolveAnilistMediaId: async () => null },
+    "./anilist/mutations": { saveListEntry: async () => ({}) },
     "./mal/session": { isAuthenticated: () => animeAccounts },
-    "./simkl/ids": { stremioIdToSimklTarget: id },
+    "./mal/mutations": {
+      resolveMalMediaId: async () => null,
+      saveListEntry: async () => ({}),
+    },
+    "./simkl/ids": {
+      stremioIdToSimklTarget: id,
+      simklEntryIdKeys: (
+        ids: { imdb?: string; tmdb?: number | string },
+        kind: "movie" | "show",
+      ) => {
+        const keys: string[] = [];
+        if (ids.imdb) keys.push(ids.imdb);
+        if (ids.tmdb != null)
+          keys.push(kind === "movie" ? `tmdb:movie:${ids.tmdb}` : `tmdb:tv:${ids.tmdb}`);
+        return keys;
+      },
+    },
     "./simkl/list-status": {
       readSimklStateStrict: async () => {
         if (readFails) throw new Error("offline");
         return simklState;
       },
+      loadSimklStatusMap: async () => {
+        if (readFails) throw new Error("offline");
+        const map = new Map<string, string>();
+        if (simklState.status) map.set("tt123", simklState.status);
+        return map;
+      },
       invalidateSimklListStatus: () => {},
+      SIMKL_STATUS_LABELS: {
+        watching: "Watching",
+        plantowatch: "Plan to Watch",
+        completed: "Completed",
+        hold: "On Hold",
+        dropped: "Dropped",
+      },
     },
     "./simkl/watchlist": { invalidateWatchlistCache: () => {} },
     "./simkl/history": { invalidateHistoryCache: () => {} },
@@ -69,6 +102,32 @@ function harness() {
     "./publicmetadb/mappings": {},
     "./publicmetadb/history": {},
     "./publicmetadb/watchlist": {},
+    "./publicmetadb/lists": {},
+    "./publicmetadb/scrobble": { pmdbDeleteResumesForTitle: async () => {} },
+    "./publicmetadb/dropped": { dropPmdbShow: async () => true },
+    "./nuvio/nuvio-client": { isNuvioSignedIn: () => false, isNuvioProviderActive: () => false },
+    "./nuvio/nuvio-sync": {
+      resolveNuvioProfileIndex: () => 0,
+      pushWatchedItemToNuvio: async () => {},
+      deleteWatchedItemFromNuvio: async () => {},
+      pushWatchProgressToNuvio: async () => {},
+      deleteWatchProgressFromNuvio: async () => {},
+      deleteEpisodeWatchProgressFromNuvio: async () => {},
+      undismissNextUpInNuvioCloud: async () => {},
+      readCachedWatchProgress: () => null,
+      readCachedWatchedItems: () => [],
+    },
+    "./nuvio/nuvio-playback": {
+      buildNuvioPlaybackItems: () => [],
+      writeCachedNuvioPlaybackItems: () => {},
+    },
+    "./nuvio/nuvio-library": {
+      addNuvioLibraryItem: async () => {},
+      removeNuvioLibraryItem: async () => {},
+    },
+    "./local-cw": { saveLocalCw: () => {}, clearLocalCw: () => {} },
+    "./resume": { saveResumeMs: () => {} },
+    "./settings/load": { loadStoredSettings: () => ({}) },
   };
   const output = ts.transpileModule(
     readFileSync(new URL("../src/lib/media-provider-actions.ts", import.meta.url), "utf8"),
@@ -130,14 +189,37 @@ test("Trakt watchlist idempotent existing result is confirmed", async () => {
   await h.providers.watchlistProviderWrites(series, true)[0]!.run(current);
 });
 
-test("Simkl watchlist removal never invokes the destructive history endpoint", async () => {
+test("Simkl plan-to-watch with no history can be removed safely", async () => {
   const h = harness();
   h.state("plantowatch");
   const result = await h.providers
     .watchlistProviderWrites(series, false)
     .find((w) => w.provider === "Simkl")!
     .run(current);
+  assert.equal(result, undefined);
+  assert.equal(h.calls[0]?.path, "/sync/history/remove");
+  assert.deepEqual(h.calls[0]?.body, { shows: [{ ids: { imdb: "tt123" } }] });
+});
+
+test("Simkl plan-to-watch with history is left untouched", async () => {
+  const h = harness();
+  h.state("plantowatch", ["1:1"]);
+  const result = await h.providers
+    .watchlistProviderWrites(series, false)
+    .find((w) => w.provider === "Simkl")!
+    .run(current);
   assert.match(result!, /history|Simkl/);
+  assert.deepEqual(h.calls, []);
+});
+
+test("Simkl completed removal is left untouched with a status reason", async () => {
+  const h = harness();
+  h.state("completed", ["1:1"]);
+  const result = await h.providers
+    .watchlistProviderWrites(series, false)
+    .find((w) => w.provider === "Simkl")!
+    .run(current);
+  assert.match(result!, /already has a status/);
   assert.deepEqual(h.calls, []);
 });
 
@@ -177,14 +259,60 @@ test("Simkl Add requires the returned plan-to-watch status", async () => {
   );
 });
 
-test("movie Unwatched never silently removes the Simkl library item", async () => {
+test("movie Unwatched asks before removing a completed Simkl library item", async () => {
   const h = harness();
+  h.state("completed");
+  const write = h.providers
+    .watchedProviderWrites(movie, false, { episodes: [] })
+    .find((w) => w.provider === "Simkl")!;
+  const preflight = await write.preflight?.(current);
+  assert.equal(typeof preflight, "object");
+  assert.equal(
+    typeof preflight === "object" ? preflight.confirmation : undefined,
+    "simkl-library-removal",
+  );
+  assert.deepEqual(h.calls, []);
+  const allowed = h.providers
+    .watchedProviderWrites(movie, false, { episodes: [], allowSimklLibraryRemoval: true })
+    .find((w) => w.provider === "Simkl")!;
+  assert.equal(await allowed.preflight?.(current), undefined);
+});
+
+test("movie Unwatched removes a completed title from the Simkl library and history", async () => {
+  const h = harness();
+  h.state("completed");
   const result = await h.providers
     .watchedProviderWrites(movie, false, { episodes: [] })
     .find((w) => w.provider === "Simkl")!
     .run(current);
-  assert.match(result!, /library/);
+  assert.equal(result, undefined);
+  assert.equal(h.calls[0]?.path, "/sync/history/remove");
+  assert.deepEqual(h.calls[0]?.body, { movies: [{ ids: { imdb: "tt123" } }] });
+});
+
+test("movie Unwatched leaves a title Simkl does not list as completed untouched", async () => {
+  const h = harness();
+  h.state("plantowatch");
+  const write = h.providers
+    .watchedProviderWrites(movie, false, { episodes: [] })
+    .find((w) => w.provider === "Simkl")!;
+  assert.equal(await write.preflight?.(current), undefined);
+  await write.run(current);
   assert.deepEqual(h.calls, []);
+});
+
+test("movie Unwatched requires Simkl to confirm the removal", async () => {
+  const h = harness();
+  h.state("completed");
+  h.response({ deleted: { movies: 0 }, not_found: {} });
+  await assert.rejects(
+    () =>
+      h.providers
+        .watchedProviderWrites(movie, false, { episodes: [] })
+        .find((w) => w.provider === "Simkl")!
+        .run(current),
+    /confirm/,
+  );
 });
 
 test("episode unwatch uses exact episodes across seasons and keeps the show", async () => {

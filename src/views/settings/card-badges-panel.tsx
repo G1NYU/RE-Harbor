@@ -125,14 +125,20 @@ function PreviewCard({
   flags,
   watchlistBadge,
   limit,
+  layout = "poster",
 }: {
   position: "top" | "bottom";
   phase: "normal" | "anime";
   flags: PreviewFlags;
   watchlistBadge: WatchlistPos;
   limit: number;
+  layout?: "poster" | "tv";
 }) {
-  const normalPoster = useSampleArtwork(8).poster;
+  const {
+    poster: normalPoster,
+    background: normalBackground,
+    name: normalName,
+  } = useSampleArtwork(8);
   const animePoster = ANIME_PREVIEW;
   const extras = previewExtras(flags);
   const normal: React.ReactNode[] = [];
@@ -170,11 +176,13 @@ function PreviewCard({
   anime.push(...extras);
 
   const cap = Math.max(1, limit);
-  const badgePos = position === "top" ? "top-2" : "bottom-2";
+  const badgePos = position === "top" ? "top-2" : layout === "tv" ? "bottom-9" : "bottom-2";
   return (
-    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-raised">
+    <div
+      className={`relative w-full overflow-hidden rounded-md bg-raised ${layout === "tv" ? "aspect-[16/9]" : "aspect-[2/3]"}`}
+    >
       <img
-        src={normalPoster}
+        src={layout === "tv" ? normalBackground : normalPoster}
         alt=""
         draggable={false}
         className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out ${
@@ -189,8 +197,35 @@ function PreviewCard({
           phase === "anime" ? "opacity-100" : "opacity-0"
         }`}
       />
-      <PreviewBadgeRow nodes={normal.slice(0, cap)} badgePos={badgePos} visible={phase === "normal"} />
-      <PreviewBadgeRow nodes={anime.slice(0, cap)} badgePos={badgePos} visible={phase === "anime"} />
+      {layout === "tv" && (
+        <>
+          <span
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/5"
+          />
+          <div className="absolute inset-x-3 bottom-3 flex items-end gap-2.5">
+            <img
+              src={phase === "anime" ? animePoster : normalPoster}
+              alt=""
+              draggable={false}
+              className="h-[54px] w-[36px] shrink-0 rounded-sm object-cover shadow-[0_4px_12px_rgba(0,0,0,0.7)] ring-1 ring-white/20"
+            />
+            <span className="mb-0.5 min-w-0 text-[14px] font-semibold leading-tight text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.9)]">
+              {phase === "anime" ? "Namakura Gatana" : normalName}
+            </span>
+          </div>
+        </>
+      )}
+      <PreviewBadgeRow
+        nodes={normal.slice(0, cap)}
+        badgePos={badgePos}
+        visible={phase === "normal"}
+      />
+      <PreviewBadgeRow
+        nodes={anime.slice(0, cap)}
+        badgePos={badgePos}
+        visible={phase === "anime"}
+      />
       {watchlistBadge !== "off" && (
         <span
           className={`absolute z-10 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-canvas text-ink ${WL_PREVIEW_POS[watchlistBadge]}`}
@@ -249,7 +284,9 @@ export function WatchlistControl({
   const t = useT();
   const rtl = useIsRtl();
   const on = value !== "off";
-  const [last, setLast] = useState<Exclude<WatchlistPos, "off">>(value !== "off" ? value : "topEnd");
+  const [last, setLast] = useState<Exclude<WatchlistPos, "off">>(
+    value !== "off" ? value : "topEnd",
+  );
   const corners: Array<{ value: Exclude<WatchlistPos, "off">; label: string }> = [
     { value: "topStart", label: rtl ? t("Top right") : t("Top left") },
     { value: "topEnd", label: rtl ? t("Top left") : t("Top right") },
@@ -292,10 +329,14 @@ export function CardScoresPreview({
   settings,
   flags,
   enabledBadgeCount,
+  layout = "poster",
+  cardWidth,
 }: {
   settings: Settings;
   flags: PreviewFlags;
   enabledBadgeCount: number;
+  layout?: "poster" | "tv";
+  cardWidth: number;
 }) {
   const t = useT();
   const [phase, setPhase] = useState<"normal" | "anime">("normal");
@@ -303,19 +344,32 @@ export function CardScoresPreview({
     <div className="flex flex-col items-center gap-4 rounded-[12px] bg-elevated p-4">
       <Segmented
         value={phase}
-        options={[{ value: "normal", label: t("Movies") }, { value: "anime", label: t("Anime") }]}
+        options={[
+          { value: "normal", label: t("Movies") },
+          { value: "anime", label: t("Anime") },
+        ]}
         onChange={(v) => setPhase(v as "normal" | "anime")}
       />
-      <div className="w-[184px] max-w-full">
+      <div
+        className={`max-w-full ${layout === "tv" ? "shrink-0" : "w-[184px]"}`}
+        style={layout === "tv" ? { width: cardWidth } : undefined}
+      >
         <PreviewCard
           position={settings.badgePlacement === "top" ? "top" : "bottom"}
           phase={phase}
           flags={flags}
           watchlistBadge={settings.watchlistBadge}
-          limit={Math.min(settings.cardBadgeLimit, Math.max(2, enabledBadgeCount))}
+          limit={
+            layout === "tv"
+              ? enabledBadgeCount
+              : Math.min(settings.cardBadgeLimit, Math.max(2, enabledBadgeCount))
+          }
+          layout={layout}
         />
       </div>
-      <p className="text-center text-[14px] leading-5 text-ink-muted">{t("Example scores with your settings.")}</p>
+      <p className="text-center text-[14px] leading-5 text-ink-muted">
+        {t("Example scores with your settings.")}
+      </p>
     </div>
   );
 }
@@ -324,10 +378,12 @@ export function CardBadgesPanel({
   settings,
   update,
   enabledBadgeCount,
+  layout = "poster",
 }: {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
   enabledBadgeCount: number;
+  layout?: "poster" | "tv";
 }) {
   const t = useT();
   const placement: "top" | "bottom" = settings.badgePlacement === "top" ? "top" : "bottom";
@@ -351,16 +407,18 @@ export function CardBadgesPanel({
         />
       </SettingRow>
 
-      <SettingRow
-        icon={<Hash size={18} strokeWidth={2.2} />}
-        label={t("Max scores per card")}
-        desc={t(
-          "Caps how many score chips a poster shows. Extras drop off the end of the chip. You have {n} turned on.",
-          { n: enabledBadgeCount },
-        )}
-      >
-        <LimitScale value={effLimit} max={maxN} onChange={(n) => update({ cardBadgeLimit: n })} />
-      </SettingRow>
+      {layout === "poster" && (
+        <SettingRow
+          icon={<Hash size={18} strokeWidth={2.2} />}
+          label={t("Max scores per card")}
+          desc={t(
+            "Caps how many score chips a poster shows. Extras drop off the end of the chip. You have {n} turned on.",
+            { n: enabledBadgeCount },
+          )}
+        >
+          <LimitScale value={effLimit} max={maxN} onChange={(n) => update({ cardBadgeLimit: n })} />
+        </SettingRow>
+      )}
     </>
   );
 }

@@ -1,53 +1,57 @@
 use std::collections::HashSet;
 
-pub const ALL: &[&str] = &[
-    "https://tracker.zhuqiy.com:443/announce",
-    "https://tracker.nekomi.cn:443/announce",
-    "https://tracker.gcrenwp.top:443/announce",
-    "https://tracker.7471.top:443/announce",
-    "https://tracker.leechshield.link:443/announce",
-    "https://tracker.pmman.tech:443/announce",
-    "https://tr.zukizuki.org:443/announce",
-    "https://tr.nyacat.pw:443/announce",
-    "https://torrents.tmtime.dev:443/announce",
-    "https://t.213891.xyz:443/announce",
-    "https://tracker.yemekyedim.com:443/announce",
-    "https://tracker.anibt.net:443/announce",
-    "https://tracker.manager.v6.navy:443/announce",
-    "http://tracker.opentrackr.org:1337/announce",
-    "http://bt1.archive.org:6969/announce",
-    "http://tracker.mywaifu.best:6969/announce",
-    "http://tracker.renfei.net:8080/announce",
-    "http://tracker.dhitechnical.com:6969/announce",
-    "http://tracker.waaa.moe:6969/announce",
-    "http://tracker.tritan.gg:8080/announce",
-    "http://tracker.dler.org:6969/announce",
-    "http://tracker.qu.ax:6969/announce",
-    "http://tracker.bittor.pw:1337/announce",
+/// Long-lived public trackers used only when a stream brings none of its own.
+///
+/// The list is deliberately small. Every extra tracker can return peers that do
+/// not have the torrent at all; those junk peers still complete handshakes and
+/// occupy connection slots, which shows up as a large peer queue and a swarm
+/// that never delivers a piece. Streams resolved by addons carry their own
+/// `tr=` list, so this is a fallback rather than a session-wide announcement set.
+pub const FALLBACK: &[&str] = &[
     "udp://tracker.opentrackr.org:1337/announce",
-    "udp://open.demonii.com:1337/announce",
+    "http://tracker.opentrackr.org:1337/announce",
     "udp://open.stealth.si:80/announce",
     "udp://tracker.torrent.eu.org:451/announce",
+    "udp://open.demonii.com:1337/announce",
+    "udp://explodie.org:6969/announce",
     "udp://tracker.dler.org:6969/announce",
-    "udp://tracker.qu.ax:6969/announce",
-    "udp://tracker-udp.gbitt.info:80/announce",
-    "udp://tracker.bittor.pw:1337/announce",
-    "udp://bt1.archive.org:6969/announce",
     "udp://exodus.desync.com:6969/announce",
+    "udp://tracker-udp.gbitt.info:80/announce",
+    "https://tracker.gcrenwp.top:443/announce",
+    "https://tr.zukizuki.org:443/announce",
+    "https://tracker.qu.ax:6969/announce",
 ];
 
-pub fn as_url_set() -> HashSet<url::Url> {
-    ALL.iter().filter_map(|t| url::Url::parse(t).ok()).collect()
+pub fn fallback_trackers() -> Vec<String> {
+    FALLBACK.iter().map(|tracker| tracker.to_string()).collect()
 }
 
-pub fn merge_into(mut trackers: Vec<String>) -> Vec<String> {
-    for t in ALL {
-        let s = t.to_string();
-        if !trackers.contains(&s) {
-            trackers.push(s);
+/// Session-wide fallback set for the Android engine; desktop adds trackers per
+/// torrent instead.
+#[cfg(any(target_os = "android", test))]
+pub fn fallback_url_set() -> HashSet<url::Url> {
+    FALLBACK
+        .iter()
+        .filter_map(|tracker| url::Url::parse(tracker).ok())
+        .collect()
+}
+
+/// Prefer the trackers the source already carries; use the curated fallback only
+/// when it has none. Entries are trimmed and de-duplicated.
+pub fn with_fallback(trackers: Vec<String>) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut cleaned = Vec::new();
+    for tracker in trackers {
+        let tracker = tracker.trim();
+        if !tracker.is_empty() && seen.insert(tracker.to_string()) {
+            cleaned.push(tracker.to_string());
         }
     }
-    trackers
+    if cleaned.is_empty() {
+        fallback_trackers()
+    } else {
+        cleaned
+    }
 }
 
 /// Splice trackers into a magnet URI as `tr=` params.
@@ -106,4 +110,42 @@ fn pct_encode(s: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{embed_into_magnet, with_fallback, FALLBACK};
+
+    #[test]
+    fn keeps_source_trackers_and_does_not_add_fallback() {
+        let trackers = with_fallback(vec![
+            " udp://tracker.opentrackr.org:1337/announce ".into(),
+            "udp://tracker.opentrackr.org:1337/announce".into(),
+            "".into(),
+        ]);
+        assert_eq!(trackers.len(), 1);
+        assert_eq!(trackers[0], "udp://tracker.opentrackr.org:1337/announce");
+    }
+
+    #[test]
+    fn falls_back_only_when_the_source_has_no_trackers() {
+        let fallback = with_fallback(vec![]);
+        assert_eq!(fallback.len(), FALLBACK.len());
+        assert_eq!(fallback[0], FALLBACK[0]);
+    }
+
+    #[test]
+    fn embeds_fallback_trackers_into_a_bare_magnet() {
+        let magnet = embed_into_magnet("magnet:?xt=urn:btih:abc", &with_fallback(vec![]));
+        assert!(magnet.starts_with("magnet:?xt=urn:btih:abc&tr="));
+        assert!(magnet.contains("udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce"));
+    }
+
+    #[test]
+    fn leaves_non_magnet_inputs_untouched() {
+        assert_eq!(
+            embed_into_magnet("https://example.test/a.torrent", &with_fallback(vec![])),
+            "https://example.test/a.torrent"
+        );
+    }
 }

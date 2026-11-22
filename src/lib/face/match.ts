@@ -1,6 +1,7 @@
 export type FaceBox = { x: number; y: number; w: number; h: number };
 
 export type WireFace = { box: FaceBox; embedding: number[] };
+export type DetectedFace = { box: FaceBox; keypoints: { x: number; y: number }[] };
 
 export type GalleryEntry = {
   id: number;

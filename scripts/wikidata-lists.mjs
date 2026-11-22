@@ -1,5 +1,5 @@
 const ENDPOINT = "https://query.wikidata.org/sparql";
-const UA = "HarborListSnapshot/1.0 (https://harbor.site) build-time list snapshot";
+const UA = "HarborListSnapshot/1.0 (https://harborcommunity.site) build-time list snapshot";
 const LABELS = "en,mul,fr,de,it,es,pt,ja,ko,zh,ru";
 const TIMEOUT_MS = 70000;
 const MAX_RETRIES = 3;
@@ -106,7 +106,8 @@ function bump(counts, key) {
 }
 
 export async function fetchWikidataList(source) {
-  const query = source.awardYear === "ceremony" ? ceremonyQuery(source.award) : releaseQuery(source.award);
+  const query =
+    source.awardYear === "ceremony" ? ceremonyQuery(source.award) : releaseQuery(source.award);
   const { rows, ms } = await ask(query);
   const skipped = new Map();
   const seen = new Set();

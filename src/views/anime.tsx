@@ -1,5 +1,7 @@
+import { usePinnedCatalogRows } from "./home/hooks/use-pinned-rows";
 import { RotateCcw } from "lucide-react";
 import {
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -12,6 +14,7 @@ import { AnimeGenrePicker } from "@/components/anime-genre-picker";
 import { preloadAnimeGenreArt } from "@/lib/anime-genre-art-map";
 import { AnimeHero, AnimeHeroSkeleton } from "@/components/anime-hero";
 import { BackToTop } from "@/components/back-to-top";
+import { LazyMount } from "@/components/lazy-mount";
 import { ContinueCard } from "@/components/continue-card";
 import { dismissCw, isCwDismissed, useCwDismissVersion } from "@/lib/cw-dismiss";
 import { PickCard } from "@/components/pick-card";
@@ -62,7 +65,9 @@ import {
   type RowState,
 } from "./anime/anime-rows";
 import { animeFranchiseKey, stripFranchiseSuffix } from "@/lib/providers/jikan";
-import { franchiseRoot, franchiseRootSync } from "@/lib/providers/anime-franchise-root";
+import { animeCwIdsVersion, subscribeAnimeCwIds } from "@/lib/anime-cw-ids";
+import { dedupeAnimeCw, warmCwAnimeIdentities } from "@/lib/cw-anime-identity";
+import { sortCwFinal } from "@/lib/cw-order";
 import { animeFiltered, enrichAnimeCountry, type AnimeFilterOpts } from "@/lib/anime-filter";
 import {
   buildHeroSelection,
@@ -84,7 +89,7 @@ import {
 } from "@/lib/providers/anime-hero-art-static";
 import { useAnnouncement } from "@/lib/announcements";
 import { AnnouncementHero } from "@/components/announcement-hero";
-import { fetchAnilistTrendingAnime } from "@/lib/anilist/browse";
+import { useAnilistBrowseState } from "@/lib/use-anilist-top";
 import { useSettings } from "@/lib/settings";
 import { useCollectionRowsForPage } from "@/lib/page-collection-rows";
 import { useContentDrag } from "@/lib/window-drag";
@@ -98,7 +103,13 @@ import {
   library,
   type LibraryItem,
 } from "@/lib/stremio";
-import { clearLocalCw, listLocalCw, localCwVersion, subscribeLocalCw } from "@/lib/local-cw";
+import {
+  clearLocalCw,
+  listLocalCwMerged,
+  localCwSourceEnabled,
+  localCwVersion,
+  subscribeLocalCw,
+} from "@/lib/local-cw";
 import {
   dismissManualWatched,
   manualWatchedLibraryItems,
@@ -157,10 +168,17 @@ export function AnimeView({ active = true }: { active?: boolean }) {
             try {
               const metas = await s.fetcher(1);
               if (cancelled) return;
-              setRowsByKey((prev) => ({
-                ...prev,
-                [s.key]: { metas, page: 1, hasMore: metas.length >= ROW_MIN_VISIBLE, ready: true },
-              }));
+              startTransition(() => {
+                setRowsByKey((prev) => ({
+                  ...prev,
+                  [s.key]: {
+                    metas,
+                    page: 1,
+                    hasMore: metas.length >= ROW_MIN_VISIBLE,
+                    ready: true,
+                  },
+                }));
+              });
             } catch {
               if (cancelled) return;
               setRowsByKey((prev) => ({
@@ -252,7 +270,8 @@ export function AnimeView({ active = true }: { active?: boolean }) {
   const heroBuildingRef = useRef(false);
   const heroActivateRef = useRef(false);
   const filtersInitRef = useRef(true);
-  const [anilistTrending, setAnilistTrending] = useState<Meta[]>([]);
+  const trendingBrowse = useAnilistBrowseState("trending", active);
+  const anilistTrending = useMemo(() => trendingBrowse.metas.slice(0, 30), [trendingBrowse.metas]);
   const [hostedHero, setHostedHero] = useState<HostedHeroItem[] | null>(() => peekHostedHero());
   useEffect(() => {
     if (!active) return;
@@ -260,18 +279,6 @@ export function AnimeView({ active = true }: { active?: boolean }) {
     fetchHostedHero()
       .then((h) => {
         if (!cancelled && h) setHostedHero(h);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [active]);
-  useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    fetchAnilistTrendingAnime(30)
-      .then((m) => {
-        if (!cancelled) setAnilistTrending(m);
       })
       .catch(() => {});
     return () => {
@@ -396,28 +403,31 @@ export function AnimeView({ active = true }: { active?: boolean }) {
   }, [authKey, hideSharedCw]);
 
   useEffect(() => {
-    if (!simklConnected) {
+    if (!simklConnected || !settings.cwSources.simkl || hideSharedCw) {
       setSimklCw([]);
       return;
     }
     let cancelled = false;
     fetchSimklPlaybackItems()
-      .then((cw) => {
-        if (!cancelled) setSimklCw(cw.filter(isAnimeCwItem));
+      .then(({ items }) => {
+        if (!cancelled) setSimklCw(items.filter(isAnimeCwItem));
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [simklConnected]);
+  }, [simklConnected, settings.cwSources.simkl, hideSharedCw]);
 
   const animeDetectVer = useDetectedAnimeVersion();
-  const trackerCw = useExternalCw(!hideSharedCw && settings.cwSources.trakt);
-  const [cwRootVersion, setCwRootVersion] = useState(0);
+  const trackerCw = useExternalCw(
+    !hideSharedCw && (settings.cwSources.trakt || settings.cwSources.publicmetadb),
+  );
+  const animeIdsVersion = useSyncExternalStore(subscribeAnimeCwIds, animeCwIdsVersion);
   const localCwVer = useSyncExternalStore(subscribeLocalCw, localCwVersion);
   const localAnimeCw = useMemo<LibraryItem[]>(() => {
     void localCwVer;
-    return listLocalCw(hideSharedCw)
+    return listLocalCwMerged(hideSharedCw)
+      .filter((e) => localCwSourceEnabled(e, settings.cwSources))
       .filter((e) => ANIME_CLOUD_ID.test(e.id) || e.isAnime)
       .map((e) => ({
         _id: e.id,
@@ -441,33 +451,33 @@ export function AnimeView({ active = true }: { active?: boolean }) {
         _mtime: new Date(e.t).toISOString(),
         local: true,
       }));
-  }, [localCwVer, hideSharedCw, activeProfile?.id]);
+  }, [localCwVer, hideSharedCw, activeProfile?.id, settings.cwSources]);
   const continueWatching = useMemo(() => {
-    const seen = new Set<string>();
-    const seenRoot = new Set<string>();
-    return [
-      ...localAnimeCw,
-      ...(hideSharedCw ? [] : libItems.filter((i) => !ANIME_CLOUD_ID.test(i._id))),
-      ...(hideSharedCw ? [] : simklCw),
-      ...(hideSharedCw ? [] : trackerCw.filter((i) => i.external === "trakt")),
-    ]
-      .filter((i) => {
-        if (!isCwMember(i)) return false;
-        if (!i.local && !isAnimeCwItem(i)) return false;
-        if (isCwDismissed(i)) return false;
-        if (seen.has(i._id)) return false;
-        seen.add(i._id);
-        return true;
-      })
-      .sort((a, b) => cwSortKey(b) - cwSortKey(a))
-      .filter((i) => {
-        const root = franchiseRootSync(i._id);
-        if (!root) return true;
-        if (seenRoot.has(root)) return false;
-        seenRoot.add(root);
-        return true;
-      })
-      .slice(0, 20);
+    return sortCwFinal(
+      dedupeAnimeCw(
+        [
+          ...localAnimeCw,
+          ...(hideSharedCw || !settings.cwSources.library
+            ? []
+            : libItems.filter((i) => !ANIME_CLOUD_ID.test(i._id))),
+          ...(hideSharedCw || !settings.cwSources.simkl ? [] : simklCw),
+          ...(hideSharedCw
+            ? []
+            : trackerCw.filter(
+                (i) =>
+                  (i.external === "trakt" && settings.cwSources.trakt) ||
+                  (i.external === "publicmetadb" && settings.cwSources.publicmetadb),
+              )),
+        ]
+          .filter((i) => {
+            if (!isCwMember(i)) return false;
+            if (!i.local && !isAnimeCwItem(i)) return false;
+            if (isCwDismissed(i)) return false;
+            return true;
+          })
+          .sort((a, b) => cwSortKey(b) - cwSortKey(a)),
+      ),
+    ).slice(0, 20);
   }, [
     localAnimeCw,
     libItems,
@@ -475,30 +485,15 @@ export function AnimeView({ active = true }: { active?: boolean }) {
     trackerCw,
     cwVersion,
     animeDetectVer,
-    cwRootVersion,
+    animeIdsVersion,
     hideSharedCw,
     localCwVer,
+    settings.cwSources,
   ]);
 
   useEffect(() => {
-    const ids = [
-      ...localAnimeCw,
-      ...libItems.filter((i) => !ANIME_CLOUD_ID.test(i._id)),
-      ...simklCw,
-      ...trackerCw.filter((i) => i.external === "trakt"),
-    ]
-      .filter((i) => isCwMember(i) && (i.local || isAnimeCwItem(i)))
-      .map((i) => i._id);
-    if (ids.length === 0) return;
-    if (ids.every((id) => franchiseRootSync(id))) return;
-    let cancelled = false;
-    void Promise.all(ids.map((id) => franchiseRoot(id).catch(() => id))).then(() => {
-      if (!cancelled) setCwRootVersion((v) => v + 1);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [localAnimeCw, libItems, simklCw, trackerCw, animeDetectVer]);
+    void warmCwAnimeIdentities(continueWatching);
+  }, [continueWatching]);
 
   useEffect(() => {
     publishResumeStates(continueWatching);
@@ -506,14 +501,15 @@ export function AnimeView({ active = true }: { active?: boolean }) {
 
   const manualWatchedVer = useSyncExternalStore(subscribeManualWatched, manualWatchedVersion);
   const resurfaceLibrary = useMemo(() => {
+    const library = hideSharedCw || !settings.cwSources.library ? [] : libItems;
     const manual = manualWatchedLibraryItems().filter(isAnimeCwItem);
-    if (manual.length === 0) return libItems;
-    const cwMemberIds = new Set(libItems.filter(isCwMember).map((i) => i._id));
+    if (manual.length === 0) return library;
+    const cwMemberIds = new Set(library.filter(isCwMember).map((i) => i._id));
     const usable = manual.filter((i) => !cwMemberIds.has(i._id));
-    if (usable.length === 0) return libItems;
+    if (usable.length === 0) return library;
     const overrideIds = new Set(usable.map((i) => i._id));
-    return [...libItems.filter((i) => !overrideIds.has(i._id)), ...usable];
-  }, [libItems, manualWatchedVer]);
+    return [...library.filter((i) => !overrideIds.has(i._id)), ...usable];
+  }, [libItems, manualWatchedVer, hideSharedCw, settings.cwSources.library]);
   useEffect(() => {
     if (!simklConnected) {
       setSimklWatchedMap(new Map());
@@ -543,6 +539,10 @@ export function AnimeView({ active = true }: { active?: boolean }) {
     [simklStatusMap, simklWatchedMap, anilistWatchedMap],
   );
   const emptyTrakt = useMemo(() => new Set<string>(), []);
+  const cwProgressPool = useMemo(
+    () => [...libItems, ...localAnimeCw, ...simklCw, ...trackerCw],
+    [libItems, localAnimeCw, simklCw, trackerCw],
+  );
   const cwItems = useCwAdvance(
     continueWatching,
     settings.tmdbKey,
@@ -557,6 +557,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
     animeDetectVer,
     settings.episodeHiding,
     settings.animeCwEnd,
+    cwProgressPool,
   );
 
   const cwSig = cwItems
@@ -683,7 +684,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
     for (const m of peekHostedHero() ?? [])
       if ((m as { source?: string }).source === "MyAnimeList" && consider(m)) malPool.push(m);
     for (const it of malExtra) {
-      const art = peekStaticHeroArt(it.id);
+      const art = peekStaticHeroArt(it.id, it.format === "MOVIE" ? "movie" : "tv");
       if (!art?.bg) continue;
       const m: Meta & { source?: string } = {
         id: it.id,
@@ -793,10 +794,11 @@ export function AnimeView({ active = true }: { active?: boolean }) {
       const seen = pools[spec.pool ?? "general"];
       const filtered: Meta[] = [];
       for (const m of row.metas) {
-        const fk = animeFranchiseKey(m.name);
+        const name = stripFranchiseSuffix(m.name);
+        const fk = name.toLowerCase();
         if (seen.has(fk)) continue;
         seen.add(fk);
-        filtered.push(cleanMeta(m));
+        filtered.push(name === m.name ? m : { ...m, name });
       }
       out[spec.key] = { ...row, metas: filtered };
     }
@@ -804,6 +806,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
   }, [rowsByKey, heroMetas, topPicks]);
 
   useEffect(() => {
+    if (!active) return;
     for (const spec of SPECS) {
       const raw = rowsByKey[spec.key];
       if (!raw?.ready || raw.failed || !raw.hasMore || raw.page >= ROW_MAX_PAGES) continue;
@@ -811,7 +814,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
       if (!shown || shown.metas.length >= ROW_MIN_VISIBLE) continue;
       loadMore(spec.key);
     }
-  }, [rowsByKey, filteredRowsByKey, loadMore]);
+  }, [active, rowsByKey, filteredRowsByKey, loadMore]);
 
   const dedupedAddonRows = useMemo(() => {
     const seen = new Set<string>();
@@ -836,6 +839,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
   }, []);
   useScrollMemory("anime", scrollRef, active);
   const animeCollections = useCollectionRowsForPage("anime");
+  const pinnedRows = usePinnedCatalogRows("anime");
 
   const prevActiveRef = useRef(active);
   useEffect(() => {
@@ -951,7 +955,12 @@ export function AnimeView({ active = true }: { active?: boolean }) {
             </button>
           </div>
           {(() => {
-            const rd: { key: string; name: string; node: ReactNode }[] = [];
+            const rd: {
+              key: string;
+              name: string;
+              node: ReactNode;
+              defer?: boolean;
+            }[] = [];
             const nameOf = (key: string, fallback: string) =>
               settings.animeRows.renamed[key] ?? fallback;
             if (cwItems.length > 0) {
@@ -960,16 +969,25 @@ export function AnimeView({ active = true }: { active?: boolean }) {
                 key: "continueWatching",
                 name: nm,
                 node: cwReady ? (
-                  <Row title={nm} min={260} shape="landscape">
+                  <Row
+                    title={nm}
+                    min={260}
+                    shape="landscape"
+                    scrollAnchorKey={cwItems[0]?._id ?? ""}
+                  >
                     {cwItems.map((item) => (
                       <ContinueCard
                         key={item._id}
                         item={item}
                         onDismiss={(it) => {
+                          if (it.cwMembers?.length)
+                            return dismissCw(it, authKey, { acknowledged: true });
                           if (it.manualWatched) {
                             dismissManualWatched(it._id, { acknowledged: true });
                             return;
                           }
+                          // The cloud feed re-absorbs a local entry unless the local
+                          // store is purged too, so both copies drop in one step.
                           if (it.local) clearLocalCw(it._id, { acknowledged: true });
                           return dismissCw(it, authKey, { acknowledged: true });
                         }}
@@ -994,7 +1012,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
             rd.push({
               key: "anilistTrending",
               name: nameOf("anilistTrending", t("Trending")),
-              node: <AnilistTrendingRow />,
+              node: <AnilistTrendingRow browse={trendingBrowse} />,
             });
             rd.push({
               key: "anilistTop100",
@@ -1040,6 +1058,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
               rd.push({
                 key: spec.key,
                 name: spec.rank ? rankName : specName,
+                defer: true,
                 node: r.failed ? (
                   <>
                     <AnimeRowStatus title={specName} onRetry={() => retryRow(spec.key)} />
@@ -1084,6 +1103,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
               rd.push({
                 key: `addon:${row.key}`,
                 name: addonName,
+                defer: true,
                 node: (
                   <Row
                     title={addonName}
@@ -1124,6 +1144,28 @@ export function AnimeView({ active = true }: { active?: boolean }) {
                 ),
               });
             }
+            for (const row of pinnedRows) {
+              const nm = nameOf(row.key, row.name);
+              rd.push({
+                key: row.key,
+                name: nm,
+                defer: true,
+                node: (
+                  <Row
+                    title={nm}
+                    onViewAll={
+                      row.fetcher
+                        ? () => openGrid({ title: nm, fetcher: row.fetcher!, initial: row.metas })
+                        : undefined
+                    }
+                  >
+                    {row.metas.map((meta, i) => (
+                      <PickCard key={`${meta.id}-${i}`} meta={meta} />
+                    ))}
+                  </Row>
+                ),
+              });
+            }
             for (const c of animeCollections) {
               if (c.items.length === 0) continue;
               const key = `collection-${c.id}`;
@@ -1131,6 +1173,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
               rd.push({
                 key,
                 name: nm,
+                defer: true,
                 node: (
                   <Row title={nm}>
                     {c.items.map((it, i) => (
@@ -1145,7 +1188,7 @@ export function AnimeView({ active = true }: { active?: boolean }) {
             }
             const orderKeys = animeEffectiveOrder(rd, settings.animeRows);
             const shown = applyAnimeRowCustomization(rd, settings.animeRows, editMode);
-            return shown.map((d) => {
+            return shown.map((d, index) => {
               const rowHidden = settings.animeRows.hidden.includes(d.key);
               const idx = orderKeys.indexOf(d.key);
               return (
@@ -1174,7 +1217,12 @@ export function AnimeView({ active = true }: { active?: boolean }) {
                       isRenamed={d.key in settings.animeRows.renamed}
                     />
                   )}
-                  {!rowHidden && d.node}
+                  {!rowHidden &&
+                    (d.defer && index >= 2 ? (
+                      <LazyMount minHeight={340}>{d.node}</LazyMount>
+                    ) : (
+                      d.node
+                    ))}
                 </div>
               );
             });

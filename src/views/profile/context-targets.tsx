@@ -1,4 +1,4 @@
-import { Copy, Link2, UserRound, UserCheck, UserPlus, UserMinus, UserX } from "lucide-react";
+import { Copy, Link2, Send, UserRound, UserCheck, UserPlus, UserMinus, UserX } from "lucide-react";
 import type { ContextMenuTarget } from "@/lib/context-menu";
 import type { ContextAction } from "@/lib/context-actions";
 import { HARBOR_API_BASE } from "@/lib/config/endpoints";
@@ -9,14 +9,18 @@ import { currentAuthor } from "@/lib/theme-auth";
 import { fetchSummary } from "./profile-api";
 import { acceptFriend, removeFriend, sendFriendRequest } from "@/lib/social/friends";
 import { friendCommand, type FriendStatus } from "@/lib/social/friend-command";
+import { requestShareToDm } from "@/lib/social/share-dm";
 import {
   assertSocialActor,
   captureSocialActor,
   isSocialActorCurrent,
 } from "@/lib/social/action-actor";
 
+import { updateProfileCardFriendStatus } from "@/lib/social/profile-card-summary";
+
 const relationshipListeners = new Set<(handle: string, status: FriendStatus) => void>();
 export function publishFriendStatus(handle: string, status: FriendStatus) {
+  updateProfileCardFriendStatus(handle, status);
   for (const listener of relationshipListeners) listener(handle, status);
 }
 export function subscribeFriendStatus(listener: (handle: string, status: FriendStatus) => void) {
@@ -120,6 +124,13 @@ export function userContextTarget(
           ]
         : []),
       ...actions,
+      {
+        id: "user:share-dm",
+        label: t("Send to a friend"),
+        icon: <Send size={14} />,
+        disabled: !valid,
+        run: () => requestShareToDm({ type: "profile", id: handle.toLowerCase() }),
+      },
       {
         id: "user:copy-name",
         label: t("Copy username"),

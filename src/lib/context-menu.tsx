@@ -82,7 +82,6 @@ export type ContextMenuTarget = ContentContext & {
         onOpen?: () => void;
       }
     | { kind: "edit"; element: HTMLElement | null; selection: string }
-    | { kind: "backdrop"; metaId: string; url: string }
     | {
         kind: "subtitle";
         label: string;

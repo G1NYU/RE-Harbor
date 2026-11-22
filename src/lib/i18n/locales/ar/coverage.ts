@@ -1,7 +1,10 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Waiting for {name}…": "في انتظار {name}…",
+  "Keeping the source you were watching.": "الإبقاء على المصدر الذي كنت تشاهده.",
   "Sound descriptions": "أوصاف الأصوات",
   "Hide sound effects and speaker names": "إخفاء المؤثرات الصوتية وأسماء المتحدثين",
-  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "يزيل الأوصاف الموضوعة بين قوسين معقوفين مثل [صرير الباب] وأسماء المتحدثين المكتوبة بأحرف لاتينية كبيرة مثل JOHN: أثناء عرض الترجمة، حتى تُقرأ النسخة التي لا تتوفر إلا بمسار SDH كحوار عادي. تبقى كلمات الأغاني والأقواس العادية والكتابات غير اللاتينية كما هي. لا يُطبَّق على المسارات المفروضة ولا على المسارات الصورية.",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
+    "يزيل الأوصاف الموضوعة بين قوسين معقوفين مثل [صرير الباب] وأسماء المتحدثين المكتوبة بأحرف لاتينية كبيرة مثل JOHN: أثناء عرض الترجمة، حتى تُقرأ النسخة التي لا تتوفر إلا بمسار SDH كحوار عادي. تبقى كلمات الأغاني والأقواس العادية والكتابات غير اللاتينية كما هي. لا يُطبَّق على المسارات المفروضة ولا على المسارات الصورية.",
   "Play from": "التشغيل من",
   end: "النهاية",
   "m:ss": "د:ث",
@@ -627,6 +630,7 @@ const coverage: Record<string, string> = {
   "Keep the clock on screen when the player is not fullscreen.":
     "أبقِ الساعة على الشاشة عندما لا يكون المشغّل في وضع ملء الشاشة.",
   "On the poster": "على الملصق",
+  "On the TV": "على المسلسلات",
   Scores: "التقييمات",
   "Episode order": "ترتيب الحلقات",
   "Watchlist overlaps ({n})": "عناصر متداخلة في قائمة المشاهدة ({n})",
@@ -644,6 +648,18 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "مفتاح API لخدمة NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "اختر ما إذا كان Harbor يفضّل المصادر المباشرة وdebrid أو تورنت الند للند أو يعرض كليهما.",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

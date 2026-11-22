@@ -5,10 +5,20 @@ import { readPlayback } from "@/lib/playback-history";
 import type { Settings } from "@/lib/settings";
 import type { PlayEpisode } from "@/lib/view";
 import { resolveAddonRanks } from "./addon-priority";
-import { animeAbsoluteFromScopedId } from "./anime-identity-core";
+import { animeAbsoluteFromScopedId, splitAnimeStreamCoordinates } from "./anime-identity-core";
 import type { PipelineInput } from "./pipeline";
-import { PLUGIN_ADDON_PREFIX, isPluginAddon, pluginAddonById, pluginIdFromCatalogueBase, pluginsForAddon } from "./plugins/addon";
-import { preferredAnimeImdbStreamId, unverifiedAnimeSeasonId } from "./stream-ids";
+import {
+  PLUGIN_ADDON_PREFIX,
+  isPluginAddon,
+  pluginAddonById,
+  pluginIdFromCatalogueBase,
+  pluginsForAddon,
+} from "./plugins/addon";
+import {
+  catalogEpisodeStreamId,
+  preferredAnimeImdbStreamId,
+  unverifiedAnimeSeasonId,
+} from "./stream-ids";
 import type { Stream } from "./types";
 
 function runtimeMinutes(runtime: string | number | undefined): number | undefined {
@@ -60,6 +70,8 @@ export function buildEpisodePipelineInput(params: {
   strictMode: boolean;
   filterDisabled: boolean;
   animeTitles?: string[] | null;
+  /** Prefer this addon's copy when the same stream is offered by several addons. */
+  preferredAddonId?: string | null;
   /** Resolve the item's own plugin when it names one, even where plugins are otherwise kept out.
    * Background work opts out, so the switch keeps plugins out of it entirely. */
   resolvePinnedPlugin?: boolean;
@@ -86,9 +98,7 @@ export function buildEpisodePipelineInput(params: {
   // The master switch wins: with every plugin paused there is nothing to resolve an item with,
   // however it names its source.
   if (params.resolvePinnedPlugin !== false && settings.pluginsEnabled) {
-    pinnedId = originBases
-      .map((base) => pluginIdFromCatalogueBase(base))
-      .find((id) => id != null);
+    pinnedId = originBases.map((base) => pluginIdFromCatalogueBase(base)).find((id) => id != null);
     // A plugin row names its plugin by id rather than by base, and a saved row may have kept
     // only that; either way the name is enough when it belongs to an installed plugin.
     if (!pinnedId && meta.addonOrigin?.id && pluginAddonById(meta.addonOrigin.id)) {
@@ -103,7 +113,8 @@ export function buildEpisodePipelineInput(params: {
     const covered = effectiveAddons.some(
       (a) =>
         a.transportUrl === url ||
-        (isPluginAddon(a) && pluginsForAddon(a).some((p) => `${PLUGIN_ADDON_PREFIX}${p.id}` === url)),
+        (isPluginAddon(a) &&
+          pluginsForAddon(a).some((p) => `${PLUGIN_ADDON_PREFIX}${p.id}` === url)),
     );
     if (!covered) {
       const only = pluginAddonById(pinnedId);
@@ -123,9 +134,16 @@ export function buildEpisodePipelineInput(params: {
         ? "series"
         : "movie";
   const animeReq = streamIds.some((id) => id.startsWith("kitsu:") || id.startsWith("mal:"));
-  const preferredAnimeImdbId = settings.animePreferImdbStreams && !addonNative
-    ? preferredAnimeImdbStreamId(meta.id, episode, imdbId, params.imdbIdVerified === true, streamIds)
-    : undefined;
+  const preferredAnimeImdbId =
+    settings.animePreferImdbStreams && !addonNative
+      ? preferredAnimeImdbStreamId(
+          meta.id,
+          episode,
+          imdbId,
+          params.imdbIdVerified === true,
+          streamIds,
+        )
+      : undefined;
   const unverifiedAnimeId = unverifiedAnimeSeasonId(meta.id, episode);
   const animeIdUnverified =
     unverifiedAnimeId != null &&
@@ -135,42 +153,51 @@ export function buildEpisodePipelineInput(params: {
   const animeAbsoluteEpisode = animeReq
     ? (streamIds.map(animeAbsoluteFromScopedId).find((n) => n != null) ?? null)
     : null;
+  const split = splitAnimeStreamCoordinates(
+    episode?.kitsuStreamId ?? streamIds.find((id) => id.startsWith("kitsu:")),
+  );
   // Split-franchise cours (Bleach TYBW) are numbered entry-relative while addon
   // streams often use provider coords (cour 4 ep 1 = S17E41). Accept both so the
   // episode filter keeps streams in either numbering and drops clear mismatches.
-  const animeEpisodeAliases =
-    animeReq &&
-    episode?.imdbEpisode != null &&
-    episode?.episode != null &&
-    episode.imdbEpisode !== episode.episode
+  const animeEpisodeAliases = split
+    ? new Set(split.absoluteNumbers)
+    : animeReq &&
+        episode?.imdbEpisode != null &&
+        episode?.episode != null &&
+        episode.imdbEpisode !== episode.episode
       ? new Set<number>([episode.imdbEpisode])
       : null;
   const imdbEpAligned =
     !animeReq || episode?.imdbEpisode == null || episode.episode === episode.imdbEpisode;
-  const effSeason = imdbEpAligned ? (episode?.imdbSeason ?? episode?.season) : episode?.season;
-  const effEpisode = imdbEpAligned ? (episode?.imdbEpisode ?? episode?.episode) : episode?.episode;
+  const effSeason =
+    split?.coordinates[0][0] ??
+    (imdbEpAligned ? (episode?.imdbSeason ?? episode?.season) : episode?.season);
+  const effEpisode =
+    split?.coordinates[0][1] ??
+    (imdbEpAligned ? (episode?.imdbEpisode ?? episode?.episode) : episode?.episode);
   const prevGroup =
     episode && typeof effSeason === "number" && typeof effEpisode === "number" && effEpisode > 1
       ? (readPlayback(meta.id, effSeason, effEpisode - 1)?.releaseGroup ?? undefined)
       : undefined;
   return {
+    preferredAddonId: params.preferredAddonId ?? null,
     request: {
       type: requestType,
       ids: streamIds,
       preferredAnimeImdbId,
       animeIdUnverified,
       context: {
-        imdbId: imdbId ?? null,
+        imdbId: split && (episode?.imdbSeason ?? 0) >= 17 ? null : (imdbId ?? null),
         title: meta.name,
         year: parseInt(meta.releaseInfo ?? "", 10) || null,
         season: effSeason ?? null,
         episode: effEpisode ?? null,
-        absoluteEpisode: animeAbsoluteEpisode,
+        absoluteEpisode: split?.absoluteNumbers[0] ?? animeAbsoluteEpisode,
       },
     },
     query: {
       type: episode ? "series" : meta.type === "series" ? "series" : "movie",
-      imdbId: imdbId ?? "",
+      imdbId: split && (episode?.imdbSeason ?? 0) >= 17 ? "" : (imdbId ?? ""),
       title: meta.name,
       year: parseInt(meta.releaseInfo ?? "", 10) || undefined,
       season: animeReq && episode?.imdbSeason == null ? undefined : effSeason,
@@ -181,12 +208,20 @@ export function buildEpisodePipelineInput(params: {
     isAnime: animeReq,
     animeAbsoluteEpisode,
     animeEpisodeAliases,
+    animeEpisodeCoordinates:
+      split?.coordinates ??
+      (animeReq && effSeason != null && effEpisode != null ? [[effSeason, effEpisode]] : undefined),
+    animeSplitPart: split?.coordinates[0][0],
     presetStreams: embedded.length > 0 ? embedded : undefined,
     addonTimeoutMs: Math.max(8, Math.min(120, settings.addonTimeoutSec ?? 30)) * 1000,
     addonRanks: resolveAddonRanks(effectiveAddons, settings.streamPriority),
     forcedAddonBases: (() => {
-      const forced = originBases.map((base) => ({ base, id: meta.id }));
-      if (appendedBase) forced.push({ base: appendedBase, id: meta.id });
+      // Catalog provenance selects the addon, not the series-level stream ID.
+      // A bare override here bypasses the episode-aware ID builder and makes
+      // /stream/series/tt123.json requests even while playing S01E01.
+      const episodeId = catalogEpisodeStreamId(meta.id, episode, streamIds);
+      const forced = originBases.map((base) => ({ base, id: episodeId }));
+      if (appendedBase) forced.push({ base: appendedBase, id: episodeId });
       return forced.length > 0 ? forced : undefined;
     })(),
     trust: {
@@ -204,7 +239,7 @@ export function buildEpisodePipelineInput(params: {
       allowSeasonPacks: !strictMode,
       allowSizeOutliers: !strictMode,
       isAnime: animeReq,
-      expectedTitles: animeReq ? (animeTitles ?? null) : null,
+      expectedTitles: animeReq ? (animeTitles ?? null) : (meta.alternateTitles ?? null),
     },
     score: {
       activeDebrids: debrids.map((d) => d.slug),

@@ -40,7 +40,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "Значок качества",
   "music.dock.part.source": "Источник",
   "music.dock.part.time": "Время",
-  "music.dock.part.queue": "Очередь",
+  "music.dock.part.queue": "Очередь прослушивания",
   "music.dock.part.like": "Нравится",
 
   "music.now.colors": "Цвета альбома",

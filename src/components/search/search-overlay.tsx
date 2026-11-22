@@ -8,11 +8,11 @@ import { tvFocus } from "@/lib/keyboard-navigation";
 import { useT } from "@/lib/i18n";
 import type { Meta } from "@/lib/cinemeta";
 import { useSearch } from "@/lib/search-context";
+import { matchPersonForQuery } from "@/lib/search-top-match";
 import { useView } from "@/lib/view";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/feed/tags";
-import { metaLooksAnime, warmAnimeResolution } from "@/lib/anime-detect";
+import { warmAnimeResolution } from "@/lib/anime-detect";
 import { AnimeRow } from "./anime-row";
-import { AnimeRelations } from "./anime-relations";
 import { MangaRow } from "./manga-row";
 import { MusicRow } from "./music-row";
 import { EBookRow } from "./ebook-row";
@@ -24,7 +24,7 @@ import { LiveTvRow } from "./live-tv-row";
 import { TopMatch } from "./top-match";
 import { CollectionHitsRow } from "./collection-pane";
 import { ExplorePane, type ExploreFrame } from "./explore-pane";
-import { matchPersonForQuery, PersonTopMatch } from "./person-top-match";
+import { PersonTopMatch } from "./person-top-match";
 import { PeopleRow } from "./people-row";
 import { collectionForTitle, useCollectionHits } from "./use-collection-hits";
 import { MetaList } from "./meta-list";
@@ -44,6 +44,7 @@ import { useExitPresence } from "@/lib/use-exit-presence";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { isMagnetInput, isDirectVideoUrl } from "@/lib/torrent/magnet";
 import { useProfiles } from "@/lib/profiles";
+import { useInstallFeatures } from "@/lib/features/install";
 import { steamStoreQuery } from "@/lib/games/steam-store-search";
 const SteamStoreSearch = lazy(() =>
   import("./steam-store-search").then((module) => ({ default: module.SteamStoreSearch })),
@@ -67,7 +68,8 @@ export function SearchOverlay() {
   const resultsBodyRef = useRef<HTMLDivElement>(null);
   const scrollMemory = useRef({ key: "", top: 0 });
   const backdropGesture = useRef<(() => void) | null>(null);
-  const { openFilter, openMeta, openPerson, setView } = useView();
+  const { openFilter, openMeta, openPerson, setView, topPath } = useView();
+  const navigationOrigin = useRef<string | null>(null);
   const [explore, setExplore] = useState<ExploreFrame[]>([]);
   const t = useT();
   const [guideOpen, setGuideOpen] = useState(false);
@@ -77,13 +79,19 @@ export function SearchOverlay() {
   const [mediaFilter, setMediaFilter] = useState<SearchFilter>("all");
   const { activeProfile } = useProfiles();
   const { settings, update } = useSettings();
-  const storeQuery = activeProfile?.kid
-    ? null
-    : steamStoreQuery(query, settings.steamSearchShortcut);
+  const gamesEnabled = useInstallFeatures().games;
+  const storeQuery =
+    activeProfile?.kid || !gamesEnabled
+      ? null
+      : steamStoreQuery(query, settings.steamSearchShortcut);
   useEffect(() => {
     setMediaFilter("all");
   }, [query]);
   const { mounted, closing } = useExitPresence(open, 150);
+  // The destination has its own entrance. Take the result tree out of the
+  // same frames once navigation commits, while ordinary dismissal still fades.
+  const present =
+    mounted && (open || navigationOrigin.current == null || navigationOrigin.current === topPath);
   const fullscreen = useWindowFullscreen();
   // The exit animation unmounts the panel; retain its position outside that DOM.
   const scrollKey = JSON.stringify([activeProfile?.id, query, mediaFilter, aiMode, explore]);
@@ -91,10 +99,10 @@ export function SearchOverlay() {
     if (scrollMemory.current.key !== scrollKey) {
       scrollMemory.current = { key: scrollKey, top: 0 };
     }
-    if (mounted && resultsBodyRef.current) {
+    if (present && resultsBodyRef.current) {
       resultsBodyRef.current.scrollTop = scrollMemory.current.top;
     }
-  }, [mounted, scrollKey]);
+  }, [present, scrollKey]);
 
   useEffect(
     () => () => backdropGesture.current?.(),
@@ -127,11 +135,17 @@ export function SearchOverlay() {
   const commit = () => {
     backdropGesture.current?.();
     if (query.trim() && results) recordRecent(query);
+    finishNavigation();
+  };
+
+  const finishNavigation = () => {
+    navigationOrigin.current = topPath;
     closeForNavigation();
   };
 
   useEffect(() => {
     if (!open) return;
+    navigationOrigin.current = null;
     const prevFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const id = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 30);
@@ -206,7 +220,7 @@ export function SearchOverlay() {
       : trimmedQ;
   const collectionHits = useCollectionHits(collectionsQuery);
 
-  if (!mounted) return null;
+  if (!present) return null;
 
   const beginDragOrClose = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget || e.button !== 0 || !open || closing) return;
@@ -283,14 +297,14 @@ export function SearchOverlay() {
       const id = (intent.mediaType === "movie" ? MOVIE_GENRES : TV_GENRES)[intent.genre];
       if (typeof id === "number") {
         recordRecent(query);
-        closeForNavigation();
+        finishNavigation();
         openFilter({ kind: "genre", mediaType: intent.mediaType, name: intent.genre, id });
       }
       return;
     }
     if (intent.kind === "year") {
       recordRecent(query);
-      closeForNavigation();
+      finishNavigation();
       openFilter({ kind: "year", mediaType: "movie", value: intent.year });
     }
   };
@@ -321,13 +335,11 @@ export function SearchOverlay() {
   const shownAddonGroups = (currentResults?.addonGroups ?? []).filter(
     (group) => !addonFilter || group.id === addonFilter,
   );
-  const personMatch = matchPersonForQuery(currentResults?.people, trimmed);
-  const topMatchIsAnime =
-    !personMatch &&
-    !!currentResults?.topMatch &&
-    currentResults.anime.length > 0 &&
-    metaLooksAnime(currentResults.topMatch.meta);
-  const topAnime = topMatchIsAnime && currentResults ? currentResults.anime[0] : null;
+  const personMatch = matchPersonForQuery(
+    currentResults?.people,
+    trimmed,
+    currentResults?.topMatch,
+  );
   const magnetInput = !!trimmed && isMagnetInput(trimmed);
   const urlInput = !!trimmed && !magnetInput && isDirectVideoUrl(trimmed);
   const directInput = magnetInput || urlInput;
@@ -609,9 +621,6 @@ export function SearchOverlay() {
                             })()}
                           />
                         )
-                      )}
-                      {showKind("anime") && topAnime && (
-                        <AnimeRelations anime={topAnime} onClose={commit} />
                       )}
                       <LiveTvRow
                         items={showKind("live") ? currentResults.liveTv : []}

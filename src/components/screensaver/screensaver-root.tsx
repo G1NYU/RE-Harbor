@@ -35,7 +35,7 @@ function toItems(metas: Meta[]): AmbientItem[] {
     const r = m as Meta & { rank?: number; rankLabel?: string };
     const sub =
       typeof r.rank === "number" && r.rankLabel ? `#${r.rank} in ${r.rankLabel} today` : "";
-    out.push({ bg: m.background, title: m.name ?? "", sub });
+    out.push({ bg: m.background, title: m.name ?? "", sub, logo: m.logo });
     if (out.length >= 16) break;
   }
   return out;
@@ -108,9 +108,9 @@ export function ScreensaverRoot() {
           ? import("./cat-boat-overlay")
           : halloween
             ? import("./halloween-overlay")
-          : customMedia
-            ? import("./custom-media-overlay")
-            : import("./ambient-overlay")),
+            : customMedia
+              ? import("./custom-media-overlay")
+              : import("./ambient-overlay")),
       3000,
     );
     return () => window.clearTimeout(warm);

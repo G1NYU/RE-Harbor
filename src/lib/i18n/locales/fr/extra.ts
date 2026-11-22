@@ -136,7 +136,8 @@ const extra: Record<string, string> = {
   "Browse channels": "Parcourir les chaînes",
   "Buffer fill": "Remplissage du tampon",
   "Reveal the dot on hover": "Afficher le point au survol",
-  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "Le point reste discret et apparaît quand vous pointez la barre. Désactivez cette option pour le garder visible en permanence.",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.":
+    "Le point reste discret et apparaît quand vous pointez la barre. Désactivez cette option pour le garder visible en permanence.",
   "Buffer fill brightness": "Luminosité du remplissage du tampon",
   Build: "Version",
   "Build a named filter once, then apply it in the source picker to hide everything that doesn't match. Each filter ANDs its dimensions and ignores any you leave blank.":
@@ -181,7 +182,8 @@ const extra: Record<string, string> = {
     "Connectez un service de débridage (Real-Debrid, TorBox, AllDebrid) pour profiter instantanément de la HD, sans attendre.",
   "Connect MyAnimeList": "Connecter MyAnimeList",
   "Connect your MyAnimeList account": "Connecter votre compte MyAnimeList",
-  "Connect your Trakt account to leave comments and reviews.": "Connectez votre compte Trakt pour laisser des commentaires et des critiques.",
+  "Connect your Trakt account to leave comments and reviews.":
+    "Connectez votre compte Trakt pour laisser des commentaires et des critiques.",
   "Connected as @{username}": "Connecté en tant que @{username}",
   "Connected as @{user}": "Connecté en tant que @{user}",
   "Connected as {username}": "Connecté en tant que {username}",
@@ -195,7 +197,8 @@ const extra: Record<string, string> = {
   "Continue from last watched": "Reprendre au dernier contenu regardé",
   "Continue in your browser...": "Continuer dans votre navigateur...",
   "Copy diagnostics": "Copier les diagnostics",
-  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.": "Cette option copie au format JSON l’état du moteur et vos paramètres P2P, afin de les coller facilement dans un rapport de bug. Le dossier du moteur contient le cache DHT (dht.json) et les données des transferts actifs.",
+  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.":
+    "Cette option copie au format JSON l’état du moteur et vos paramètres P2P, afin de les coller facilement dans un rapport de bug. Le dossier du moteur contient le cache DHT (dht.json) et les données des transferts actifs.",
   "Copy your Harbor watchlist over to Trakt, or pull your Trakt watchlist into Harbor. Safe to run again, Trakt skips anything it already has.":
     "Copiez votre liste de suivi Harbor vers Trakt, ou importez votre liste de suivi Trakt dans Harbor. Vous pouvez relancer l’opération sans risque, Trakt ignore les éléments déjà présents.",
   "Corner radius": "Rayon des coins",
@@ -206,8 +209,8 @@ const extra: Record<string, string> = {
   "Couldn't connect to MyAnimeList": "Impossible de se connecter à MyAnimeList",
   "Couldn't load this list. Check the URL and try again.":
     "Impossible de charger cette liste. Vérifiez l’URL et réessayez.",
-  "Couldn't reach harbor.site to load earlier builds. Check your connection and try again.":
-    "Impossible de joindre harbor.site pour charger les versions antérieures. Vérifiez votre connexion et réessayez.",
+  "Couldn't reach GitHub to load earlier builds. Check your connection and try again.":
+    "Impossible de joindre GitHub pour charger les versions antérieures. Vérifiez votre connexion et réessayez.",
   "Couldn't reach Trakt": "Impossible de joindre Trakt",
   "Couldn't reach Trakt. Check your connection and try again.":
     "Impossible de joindre Trakt. Vérifiez votre connexion et réessayez.",
@@ -690,8 +693,8 @@ const extra: Record<string, string> = {
     "Afficher brièvement le volume en surimpression lorsque vous le modifiez alors que les commandes du lecteur sont masquées, afin que les changements effectués au clavier ou avec la molette soient toujours visibles.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Afficher un bouton Passer lorsqu’une publicité ajoutée répertoriée est diffusée, ainsi qu’un petit bouton de signalement sur les nouveautés afin de marquer les publicités à vérifier.",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Afficher un bouton Passer l’intro / Passer le générique lorsque Harbor en détecte un. Désactivez cette option pour ne jamais l’afficher. Vous pouvez aussi toucher le X du bouton pour masquer une détection erronée jusqu’à la fin de l’épisode.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Afficher un bouton Passer l’intro / Passer le générique lorsque Harbor en détecte un. Désactivez cette option pour ne jamais l’afficher. Le bouton se masque de lui-même à la fin de l’intro ou du générique, ou après le délai ci-dessous.",
   "Show an “on disk” badge on cards": "Afficher un badge « présent sur le disque » sur les fiches",
   "Show audience score on cards": "Afficher la note du public sur les fiches",
   "Show comments on detail pages": "Afficher les commentaires sur les pages de détails",
@@ -720,7 +723,8 @@ const extra: Record<string, string> = {
   "Show the full notes for this build": "Afficher les notes complètes de cette version",
   "Show the IMDb rating and synopsis on episodes across the list, grid, and panel layouts.":
     "Afficher la note IMDb et le synopsis des épisodes dans les affichages en liste, en grille et en panneau.",
-  "Show the report button on every P2P stream, not just likely new releases.": "Afficher le bouton de signalement sur chaque flux P2P, et pas seulement sur les nouveautés probables.",
+  "Show the report button on every P2P stream, not just likely new releases.":
+    "Afficher le bouton de signalement sur chaque flux P2P, et pas seulement sur les nouveautés probables.",
   "Show the Skip button": "Afficher le bouton Passer",
   "Show title": "Afficher le titre",
   "Show TMDB score on cards": "Afficher la note TMDB sur les fiches",

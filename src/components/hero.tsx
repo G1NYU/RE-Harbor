@@ -37,6 +37,7 @@ import { useTitleLogo } from "@/lib/title-logo";
 import { useLocalizedOverview } from "@/lib/use-localized-overview";
 import {
   fetchFirstTrailer,
+  prefetchTrailer,
   resolveTrailerQuality,
   trailerSrc,
   type Quality,
@@ -63,6 +64,7 @@ export const Hero = memo(function Hero({
   meta,
   rank,
   playTrailer = false,
+  warmTrailer = playTrailer,
   active = true,
   loadBackdrop = true,
   full = false,
@@ -74,6 +76,7 @@ export const Hero = memo(function Hero({
   meta: Meta;
   rank?: { label: string; position: number; sources?: Array<{ label: string; rank: number }> };
   playTrailer?: boolean;
+  warmTrailer?: boolean;
   active?: boolean;
   loadBackdrop?: boolean;
   full?: boolean;
@@ -86,7 +89,8 @@ export const Hero = memo(function Hero({
   const { openMeta, meta: activeDetail, player, picker, view } = useView();
   const { pickerOpen: profilePickerOpen } = useProfiles();
   const t = useT();
-  const description = useLocalizedOverview(meta);
+  // Hero-feed items carry IMDb ids, so translateDescriptions has to resolve them to TMDB ids.
+  const description = useLocalizedOverview(meta, true);
   const resolvedImdb = useTmdbImdbId(meta.id);
   const inWatchlist = useInWatchlist(meta.id, [resolvedImdb]);
   const [bgUrl, setBgUrl] = useState<string | undefined>(meta.background);
@@ -148,7 +152,7 @@ export const Hero = memo(function Hero({
   }, [meta.id]);
 
   useEffect(() => {
-    if (!playTrailer || trailerCandidates.length > 0) return;
+    if (!warmTrailer || trailerCandidates.length > 0) return;
     let cancelled = false;
     const isTmdb = meta.id.startsWith("tmdb:");
     const lookup: Promise<string[]> = isTmdb
@@ -165,12 +169,21 @@ export const Hero = memo(function Hero({
       .then((ids) => {
         if (cancelled) return;
         setTrailerCandidates(ids);
+        if (!playTrailer && ids[0]) prefetchTrailer(ids[0], trailerQuality);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [meta.id, meta.type, settings.tmdbKey, playTrailer, trailerCandidates.length]);
+  }, [
+    meta.id,
+    meta.type,
+    settings.tmdbKey,
+    warmTrailer,
+    playTrailer,
+    trailerQuality,
+    trailerCandidates.length,
+  ]);
 
   useEffect(() => {
     // peekCachedLogo, not meta.logo: when the image language is not English the
@@ -464,7 +477,7 @@ export const Hero = memo(function Hero({
                 ) : (
                   <Plus size={18} strokeWidth={2} />
                 )}
-                {inWatchlist ? t("In Watchlist") : t("Add to Watchlist")}
+                {inWatchlist ? t("In library") : t("Save to library")}
               </button>
             )}
           </div>
@@ -536,6 +549,19 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function upsizeTmdb(url?: string, full = false): string | undefined {
   if (!url) return url;
-  const size = full ? "original" : "w1280";
+  const size = full ? fullBackdropSize() : "w1280";
   return url.replace(/\/t\/p\/(w\d+|original)\//, `/t/p/${size}/`);
+}
+
+/**
+ * TMDB's image CDN serves fixed backdrop rungs and `original` can be 3840px wide.
+ * A 1080p window shows the hero at 1920 backing pixels, so decoding an 8MP image
+ * for it wasted four times the pixels on the Home carousel. w1920 covers every
+ * display up to 1920 backing pixels; wider displays keep the original.
+ */
+function fullBackdropSize(): string {
+  const ratio = typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1;
+  const backing = Math.round((typeof window === "undefined" ? 0 : window.innerWidth) * ratio);
+  if (backing > 1920) return "original";
+  return backing > 1280 ? "w1920" : "w1280";
 }

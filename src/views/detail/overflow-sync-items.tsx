@@ -25,6 +25,7 @@ import { useTrakt } from "@/lib/trakt/provider";
 import { pushWatched } from "@/lib/trakt/history";
 import { useT } from "@/lib/i18n";
 import { usePmdbWatchlist } from "./add-to-publicmetadb-button";
+import { useTrackerStatusVersion } from "@/lib/tracker-status-events";
 
 const ANILIST_LABELS: Record<MediaListStatus, string> = {
   CURRENT: "Watching",
@@ -114,6 +115,7 @@ export function SimklMenuItems({
 }) {
   const t = useT();
   const { isConnected } = useSimkl();
+  const trackerStatusVersion = useTrackerStatusVersion();
   const [target, setTarget] = useState<SimklTarget | null>(null);
   const [status, setStatus] = useState<WatchlistStatus | null>(null);
   const [ready, setReady] = useState(false);
@@ -139,7 +141,7 @@ export function SimklMenuItems({
     return () => {
       cancelled = true;
     };
-  }, [harborId, isConnected, type]);
+  }, [harborId, isConnected, type, trackerStatusVersion]);
 
   if (!isConnected || !target || !ready) return null;
   const order = target.kind === "movie" ? MOVIE_STATUS_ORDER : SHOW_STATUS_ORDER;
@@ -201,6 +203,7 @@ export function AnilistMenuItems({
 }) {
   const t = useT();
   const { isConnected } = useAnilist();
+  const trackerStatusVersion = useTrackerStatusVersion();
   const [mediaId, setMediaId] = useState<number | null>(null);
   const [entryId, setEntryId] = useState<number | null>(null);
   const [status, setStatus] = useState<MediaListStatus | null>(null);
@@ -227,7 +230,7 @@ export function AnilistMenuItems({
     return () => {
       cancelled = true;
     };
-  }, [harborId, isConnected]);
+  }, [harborId, isConnected, trackerStatusVersion]);
 
   if (!isConnected || !ready || mediaId == null) return null;
 
@@ -291,23 +294,42 @@ export function PmdbMenuItems({
   onAction: () => void;
 }) {
   const t = useT();
-  const { isConnected, target, inList, ready, busy, toggle } = usePmdbWatchlist(harborId, type);
+  const { isConnected, target, inList, ready, busy, toggle, listName, error } = usePmdbWatchlist(
+    harborId,
+    type,
+  );
   if (!isConnected || !target || !ready) return null;
   return (
-    <button
-      role="menuitem"
-      disabled={busy}
-      onClick={() => {
-        void toggle().then(() => onAction());
-      }}
-      className="flex h-9 items-center gap-2.5 rounded-lg px-3 text-start text-[13px] text-ink transition-colors hover:bg-raised disabled:opacity-60"
-    >
-      <img src={publicmetadbLogo} alt="" className="h-[14px] w-[14px] rounded-[3px] object-contain" />
-      <span className="flex-1 truncate">
-        {inList ? t("In PMDB · remove") : t("Add to PMDB")}
-      </span>
-      {inList && <Check size={13} className="text-ink" />}
-    </button>
+    <>
+      <button
+        role="menuitem"
+        title={error ? t(error) : listName}
+        disabled={busy}
+        onClick={() => {
+          void toggle().then((ok) => {
+            if (ok) onAction();
+          });
+        }}
+        className="flex h-9 items-center gap-2.5 rounded-lg px-3 text-start text-[13px] text-ink transition-colors hover:bg-raised disabled:opacity-60"
+      >
+        <img
+          src={publicmetadbLogo}
+          alt=""
+          className="h-[14px] w-[14px] rounded-[3px] object-contain"
+        />
+        <span className="flex-1 truncate">
+          {inList
+            ? t("Remove from {list} on PMDB", { list: listName })
+            : t("Add to {list} on PMDB", { list: listName })}
+        </span>
+        {inList && <Check size={13} className="text-ink" />}
+      </button>
+      {error && (
+        <p role="alert" className="max-w-xs px-3 py-1 text-[12px] text-danger">
+          {t(error)}
+        </p>
+      )}
+    </>
   );
 }
 

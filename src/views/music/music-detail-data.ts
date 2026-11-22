@@ -7,7 +7,7 @@ import {
   albumTracks,
   artistCatalog,
   artistRows,
-  catalogPlaylistTracks,
+  catalogPlaylistPage,
   localCollection,
   searchTyped,
   stationTracks,
@@ -67,15 +67,22 @@ export async function loadDetailTracks(
     if (refusal) throw refusal;
     return { tracks: [], trackScope: "top" };
   }
+  if (item.kind === "playlist") {
+    // The playlist page pages its tracks; the first page is what the detail view opens with.
+    const page = await catalogPlaylistPage(item);
+    return {
+      tracks: tracksOf(page.items),
+      trackCursor: page.nextCursor,
+      trackScope: page.scope,
+    };
+  }
   return {
     tracks:
       item.kind === "track"
         ? [item]
         : item.kind === "album"
           ? await albumTracks(item)
-          : item.kind === "playlist"
-            ? await catalogPlaylistTracks(item)
-            : await stationTracks(item),
+          : await stationTracks(item),
   };
 }
 
@@ -194,9 +201,7 @@ export async function loadDetailRows(
   // Most catalogues credit only the lead and bury the guests in the title.
   const names = [
     ...credited,
-    ...featuredCreditNames(item.title).filter(
-      (name) => !creditedKeys.has(artistIdentityKey(name)),
-    ),
+    ...featuredCreditNames(item.title).filter((name) => !creditedKeys.has(artistIdentityKey(name))),
   ];
   const artists = (
     await Promise.all(

@@ -11,6 +11,7 @@ import {
   recordPendingResume,
   removePendingResume,
   syncPendingResume,
+  type PendingResume,
 } from "../src/lib/publicmetadb/pending-sync.ts";
 import type { PmdbTarget } from "../src/lib/publicmetadb/types.ts";
 
@@ -23,7 +24,7 @@ function online(saveImpl: (target: PmdbTarget) => Promise<boolean> = async () =>
     calls,
     deps: {
       hasSession: () => true,
-      save: async (target: PmdbTarget, positionMs: number, runtimeMs: number) => {
+      save: async ({ target, positionMs, runtimeMs }: PendingResume) => {
         calls.push({ target, positionMs, runtimeMs });
         return saveImpl(target);
       },
@@ -115,7 +116,13 @@ test("an older flush acknowledgement preserves a newer snapshot for the same tit
   const at = Date.now();
   recordPendingResume(MOVIE, 60_000, 600_000, at);
   let finish!: (ok: boolean) => void;
-  const running = flushPendingResumes({ hasSession: () => true, save: () => new Promise((resolve) => { finish = resolve; }) });
+  const running = flushPendingResumes({
+    hasSession: () => true,
+    save: () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  });
   // Same-millisecond writes still represent distinct progress snapshots.
   recordPendingResume(MOVIE, 120_000, 600_000, at);
   finish(true);
@@ -127,7 +134,15 @@ for (const succeeds of [true, false]) {
   test(`an older live save cannot remove or replace a newer snapshot (success=${succeeds})`, async () => {
     localStorage.clear();
     let finish!: (ok: boolean) => void;
-    const running = syncPendingResume(MOVIE, 60_000, 600_000, () => new Promise((resolve) => { finish = resolve; }));
+    const running = syncPendingResume(
+      MOVIE,
+      60_000,
+      600_000,
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     assert.equal(listPendingResumes()[0].positionMs, 60_000);
     recordPendingResume(MOVIE, 120_000, 600_000);
     finish(succeeds);
@@ -138,14 +153,27 @@ for (const succeeds of [true, false]) {
 
 test("a rejected live save keeps its durable snapshot", async () => {
   localStorage.clear();
-  assert.equal(await syncPendingResume(MOVIE, 60_000, 600_000, async () => { throw new Error("offline"); }), false);
+  assert.equal(
+    await syncPendingResume(MOVIE, 60_000, 600_000, async () => {
+      throw new Error("offline");
+    }),
+    false,
+  );
   assert.equal(listPendingResumes()[0].positionMs, 60_000);
 });
 
 test("a live acknowledgement cannot clear entries created after disconnect", async () => {
   localStorage.clear();
   let finish!: (ok: boolean) => void;
-  const running = syncPendingResume(MOVIE, 60_000, 600_000, () => new Promise((resolve) => { finish = resolve; }));
+  const running = syncPendingResume(
+    MOVIE,
+    60_000,
+    600_000,
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
   clearPendingResumes();
   recordPendingResume(MOVIE, 120_000, 600_000);
   finish(true);
@@ -159,7 +187,15 @@ test("flush skips snapshots superseded while another title was being sent", asyn
   recordPendingResume(EPISODE, 30_000, 300_000);
   let finish!: (ok: boolean) => void;
   let sends = 0;
-  const running = flushPendingResumes({ hasSession: () => true, save: () => { sends++; return new Promise((resolve) => { finish = resolve; }); } });
+  const running = flushPendingResumes({
+    hasSession: () => true,
+    save: () => {
+      sends++;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+  });
   recordPendingResume(MOVIE, 120_000, 600_000);
   finish(true);
   await running;

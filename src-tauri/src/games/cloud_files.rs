@@ -1,4 +1,10 @@
 //! Game-file access to existing debrid libraries. Never creates, selects, deletes, or cleans up remote torrents.
+#[path = "cloud_tb_catalog.rs"]
+mod tb_catalog;
+pub use tb_catalog::{catalog as tb_recovery_catalog,TbRemoteFile};
+#[path = "cloud_magnets.rs"]
+mod magnets;
+pub use magnets::{create as magnet_create, status as magnet_status, download as magnet_download, MagnetRequest, MagnetJob};
 #[path = "cloud_links.rs"]
 mod links;
 pub use links::{resolve as resolve_link, LinkRequest};
@@ -136,7 +142,7 @@ impl Api {
             _ => return Err("cloud_provider"),
         };
         let client = reqwest::Client::builder()
-            .user_agent("Harbor-Games/0.9 (https://harbor.site)")
+            .user_agent("Harbor-Games/0.9 (https://harborcommunity.site)")
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(20))
             .build()

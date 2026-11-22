@@ -1,4 +1,4 @@
-export const PX_PER_MIN = 5;
+export const PX_PER_MIN = 8;
 export const PX_PER_MS = PX_PER_MIN / 60_000;
 export const CHANNEL_COL_PX = 200;
 export const ROW_HEIGHT_PX = 110;
@@ -47,7 +47,12 @@ function startOfDay(d: Date): Date {
   return out;
 }
 
-export function clampDuration(startMs: number, endMs: number, windowStart: number, windowEnd: number): {
+export function clampDuration(
+  startMs: number,
+  endMs: number,
+  windowStart: number,
+  windowEnd: number,
+): {
   visibleStart: number;
   visibleEnd: number;
 } | null {

@@ -918,8 +918,8 @@ const catalog: Record<string, string> = {
   "Font tokens": "Tokens de fuente",
   "for {count} more episodes": "durante {count} episodios más",
   "for 1 more episode": "durante 1 episodio más",
-  "For Application URL anything works, for example https://harbor.site. TMDB never visits it.":
-    "Para la URL de la aplicación, cualquier valor sirve; por ejemplo, https://harbor.site. TMDB nunca la visita.",
+  "For Application URL anything works, for example https://harborcommunity.site. TMDB never visits it.":
+    "Para la URL de la aplicación, cualquier valor sirve; por ejemplo, https://harborcommunity.site. TMDB nunca la visita.",
   "Forward {n} seconds#few": "Avanzar {n} segundos",
   "Forward {n} seconds#one": "Avanzar {n} segundos",
   "Frame grab failed": "No se pudo capturar el fotograma",
@@ -955,6 +955,8 @@ const catalog: Record<string, string> = {
   GL: "GL",
   "Go to featured item {n}": "Ir al elemento destacado {n}",
   "Go to host": "Ir al sitio anfitrión",
+  "Episode pages": "Páginas de episodios",
+  "Go to page": "Ir a la página",
   "Go to page {page}": "Ir a la página {page}",
   "Go to pages {pages}": "Ir a las páginas {pages}",
   Good: "Buena",
@@ -1734,7 +1736,8 @@ const catalog: Record<string, string> = {
   "S{season} · E{episode}": "T{season} · E{episode}",
   "S{season} E{episode}": "T{season} E{episode}",
   "Safe by design": "Seguro por diseño",
-  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.": "Ofrece el mismo acceso de solo lectura que Real-Debrid. También permite poner en cola fuentes sin caché desde el selector de reproducción.",
+  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.":
+    "Ofrece el mismo acceso de solo lectura que Real-Debrid. También permite poner en cola fuentes sin caché desde el selector de reproducción.",
   "Same-genre picks from your installed sources":
     "Selecciones del mismo género de tus fuentes instaladas",
   "Sample title": "Título de muestra",
@@ -2219,7 +2222,8 @@ const catalog: Record<string, string> = {
   "Use this icon for all states": "Usar este ícono para todos los estados",
   "Use your API key to Translate Chapters to Your Language. Get a key from the":
     "Usa tu clave de API para traducir capítulos a tu idioma. Obtén una clave de",
-  "Used to check cache and unrestrict links. Harbor never adds or removes anything on your account on its own.": "Se usa para comprobar la caché y desbloquear enlaces. Harbor nunca agrega ni elimina nada de tu cuenta por sí solo.",
+  "Used to check cache and unrestrict links. Harbor never adds or removes anything on your account on its own.":
+    "Se usa para comprobar la caché y desbloquear enlaces. Harbor nunca agrega ni elimina nada de tu cuenta por sí solo.",
   "Uses the directdl endpoint, which skips queueing for anything already cached.":
     "Usa el endpoint directdl, que omite la cola para todo lo que ya esté en caché.",
   "Uses up to 150 MB": "Usa hasta 150 MB",

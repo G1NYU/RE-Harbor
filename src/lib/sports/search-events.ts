@@ -17,6 +17,7 @@ export type SportsEventHit = {
 type DbRow = Record<string, string | null | undefined>;
 
 async function rows(url: string, field: string, signal?: AbortSignal): Promise<DbRow[]> {
+  if (signal?.aborted) return [];
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
@@ -79,7 +80,11 @@ export async function searchSportsEvents(
 
   const byName = rows(`${DB}/searchevents.php?e=${encodeURIComponent(trimmed)}`, "event", signal);
   const byTeam = (async () => {
-    const teams = await rows(`${DB}/searchteams.php?t=${encodeURIComponent(trimmed)}`, "teams", signal);
+    const teams = await rows(
+      `${DB}/searchteams.php?t=${encodeURIComponent(trimmed)}`,
+      "teams",
+      signal,
+    );
     const team = teams.find((entry) => {
       const name = normalizeSportsSearch(entry.strTeam ?? "");
       const alt = normalizeSportsSearch(entry.strTeamAlternate ?? "");

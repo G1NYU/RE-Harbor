@@ -161,7 +161,7 @@ const library: Record<string, string> = {
   "Auto-sync subtitles": "自动同步字幕",
   "Community sync": "社区同步",
   "Community sync server": "社区同步服务器",
-  "https://sync.harbor.site": "https://sync.harbor.site",
+  "https://sync.harborcommunity.site": "https://sync.harborcommunity.site",
   'Posters, logos, and title art load in the first available language from this list, falling back down the order. "Original" uses the title\'s own language. Put your main language first. Needs a TMDB key.':
     "海报、徽标和标题图将按此列表中的语言顺序，使用首个可用语言加载，并依次回退。“原始语言”会使用作品标题本身的语言。请将你的主要语言放在首位。需要 TMDB 密钥。",
   "When you reopen a show you were already browsing, jump straight back to your spot (usually the episode list) instead of starting at the top. The jump happens before the page shows, so there is no flash.":
@@ -496,7 +496,8 @@ const library: Record<string, string> = {
   "Clear history": "清除历史记录",
   "Community comments from Trakt that appear on movie and show pages.":
     "来自 Trakt 社区的评论，会显示在电影和剧集页面上。",
-  "Connect your Trakt account to leave comments and reviews.": "连接 Trakt 账号即可发表评论和评价。",
+  "Connect your Trakt account to leave comments and reviews.":
+    "连接 Trakt 账号即可发表评论和评价。",
   "Connected to Simkl": "已连接到 Simkl",
   "Connected to Trakt": "已连接到 Trakt",
   "Copy your Harbor watchlist over to Trakt, or pull your Trakt watchlist into Harbor. Safe to run again, Trakt skips anything it already has.":
@@ -892,6 +893,9 @@ const library: Record<string, string> = {
   "Show your Letterboxd card": "显示你的 Letterboxd 卡片",
   "Off by default. Shows your Letterboxd name, lists and film counts on your profile for anyone who visits. Manage the connection itself in Settings, Letterboxd.":
     "默认关闭。启用后，任何访问者都能在你的个人资料中看到 Letterboxd 名称、列表和电影数量。连接本身可在“设置”的“Letterboxd”中管理。",
+  Tabs: "标签页",
+  "Show tabs": "显示标签页",
+  "Choose which tabs appear in your library": "选择媒体库中显示的标签页",
 };
 
 export default library;

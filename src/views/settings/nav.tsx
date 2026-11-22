@@ -13,6 +13,8 @@ import { TOP_GROUPS } from "./groups";
 import { markSectionSeen, useSettingsNew } from "./settings-new";
 import { useExperimentalAccess } from "@/lib/updater/experimental-access";
 import { useStreamPluginCount } from "@/lib/plugins";
+import { useInstallFeatures } from "@/lib/features/install";
+import { quickLibraryAvailable } from "@/lib/features/quick-library";
 
 type IconProps = { size?: number; strokeWidth?: number };
 
@@ -384,6 +386,15 @@ function IconWebhooks(p: IconProps) {
       <path d="M10.4 8.4 7.2 15.4" />
       <path d="M13.6 8.4 16.8 15.4" />
       <path d="M8.4 17.5h7.2" />
+    </IconBase>
+  );
+}
+
+function IconMessages(p: IconProps) {
+  return (
+    <IconBase {...p}>
+      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.8-3A7.5 7.5 0 1 1 20 11.5Z" />
+      <path d="M8.5 11.5h7M8.5 14.5h4.5" />
     </IconBase>
   );
 }
@@ -988,6 +999,12 @@ const NAV_GROUPS: Array<{ heading: string | null; items: NavItem[] }> = [
     heading: "Notifications",
     items: [
       {
+        id: "dmNotifications",
+        label: "Direct messages",
+        Icon: IconMessages,
+        keywords: ["dm", "dms", "message", "messages", "toast", "sound", "alert", "preview"],
+      },
+      {
         id: "webhooks",
         label: "Webhooks",
         Icon: IconWebhooks,
@@ -1117,6 +1134,7 @@ export type SettingsOption = {
   tab?: string;
   anchorTitle?: string;
   keywords?: string[];
+  feature?: "games" | "library";
 };
 
 const NAV_ITEM_BY_ID = new Map(NAV_GROUPS.flatMap((g) => g.items).map((i) => [i.id, i] as const));
@@ -1143,7 +1161,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Player controls in Big Picture",
     section: "hotkeys",
     tab: "behaviour",
-    anchorTitle: "Big Picture",
+    anchorTitle: "Navigation",
     keywords: [
       "big picture player",
       "ten foot player",
@@ -2083,7 +2101,12 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     section: "player",
     tab: "trailers",
     anchorTitle: "Trailer quality",
-    keywords: ["autoplay quality", "auto play resolution", "hero trailer resolution", "background trailer quality"],
+    keywords: [
+      "autoplay quality",
+      "auto play resolution",
+      "hero trailer resolution",
+      "background trailer quality",
+    ],
   },
   {
     label: "Trailer quality",
@@ -2431,19 +2454,6 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
-    label: "Remember last stream",
-    section: "player",
-    tab: "play",
-    anchorTitle: "Playback",
-    keywords: [
-      "remember last stream",
-      "resume stream",
-      "last source",
-      "addon memory",
-      "source memory",
-    ],
-  },
-  {
     label: "Custom CSS / JS / HTML code",
     section: "advanced",
     tab: "code",
@@ -2592,6 +2602,22 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
 
+  {
+    label: "Manga upscaling",
+    section: "shaders",
+    tab: "manga",
+    anchorTitle: "Manga upscaling",
+    keywords: [
+      "manga",
+      "upscale",
+      "upscaling",
+      "waifu2x",
+      "line art",
+      "screentone",
+      "manga shaders",
+      "download model",
+    ],
+  },
   {
     label: "Anime4K upscaling",
     section: "shaders",
@@ -3242,8 +3268,20 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "games.dock.settingTitle",
     section: "theme",
     tab: "interface",
-    anchorTitle: "games.dock.settingTitle",
-    keywords: ["games", "quick game library", "game tab", "edge tab", "game bar", "hover", "half moon", "hide games tab"],
+    anchorTitle: "music.library",
+    keywords: [
+      "quick library",
+      "quick game library",
+      "quick access",
+      "games",
+      "music",
+      "edge tab",
+      "game bar",
+      "hover",
+      "half moon",
+      "hide games tab",
+    ],
+    feature: "library",
   },
   {
     label: "Onboarding & hints",
@@ -3301,7 +3339,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   {
     label: "Synced addons",
     section: "account",
-    tab: "stremio",
+    tab: "nuvio",
     anchorTitle: "Synced addons",
     keywords: ["synced addons", "addons", "stremio addons", "installed addons"],
   },
@@ -3449,8 +3487,9 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   },
   {
     label: "Picture in picture style",
-    section: "basics",
-    anchorTitle: "Picture in picture style",
+    section: "player",
+    tab: "play",
+    anchorTitle: "Picture in picture",
     keywords: [
       "pip",
       "picture in picture",
@@ -3904,6 +3943,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     tab: "providers",
     anchorTitle: "Games",
     keywords: ["IGDB", "artwork", "background", "screenshots", "cover icon", "random"],
+    feature: "games",
   },
   {
     label: "games.artwork.screenshotsSetting",
@@ -3911,6 +3951,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     tab: "providers",
     anchorTitle: "Games",
     keywords: ["IGDB", "artwork", "background", "screenshots", "cover icon", "random"],
+    feature: "games",
   },
   {
     label: "games.artwork.iconSetting",
@@ -3918,6 +3959,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     tab: "providers",
     anchorTitle: "Games",
     keywords: ["IGDB", "artwork", "background", "screenshots", "cover icon", "random"],
+    feature: "games",
   },
   {
     label: "games.details.agePreference",
@@ -3925,13 +3967,22 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     tab: "providers",
     anchorTitle: "Games",
     keywords: ["ESRB", "PEGI", "age ratings", "game metadata", "IGDB"],
+    feature: "games",
   },
   {
     label: "Steam search shortcut",
     section: "library",
     tab: "ai",
     anchorTitle: "Search shortcuts",
-    keywords: ["steam store", "st prefix", "st:", "game search", "disable steam search", "normal search"],
+    keywords: [
+      "steam store",
+      "st prefix",
+      "st:",
+      "game search",
+      "disable steam search",
+      "normal search",
+    ],
+    feature: "games",
   },
   {
     label: "AI Search · natural-language search",
@@ -4031,19 +4082,6 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     keywords: ["poster titles", "hide names", "clean grid", "minimal"],
   },
   {
-    label: "Prefer my installed metadata addon",
-    section: "library",
-    tab: "providers",
-    anchorTitle: "Titles and descriptions",
-    keywords: [
-      "meta addon",
-      "localized cinemeta",
-      "custom metadata",
-      "override cinemeta",
-      "descriptions",
-    ],
-  },
-  {
     label: "Fanart.tv · logos and backdrops",
     section: "library",
     tab: "providers",
@@ -4065,11 +4103,11 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
-    label: "Show tags on cards (New, In Cinema, Rerun, Awards)",
+    label: "Show tags on cards (New, In Cinema, Rerun)",
     section: "library",
     tab: "providers",
     anchorTitle: "Metadata providers",
-    keywords: ["card tags", "new badge", "in cinema", "rerun", "awards", "chips", "overlays"],
+    keywords: ["card tags", "new badge", "in cinema", "rerun", "chips", "overlays"],
   },
   {
     label: "Show ratings on detail pages",
@@ -4173,14 +4211,14 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "card hover",
       "poster hover",
       "peek",
+      "default",
+      "custom",
       "marquee",
       "trailer card",
       "elegantfin",
       "frosted glass",
       "cinema",
       "spotlight",
-      "minimal",
-      "glare",
       "overview",
       "preview style",
     ],
@@ -4914,21 +4952,6 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     keywords: ["p2p chip", "peers", "speed", "progress overlay", "status chip", "player overlay"],
   },
   {
-    label: "Playback cache folder",
-    section: "player",
-    tab: "play",
-    anchorTitle: "Streams",
-    keywords: [
-      "debrid cache",
-      "video cache",
-      "buffer folder",
-      "system drive full",
-      "cache location",
-      "remux",
-      "mpv cache",
-    ],
-  },
-  {
     label: "Download the whole file while streaming",
     section: "player",
     tab: "play",
@@ -5292,8 +5315,12 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "ass subtitles",
       "ssa",
       "keep original",
-      "resize only",
+      "keep the file's look",
+      "match my size",
+      "change font only",
       "use my style",
+      "hardcoded font",
+      "inline tags",
       "karaoke",
       "anime subs",
       "boxes instead of letters",
@@ -5352,6 +5379,18 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "picture in picture captions",
       "floating window subs",
       "mini player subtitles",
+    ],
+  },
+  {
+    label: "Move subtitles above player controls",
+    section: "subtitles",
+    tab: "look",
+    anchorTitle: "Elsewhere",
+    keywords: [
+      "subtitles behind controls",
+      "lift subtitles",
+      "subtitles covered by seek bar",
+      "raise captions",
     ],
   },
   {
@@ -5545,19 +5584,6 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
-    label: "Keep same source on next episode",
-    section: "player",
-    tab: "play",
-    anchorTitle: "Streams",
-    keywords: [
-      "same release",
-      "next episode source",
-      "binge same source",
-      "keep addon",
-      "sticky source",
-    ],
-  },
-  {
     label: "Stay in fullscreen after closing the player",
     section: "player",
     tab: "onscreen",
@@ -5642,7 +5668,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Embed mpv inside Harbor window",
     section: "player",
     tab: "engine",
-    anchorTitle: "Engine",
+    anchorTitle: "mpv window",
     keywords: [
       "embedded mpv",
       "separate window",
@@ -5655,7 +5681,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Separate window display",
     section: "player",
     tab: "engine",
-    anchorTitle: "Engine",
+    anchorTitle: "mpv window",
     keywords: [
       "separate window monitor",
       "mpv display",
@@ -5669,7 +5695,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Cover the taskbar",
     section: "player",
     tab: "engine",
-    anchorTitle: "Engine",
+    anchorTitle: "mpv window",
     keywords: [
       "taskbar",
       "full screen",
@@ -6609,9 +6635,9 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   },
   {
     label: "Close player",
-    section: "hotkeys",
-    tab: "keys",
-    anchorTitle: "Player",
+    section: "player",
+    tab: "upnext",
+    anchorTitle: "More like this at the end",
     keywords: ["escape", "exit playback", "quit player", "back out"],
   },
   {
@@ -6734,14 +6760,14 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     keywords: ["fast forward", "arrow right", "jump ahead", "skip forward"],
   },
   {
-    label: "Seek back 30s",
+    label: "Long seek back",
     section: "hotkeys",
     tab: "keys",
     anchorTitle: "Player",
     keywords: ["back thirty seconds", "comma key", "big rewind", "30 second jump"],
   },
   {
-    label: "Seek forward 30s",
+    label: "Long seek forward",
     section: "hotkeys",
     tab: "keys",
     anchorTitle: "Player",
@@ -7118,10 +7144,29 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     keywords: ["row title size", "rail headings", "home titles bigger", "section titles"],
   },
   {
+    label: "Card title size",
+    section: "theme",
+    anchorTitle: "Title text",
+    keywords: [
+      "card titles",
+      "poster title size",
+      "movie titles",
+      "tv show titles",
+      "font size",
+      "text under posters",
+    ],
+  },
+  {
     label: "Player title",
     section: "theme",
     anchorTitle: "Title text",
     keywords: ["player title size", "title in player", "bigger player title", "scale title"],
+  },
+  {
+    label: "Use title artwork in the player",
+    section: "theme",
+    anchorTitle: "Title text",
+    keywords: ["player logo", "title logo", "movie logo", "show logo", "banner title", "artwork"],
   },
   {
     label: "Show series name first in the player",
@@ -7154,6 +7199,20 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "small text fix",
       "ultrawide",
     ],
+  },
+  {
+    label: "Harbor cursor",
+    section: "theme",
+    tab: "interface",
+    anchorTitle: "Harbor cursor",
+    keywords: ["cursor", "mouse", "pointer", "anchor", "مؤشر", "ماوس", "مرساة"],
+  },
+  {
+    label: "Harbor cursor size",
+    section: "theme",
+    tab: "interface",
+    anchorTitle: "Harbor cursor",
+    keywords: ["mouse cursor size", "pointer size", "anchor size", "حجم المؤشر", "حجم الماوس"],
   },
   {
     label: "Show format chips on stream rows",
@@ -7236,6 +7295,12 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "filmstrip",
       "frame preview",
     ],
+  },
+  {
+    label: "Seekr preview thumbnails",
+    section: "playerLayout",
+    anchorTitle: "Seek bar",
+    keywords: ["seekr", "seekr api key", "preview api", "thumbnail provider"],
   },
   {
     label: "Bar style",
@@ -8145,6 +8210,21 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
+    label: "Allow playing unreleased episodes",
+    section: "library",
+    tab: "home",
+    anchorTitle: "Home layout",
+    keywords: [
+      "unreleased episode",
+      "future release date",
+      "play anyway",
+      "blocked playback",
+      "incorrect release date",
+      "continue watching play",
+      "unaired episode",
+    ],
+  },
+  {
     label: "Remove shows once you're caught up",
     section: "library",
     tab: "home",
@@ -8258,6 +8338,13 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     keywords: ["jina key", "jina api", "reader key", "web quota", "jina token"],
   },
   {
+    label: "Search source",
+    section: "library",
+    tab: "ai",
+    anchorTitle: "Live web",
+    keywords: ["keenable", "keenable key", "keenable api", "web search source", "search api"],
+  },
+  {
     label: "Use free IMDb data without a TMDB key",
     section: "library",
     tab: "providers",
@@ -8302,24 +8389,27 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
-    label: "Award tab on cards",
+    label: "Award display on cards",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: [
+      "award display",
       "award tab",
+      "award badge",
+      "no award",
       "laurel",
       "netflix award",
       "award banner",
       "winner tab",
-      "awards bottom",
+      "awards top",
     ],
   },
   {
     label: "Award tab position",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: [
       "award tab position",
       "above ratings",
@@ -8327,28 +8417,27 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "top of card",
       "award on top",
       "award placement",
-      "laurel position",
     ],
   },
   {
     label: "Top 10 ribbon",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: ["top 10 ribbon", "top ten", "corner ribbon", "top10", "ribbon badge", "rank ribbon"],
   },
   {
     label: "Ribbon corner",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: ["ribbon corner", "top left", "top right", "ribbon side", "ribbon placement"],
   },
   {
     label: "Show DUB badge on anime cards",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: [
       "dub badge",
       "anime dub",
@@ -8370,7 +8459,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Watched badge",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: [
       "watched badge",
       "seen badge",
@@ -8894,6 +8983,18 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     ],
   },
   {
+    label: "Hide watched titles in More like this",
+    section: "player",
+    tab: "upnext",
+    anchorTitle: "More like this at the end",
+    keywords: [
+      "hide watched recommendations",
+      "skip watched more like this",
+      "end screen watched",
+      "recommendations watched",
+    ],
+  },
+  {
     label: "Show controls when pausing with keyboard",
     section: "player",
     tab: "onscreen",
@@ -9131,6 +9232,34 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "shorter jump",
       "seek step",
     ],
+  },
+  {
+    label: "Long seek",
+    section: "hotkeys",
+    tab: "behaviour",
+    anchorTitle: "Behavior",
+    keywords: ["long seek", "big jump", "30 seconds", "comma period", "seek step"],
+  },
+  {
+    label: "Slow speed",
+    section: "hotkeys",
+    tab: "behaviour",
+    anchorTitle: "Behavior",
+    keywords: ["slow speed", "half speed", "0.5x", "slow down toggle", "listening practice"],
+  },
+  {
+    label: "Toggle slow speed",
+    section: "hotkeys",
+    tab: "keys",
+    anchorTitle: "Player",
+    keywords: ["half speed", "slow motion", "0.5x toggle", "slower playback toggle"],
+  },
+  {
+    label: "Speed step",
+    section: "hotkeys",
+    tab: "behaviour",
+    anchorTitle: "Behavior",
+    keywords: ["speed step", "playback rate step", "speed increment", "0.25x", "bracket keys"],
   },
   {
     label: "Short seek back",
@@ -9440,7 +9569,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
       "own server",
       "sync endpoint",
       "point to server",
-      "sync.harbor.site",
+      "sync.harborcommunity.site",
     ],
   },
   {
@@ -9686,7 +9815,15 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     section: "theme",
     tab: "logo",
     anchorTitle: "artwork.title",
-    keywords: ["loading animation", "connecting", "boat", "lottie", "gif", "loader", "custom animation"],
+    keywords: [
+      "loading animation",
+      "connecting",
+      "boat",
+      "lottie",
+      "gif",
+      "loader",
+      "custom animation",
+    ],
   },
   {
     label: "artwork.launch",
@@ -10016,7 +10153,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     section: "subtitles",
     tab: "sync",
     anchorTitle: "Subtitle auto-sync",
-    keywords: ["speech recognition", "asr", "smart resync", "audio derived sync", "whisper"],
+    keywords: ["speech recognition", "asr", "smart resync", "audio derived sync", "moonshine"],
   },
   {
     label: "Match subtitles across languages (experimental)",
@@ -10080,7 +10217,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Watchlist bookmark",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: ["bookmark", "watchlist marker", "saved marker", "corner bookmark"],
   },
   {
@@ -10132,9 +10269,8 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   },
   {
     label: "Show the Big Picture button",
-    section: "hotkeys",
-    tab: "behaviour",
-    anchorTitle: "Big Picture",
+    section: "bigPicture",
+    anchorTitle: "Interface",
     keywords: ["big picture button", "tv mode button", "hide big picture", "ten foot"],
   },
   {
@@ -10162,7 +10298,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Show an on disk badge on cards",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: ["on disk", "local file badge", "downloaded badge", "have it locally"],
   },
   {
@@ -10286,7 +10422,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
     label: "Bookmark corner",
     section: "library",
     tab: "cards",
-    anchorTitle: "On the poster",
+    anchorTitle: "Card overlays",
     keywords: ["bookmark corner", "marker position", "watchlist corner", "which corner"],
   },
   {
@@ -11026,6 +11162,9 @@ setSettingsSearchVocabulary([
 export function useNavSearch(trimmed: string) {
   const t = useT();
   const experimentalAccess = useExperimentalAccess();
+  const features = useInstallFeatures();
+  const gamesEnabled = features.games;
+  const libraryEnabled = quickLibraryAvailable(features.games, features.music);
   const matches = useMemo<NavItem[] | null>(() => {
     if (!trimmed) return null;
     const out: NavItem[] = [];
@@ -11047,6 +11186,8 @@ export function useNavSearch(trimmed: string) {
     if (!trimmed) return null;
     return SETTINGS_OPTIONS.filter(
       (o) =>
+        (o.feature !== "games" || gamesEnabled) &&
+        (o.feature !== "library" || libraryEnabled) &&
         (o.label !== "Experimental builds" || experimentalAccess) &&
         matchesSettingsSearch(
           trimmed,
@@ -11059,7 +11200,7 @@ export function useNavSearch(trimmed: string) {
         rankSettingsSearch(trimmed, a.label, a.keywords ?? []) -
         rankSettingsSearch(trimmed, b.label, b.keywords ?? []),
     );
-  }, [experimentalAccess, t, trimmed]);
+  }, [experimentalAccess, gamesEnabled, libraryEnabled, t, trimmed]);
   return { matches, optionMatches };
 }
 
@@ -11376,6 +11517,7 @@ export function SettingsNav({
         : "•",
     badges: null,
     awardIcons: null,
+    dmNotifications: null,
     webhooks: webhookActive ? "live" : null,
     hotkeys: null,
     bug: null,

@@ -2,7 +2,15 @@ import type { DefaultParserResult } from "parse-torrent-title";
 import type { Container, Resolution, Source } from "../types";
 
 const CONTAINER_RX = /\.(mkv|mp4|m4v|avi|webm|mov|ts|wmv)\b/i;
-const SIZE_RX = /(\d+(?:\.\d+)?)\s*(GB|MB|TB|GiB|MiB|TiB)\b/i;
+// Accepts thousands separators ("1,024 MB", European "1.234,56 GB") and comma decimals
+// ("2,91Gb"), which otherwise match only the digits after the separator and misread the size.
+// A dot without a comma decimal stays a decimal point, so "1.234 GB" is 1.234 GB.
+// The thousands forms cannot start inside a longer number, or "Movie.2024.123,45GB" would
+// read as "024.123,45".
+const SIZE_RX =
+  /((?<!\d)\d{1,3}(?:\.\d{3})+,\d{1,2}|(?<!\d)\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+|,\d{1,2})?)\s*(GB|MB|TB|GiB|MiB|TiB)\b/i;
+// The addon's own size field ("💾 1.07 GB") beats a rounded size inside the release name.
+const MARKED_SIZE_RX = new RegExp(`💾\\s*${SIZE_RX.source}`, "iu");
 const SEEDERS_RX = /(?:👥|👤|S:|seeds?:?|\bS\s*=\s*)\s*(\d+)/i;
 const ANIME_HASH_RX = /\[([0-9A-F]{8})\]/i;
 const REPACK_RX = /\bREPACK(\d+)?\b/i;
@@ -16,7 +24,11 @@ const EDITION_RX =
 const QUALITY_STOP_RX =
   /\.(?:480p|576p|720p|1080p|1440p|2160p|4k|uhd|hdr|hdr10|dv|dovi|bluray|bdrip|brrip|web[\.\-]?dl|webrip|hdrip|hdtv|remux|cam|ts|hdts|tc|scr|x264|x265|hevc|avc|h\.?264|h\.?265|av1|aac|ac3|ddp?|eac3|dts|truehd|atmos|flac|opus|10bit|8bit|repack|proper|extended|directors?|imax|hybrid|hdr10\+|repack\d?|multi|dual|dubbed|sub|subbed|complete|amzn|nf|hulu|max|atvp|dsnp)/i;
 
-export function parseEpisodeTitle(filename: string, season?: number, episode?: number): string | null {
+export function parseEpisodeTitle(
+  filename: string,
+  season?: number,
+  episode?: number,
+): string | null {
   if (season == null || episode == null) return null;
   const code = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
   const idx = filename.toUpperCase().indexOf(code);
@@ -24,7 +36,10 @@ export function parseEpisodeTitle(filename: string, season?: number, episode?: n
   let after = filename.slice(idx + code.length).replace(/^[\.\-_\s]+/, "");
   const stop = after.search(QUALITY_STOP_RX);
   if (stop > 0) after = after.slice(0, stop);
-  const cleaned = after.replace(/[\.\-_]+/g, " ").replace(/\s+/g, " ").trim();
+  const cleaned = after
+    .replace(/[\.\-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (cleaned.length < 2 || cleaned.length > 80) return null;
   if (/^(?:e\d+|episode|hdtv|webrip)$/i.test(cleaned)) return null;
   return cleaned;
@@ -43,11 +58,20 @@ export function parseContainer(
   return null;
 }
 
+function sizeNumber(raw: string): number {
+  const comma = raw.indexOf(",");
+  if (comma > raw.indexOf(".") && raw.includes(".")) {
+    return Number(raw.replace(/\./g, "").replace(",", "."));
+  }
+  if (/,\d{3}/.test(raw)) return Number(raw.replace(/,/g, ""));
+  return Number(raw.replace(",", "."));
+}
+
 export function parseSize(text: string, hint?: number): number | null {
   if (hint && hint > 0) return hint;
-  const m = text.match(SIZE_RX);
+  const m = text.match(MARKED_SIZE_RX) ?? text.match(SIZE_RX);
   if (!m) return null;
-  const n = Number(m[1]);
+  const n = sizeNumber(m[1]);
   const unit = m[2].toLowerCase();
   if (unit.startsWith("t")) return Math.round(n * 1024 ** 4);
   if (unit.startsWith("g")) return Math.round(n * 1024 ** 3);
@@ -119,7 +143,11 @@ export function parseAnimeHash(text: string): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-export function computeScamScore(source: Source, resolution: Resolution, size: number | null): number {
+export function computeScamScore(
+  source: Source,
+  resolution: Resolution,
+  size: number | null,
+): number {
   let s = 0;
   if (resolution === "4K" && size != null && size < 5 * 1024 ** 3) s += 3;
   if (resolution === "1080p" && size != null && size < 700 * 1024 ** 2) s += 3;

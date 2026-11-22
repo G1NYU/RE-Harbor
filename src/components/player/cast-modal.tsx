@@ -45,7 +45,7 @@ export function CastModal({
   meta: Meta;
   tmdbKey: string | null;
   onOpenDetail?: (m: Meta) => void;
-  onPlay?: (m: Meta, episode?: PlayEpisode) => void;
+  onPlay?: (m: Meta, episode?: PlayEpisode, queueItemId?: string) => void;
   currentEpisode?: PlayEpisode | null;
   initialPerson?: { id: number; name: string };
 }) {
@@ -106,8 +106,8 @@ export function CastModal({
     setActiveGenre({ id: genreId, mediaType });
     setStack((s) => [...s, { kind: "genre", name, genreId, mediaType }]);
   };
-  const play = (m: Meta, episode?: PlayEpisode) => {
-    if (onPlay) onPlay(m, episode);
+  const play = (m: Meta, episode?: PlayEpisode, queueItemId?: string) => {
+    if (onPlay) onPlay(m, episode, queueItemId);
   };
 
   const requestExit = (m: Meta) => {
@@ -147,7 +147,9 @@ export function CastModal({
     const recompute = () => {
       const headerH = headerRef.current?.offsetHeight ?? 56;
       const maxH = window.innerHeight * 0.88;
-      setCardHeight(Math.min(body.scrollHeight + headerH, maxH));
+      // Round up so fractional content heights do not create a one-pixel overflow.
+      const bodyH = Number.parseFloat(getComputedStyle(body).height);
+      setCardHeight(Math.min(Math.ceil(bodyH + headerH), maxH));
     };
     recompute();
     const ro = new ResizeObserver(recompute);
@@ -238,7 +240,7 @@ export function CastModal({
                 type="button"
                 onClick={openQueueView}
                 className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
-                aria-label={t("Queue")}
+                aria-label={t("Watching queue")}
               >
                 <ListVideo size={19} strokeWidth={2.2} />
                 {queue.length > 0 && (
@@ -281,7 +283,7 @@ export function CastModal({
           </div>
         </header>
 
-        <div className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="relative z-10 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
           <div ref={bodyRef}>
             <div
               key={

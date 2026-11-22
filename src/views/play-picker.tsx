@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowDownToLine,
   ArrowUp,
@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { shouldIgnoreSourceDrawerKey } from "@/views/play-picker/keyboard";
 import { resolveAddonLogo } from "@/components/addon-logo";
 import { torrentEngineStatus } from "@/lib/torrent/local-engine";
 import { directTorrentEnabled, torrentsDisabled } from "@/lib/torrent/stremio-stream";
@@ -30,11 +31,19 @@ import { consumeRecentStubEvent } from "@/lib/dead-streams";
 import { peekCachedLogo, resolveLogo } from "@/lib/logo";
 import {
   readPlayback,
+  readActualPlaybackForTarget,
+  getPlaybackRevision,
+  subscribePlayback,
   isPlaybackActorCurrent,
   readLastSeriesPlayback,
   streamMatchesEntry,
-  streamMatchesReleaseLineage,
+  streamMatchesPreferredSource,
+  streamMatchesRememberedSource,
   streamMatchesSource,
+  findPreferredSourceMatch,
+  findRememberedSourceMatch,
+  preferredSourceAddonPending,
+  streamOfferedByAddon,
 } from "@/lib/playback-history";
 import { readSeasonLock } from "@/lib/season-lock";
 import { continuationStream } from "@/lib/player/continue-playback";
@@ -44,6 +53,7 @@ import { isAddonRanked } from "@/lib/streams/addon-detect";
 import { isFilterEmpty, matchesCustomFilter } from "@/lib/streams/custom-filters";
 import { useScrollMemory, useView, type PlayEpisode, type PlayerSrc } from "@/lib/view";
 import { prefetchSegments } from "@/lib/skip-intro";
+import { releaseIntentPrewarm } from "@/lib/streams/p2p-prewarm";
 import { exitWindowFullscreen } from "@/lib/fullscreen-state";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { AutoExhaustedModal } from "./play-picker/auto-exhausted-modal";
@@ -78,6 +88,7 @@ import { SourceDrawer } from "./play-picker/source-drawer";
 import { TierStrip } from "./play-picker/tier-strip";
 import { usePickHandler, type ResolvingSelection } from "./play-picker/use-pick-handler";
 import { useActiveKid } from "@/lib/profiles";
+import { expandOriginalAudioLang } from "@/lib/player/audio-language";
 import { useAutoCandidates } from "./play-picker/use-auto-candidates";
 import { useAutoFire } from "./play-picker/use-auto-fire";
 import { useRoomInvite } from "./play-picker/use-room-invite";
@@ -102,6 +113,16 @@ const TIER_ORDER: Tier[] = ["4K_DV", "4K_HDR", "4K", "1080p_HDR", "1080p", "720p
 
 const RESOLVE_TIMEOUT_MS = 150_000;
 
+const TORRENTS_BANNER_DISMISS_KEY = "harbor.stream-picker.torrents-disabled.dismissed.v1";
+
+function torrentsBannerDismissed(): boolean {
+  try {
+    return localStorage.getItem(TORRENTS_BANNER_DISMISS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 type PerEpisodeStatus =
   | { code: "checking"; total: number }
   | { code: "checked"; done: number; total: number }
@@ -112,6 +133,7 @@ type PerEpisodeStatus =
 
 export function PlayPicker({
   meta,
+  queueItemId,
   episode,
   autoPlay,
   attempt,
@@ -122,6 +144,7 @@ export function PlayPicker({
   playerActive,
 }: {
   meta: Meta;
+  queueItemId?: string;
   episode?: PlayEpisode;
   autoPlay?: boolean;
   attempt?: number;
@@ -155,6 +178,9 @@ export function PlayPicker({
   } = useTogether();
   const inSession = roomSnapshot.state === "joined";
   const resolvedImdb = useImdbId(meta, settings.tmdbKey);
+  // Leaving the picker (play, back, or a source switch) drops any hover/focus
+  // prewarm so it cannot outlive the list that started it.
+  useEffect(() => () => releaseIntentPrewarm(), []);
   useEffect(() => {
     prefetchSegments(meta, episode);
   }, [meta, episode]);
@@ -231,14 +257,38 @@ export function PlayPicker({
     () => (seasonLogo ? { ...meta, logo: seasonLogo } : meta),
     [meta, seasonLogo],
   );
+  const isAnimeMetaId = /^(kitsu|mal|anilist|anidb):/.test(meta.id);
+  const seasonLock = settings.seasonSourceLock && (meta.type === "series" || isAnimeMetaId);
+  const seasonLockEntry = useMemo(
+    () =>
+      seasonLock ? readSeasonLock(meta.id, isAnimeMetaId ? null : (episode?.season ?? null)) : null,
+    [seasonLock, meta.id, episode?.season, isAnimeMetaId],
+  );
+  const lastSeriesSource = useMemo(
+    () =>
+      seasonLockEntry ??
+      (autoPlay && (meta.type === "series" || isAnimeMetaId)
+        ? readLastSeriesPlayback(meta.id)
+        : null),
+    [seasonLockEntry, meta.id, meta.type, isAnimeMetaId, autoPlay],
+  );
+  const lastSeriesSourceIsLineage = seasonLockEntry == null;
   const [resolving, setResolving] = useState<ResolvingSelection | null>(null);
   const [failedStreams, setFailedStreams] = useState<Set<ScoredStream>>(new Set());
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
+  const tierTouchedRef = useRef(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerOpenRef = useRef(drawerOpen);
+  drawerOpenRef.current = drawerOpen;
+  const mainRef = useRef<HTMLElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const openDrawerWithScrollRef = useRef<(() => void) | null>(null);
+  const closeDrawerWithScrollRef = useRef<(() => void) | null>(null);
   const [strictMode, setStrictMode] = useState(settings.streamFilterLevel === "strict");
   const [forceShowAll, setForceShowAll] = useState(false);
+  const [hideTorrentsBanner, setHideTorrentsBanner] = useState(torrentsBannerDismissed);
   const filterDisabled = settings.streamFilterLevel === "off" || forceShowAll || isDownload;
-  const animeTitles = useAnimeAltTitles(meta);
+  const animeTitles = useAnimeAltTitles(meta, episode?.sourceMetaId);
   const {
     result,
     loading,
@@ -263,6 +313,7 @@ export function PlayPicker({
     strictMode,
     filterDisabled,
     animeTitles,
+    preferredAddonId: lastSeriesSource?.addonId ?? null,
   });
   const baseLangs = settings.preferredLanguages ?? [];
   const isAnimeRequest = useMemo(
@@ -282,8 +333,8 @@ export function PlayPicker({
       seen.add(code);
       out.push(lang);
     }
-    return out;
-  }, [baseLangs, settings.preferredAudioLangs, isAnimeRequest]);
+    return expandOriginalAudioLang(out, meta.originalLanguage, isAnimeRequest);
+  }, [baseLangs, settings.preferredAudioLangs, isAnimeRequest, meta.originalLanguage]);
   const [langFilter, setLangFilter] = useState(
     settings.requirePreferredLanguage === true && baseLangs.length > 0,
   );
@@ -452,36 +503,41 @@ export function PlayPicker({
     [filteredPicker],
   );
 
-  useEffect(() => {
-    if (!filteredPicker?.primary) return;
-    setSelectedTier((s) => s ?? filteredPicker.primary!.tier);
-  }, [filteredPicker]);
-
-  const isAnimeMetaId = /^(kitsu|mal|anilist|anidb):/.test(meta.id);
   const previousPlayback = useMemo(
-    () =>
-      continuation?.source ??
-      (settings.rememberLastStream
-        ? readPlayback(meta.id, episode?.season, episode?.episode)
-        : null),
-    [meta.id, episode?.season, episode?.episode, settings.rememberLastStream, continuation],
+    () => continuation?.source ?? readPlayback(meta.id, episode?.season, episode?.episode),
+    [meta.id, episode?.season, episode?.episode, continuation],
   );
+  const playbackRevision = useSyncExternalStore(subscribePlayback, getPlaybackRevision);
+  const lastPlayedMatch = useMemo(() => {
+    if (isDownload) return null;
+    const playback = readActualPlaybackForTarget(meta.id, episode?.season, episode?.episode);
+    const source = playback?.src.streamRef;
+    if (!playback || !source) return null;
+    const saved = {
+      ...source,
+      url: playback.src.historyUrl || playback.src.url,
+      urlFingerprint: playback.sourceFingerprint,
+      savedAt: playback.playedAt,
+    };
+    return (
+      displayStreams.find(
+        (stream) =>
+          (!source.addonId || streamOfferedByAddon(stream, source.addonId)) &&
+          (!source.infoHash || !!stream.infoHash) &&
+          streamMatchesEntry(stream, saved),
+      ) ?? null
+    );
+  }, [isDownload, meta.id, episode?.season, episode?.episode, playbackRevision, displayStreams]);
 
-  const seasonLock = settings.seasonSourceLock && (meta.type === "series" || isAnimeMetaId);
-  const seasonLockEntry = useMemo(
-    () =>
-      seasonLock ? readSeasonLock(meta.id, isAnimeMetaId ? null : (episode?.season ?? null)) : null,
-    [seasonLock, meta.id, episode?.season, isAnimeMetaId],
-  );
-  const lastSeriesSource = useMemo(
-    () =>
-      seasonLockEntry ??
-      (settings.keepSourceNextEpisode && !!autoPlay && (meta.type === "series" || isAnimeMetaId)
-        ? readLastSeriesPlayback(meta.id)
-        : null),
-    [seasonLockEntry, meta.id, meta.type, isAnimeMetaId, settings.keepSourceNextEpisode, autoPlay],
-  );
-  const lastSeriesSourceIsLineage = seasonLockEntry == null;
+  // The same episode's exact source is more specific than the series lineage,
+  // but an explicit season lock stays in charge.
+  const preferredSourceEntry =
+    !seasonLockEntry && previousPlayback ? previousPlayback : lastSeriesSource;
+  const rememberedAddonPending =
+    !!previousPlayback &&
+    !pipelineDone &&
+    (preferredSourceAddonPending(previousPlayback, false, pipelineDone, addonQuorum) ||
+      (!addonQuorum.queriedAddonIds.length && !!previousPlayback.addonId));
 
   const kidProfile = useActiveKid();
   const p2pAutoConsent = settings.p2pAutoConsent || !!kidProfile;
@@ -490,6 +546,7 @@ export function PlayPicker({
     previousPlayback,
     sourceEntry: lastSeriesSource,
     sourceEntryLineage: lastSeriesSourceIsLineage,
+    sourceEntryBestEffort: lastSeriesSourceIsLineage,
     isCached,
     addons,
     hasStrongAddon,
@@ -498,6 +555,7 @@ export function PlayPicker({
     hostSource: hostSourceForMedia,
     prefer1080: !!kidProfile,
     preferPacks: seasonLock,
+    sourceEntryFirst: !lastSeriesSourceIsLineage,
     season: !isAnimeMetaId ? (episode?.season ?? null) : null,
     episode: !isAnimeMetaId ? (episode?.episode ?? null) : null,
     expectedTitle: meta.name,
@@ -507,7 +565,6 @@ export function PlayPicker({
   });
 
   const autoFiredRef = useRef(false);
-  const mainRef = useRef<HTMLElement>(null);
   const [autoAttemptIdx, setAutoAttemptIdx] = useState(0);
   const [autoExhausted, setAutoExhausted] = useState(false);
   const [autoCancelled, setAutoCancelled] = useState(false);
@@ -520,9 +577,99 @@ export function PlayPicker({
     !roomGuestPick;
   useEffect(() => {
     if (!autoActive) return;
+    if (preferredSourceAddonPending(preferredSourceEntry, false, pipelineDone, addonQuorum)) return;
     const t = window.setTimeout(() => setAutoCancelled(true), 45_000);
     return () => window.clearTimeout(t);
-  }, [autoActive]);
+  }, [autoActive, preferredSourceEntry, pipelineDone, addonQuorum]);
+
+  const setMainRef = useCallback(
+    (node: HTMLElement | null) => {
+      mainRef.current = node;
+
+      if (settings.pickerLayout !== "condensed" || !node) return;
+
+      let scrollFrame = 0;
+      let measureFrame = 0;
+      let scrollPending = false;
+      const scrollToSourceDrawer = (gap = 20) => {
+        if (drawerOpenRef.current || scrollPending) return;
+        scrollPending = true;
+        setDrawerOpen(true);
+        scrollFrame = requestAnimationFrame(() => {
+          scrollFrame = 0;
+          measureFrame = requestAnimationFrame(() => {
+            measureFrame = 0;
+            scrollPending = false;
+            if (!node.isConnected || !drawerOpenRef.current) return;
+            const drawerEl = drawerRef.current;
+            if (!drawerEl) return;
+            const maxScroll = Math.max(0, node.scrollHeight - node.clientHeight);
+            const drawerTop = drawerEl.offsetTop;
+            const targetScroll = Math.max(0, Math.min(drawerTop - gap, maxScroll));
+            const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+              ? "auto"
+              : "smooth";
+            node.scrollTo({ top: targetScroll, behavior });
+          });
+        });
+      };
+      const scrollToTop = () => {
+        if (scrollFrame) cancelAnimationFrame(scrollFrame);
+        if (measureFrame) cancelAnimationFrame(measureFrame);
+        scrollFrame = 0;
+        measureFrame = 0;
+        scrollPending = false;
+        const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth";
+        node.scrollTo({ top: 0, behavior });
+      };
+      openDrawerWithScrollRef.current = scrollToSourceDrawer;
+      closeDrawerWithScrollRef.current = scrollToTop;
+
+      const onWheel = (e: WheelEvent) => {
+        if (e.deltaY <= 0) return;
+        const atBottom = node.scrollHeight - node.scrollTop - node.clientHeight <= 20;
+        if (atBottom) scrollToSourceDrawer();
+      };
+
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (shouldIgnoreSourceDrawerKey(e.target, node)) return;
+
+        if (e.key === " " && drawerOpenRef.current) {
+          e.preventDefault();
+          setDrawerOpen(false);
+          scrollToTop();
+          return;
+        }
+
+        if (drawerOpenRef.current) return;
+
+        if (["ArrowDown", "PageDown", " ", "Down"].includes(e.key)) {
+          e.preventDefault();
+          scrollToSourceDrawer();
+        }
+      };
+
+      node.addEventListener("wheel", onWheel, { passive: true });
+      window.addEventListener("keydown", onKeyDown);
+
+      return () => {
+        if (scrollFrame) cancelAnimationFrame(scrollFrame);
+        if (measureFrame) cancelAnimationFrame(measureFrame);
+        scrollPending = false;
+        if (openDrawerWithScrollRef.current === scrollToSourceDrawer) {
+          openDrawerWithScrollRef.current = null;
+        }
+        if (closeDrawerWithScrollRef.current === scrollToTop) {
+          closeDrawerWithScrollRef.current = null;
+        }
+        node.removeEventListener("wheel", onWheel);
+        window.removeEventListener("keydown", onKeyDown);
+      };
+    },
+    [settings.pickerLayout],
+  );
 
   const previousMatch: ScoredStream | null = useMemo(() => {
     if (!filteredPicker || !previousPlayback) return null;
@@ -530,7 +677,7 @@ export function PlayPicker({
       ? (filteredPicker.allRaw
           .map((s) => continuationStream(s, continuation))
           .find((s) => s != null) ?? null)
-      : (filteredPicker.allRaw.find((s) => streamMatchesEntry(s, previousPlayback)) ?? null);
+      : findRememberedSourceMatch(filteredPicker.allRaw, previousPlayback);
     if (!m || isAnimeMetaId || !episode) return m;
     if (
       m.episode != null &&
@@ -549,12 +696,22 @@ export function PlayPicker({
 
   const sameSourceMatch: ScoredStream | null = useMemo(() => {
     if (!filteredPicker || !lastSeriesSource || previousMatch) return null;
-    const matches = lastSeriesSourceIsLineage ? streamMatchesReleaseLineage : streamMatchesSource;
-    return filteredPicker.allRaw.find((s) => matches(s, lastSeriesSource)) ?? null;
+    const matches = lastSeriesSourceIsLineage ? streamMatchesPreferredSource : streamMatchesSource;
+    return findPreferredSourceMatch(filteredPicker.allRaw, lastSeriesSource, matches);
   }, [filteredPicker, lastSeriesSource, lastSeriesSourceIsLineage, previousMatch]);
+
+  useEffect(() => {
+    const preferred = previousMatch ?? sameSourceMatch ?? filteredPicker?.primary;
+    if (!preferred || tierTouchedRef.current) return;
+    setSelectedTier(preferred.tier);
+  }, [filteredPicker, previousMatch, sameSourceMatch]);
 
   const currentPick: ScoredStream | null = useMemo(() => {
     if (!filteredPicker) return null;
+    if (!tierTouchedRef.current) {
+      if (previousMatch) return previousMatch;
+      if (sameSourceMatch) return sameSourceMatch;
+    }
     if (selectedTier && filteredPicker.byTier[selectedTier]) {
       return filteredPicker.byTier[selectedTier]!;
     }
@@ -566,6 +723,9 @@ export function PlayPicker({
   const [pendingPreselect, setPendingPreselect] = useState<PlayerSrc | null>(null);
   const openPlayerGated = useCallback(
     (s: PlayerSrc) => {
+      const source = queueItemId
+        ? { ...s, meta: metaForDisplay, episode, queueItemId }
+        : { ...s, queueItemId: undefined };
       const applicable =
         settings.subtitlePreselect &&
         !isDownload &&
@@ -575,13 +735,21 @@ export function PlayPicker({
         !s.meta.id?.startsWith("iptv:") &&
         (s.meta.type === "movie" || s.meta.type === "series" || s.meta.type === "anime");
       if (!applicable) {
-        openPlayer(s);
+        openPlayer(source);
         return;
       }
       setResolving(null);
-      setPendingPreselect(s);
+      setPendingPreselect(source);
     },
-    [settings.subtitlePreselect, isDownload, inSession, openPlayer],
+    [
+      settings.subtitlePreselect,
+      isDownload,
+      inSession,
+      openPlayer,
+      queueItemId,
+      metaForDisplay,
+      episode,
+    ],
   );
 
   const {
@@ -597,6 +765,7 @@ export function PlayPicker({
     cancelP2p,
   } = usePickHandler({
     meta: metaForDisplay,
+    queueItemId,
     imdbId,
     imdbIdVerified: resolvedImdb.verified,
     episode,
@@ -651,13 +820,14 @@ export function PlayPicker({
     !!previousMatch && (isCached(previousMatch) || !!previousMatch.url || p2pAutoConsent);
   const rememberedFiredRef = useRef(false);
   const rememberedHandledFirst =
+    !autoCancelled &&
     !!previousMatch &&
-    (settings.rememberLastStream || !!continuation) &&
     !!resume &&
     !wasInvitedTo(inviteKey) &&
     !isDownload &&
     !roomGuestPick &&
     !inSession &&
+    !rememberedAddonPending &&
     rememberedInstant &&
     (attempt ?? 0) === 0;
   useEffect(() => {
@@ -699,7 +869,7 @@ export function PlayPicker({
     openPlayerGated,
   ]);
 
-  useAutoFire({
+  const { waitingForPreferredSource } = useAutoFire({
     autoActive,
     rememberedHandledFirst: rememberedHandledFirst && autoAttemptIdx === 0,
     attempt,
@@ -716,8 +886,21 @@ export function PlayPicker({
     isTorrentioStream,
     expectHostSource,
     hostSource: hostSourceForMedia,
-    preferredSourceEntry: lastSeriesSource,
-    preferredSourceMatched: sameSourceMatch != null || previousMatch != null,
+    preferredSourceEntry,
+    preferredSourceMatched: (() => {
+      if (!preferredSourceEntry || !autoCandidates[0]) return false;
+      const remembered = preferredSourceEntry === previousPlayback ? previousPlayback : null;
+      if (remembered) return streamMatchesRememberedSource(autoCandidates[0], remembered);
+      if (!lastSeriesSource) return false;
+      const matched = lastSeriesSourceIsLineage
+        ? streamMatchesPreferredSource(autoCandidates[0], lastSeriesSource)
+        : streamMatchesSource(autoCandidates[0], lastSeriesSource);
+      return (
+        matched &&
+        (!lastSeriesSource.addonId ||
+          streamOfferedByAddon(autoCandidates[0], lastSeriesSource.addonId))
+      );
+    })(),
     season: !isAnimeMetaId ? (episode?.season ?? null) : null,
     episode: !isAnimeMetaId ? (episode?.episode ?? null) : null,
     addonQuorum,
@@ -727,6 +910,12 @@ export function PlayPicker({
     setAutoCancelled,
     onPlay,
   });
+  const preferredAddonName = useMemo(() => {
+    if (!waitingForPreferredSource) return null;
+    const id = preferredSourceEntry?.addonId;
+    if (!id) return null;
+    return addons?.find((a) => a.manifest.id === id)?.manifest.name ?? id;
+  }, [waitingForPreferredSource, preferredSourceEntry, addons]);
 
   const allCount = filteredPicker?.all.length ?? 0;
   const rawCount = (result?.raw.addon.length ?? 0) + (result?.raw.library.length ?? 0);
@@ -854,11 +1043,11 @@ export function PlayPicker({
     };
   }, [engineWarming, setResolveError]);
 
-  const showAutoTransition =
-    !pickerErrorText &&
-    !isDownload &&
-    ((autoActive && (streamIds === null || loading || autoCandidates.length > 0)) ||
-      resolving != null);
+  // Keep the initial automatic/resume transition mounted while waiting for
+  // the preferred addon's first candidate. The old condition briefly became
+  // false between stream IDs resolving and the first source arriving, exposing
+  // the picker for a frame before switching back to the loading screen.
+  const showAutoTransition = !pickerErrorText && !isDownload && (autoActive || resolving != null);
   void terminalEmpty;
 
   const pickerScrollKey = useMemo(() => {
@@ -916,6 +1105,7 @@ export function PlayPicker({
         p2p={resolving?.p2p === true}
         attemptIdx={autoAttemptIdx}
         download={isDownload}
+        waitingFor={preferredAddonName}
         onCancel={() => {
           abortResolve();
           setResolving(null);
@@ -947,7 +1137,7 @@ export function PlayPicker({
   }
 
   return (
-    <main ref={mainRef} data-stream-picker className="absolute inset-0 z-50 overflow-y-auto bg-canvas">
+    <main ref={setMainRef} data-stream-picker className="absolute inset-0 z-50 overflow-y-auto bg-canvas">
       <BackdropLayer src={backdropSrc} />
 
       <div
@@ -958,6 +1148,17 @@ export function PlayPicker({
 
       <div data-stream-picker-content className="relative mx-auto flex min-h-full w-full max-w-5xl flex-col gap-12 px-12 pb-32 pt-32">
         <PickerNav onBack={backToDetail} onRefresh={refresh} refreshing={loading} />
+        {pickerErrorText && engineWarming && (
+          <div className="flex items-center gap-3 rounded-2xl border border-edge-soft/60 bg-elevated/40 px-5 py-4 text-[13.5px] text-ink-muted">
+            <Loader2 size={16} className="shrink-0 animate-spin text-ink-subtle" />
+            <span>{pickerErrorText}</span>
+          </div>
+        )}
+        {pickerErrorText && !engineWarming && (
+          <div className="rounded-2xl border border-danger/30 bg-danger/15 px-5 py-4 text-[13.5px] text-ink">
+            {pickerErrorText}
+          </div>
+        )}
         <PickerHeader
           meta={metaForDisplay}
           episode={episode}
@@ -1000,19 +1201,36 @@ export function PlayPicker({
           </div>
         )}
 
-        {torrentsDisabled() && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300/30 bg-amber-400/10 px-5 py-3.5 text-[13px] text-amber-100">
-            <span>
+        {torrentsDisabled() && !hideTorrentsBanner && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-300/30 bg-amber-400/10 px-5 py-3.5 text-[13px] text-amber-100">
+            <span className="min-w-0 flex-1">
               Torrents are disabled in settings. Uncached streams will not play unless they come
               from a debrid service or a direct link.
             </span>
-            <button
-              type="button"
-              onClick={() => openSettings("player")}
-              className="rounded-md border border-amber-300/40 px-3 py-1 text-[12px] font-semibold text-amber-100 transition-colors hover:bg-amber-300/10"
-            >
-              Open Settings
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openSettings("player")}
+                className="rounded-md border border-amber-300/40 px-3 py-1 text-[12px] font-semibold text-amber-100 transition-colors hover:bg-amber-300/10"
+              >
+                Open Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    localStorage.setItem(TORRENTS_BANNER_DISMISS_KEY, "1");
+                  } catch {
+                    /* noop */
+                  }
+                  setHideTorrentsBanner(true);
+                }}
+                aria-label={t("Dismiss")}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-amber-100/80 transition-colors hover:bg-amber-300/10 hover:text-amber-100"
+              >
+                <X size={14} strokeWidth={2.2} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -1128,6 +1346,7 @@ export function PlayPicker({
         filteredPicker.all.length > 0 ? (
           <StremioLayout
             streams={displayStreams}
+            lastPlayedStream={lastPlayedMatch}
             addons={addons}
             pipelineDone={pipelineDone}
             loadingAddonCount={Math.max(0, (addons?.length ?? 0) - addonCount)}
@@ -1163,6 +1382,7 @@ export function PlayPicker({
                 queued={currentPick.infoHash != null && queuedHash === currentPick.infoHash}
                 inSession={inSession}
                 isPreviouslyPlayed={previousMatch === currentPick}
+                playedLast={lastPlayedMatch === currentPick}
                 match={matchFor(currentPick)}
               />
             )}
@@ -1171,7 +1391,10 @@ export function PlayPicker({
               <TierStrip
                 tiers={populatedTiers}
                 selected={selectedTier}
-                onSelect={setSelectedTier}
+                onSelect={(tier) => {
+                  tierTouchedRef.current = true;
+                  setSelectedTier(tier);
+                }}
                 byTier={filteredPicker.byTier}
                 debrids={debrids}
                 langFilterSlot={
@@ -1198,36 +1421,36 @@ export function PlayPicker({
             )}
 
             {!loading && allCount > 0 && filteredPicker && (
-              <SourceDrawer
-                open={drawerOpen}
-                onToggle={() => setDrawerOpen((o) => !o)}
-                count={allCount}
-                addonCount={addonCount}
-                usedAddons={usedAddons}
-                streams={displayStreams}
-                debrids={debrids}
-                getAddonLogo={lookupLogo}
-                matchFor={hostMatch ? matchFor : undefined}
-                onPlay={playManually}
-                resolvingId={resolving?.stream.infoHash ?? null}
-                showName={meta.name}
-                episode={episode}
-                absoluteEpisode={animeAbsoluteEpisode}
-              />
+              <div ref={drawerRef}>
+                <SourceDrawer
+                  open={drawerOpen}
+                  onToggle={() => {
+                    if (drawerOpenRef.current) {
+                      setDrawerOpen(false);
+                      closeDrawerWithScrollRef.current?.();
+                    } else if (openDrawerWithScrollRef.current) {
+                      openDrawerWithScrollRef.current();
+                    } else {
+                      setDrawerOpen(true);
+                    }
+                  }}
+                  count={allCount}
+                  addonCount={addonCount}
+                  usedAddons={usedAddons}
+                  streams={displayStreams}
+                  lastPlayedStream={lastPlayedMatch}
+                  debrids={debrids}
+                  getAddonLogo={lookupLogo}
+                  matchFor={hostMatch ? matchFor : undefined}
+                  onPlay={playManually}
+                  resolvingId={resolving?.stream.infoHash ?? null}
+                  showName={meta.name}
+                  episode={episode}
+                  absoluteEpisode={animeAbsoluteEpisode}
+                />
+              </div>
             )}
           </>
-        )}
-
-        {pickerErrorText && engineWarming && (
-          <div className="flex items-center gap-3 rounded-2xl border border-edge-soft/60 bg-elevated/40 px-5 py-4 text-[13.5px] text-ink-muted">
-            <Loader2 size={16} className="shrink-0 animate-spin text-ink-subtle" />
-            <span>{pickerErrorText}</span>
-          </div>
-        )}
-        {pickerErrorText && !engineWarming && (
-          <div className="rounded-2xl border border-danger/30 bg-danger/15 px-5 py-4 text-[13.5px] text-ink">
-            {pickerErrorText}
-          </div>
         )}
       </div>
       {(settings.pickerLayout === "stremio" || isDownload) &&
@@ -1418,7 +1641,7 @@ function PickerScrollTop({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const onScroll = () => setShow(el.scrollTop > 600);
+    const onScroll = () => setShow(el.scrollTop > 400);
     el.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => el.removeEventListener("scroll", onScroll);

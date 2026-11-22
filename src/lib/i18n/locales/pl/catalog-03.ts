@@ -60,8 +60,8 @@ const catalog03: Record<string, string> = {
   Checking: "Sprawdzanie",
   "Checking SVP installation...": "Sprawdzanie instalacji SVP...",
   "Checking availability": "Sprawdzanie dostępności",
-  "Checking harbor.site for a newer build.":
-    "Sprawdzanie dostępności nowszej kompilacji w harbor.site.",
+  "Checking harborcommunity.site for a newer build.":
+    "Sprawdzanie dostępności nowszej kompilacji w harborcommunity.site.",
   "Checking plots, cast, and scenes": "Sprawdzanie fabuły, obsady i scen",
   "Checking sources and audio": "Sprawdzanie źródeł i dźwięku",
   "Checking the local SVP and VapourSynth installation...":
@@ -406,7 +406,8 @@ const catalog03: Record<string, string> = {
   "Connect your Trakt account": "Połącz konto Trakt",
   "Connect your Trakt account to scrobble playback, sync your watchlist, and pull personalized recommendations.":
     "Połącz konto Trakt, aby rejestrować odtwarzanie, synchronizować listę do obejrzenia i pobierać spersonalizowane rekomendacje.",
-  "Connect your Trakt account to leave comments and reviews.": "Połącz konto Trakt, aby zostawiać komentarze i recenzje.",
+  "Connect your Trakt account to leave comments and reviews.":
+    "Połącz konto Trakt, aby zostawiać komentarze i recenzje.",
   "Connect your provider.": "Połącz się z dostawcą.",
   "Connect {name} in Settings first": "Najpierw połącz {name} w Ustawieniach",
   Connected: "Połączono",
@@ -497,7 +498,8 @@ const catalog03: Record<string, string> = {
   "Copy Webhook URL": "Kopiuj adres URL webhooka",
   "Copy code": "Skopiuj kod",
   "Copy diagnostics": "Kopiuj dane diagnostyczne",
-  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.": "Funkcja kopiowania danych diagnostycznych pobiera stan silnika i ustawienia P2P w formacie JSON, co ułatwia wklejenie ich do zgłoszenia błędu. Folder silnika zawiera pamięć podręczną DHT (dht.json) oraz dane aktywnych transferów.",
+  "Copy diagnostics grabs the engine status and your P2P settings as JSON, handy to paste into a bug report. The engine folder holds the DHT cache (dht.json) and active transfer data.":
+    "Funkcja kopiowania danych diagnostycznych pobiera stan silnika i ustawienia P2P w formacie JSON, co ułatwia wklejenie ich do zgłoszenia błędu. Folder silnika zawiera pamięć podręczną DHT (dht.json) oraz dane aktywnych transferów.",
   "Copy error": "Skopiuj błąd",
   "Copy example": "Kopiuj przykład",
   "Copy filename": "Kopiuj nazwę pliku",
@@ -706,8 +708,8 @@ const catalog03: Record<string, string> = {
   "Couldn't reach Trakt. Check your connection and try again.":
     "Nie udało się połączyć z Trakt. Sprawdź połączenie i spróbuj ponownie.",
   "Couldn't reach Trakt. Try refreshing.": "Nie udało się połączyć z Trakt. Spróbuj odświeżyć.",
-  "Couldn't reach harbor.site to load earlier builds. Check your connection and try again.":
-    "Nie udało się połączyć z harbor.site, aby wczytać wcześniejsze kompilacje. Sprawdź połączenie i spróbuj ponownie.",
+  "Couldn't reach GitHub to load earlier builds. Check your connection and try again.":
+    "Nie udało się połączyć z GitHub, aby wczytać wcześniejsze kompilacje. Sprawdź połączenie i spróbuj ponownie.",
   "Couldn't reach that pack": "Nie udało się uzyskać dostępu do tego pakietu",
   "Couldn't reach that pack (HTTP {n})": "Nie udało się uzyskać dostępu do tego pakietu (HTTP {n})",
   "Couldn't reach the update server. Try again in a moment.":

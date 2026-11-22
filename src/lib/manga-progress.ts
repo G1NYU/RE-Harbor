@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useProfiles } from "./profiles";
+import { persistCritical } from "./storage-recovery";
 import { queueSuwayomiProgress } from "./manga/sources/suwayomi/progress-bridge";
 
 export type MangaProgressEntry = {
@@ -45,9 +46,7 @@ export function listMangaProgress(pid: string): MangaProgressEntry[] {
     if (!raw) return [];
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
-    return arr.filter(
-      (e) => e && typeof e.id === "string" && typeof e.chapterId === "string",
-    );
+    return arr.filter((e) => e && typeof e.id === "string" && typeof e.chapterId === "string");
   } catch {
     return [];
   }
@@ -55,7 +54,7 @@ export function listMangaProgress(pid: string): MangaProgressEntry[] {
 
 function write(pid: string, list: MangaProgressEntry[]): void {
   try {
-    localStorage.setItem(keyFor(pid), JSON.stringify(list.slice(0, MAX)));
+    persistCritical(keyFor(pid), JSON.stringify(list.slice(0, MAX)));
   } catch {
     return;
   }
@@ -80,7 +79,10 @@ export function recordMangaProgress(pid: string, entry: MangaProgressEntry): voi
 }
 
 export function removeMangaProgressEntry(pid: string, id: string): void {
-  write(pid, listMangaProgress(pid).filter((e) => e.id !== id));
+  write(
+    pid,
+    listMangaProgress(pid).filter((e) => e.id !== id),
+  );
   notify();
 }
 
@@ -122,7 +124,7 @@ export function recordMangaChapterRead(
     const prev = Array.isArray(rec[mangaId]) ? rec[mangaId] : [];
     if (prev.includes(chapterId)) return;
     rec[mangaId] = [chapterId, ...prev].slice(0, READ_MAX_PER_MANGA);
-    localStorage.setItem(readKeyFor(pid), JSON.stringify(rec));
+    persistCritical(readKeyFor(pid), JSON.stringify(rec));
   } catch {
     return;
   }
@@ -156,7 +158,7 @@ export function removeMangaChapterRead(pid: string, mangaId: string, chapterId: 
     const next = prev.filter((v) => v !== chapterId);
     if (next.length === 0) delete rec[mangaId];
     else rec[mangaId] = next;
-    localStorage.setItem(readKeyFor(pid), JSON.stringify(rec));
+    persistCritical(readKeyFor(pid), JSON.stringify(rec));
   } catch {
     return;
   }

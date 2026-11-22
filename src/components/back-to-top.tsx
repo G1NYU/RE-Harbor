@@ -19,10 +19,38 @@ export function BackToTop({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const onScroll = () => setShow(el.scrollTop > threshold);
-    onScroll();
+    let shown: boolean | undefined;
+    let frame = 0;
+    let timer: number | undefined;
+    let lastCheck = 0;
+    // Reading scrollTop in the scroll event forces a synchronous style and layout
+    // whenever a commit left the tree dirty, which is the common case while a row
+    // is revealing cards. Check at most ten times a second, between frames.
+    const update = () => {
+      frame = 0;
+      lastCheck = performance.now();
+      const next = el.scrollTop > threshold;
+      if (shown === next) return;
+      shown = next;
+      setShow(next);
+    };
+    const queueCheck = () => {
+      timer = undefined;
+      frame = requestAnimationFrame(update);
+    };
+    const onScroll = () => {
+      if (frame || timer !== undefined) return;
+      const delay = 100 - (performance.now() - lastCheck);
+      if (delay > 0) timer = window.setTimeout(queueCheck, delay);
+      else queueCheck();
+    };
+    update();
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      cancelAnimationFrame(frame);
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [scrollRef, threshold]);
 
   return (

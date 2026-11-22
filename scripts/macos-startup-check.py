@@ -5,12 +5,15 @@ Surviving the observation period is a startup check, not a UI/playback test.
 Logs remain in --output. Only the process group started here is stopped.
 """
 import argparse
+import errno
 import os
 from pathlib import Path
+import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 
 def probe(command, output: Path, seconds: float, env: dict) -> None:
@@ -43,6 +46,27 @@ def probe(command, output: Path, seconds: float, env: dict) -> None:
                 process.wait(timeout=5)
 
 
+def cleanup_profile(path: Path) -> None:
+    # WebKit helpers can still be writing caches after Harbor's process exits.
+    # Retry the resulting ENOTEMPTY/EBUSY race, but don't turn a successful
+    # startup check into a failed build just because an ephemeral cache remains.
+    for attempt in range(8):
+        try:
+            shutil.rmtree(path)
+            return
+        except FileNotFoundError:
+            if not path.exists():
+                return
+        except OSError as error:
+            if error.errno not in (errno.ENOTEMPTY, errno.EBUSY):
+                raise
+            if attempt == 7:
+                print(f"[macos-startup] warning: temporary profile cleanup is still busy: {error}",
+                      file=sys.stderr)
+                return
+        time.sleep(0.25)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", type=Path, required=True)
@@ -58,10 +82,11 @@ def main() -> int:
         parser.error(f"Missing executable: {binary}")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="profile-", dir=output) as home:
-        temp = Path(home) / "tmp"
+    home = Path(tempfile.mkdtemp(prefix="profile-", dir=output))
+    try:
+        temp = home / "tmp"
         temp.mkdir()
-        env = {**os.environ, "HOME": home, "CFFIXED_USER_HOME": home, "TMPDIR": str(temp)}
+        env = {**os.environ, "HOME": str(home), "CFFIXED_USER_HOME": str(home), "TMPDIR": str(temp)}
         # Do not let the build machine's dyld search paths mask missing libraries.
         env = {key: value for key, value in env.items() if not key.startswith("DYLD_")}
         try:
@@ -69,7 +94,9 @@ def main() -> int:
         except (RuntimeError, OSError) as error:
             print(f"[macos-startup] {error}", file=sys.stderr)
             return 1
-    return 0
+        return 0
+    finally:
+        cleanup_profile(home)
 
 
 if __name__ == "__main__":

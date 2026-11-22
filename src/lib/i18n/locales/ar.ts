@@ -1,3 +1,5 @@
+import seekSteps from "./ar/seek-steps";
+import reviews from "./ar/reviews";
 import playOrders from "./ar/play-orders";
 import gameRomLibrary from "./ar/game-rom-library";
 import gameNotes from "./ar/game-notes";
@@ -84,6 +86,7 @@ import settingsRefinements from "./ar/settings-refinements";
 import uiFallback from "./ui-fallback";
 import experimentalUpdates from "./ar/experimental-updates";
 import coverage from "./ar/coverage";
+import subtitles from "./ar/subtitles";
 import settingsFill from "./ar/settings-fill";
 import profileFill from "./ar/profile-fill";
 import appFill from "./ar/app-fill";
@@ -124,6 +127,9 @@ import contextActions from "./ar/context-actions";
 import nytTv from "./ar/nyt-tv";
 
 import gameAchievements from "./ar/game-achievements";
+
+import queueBasket from "./ar/queue-basket";
+import liveWeb from "./ar/live-web";
 
 const ar: Record<string, string> = {
   "collections.feed.more": "تحميل المزيد من المجموعات",
@@ -297,6 +303,7 @@ const ar: Record<string, string> = {
   ...ebookSources,
   ...uiFallback,
   ...coverage,
+  ...subtitles,
   ...settingsFill,
   ...profileFill,
   ...appFill,
@@ -411,14 +418,17 @@ const ar: Record<string, string> = {
   ...gameNotes,
   ...playOrders,
   ...contextActions,
+  ...reviews,
+  ...queueBasket,
+  ...liveWeb,
+  ...seekSteps,
   "Refract sync": "مزامنة Refract",
   "Sync watched history and Harbor watchlist changes with Refract.":
     "زامن سجل المشاهدة والتغييرات في قائمة المشاهدة في Harbor مع Refract.",
   "Refract personal API key": "مفتاح API شخصي لـ Refract",
   "Verifying...": "جارٍ التحقق…",
   "Connect Refract": "ربط Refract",
-  "Refract key saved in Harbor's secret store":
-    "تم حفظ مفتاح Refract في مخزن الأسرار في Harbor",
+  "Refract key saved in Harbor's secret store": "تم حفظ مفتاح Refract في مخزن الأسرار في Harbor",
   "Sync watched history and watchlist": "مزامنة سجل المشاهدة وقائمة المشاهدة",
   "Send watched history and watchlist changes from Harbor to Refract. Only the primary Harbor profile is synced.":
     "أرسل سجل المشاهدة والتغييرات في قائمة المشاهدة من Harbor إلى Refract. تتم مزامنة الملف الشخصي الأساسي في Harbor فقط.",

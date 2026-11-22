@@ -41,6 +41,7 @@ const sweep: Record<string, string> = {
   "6-digit code": "رمز من 6 أرقام",
   "64 neurons": "64 عصبونًا",
   "8 seconds": "8 ثوانٍ",
+  "10 seconds": "10 ثوانٍ",
   "8-0-4-1. Half the passes, kinder to weaker cards.":
     "8-0-4-1. نصف عدد التمريرات، وألطف مع البطاقات الضعيفة.",
   "A Harbor account": "حساب Harbor",

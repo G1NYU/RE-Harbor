@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isNaturalEnd, isTruncatedEnd } from "../src/lib/player/playback-end.ts";
+import {
+  isNaturalEnd,
+  isPlaybackFinished,
+  isTruncatedEnd,
+} from "../src/lib/player/playback-end.ts";
 import type { PlayerSnapshot } from "../src/lib/player/bridge.ts";
 
 const snap = (status: string, durationSec: number): PlayerSnapshot =>
@@ -29,4 +33,12 @@ test("nothing but an ended status counts as an ending", () => {
     assert.equal(isNaturalEnd(snap(s, 2400), 2400), false);
     assert.equal(isTruncatedEnd(snap(s, 2400), 10), false);
   }
+});
+
+test("the finish ratio covers resume ownership and playback end", () => {
+  assert.equal(isPlaybackFinished(snap("paused", 2400), 2040), true);
+  assert.equal(isPlaybackFinished(snap("paused", 2400), 2039), false);
+  assert.equal(isPlaybackFinished(snap("playing", 2400), 2400), true);
+  assert.equal(isPlaybackFinished(snap("ended", 2400), 2280), true);
+  assert.equal(isPlaybackFinished(snap("ended", 0), 500), true);
 });

@@ -40,7 +40,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "Kalite rozeti",
   "music.dock.part.source": "Kaynak",
   "music.dock.part.time": "Süre",
-  "music.dock.part.queue": "Sıra",
+  "music.dock.part.queue": "Dinleme kuyruğu",
   "music.dock.part.like": "Beğen",
 
   "music.now.colors": "Albüm renkleri",

@@ -38,7 +38,7 @@ const musicNowPlaying: Record<string, string> = {
   "music.dock.part.quality": "Huy hiệu chất lượng",
   "music.dock.part.source": "Nguồn",
   "music.dock.part.time": "Thời gian",
-  "music.dock.part.queue": "Hàng chờ",
+  "music.dock.part.queue": "Hàng đợi nghe",
   "music.dock.part.like": "Thích",
 
   "music.now.colors": "Màu album",

@@ -137,7 +137,8 @@ const catalog11: Record<string, string> = {
   "Same Wi-Fi as this computer": "Ta sama sieć Wi-Fi co ten komputer",
   "Same file": "Ten sam plik",
   "Same file as host": "Ten sam plik co u hosta",
-  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.": "Takie samo użycie tylko do odczytu jak w Real-Debrid. Umożliwia też kolejkowanie źródeł spoza pamięci podręcznej w oknie wyboru odtwarzania.",
+  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.":
+    "Takie samo użycie tylko do odczytu jak w Real-Debrid. Umożliwia też kolejkowanie źródeł spoza pamięci podręcznej w oknie wyboru odtwarzania.",
   "Same-genre picks from your installed sources":
     "Propozycje z tego samego gatunku z zainstalowanych źródeł",
   "Sample title": "Przykładowy tytuł",
@@ -295,6 +296,9 @@ const catalog11: Record<string, string> = {
   "Sci-fi, fantasy & horror": "Science fiction, fantasy i horror",
   Score: "Muzyka",
   "Score /10": "Wynik /10",
+  "Scale TV score badges": "Skaluj odznaki ocen na kartach TV",
+  "Shrink the score stack when several ratings are enabled.":
+    "Zmniejsz odznaki ocen, gdy włączono kilka źródeł ocen.",
   "Score badges on cards": "Odznaki ocen na kartach",
   "Score position": "Położenie oceny",
   Scores: "Oceny",
@@ -454,7 +458,8 @@ const catalog11: Record<string, string> = {
   "Select renderer": "Wybierz urządzenie odtwarzające",
   "Self-host": "Własny hosting",
   "Self-test": "Autotest",
-  "Self-test is disabled while strict remote streaming is on. It downloads a small test file over peer-to-peer on this machine.": "Autotest jest niedostępny przy włączonym rygorystycznym zdalnym przesyłaniu strumieniowym. Pobiera mały plik testowy bezpośrednio od innych użytkowników na to urządzenie.",
+  "Self-test is disabled while strict remote streaming is on. It downloads a small test file over peer-to-peer on this machine.":
+    "Autotest jest niedostępny przy włączonym rygorystycznym zdalnym przesyłaniu strumieniowym. Pobiera mały plik testowy bezpośrednio od innych użytkowników na to urządzenie.",
   Send: "Wyślij",
   "Send a bug report": "Wyślij zgłoszenie błędu",
   "Send a bug report straight to the Harbor team. Screenshots and screen recordings welcome.":
@@ -707,8 +712,8 @@ const catalog11: Record<string, string> = {
     "Wyświetlaj na profilu kartę Minecrafta. Pozostaw nazwę użytkownika pustą, aby ją ukryć.",
   "Show a Minecraft card with your username":
     "Wyświetlaj kartę Minecrafta z Twoją nazwą użytkownika",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Pokazuj przycisk Pomiń intro / Pomiń napisy końcowe, gdy Harbor je wykryje. Wyłącz tę opcję, aby nigdy go nie wyświetlać. Możesz też nacisnąć X na przycisku, aby ukryć błędną sugestię do końca odcinka.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Pokazuj przycisk Pomiń intro / Pomiń napisy końcowe, gdy Harbor je wykryje. Wyłącz tę opcję, aby nigdy go nie wyświetlać. Przycisk sam się ukrywa, gdy intro lub napisy się skończą albo po opóźnieniu poniżej.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Pokazuj przycisk Pomiń podczas odtwarzania znanej wstawionej reklamy oraz mały przycisk zgłaszania w nowych wydaniach, aby oznaczać reklamy do sprawdzenia.",
   "Show a bookmark on saved titles": "Pokazuj zakładkę na zapisanych tytułach",

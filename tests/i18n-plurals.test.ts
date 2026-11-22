@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { pluralForm } from "../src/lib/i18n/translate.ts";
+import arQueue from "../src/lib/i18n/locales/ar/queue-basket.ts";
+import plQueue from "../src/lib/i18n/locales/pl/queue-basket.ts";
+import ruQueue from "../src/lib/i18n/locales/ru/queue-basket.ts";
 
 test("russian plural categories follow the last-digit rule", () => {
   const one = [1, 21, 31, 101, 1001];
@@ -66,6 +69,27 @@ test("plural-invariant languages always use the base form", () => {
 test("English keeps its source-string lookup path", () => {
   assert.equal(pluralForm("en", 1), null);
   assert.equal(pluralForm("en", 5), null);
+});
+
+test("queue item counts provide the plural variants selected by complex locales", () => {
+  const key = "{count} items in queue";
+  const cases = [
+    { catalog: arQueue, language: "ar" as const, counts: [2, 11] },
+    { catalog: plQueue, language: "pl" as const, counts: [2, 5] },
+    { catalog: ruQueue, language: "ru" as const, counts: [2, 5, 21] },
+  ];
+
+  for (const { catalog, language, counts } of cases) {
+    for (const count of counts) {
+      const form = pluralForm(language, count);
+      assert.ok(form);
+      const template = catalog[`${key}#${form}`] ?? catalog[key];
+      assert.ok(template?.includes("{count}"), `${language} ${form} lost {count}`);
+    }
+  }
+
+  assert.notEqual(ruQueue[`${key}#few`], ruQueue[key]);
+  assert.notEqual(plQueue[`${key}#few`], plQueue[key]);
 });
 
 const VARIANT_SUFFIX = /#(?:one|few|many)$/;

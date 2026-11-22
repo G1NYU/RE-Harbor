@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { lruSet } from "../cache";
+import { observeSettled } from "@/lib/visibility";
 
-const CACHE_MAX = 300;
+const CACHE_MAX = 1000;
 
 export type AwardType =
   | "oscar"
@@ -43,7 +44,7 @@ type Cached = { entries: AwardEntry[]; fetchedAt: number; complete: boolean };
 
 const cache = new Map<string, Cached>();
 const inflight = new Map<string, Promise<AwardEntry[]>>();
-const subs = new Set<() => void>();
+const subs = new Map<string, Set<() => void>>();
 let loaded = false;
 let saveTimer: number | null = null;
 
@@ -78,8 +79,11 @@ function persistSoon() {
   }, 5000);
 }
 
-function notify() {
-  subs.forEach((fn) => fn());
+function notify(imdbId: string) {
+  // Award responses arrive in bursts. Waking every card for every response turned
+  // a few visible cards into hundreds of re-renders, so only the title that
+  // changed is notified.
+  subs.get(imdbId)?.forEach((fn) => fn());
 }
 
 const QUERY = `SELECT DISTINCT ?award ?awardLabel ?category ?categoryLabel ?recipient ?recipientLabel ?date ?work ?workLabel ?workImdb WHERE {
@@ -168,7 +172,11 @@ function classify(name: string): AwardType {
   if (n.includes("academy award") || n.includes("oscar")) return "oscar";
   if (n.includes("primetime emmy") || n.includes("emmy")) return "emmy";
   if (n.includes("golden globe")) return "golden_globe";
-  if (n.includes("bafta tv") || n.includes("bafta television") || n.includes("british academy television"))
+  if (
+    n.includes("bafta tv") ||
+    n.includes("bafta television") ||
+    n.includes("british academy television")
+  )
     return "bafta_tv";
   if (n.includes("bafta") || n.includes("british academy")) return "bafta";
   if (n.includes("annie award")) return "annie";
@@ -206,7 +214,15 @@ function parseRows(data: any, result: "won" | "nominated"): AwardEntry[] {
     let bucket = map.get(key);
     if (!bucket) {
       bucket = {
-        entry: { type: classify(awardName), awardName, category, year, result, workTitle, workImdb },
+        entry: {
+          type: classify(awardName),
+          awardName,
+          category,
+          year,
+          result,
+          workTitle,
+          workImdb,
+        },
         recipients: new Set<string>(),
       };
       map.set(key, bucket);
@@ -345,27 +361,64 @@ export async function fetchAwards(imdbId: string, isSeries = false): Promise<Awa
     const complete = winsData !== null && nomsData !== null;
     lruSet(cache, imdbId, { entries, fetchedAt: Date.now(), complete }, CACHE_MAX);
     persistSoon();
-    notify();
+    notify(imdbId);
     return entries;
   })().finally(() => inflight.delete(imdbId));
   inflight.set(imdbId, p);
   return p;
 }
 
-export function subscribeAwards(fn: () => void): () => void {
-  subs.add(fn);
+export function subscribeAwards(imdbId: string, fn: () => void): () => void {
+  let set = subs.get(imdbId);
+  if (!set) {
+    set = new Set();
+    subs.set(imdbId, set);
+  }
+  set.add(fn);
   return () => {
-    subs.delete(fn);
+    const current = subs.get(imdbId);
+    if (!current) return;
+    current.delete(fn);
+    if (current.size === 0) subs.delete(imdbId);
   };
 }
 
-export function useAwards(imdbId?: string, isSeries = false): AwardEntry[] | null {
+/**
+ * Award data for one title. Cards pass their element so the two Wikidata queries
+ * wait until the card is near the viewport and scrolling has stopped; detail
+ * views pass no element and fetch immediately. The global subscription used to
+ * wake every card on every response, which was the expensive part of a Discover
+ * load.
+ */
+export function useAwards(
+  imdbId?: string,
+  isSeries = false,
+  element?: RefObject<HTMLElement | null>,
+): AwardEntry[] | null {
   const [v, setV] = useState<AwardEntry[] | null>(() => awardsCached(imdbId));
   useEffect(() => {
     setV(awardsCached(imdbId));
-    if (imdbId) fetchAwards(imdbId, isSeries);
-    return subscribeAwards(() => setV(awardsCached(imdbId)));
-  }, [imdbId, isSeries]);
+    if (!imdbId) return;
+    let cancelled = false;
+    let stopObserve: (() => void) | undefined;
+    const unsubscribe = subscribeAwards(imdbId, () => {
+      if (!cancelled) setV(awardsCached(imdbId));
+    });
+    const start = () => {
+      if (!cancelled) void fetchAwards(imdbId, isSeries);
+    };
+    const node = element?.current;
+    if (element && node) {
+      stopObserve = observeSettled(node, start);
+    } else if (!element) {
+      start();
+    }
+    return () => {
+      cancelled = true;
+      stopObserve?.();
+      unsubscribe();
+    };
+  }, [imdbId, isSeries, element]);
   return v;
 }
 
@@ -405,7 +458,10 @@ export function awardSummary(entries: AwardEntry[]): {
   const ranked = order
     .filter((t) => map.has(t))
     .map((t) => ({ type: t, ...(map.get(t) as { wins: number; nominations: number }) }));
-  ranked.sort((a, b) => (b.wins > 0 ? 1 : 0) - (a.wins > 0 ? 1 : 0) || order.indexOf(a.type) - order.indexOf(b.type));
+  ranked.sort(
+    (a, b) =>
+      (b.wins > 0 ? 1 : 0) - (a.wins > 0 ? 1 : 0) || order.indexOf(a.type) - order.indexOf(b.type),
+  );
   return ranked;
 }
 

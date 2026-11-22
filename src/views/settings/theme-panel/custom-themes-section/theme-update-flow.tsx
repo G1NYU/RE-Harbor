@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Loader2, UploadCloud, X } from "../../
 import { getActiveModal, isBackKey, isEditable } from "@/lib/keyboard-navigation/geometry";
 import { exportThemeJson, getCustomThemes, type CustomTheme } from "@/lib/custom-themes";
 import { optimizeBackgroundForShare } from "../image-utils";
-import { updateTheme, type StoreTheme } from "@/lib/theme-store";
+import { THEME_SUBMISSION_SCREENSHOT_LIMIT, updateTheme, type StoreTheme } from "@/lib/theme-store";
 import { useT } from "@/lib/i18n";
 import { CheatSheet } from "../theme-studio/cheat-sheet";
 import { CoverCropper } from "./theme-upload/cover-cropper";
@@ -81,14 +81,17 @@ export function ThemeUpdateFlow({
     input.accept = "image/*";
     input.multiple = true;
     input.onchange = async () => {
-      const files = Array.from(input.files || []).slice(0, 6 - shots.length);
+      const files = Array.from(input.files || []).slice(
+        0,
+        THEME_SUBMISSION_SCREENSHOT_LIMIT - shots.length,
+      );
       const added = await Promise.all(
         files.map(async (f) => {
           const blob = await scaleToBlob(f);
           return { blob, url: URL.createObjectURL(blob) };
         }),
       );
-      setShots((s) => [...s, ...added].slice(0, 6));
+      setShots((s) => [...s, ...added].slice(0, THEME_SUBMISSION_SCREENSHOT_LIMIT));
     };
     input.click();
   };
@@ -209,7 +212,9 @@ export function ThemeUpdateFlow({
                 />
               </div>
             </div>
-            {error && <p className="max-w-[66ch] text-[15.5px] leading-[22px] text-danger">{error}</p>}
+            {error && (
+              <p className="max-w-[66ch] text-[15.5px] leading-[22px] text-danger">{error}</p>
+            )}
           </div>
         </div>
       )}

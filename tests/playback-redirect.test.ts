@@ -5,29 +5,52 @@ import { isPlaybackRedirectCandidate } from "../src/lib/streams/playback-redirec
 import { isLivePlaybackSrc } from "../src/lib/player/live-src.ts";
 
 const original = "https://addon.debridio.com/fixture/play";
+const meteorUrl = "https://meteorfortheweebs.midnightignite.me/fixture/play";
 const finalUrl = "https://cdn.example.org/fixture.mkv";
 
-test("only exact supported HTTPS origins are eligible", () => {
-  assert.equal(isPlaybackRedirectCandidate(original), true);
-  assert.equal(isPlaybackRedirectCandidate("https://mediafusion.elfhosted.com/play"), true);
+const addonHosts = new Set([
+  "addon.debridio.com",
+  "sooti.click",
+  "mediafusion.elfhosted.com",
+  "meteorfortheweebs.midnightignite.me",
+]);
+
+test("only installed add-on HTTPS origins are eligible", () => {
+  assert.equal(isPlaybackRedirectCandidate(original, addonHosts), true);
+  assert.equal(isPlaybackRedirectCandidate(meteorUrl, addonHosts), true);
+  assert.equal(
+    isPlaybackRedirectCandidate("https://mediafusion.elfhosted.com/play", addonHosts),
+    true,
+  );
   for (const url of [
     finalUrl,
+    "https://not-installed.example.org/play",
     "http://addon.debridio.com/play",
     "https://addon.debridio.com.attacker.test/play",
     "https://user:secret@addon.debridio.com/play",
     "https://addon.debridio.com:8443/play",
+    "https://meteorfortheweebs.midnightignite.me.attacker.test/play",
+    "https://another.midnightignite.me/play",
+    "http://meteorfortheweebs.midnightignite.me/play",
     "not a URL",
   ]) {
-    assert.equal(isPlaybackRedirectCandidate(url), false, url);
+    assert.equal(isPlaybackRedirectCandidate(url, addonHosts), false, url);
   }
 });
 
-function redirectHarness(invoke: () => Promise<unknown>, native = true) {
+const installedAddons = [...addonHosts].map((host, index) => ({
+  id: `addon-${index}`,
+  transportUrl: `https://${host}/manifest.json`,
+  installedAt: 0,
+}));
+
+function redirectHarness(invoke: () => Promise<unknown>, native = true, addons = installedAddons) {
   return hookHarness(
     "src/lib/streams/playback-redirect.ts",
     "resolvePlaybackRedirect",
     {
       "@tauri-apps/api/core": { invoke },
+      "@/lib/addon-store": { loadInstalled: () => addons },
     },
     { window: native ? { __TAURI_INTERNALS__: {} } : {} },
   );
@@ -58,6 +81,10 @@ test("ordinary CDN links, header-bound streams, web playback and cancelled reque
 test("uses a resolved URL, with fallback for unavailable native support and invalid targets", async () => {
   const args = { url: original, signal: new AbortController().signal };
   assert.equal(await redirectHarness(async () => finalUrl).render(args), finalUrl);
+  assert.equal(
+    await redirectHarness(async () => finalUrl).render({ ...args, url: meteorUrl }),
+    finalUrl,
+  );
   for (const result of [
     null,
     "file:///private",
@@ -88,7 +115,54 @@ test("cancelling during resolution discards the returned URL", async () => {
   assert.equal(await result, original);
 });
 
-function pickerHarness(intent = "play") {
+test("only hosts of installed add-ons are probed", async () => {
+  let calls = 0;
+  const invoke = async () => {
+    calls++;
+    return finalUrl;
+  };
+  const signal = new AbortController().signal;
+  assert.equal(
+    await redirectHarness(invoke).render({ url: "https://cdn.example.org/play", signal }),
+    "https://cdn.example.org/play",
+  );
+  assert.equal(calls, 0);
+  assert.equal(await redirectHarness(invoke).render({ url: original, signal }), finalUrl);
+  assert.equal(calls, 1);
+});
+
+test("a host without a usable redirect is skipped for the rest of the session", async () => {
+  let calls = 0;
+  const h = redirectHarness(async () => {
+    calls++;
+    return null;
+  });
+  const signal = new AbortController().signal;
+  assert.equal(await h.render({ url: original, signal }), original);
+  assert.equal(await h.render({ url: original, signal }), original);
+  assert.equal(calls, 1);
+});
+
+test("an unavailable native resolver does not retire the host", async () => {
+  let calls = 0;
+  const h = redirectHarness(async () => {
+    calls++;
+    throw new Error("native unavailable");
+  });
+  const signal = new AbortController().signal;
+  assert.equal(await h.render({ url: original, signal }), original);
+  assert.equal(await h.render({ url: original, signal }), original);
+  assert.equal(calls, 2);
+});
+
+function pickerHarness(
+  intent = "play",
+  resolveStream = async (stream: { url: string }) => ({
+    ok: true,
+    via: "direct",
+    data: { url: stream.url },
+  }),
+) {
   const opened: any[] = [],
     history: any[] = [],
     downloads: any[] = [];
@@ -100,15 +174,22 @@ function pickerHarness(intent = "play") {
     "@/lib/playback-history": { savePlayback: (_id: string, entry: any) => history.push(entry) },
     "@/lib/season-lock": { saveSeasonLock() {} },
     "@/lib/dead-streams": { markStreamDead() {}, recordStubEvent() {} },
-    "@/lib/torrent/stremio-stream": { engineP2pEligible: () => false },
+    "@/lib/torrent/stremio-stream": {
+      engineP2pEligible: () => false,
+      isHostedTorrentServerUrl: () => false,
+    },
     "@/lib/streams/cached": { hasUncachedMarker: () => false },
+    "@/lib/streams/p2p-prewarm": {
+      PLAY_PREWARM_ABANDON_MS: 30_000,
+      prewarmP2pStream() {},
+    },
     "@/lib/streams/preflight": {
       preflightCheck: () => {
         throw new Error("unexpected preflight");
       },
     },
     "@/lib/streams/resolve": {
-      resolveStream: async () => ({ ok: true, via: "direct", data: { url: original } }),
+      resolveStream,
       shouldPreferP2pDownload: () => false,
     },
     "@/lib/streams/playback-redirect": {
@@ -192,12 +273,39 @@ test("manual selection loads the final URL and preserves the original source in 
   assert.equal(h.opened[0].autoFired, false);
 });
 
-test("instant-play and downloads keep their existing paths", async () => {
+test("manual Torrentio selection supersedes a pending AIOStreams resolution", async () => {
+  let finish!: () => void;
+  const h = pickerHarness("play", async (stream) => {
+    if (stream.url === original)
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    return { ok: true, via: "direct", data: { url: stream.url } };
+  });
+  h.api.onPlay({ addonId: "aiostreams", url: original }, true, false, true);
+  h.api.onPlay({ addonId: "torrentio", url: finalUrl });
+  await flushPromises();
+  finish();
+  await flushPromises();
+  assert.deepEqual(
+    h.opened.map((src) => src.streamRef.addonId),
+    ["torrentio"],
+  );
+  assert.equal(h.opened[0].autoFired, false);
+  assert.deepEqual(
+    h.history.map((entry) => entry.addonId),
+    ["torrentio"],
+  );
+});
+
+test("automatic selection resolves redirects while downloads keep their existing path", async () => {
   const automatic = pickerHarness();
   automatic.api.onPlay({ url: original }, true, false, true);
   await flushPromises();
-  assert.equal(automatic.lookups, 0);
-  assert.equal(automatic.opened[0].url, original);
+  assert.equal(automatic.lookups, 1);
+  assert.equal(automatic.opened[0].url, finalUrl);
+  assert.equal(automatic.opened[0].historyUrl, original);
+  assert.equal(automatic.history[0].url, original);
   assert.equal(automatic.opened[0].autoFired, true);
   const download = pickerHarness("download");
   download.api.onPlay({ url: original });
@@ -217,6 +325,25 @@ test("a cancelled manual selection never opens or saves the resolved stream", as
   );
   h.api.onPlay({ url: original });
   await flushPromises();
+  h.api.abortResolve();
+  finish(finalUrl);
+  await flushPromises();
+  assert.equal(h.opened.length, 0);
+  assert.equal(h.history.length, 0);
+});
+
+test("cancelling automatic selection during redirect resolution never opens the result", async () => {
+  const h = pickerHarness();
+  let finish!: (url: string) => void;
+  h.redirect(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  h.api.onPlay({ url: original }, true, false, true);
+  await flushPromises();
+  assert.equal(h.lookups, 1);
   h.api.abortResolve();
   finish(finalUrl);
   await flushPromises();

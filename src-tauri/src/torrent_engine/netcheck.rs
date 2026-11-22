@@ -149,12 +149,13 @@ async fn https_step() -> NetStep {
     let Some(client) = https_client() else {
         return st("https egress", false, "client build failed");
     };
-    for url in super::trackers::ALL
+    for url in super::trackers::FALLBACK
         .iter()
         .filter(|u| u.starts_with("https://"))
     {
+        let url = *url;
         if let Some(host) = announce_host(url) {
-            if client.get(*url).send().await.is_ok() {
+            if client.get(url).send().await.is_ok() {
                 return st(
                     "https egress",
                     true,

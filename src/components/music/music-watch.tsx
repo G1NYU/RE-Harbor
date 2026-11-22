@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ExternalLink, Heart, Play, RotateCcw, VideoOff } from "@/components/icons/music-icons";
+import {
+  ChevronLeft,
+  ExternalLink,
+  Heart,
+  ListPlus,
+  Play,
+  RotateCcw,
+  VideoOff,
+} from "@/components/icons/music-icons";
 import { MusicServiceLogo } from "@/components/music/music-service-logo";
 import { MusicArtistLink } from "./music-artist-link";
 import { MusicWhereToBuy } from "./music-artist-overview";
@@ -10,21 +18,29 @@ import { MusicMediaBadge } from "./music-media-badge";
 import { musicUpcoming, useMusicTransport } from "./music-queue";
 import { Poster } from "@/components/poster";
 import { useT } from "@/lib/i18n";
+import { useMusicAppearance } from "@/lib/music/appearance";
 import { appendMusicVideos, searchMusicVideoPage } from "@/lib/music/video-pages";
 import { searchTrackKey } from "@/lib/music/now-search";
 import { prefetchMusicVideoStreams } from "@/lib/music/video";
 import {
+  enqueueMusic,
   getMusicState,
+  isMusicTrackPrimed,
   playMusic,
   returnMusicToComputer,
   toggleMusicLiked,
   useMusicPlayer,
   waitForMusicAudioReady,
 } from "@/lib/music/player";
+import { useMusicTrackContextMenu } from "./music-track-menu";
+import { setMusicWatchOpen, useMusicVideoMini } from "@/lib/music/video-mini";
 import { getMusicSpeakerState } from "@/lib/music/casting";
 import type { MusicTrack } from "@/lib/music/types";
 import { MusicVideoSurface } from "./music-video-surface";
 import { MusicVideoFullscreen } from "./music-video-fullscreen";
+import { MusicVideoMiniToggle } from "./music-video-mini-toggle";
+import { musicVideoSurfaces } from "@/lib/music/video-session";
+import { musicVideoPlayback, musicWatchQueue } from "@/lib/music/video-queue";
 import {
   getMusicVideoFullscreen,
   subscribeMusicVideoFullscreen,
@@ -58,8 +74,11 @@ export function MusicWatch({
   const [similar, setSimilar] = useState<MusicTrack[]>([]);
   const [similarBusy, setSimilarBusy] = useState(true);
   const [similarNext, setSimilarNext] = useState<string | null>(null);
-  const [moreBusy, setMoreBusy] = useState(false), [moreError, setMoreError] = useState(false);
-  const similarGeneration = useRef(0), moreLoading = useRef(false), moreButton = useRef<HTMLButtonElement>(null);
+  const [moreBusy, setMoreBusy] = useState(false),
+    [moreError, setMoreError] = useState(false);
+  const similarGeneration = useRef(0),
+    moreLoading = useRef(false),
+    moreButton = useRef<HTMLButtonElement>(null);
   const seenPages = useRef(new Set<string>());
   const [readySelection, setReadySelection] = useState("");
   const [videoShowing, setVideoShowing] = useState(false);
@@ -109,11 +128,15 @@ export function MusicWatch({
         current.current?.id !== track.id ||
         current.current.connectorId !== track.connectorId ||
         current.current.mediaKind !== "video" ||
-        current.phase === "error"
+        current.phase === "error" ||
+        !isMusicTrackPrimed(track)
       )
         await playMusic(
-          { ...track, mediaKind: "video" },
-          (queue.length ? queue : [track]).map((item) => ({ ...item, mediaKind: "video" })),
+          musicVideoPlayback({ ...track, mediaKind: "video" }, current),
+          musicWatchQueue(track, queue.length ? queue : [track], current).map((item) => ({
+            ...item,
+            mediaKind: "video",
+          })),
         );
       else await waitForMusicAudioReady(track);
       if (cancelled) return;
@@ -142,19 +165,53 @@ export function MusicWatch({
 
   const playing = readySelection === selection ? (player.current ?? track) : track;
   const playingId = playing.id;
+  const appearance = useMusicAppearance();
+  const theatre = playing.mediaKind === "video" && appearance.theatre;
+  const mini = useMusicVideoMini();
+  const videoMenu = useMusicTrackContextMenu(playing, {
+    onAddToQueue: () => enqueueMusic(playing),
+    onToggleLike: () => toggleMusicLiked(playing),
+  });
+  const miniEnabled = useRef(mini.enabled);
+  miniEnabled.current = mini.enabled;
+  useEffect(() => {
+    const node = stageRef.current;
+    if (!node) return;
+    const onMenu = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      videoMenu.onContextMenu(event as unknown as React.MouseEvent<HTMLElement>);
+    };
+    node.addEventListener("contextmenu", onMenu, true);
+    return () => node.removeEventListener("contextmenu", onMenu, true);
+  }, [videoMenu.onContextMenu]);
+  useLayoutEffect(() => {
+    setMusicWatchOpen(active);
+    if (!active) return;
+    return () => {
+      setMusicWatchOpen(false);
+      // With the mini player off, leaving the stage should hand playback back to the dock
+      // instead of leaving a hidden video decoder running.
+      if (!miniEnabled.current) musicVideoSurfaces.stop();
+    };
+  }, [active]);
 
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
     const generation = ++similarGeneration.current;
-    moreLoading.current = false; seenPages.current.clear();
-    setSimilarNext(null); setMoreBusy(false); setMoreError(false);
+    moreLoading.current = false;
+    seenPages.current.clear();
+    setSimilarNext(null);
+    setMoreBusy(false);
+    setMoreError(false);
     setSimilarBusy(true);
     searchMusicVideoPage(`${playing.artist} music videos`, false)
       .then(({ tracks, next: cursor }) => {
         if (cancelled) return;
         const next = tracks.filter((item) => item.id !== playingId);
-        setSimilar(next); setSimilarNext(cursor);
+        setSimilar(next);
+        setSimilarNext(cursor);
         // Warmed against the same predicate the surface resolves by, because video.ts cannot
         // import it back from video-session without a cycle.
         prefetchMusicVideoStreams(
@@ -178,21 +235,40 @@ export function MusicWatch({
 
   const loadMoreVideos = useCallback(async () => {
     if (!active || !similarNext || moreLoading.current) return;
-    const generation = similarGeneration.current, cursor = similarNext;
-    moreLoading.current = true; setMoreBusy(true); setMoreError(false);
+    const generation = similarGeneration.current,
+      cursor = similarNext;
+    moreLoading.current = true;
+    setMoreBusy(true);
+    setMoreError(false);
     try {
       const page = await searchMusicVideoPage(`${playing.artist} music videos`, false, cursor);
       if (similarGeneration.current !== generation) return;
       seenPages.current.add(cursor);
-      setSimilar(previous => appendMusicVideos(previous, page.tracks.filter(item => item.id !== playingId)));
+      setSimilar((previous) =>
+        appendMusicVideos(
+          previous,
+          page.tracks.filter((item) => item.id !== playingId),
+        ),
+      );
       setSimilarNext(page.next && !seenPages.current.has(page.next) ? page.next : null);
-    } catch { if (similarGeneration.current === generation) setMoreError(true); }
-    finally { if (similarGeneration.current === generation) { moreLoading.current = false; setMoreBusy(false); } }
+    } catch {
+      if (similarGeneration.current === generation) setMoreError(true);
+    } finally {
+      if (similarGeneration.current === generation) {
+        moreLoading.current = false;
+        setMoreBusy(false);
+      }
+    }
   }, [active, similarNext, playing.artist, playingId]);
   useEffect(() => {
     const button = moreButton.current;
     if (!button || similarBusy || moreBusy || moreError || !active) return;
-    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void loadMoreVideos(); }, { rootMargin: "160px" });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMoreVideos();
+      },
+      { rootMargin: "160px" },
+    );
     observer.observe(button);
     return () => observer.disconnect();
   }, [active, similarBusy, moreBusy, moreError, loadMoreVideos]);
@@ -211,8 +287,14 @@ export function MusicWatch({
 
   return (
     <>
-      <section className="relative z-10 flex flex-col gap-6 lg:flex-row">
+      <section
+        className={`music-watch-layout relative z-10 flex flex-col gap-6 ${
+          theatre ? "" : "lg:flex-row"
+        }`}
+        data-theatre={theatre ? "1" : undefined}
+      >
         <div className="min-w-0 flex-1">
+          <MusicVideoMiniToggle className="mb-3" />
           <button
             type="button"
             data-music-inner-back
@@ -224,6 +306,7 @@ export function MusicWatch({
           </button>
 
           <div ref={stageRef} className="music-watch-stage">
+            {videoMenu.menu}
             {preparationError ? (
               <div className="music-watch-stage-error" role="alert">
                 <VideoOff className="size-6 text-ink-subtle" aria-hidden />
@@ -293,6 +376,15 @@ export function MusicWatch({
               >
                 <Heart className="size-4" fill={liked ? "currentColor" : "none"} aria-hidden />
               </button>
+              <button
+                type="button"
+                onClick={() => enqueueMusic(playing)}
+                aria-label={t("music.card.addToQueue")}
+                title={t("music.card.addToQueue")}
+                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] text-ink-muted ring-1 ring-white/10 transition-colors hover:text-ink"
+              >
+                <ListPlus className="size-4" aria-hidden />
+              </button>
               <MusicAddToPlaylist track={playing} />
             </div>
           </div>
@@ -327,10 +419,26 @@ export function MusicWatch({
               ))}
             </div>
           )}
-          {moreError && <p role="alert" className="text-sm text-ink-muted">{t("music.videos.error")}</p>}
-          {similarNext && <button ref={moreButton} type="button" className="music-watch-retry" disabled={moreBusy} onClick={() => { void loadMoreVideos(); }}>
-            {t(moreError ? "common.retry" : moreBusy ? "common.loading" : "music.library.loadMore")}
-          </button>}
+          {moreError && (
+            <p role="alert" className="text-sm text-ink-muted">
+              {t("music.videos.error")}
+            </p>
+          )}
+          {similarNext && (
+            <button
+              ref={moreButton}
+              type="button"
+              className="music-watch-retry"
+              disabled={moreBusy}
+              onClick={() => {
+                void loadMoreVideos();
+              }}
+            >
+              {t(
+                moreError ? "common.retry" : moreBusy ? "common.loading" : "music.library.loadMore",
+              )}
+            </button>
+          )}
         </section>
       )}
     </>

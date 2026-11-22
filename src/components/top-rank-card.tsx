@@ -48,8 +48,8 @@ function WatchlistDot({ side = "right" }: { side?: "left" | "right" }) {
       className={`pointer-events-none absolute top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas/85 text-ink ring-1 ring-edge-soft/70 backdrop-blur-sm ${
         side === "left" ? "start-1.5" : "end-1.5"
       }`}
-      title={t("In your watchlist")}
-      aria-label={t("In watchlist")}
+      title={t("In your library")}
+      aria-label={t("In library")}
     >
       <Bookmark size={11} strokeWidth={2.6} fill="currentColor" />
     </span>
@@ -91,26 +91,30 @@ export const TopRankCard = memo(function TopRankCard({ meta, rank }: { meta: Met
           lineHeight: 1,
           letterSpacing: "-0.01em",
           WebkitTextStroke: "2.6px var(--color-ink-muted)",
-          WebkitMaskImage: "linear-gradient(to right, transparent 0, #000 12%, #000 54%, transparent 82%)",
-          maskImage: "linear-gradient(to right, transparent 0, #000 12%, #000 54%, transparent 82%)",
+          WebkitMaskImage:
+            "linear-gradient(to right, transparent 0, #000 12%, #000 54%, transparent 82%)",
+          maskImage:
+            "linear-gradient(to right, transparent 0, #000 12%, #000 54%, transparent 82%)",
         }}
       >
-        {rank >= 10 ? (
-          <>
-            <span style={{ WebkitTextStroke: "2.6px var(--color-ink-muted)" }}>1</span>
-            <span
-              style={{
-                WebkitTextStroke: "2.6px var(--color-ink-muted)",
-                color: "var(--color-canvas)",
-                marginInlineStart: "-0.2em",
-              }}
-            >
-              0
-            </span>
-          </>
-        ) : (
-          rank
-        )}
+        <span dir="ltr" className="flex">
+          {rank >= 10 ? (
+            <>
+              <span style={{ WebkitTextStroke: "2.6px var(--color-ink-muted)" }}>1</span>
+              <span
+                style={{
+                  WebkitTextStroke: "2.6px var(--color-ink-muted)",
+                  color: "var(--color-canvas)",
+                  marginInlineStart: "-0.2em",
+                }}
+              >
+                0
+              </span>
+            </>
+          ) : (
+            rank
+          )}
+        </span>
       </span>
       <div
         data-preview-anchor
@@ -138,7 +142,13 @@ export const TopRankCard = memo(function TopRankCard({ meta, rank }: { meta: Met
   );
 });
 
-export const AnimeRankCard = memo(function AnimeRankCard({ meta, rank }: { meta: Meta; rank: number }) {
+export const AnimeRankCard = memo(function AnimeRankCard({
+  meta,
+  rank,
+}: {
+  meta: Meta;
+  rank: number;
+}) {
   const { openMeta } = useView();
   const { open: openContextMenu } = useContextMenu();
   const { settings } = useSettings();
@@ -171,22 +181,24 @@ export const AnimeRankCard = memo(function AnimeRankCard({ meta, rank }: { meta:
           WebkitTextStroke: "2.6px var(--color-ink-muted)",
         }}
       >
-        {rank >= 10 ? (
-          <>
-            <span style={{ WebkitTextStroke: "2.6px var(--color-ink-muted)" }}>1</span>
-            <span
-              style={{
-                WebkitTextStroke: "2.6px var(--color-ink-muted)",
-                color: "var(--color-canvas)",
-                marginInlineStart: "-0.2em",
-              }}
-            >
-              0
-            </span>
-          </>
-        ) : (
-          rank
-        )}
+        <span dir="ltr">
+          {rank >= 10 ? (
+            <>
+              <span style={{ WebkitTextStroke: "2.6px var(--color-ink-muted)" }}>1</span>
+              <span
+                style={{
+                  WebkitTextStroke: "2.6px var(--color-ink-muted)",
+                  color: "var(--color-canvas)",
+                  marginInlineStart: "-0.2em",
+                }}
+              >
+                0
+              </span>
+            </>
+          ) : (
+            rank
+          )}
+        </span>
       </span>
       <div
         data-preview-anchor

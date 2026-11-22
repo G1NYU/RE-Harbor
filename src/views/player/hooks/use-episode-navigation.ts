@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlayInvite } from "@/lib/together/protocol";
 import type { PlayerSrc, PlayEpisode } from "@/lib/view";
 import { isAddonNativeMeta, type Meta } from "@/lib/cinemeta";
@@ -9,8 +9,7 @@ import { isEpisodeHidden } from "@/lib/hidden-episodes";
 import { findLocalEpisode, localShowEpisodes } from "@/lib/local-library";
 import { isLocalUrl } from "@/lib/player/local-url";
 import { localPlayerSrc } from "@/views/library/local-tab/show-group";
-import { completedDownloadFor } from "@/lib/download/downloads-store";
-import { downloadPlayerSrc } from "@/lib/download/player-src";
+import { completedEpisodeSource } from "@/lib/download/completed-episode-source";
 
 type OpenPicker = (
   meta: Meta,
@@ -80,10 +79,26 @@ export function useEpisodeNavigation(params: {
 }) {
   const { src, settings, inRoom, isHost, openPicker, replacePlayerSrc } = params;
 
-  const [adjacent, setAdjacent] = useState<{ prev: PlayEpisode | null; next: PlayEpisode | null }>({
+  const [adjacent, setAdjacent] = useState<{
+    prev: PlayEpisode | null;
+    next: PlayEpisode | null;
+    prevMeta?: Meta;
+    nextMeta?: Meta;
+  }>({
     prev: null,
     next: null,
   });
+  const adjacentRef = useRef(adjacent);
+  adjacentRef.current = adjacent;
+  const latestSrcRef = useRef(src);
+  latestSrcRef.current = src;
+  const navigationRevisionRef = useRef(0);
+  useEffect(
+    () => () => {
+      navigationRevisionRef.current += 1;
+    },
+    [],
+  );
 
   const localShowKey = isLocalUrl(src.url)
     ? {
@@ -102,8 +117,16 @@ export function useEpisodeNavigation(params: {
     const cur = { season: src.episode.season, episode: src.episodeEnd ?? src.episode.episode };
     fetchAdjacentEpisodes(src.meta, cur, {
       tmdbKey: settings.tmdbKey,
+      episodeSources: settings.metadataSources?.episodes,
+      tvdbKey: settings.tvdbKey,
+      tvdbSeasonType: settings.tvdbSeasonType,
       kitsuStreamId: src.episode.kitsuStreamId,
-      skip: settings.episodeHiding ? (s, e) => isEpisodeHidden(src.meta.id, s, e) : undefined,
+      imdbSeason: src.episode.imdbSeason,
+      imdbEpisode: src.episode.imdbEpisode,
+      episodeEndOffset: Math.max(0, (src.episodeEnd ?? src.episode.episode) - src.episode.episode),
+      skip: settings.episodeHiding
+        ? (s, e, metaId) => isEpisodeHidden(metaId ?? src.meta.id, s, e)
+        : undefined,
     }).then((r) => {
       if (cancelled) return;
       if (localShowKey) {
@@ -112,6 +135,7 @@ export function useEpisodeNavigation(params: {
         const localPrev = i > 0 ? eps[i - 1] : null;
         const localNext = i >= 0 && i < eps.length - 1 ? eps[i + 1] : null;
         setAdjacent({
+          ...r,
           prev:
             r.prev ??
             (localPrev
@@ -136,8 +160,12 @@ export function useEpisodeNavigation(params: {
     src.meta.type,
     src.meta.videos,
     src.episode,
+    src.episodeEnd,
     src.url,
     settings.tmdbKey,
+    settings.tvdbKey,
+    settings.tvdbSeasonType,
+    settings.metadataSources?.episodes,
     settings.episodeHiding,
   ]);
 
@@ -145,53 +173,56 @@ export function useEpisodeNavigation(params: {
     (ep: PlayEpisode | null) => {
       if (!ep) return;
       if (inRoom && !isHost) return;
-      if (localShowKey) {
-        const local = findLocalEpisode(localShowKey, ep.season, ep.episode);
-        if (local) {
-          replacePlayerSrc(localPlayerSrc(local, undefined, ep));
-          return;
-        }
-      }
       const carried =
         src.meta.id.startsWith("tt") && src.episode?.sourceMetaId && !ep.sourceMetaId
           ? { ...ep, sourceMetaId: src.episode.sourceMetaId }
           : ep;
-      const withoutDownload = () => {
-        if (localShowKey) {
-          const local = findLocalEpisode(localShowKey, ep.season, ep.episode);
+      const targetMeta =
+        ep.sourceMetaId && adjacentRef.current.nextMeta?.id === ep.sourceMetaId
+          ? adjacentRef.current.nextMeta
+          : ep.sourceMetaId && adjacentRef.current.prevMeta?.id === ep.sourceMetaId
+            ? adjacentRef.current.prevMeta
+            : src.meta;
+      const changesEntry = targetMeta.id !== src.meta.id;
+      // Split cours may share an IMDb ID while restarting their local numbering.
+      const targetLocalKey = localShowKey
+        ? changesEntry
+          ? { title: targetMeta.name }
+          : localShowKey
+        : null;
+      const request = ++navigationRevisionRef.current;
+      const stillCurrent = () =>
+        navigationRevisionRef.current === request && latestSrcRef.current === src;
+      const fallback = () => {
+        if (!stillCurrent()) return;
+        if (targetLocalKey) {
+          const local = findLocalEpisode(targetLocalKey, ep.season, ep.episode);
           if (local) {
-            replacePlayerSrc(localPlayerSrc(local));
+            const localSrc = localPlayerSrc(local, src.isAnime, ep);
+            replacePlayerSrc(
+              changesEntry ? { ...localSrc, meta: targetMeta, episode: carried } : localSrc,
+            );
             return;
           }
         }
-        openPicker(src.meta, carried, { autoPlay: true });
+        openPicker(targetMeta, carried, { autoPlay: true });
       };
-      if (inRoom || settings.localPlaybackMode === "stream") {
-        withoutDownload();
+      // Watch-together peers cannot access the host's private downloaded file.
+      if (inRoom) {
+        fallback();
         return;
       }
-      void completedDownloadFor(src.meta.id, ep.season, ep.episode).then((item) => {
-        if (!item) {
-          withoutDownload();
-          return;
-        }
-        replacePlayerSrc(
-          downloadPlayerSrc(src.meta, ep, item, { imdbId: src.imdbId, isAnime: src.isAnime }),
-        );
-      }, withoutDownload);
+      void completedEpisodeSource(targetMeta, carried, {
+        imdbId: changesEntry ? ep.imdbId : src.imdbId,
+        isAnime: src.isAnime,
+        startFromZero: true,
+      }).then((download) => {
+        if (!stillCurrent()) return;
+        if (download) replacePlayerSrc(download);
+        else fallback();
+      }, fallback);
     },
-    [
-      openPicker,
-      replacePlayerSrc,
-      src.meta,
-      src.episode,
-      src.imdbId,
-      src.isAnime,
-      src.url,
-      settings.localPlaybackMode,
-      inRoom,
-      isHost,
-    ],
+    [openPicker, replacePlayerSrc, src, inRoom, isHost],
   );
 
   return { adjacent, swappingEp: false, goToEpisode };

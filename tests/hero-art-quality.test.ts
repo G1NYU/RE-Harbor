@@ -10,35 +10,55 @@ const source = ts.createSourceFile(
   true,
   ts.ScriptKind.TSX,
 );
-const helper = source.statements.find(
-  (node): node is ts.FunctionDeclaration =>
-    ts.isFunctionDeclaration(node) && node.name?.text === "upsizeTmdb",
-);
-assert.ok(helper);
-const js = ts.transpileModule(helper.getText(source), {
+const helpers = ["upsizeTmdb", "fullBackdropSize"].map((name) => {
+  const fn = source.statements.find(
+    (node): node is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(node) && node.name?.text === name,
+  );
+  assert.ok(fn, `Missing hero declaration: ${name}`);
+  return fn.getText(source);
+});
+const js = ts.transpileModule(helpers.join("\n"), {
   compilerOptions: { target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
-function heroImage(height: number, pixelRatio: number) {
-  return new Function("window", `${js}; return upsizeTmdb;`)(
-    { screen: { height }, devicePixelRatio: pixelRatio },
+function heroImage(innerWidth: number, pixelRatio: number) {
+  return new Function("window", "devicePixelRatio", `${js}; return upsizeTmdb;`)(
+    {
+      innerWidth,
+    },
+    pixelRatio,
   ) as (url?: string, full?: boolean) => string | undefined;
 }
 
-test("explicit full hero quality requests original art on ordinary and high-density displays", () => {
-  for (const [height, ratio] of [[768, 1], [1080, 1], [1080, 1.25], [1080, 2], [2160, 1]]) {
-    const image = heroImage(height, ratio);
-    assert.equal(image("https://image.tmdb.org/t/p/w780/hero.jpg", true),
-      "https://image.tmdb.org/t/p/original/hero.jpg", `${height}px at ${ratio}x`);
+test("explicit full hero quality asks for the largest backdrop the display needs", () => {
+  for (const [width, ratio, size] of [
+    [960, 1, "w1280"],
+    [1280, 1, "w1280"],
+    [1440, 1, "w1920"],
+    [1920, 1, "w1920"],
+    [960, 2, "w1920"],
+    [2560, 1, "original"],
+  ] as const) {
+    const image = heroImage(width, ratio);
+    assert.equal(
+      image("https://image.tmdb.org/t/p/w780/hero.jpg", true),
+      `https://image.tmdb.org/t/p/${size}/hero.jpg`,
+      `${width}px at ${ratio}x`,
+    );
   }
 });
 
 test("turning full quality off restores the optimized hero image", () => {
   const image = heroImage(2160, 2);
-  assert.equal(image("https://image.tmdb.org/t/p/original/hero.jpg", false),
-    "https://image.tmdb.org/t/p/w1280/hero.jpg");
-  assert.equal(image("https://image.tmdb.org/t/p/w780/hero.jpg"),
-    "https://image.tmdb.org/t/p/w1280/hero.jpg");
+  assert.equal(
+    image("https://image.tmdb.org/t/p/original/hero.jpg", false),
+    "https://image.tmdb.org/t/p/w1280/hero.jpg",
+  );
+  assert.equal(
+    image("https://image.tmdb.org/t/p/w780/hero.jpg"),
+    "https://image.tmdb.org/t/p/w1280/hero.jpg",
+  );
 });
 
 test("missing artwork and other providers are preserved", () => {

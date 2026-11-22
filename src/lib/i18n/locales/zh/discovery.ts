@@ -101,8 +101,8 @@ const discovery: Record<string, string> = {
     "浏览时，这些徽章会显示在海报上。上方密钥设置中的 RPDB 是独立选项，会将评分直接嵌入海报图片。",
   "Home hero": "首页焦点横幅",
   "Make the featured banner on Home bigger and sharper.": "让首页推荐横幅更大、更清晰。",
-  "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.":
-    "为推荐焦点横幅加载最高分辨率的图片。会使用更多带宽。",
+  "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.":
+    "为推荐焦点横幅、详情页横幅以及未模糊的播放源选择器背景加载最高分辨率的图片。会使用更多带宽和显存。",
   "Show Playlists tab": "显示“播放列表”标签",
   "Show IMDb score on cards": "在卡片上显示 IMDb 评分",
   "Only show streams in my languages": "仅显示符合我的语言设置的视频流",
@@ -457,8 +457,8 @@ const discovery: Record<string, string> = {
     "浏览特定服务的内容需要 TMDB 密钥。选择“全部”/“电影”/“剧集”可通过 Cinemeta 浏览。",
   Show: "显示",
   "Show {n} more reviews": "再显示 {n} 条评论",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Harbor 检测到片头或片尾时，显示“跳过片头”或“跳过片尾”按钮。关闭后将不再显示。也可点按按钮上的 X，在本集剩余时间内忽略错误识别。",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Harbor 检测到片头或片尾时，显示“跳过片头”或“跳过片尾”按钮。关闭后将不再显示。片头或片尾结束时，或经过下方延迟后，按钮会自动隐藏。",
   "Show audience score on cards": "在卡片上显示观众评分",
   "Show comments on detail pages": "在详情页显示评论",
   "Show email": "显示电子邮箱",

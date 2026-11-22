@@ -14,12 +14,34 @@ import musicPlaylists from "./music-playlists";
 import musicPossible from "./music-possible";
 import musicLegal from "./music-legal";
 const music: Record<string, string> = {
-  "music.motion.reduced": "Animation is paused because reduced motion is enabled in your system accessibility settings.",
-  "music.motion.reducedShort": "Reduced motion",
-  "music.motion.override": "Allow animated music visualizers",
-  "music.motion.overrideHelp": "Overrides Windows reduced-motion preference for Miku, custom GIFs and spectrum bars only. Other app animations remain unchanged.",
-  "music.gif.frameCount": "{count} frames",
-  "music.gif.static": "This GIF contains only one frame and cannot move.",
+  "music.linked.import": "Import from link",
+  "music.linked.linkLabel": "YouTube Music playlist link or ID",
+  "music.linked.importHelp":
+    "Link a public or unlisted YouTube playlist or a generated Mix watch link. Harbor saves a local copy for manual sync. Mixes save only the current queue, not an endless radio playlist. Signing in is not supported.",
+  "music.linked.loading": "Loading tracks from YouTube Music…",
+  "music.linked.mixHelp":
+    "This generated Mix saves the current queue as a snapshot. Sync refreshes that snapshot; the lineup may change and does not include endless radio continuations. Local edits are overwritten. Unlink to keep them permanently.",
+  "music.linked.mixSyncConfirm":
+    "Replace this playlist with the Mix's current queue snapshot? The lineup may change. Local additions, removals, reordering and title edits will be overwritten.",
+  "music.linked.source": "Linked to YouTube Music",
+  "music.linked.lastSynced": "Last synced: {date}",
+  "music.linked.mirrorHelp":
+    "Sync replaces local edits with YouTube's tracks, order and title. Unlink to keep your changes permanently.",
+  "music.linked.sync": "Sync now",
+  "music.linked.syncTitle": "Sync with YouTube Music?",
+  "music.linked.mixSyncTitle": "Refresh this Mix snapshot?",
+  "music.linked.syncConfirm":
+    "Replace this playlist with YouTube's current tracks, order and title? Local additions, removals and reordering will be overwritten.",
+  "music.linked.syncedNotice": "Synced {count} tracks from YouTube Music.",
+  "music.linked.importedNotice": "Linked {name} with {count} tracks from YouTube Music.",
+  "music.linked.unlink": "Unlink",
+  "music.linked.unlinkTitle": "Unlink this playlist?",
+  "music.linked.unlinkConfirm":
+    "Stop syncing with YouTube Music? The current tracks will stay as a local playlist.",
+  "music.linked.editTitle": "Edit linked playlist?",
+  "music.linked.editContinue": "Continue editing",
+  "music.linked.editConfirm":
+    "This playlist is linked to YouTube Music. Local changes will be overwritten on sync. Continue editing? You can unlink it from the playlist page to keep your changes permanently.",
   "music.xxl.newer": "Newer class",
   "music.xxl.older": "Older class",
   ...musicMiku,
@@ -115,7 +137,8 @@ const music: Record<string, string> = {
   "dj.minimize": "Minimise",
   "dj.maximize": "Maximise",
   "dj.close": "Close",
-  "dj.blurb": "Tempo, pitch, EQ kills and cue pads in a window of their own, over whatever is playing.",
+  "dj.blurb":
+    "Tempo, pitch, EQ kills and cue pads in a window of their own, over whatever is playing.",
   "dj.open": "Open the deck",
   "dj.idle": "Nothing playing",
   "dj.tempo": "Tempo",
@@ -175,7 +198,8 @@ const music: Record<string, string> = {
   "dj.pads.jump": "Beat jump",
   "dj.pads.sampler": "Sampler",
   "dj.pads.triplet": "Triplet",
-  "dj.pads.rollHint": "Hold a pad to roll, let go and the track carries on where it would have been",
+  "dj.pads.rollHint":
+    "Hold a pad to roll, let go and the track carries on where it would have been",
   "dj.pads.jumpHint": "Jump back or forward without losing the beat",
   "dj.pads.noBpm": "No BPM yet, lengths are in seconds until you tap it in",
   "dj.reset": "Reset",
@@ -185,21 +209,28 @@ const music: Record<string, string> = {
   "music.broadcast.drift": "({ms} ms off)",
   "music.broadcast.live": "Broadcasting through {product}",
   "music.broadcast.install": "Get {product}",
-  "music.broadcast.none": "No virtual audio cable is installed. Install {product}, then pick it here.",
+  "music.broadcast.none":
+    "No virtual audio cable is installed. Install {product}, then pick it here.",
   "music.broadcast.auto": "First one found",
   "music.broadcast.output": "Output",
   "music.broadcast.stop": "Stop",
   "music.broadcast.start": "Start",
-  "music.broadcast.blurb": "Send what you are playing to a virtual microphone so friends on a call hear it. You keep hearing it on your speakers.",
+  "music.broadcast.blurb":
+    "Send what you are playing to a virtual microphone so friends on a call hear it. You keep hearing it on your speakers.",
   "music.broadcast.title": "Broadcast to voice chat",
-  "music.cable.mac.installNeeded": "Harbor can install its own virtual microphone. macOS will ask for your administrator password, then Core Audio restarts.",
-  "music.cable.mac.installMissing": "This build of Harbor does not include the virtual microphone driver.",
+  "music.cable.mac.installNeeded":
+    "Harbor can install its own virtual microphone. macOS will ask for your administrator password, then Core Audio restarts.",
+  "music.cable.mac.installMissing":
+    "This build of Harbor does not include the virtual microphone driver.",
   "music.cable.mac.installCancelled": "Installation was cancelled.",
   "music.cable.mac.installFailed": "The virtual microphone could not be installed.",
-  "music.cable.mac.restartNeeded": "The virtual microphone is installed, but Core Audio has not picked it up yet. Restart your Mac to finish.",
-  "music.cable.mac.updateAvailable": "A newer virtual microphone ships with this version of Harbor. Install it to keep the cable working.",
+  "music.cable.mac.restartNeeded":
+    "The virtual microphone is installed, but Core Audio has not picked it up yet. Restart your Mac to finish.",
+  "music.cable.mac.updateAvailable":
+    "A newer virtual microphone ships with this version of Harbor. Install it to keep the cable working.",
   "music.cable.title": "Harbor virtual mic",
-  "music.cable.blurb": "Harbor sets the virtual microphone up itself. Nothing to download, nothing to install.",
+  "music.cable.blurb":
+    "Harbor sets the virtual microphone up itself. Nothing to download, nothing to install.",
   "music.cable.create": "Create virtual mic",
   "music.cable.remove": "Remove virtual mic",
   "music.cable.spec": "{rate}, {depth}",
@@ -226,7 +257,8 @@ const music: Record<string, string> = {
   "music.cable.installNeeded": "Harbor needs your permission to install the virtual mic",
   "music.cable.installMissing": "This Harbor build does not ship a virtual mic",
   "music.cable.restartNeeded": "The audio system has to restart before the virtual mic appears",
-  "music.cable.updateAvailable": "This Harbor ships a newer virtual mic. Create it again to update.",
+  "music.cable.updateAvailable":
+    "This Harbor ships a newer virtual mic. Create it again to update.",
   "dj.crossfade": "Crossfader",
   "dj.b.broadcasting": "Carrying the broadcast",
   "dj.b.eject": "Eject",
@@ -273,7 +305,8 @@ const music: Record<string, string> = {
   "music.speed.pitch": "Pitch",
   "music.speed.reverb": "Reverb",
   "music.speed.keepPitch": "Keep the original key",
-  "music.speed.keepPitchHelp": "On, the tempo changes but the key does not. Off is the nightcore and slowed sound.",
+  "music.speed.keepPitchHelp":
+    "On, the tempo changes but the key does not. Off is the nightcore and slowed sound.",
   "music.speed.reset": "Reset",
   "music.speed.normal": "Normal",
   "music.speed.nightcore": "Nightcore",
@@ -298,6 +331,7 @@ const music: Record<string, string> = {
   "music.playlist.likeThisFresh": "Only music new to me",
   "music.playlist.likeThisHeard": "Include songs I've heard",
   "music.playlist.delete": "Delete playlist",
+  "music.playlist.deleteTitle": "Delete playlist?",
   "music.playlist.deleteConfirm": "Delete this playlist? The songs stay in your library.",
   "music.watch.back": "Back to music",
   "music.watch.similar": "Similar songs",
@@ -350,12 +384,22 @@ const music: Record<string, string> = {
   "music.explore.scene": "From the scene",
   "music.artist.inPlaylists": "Playlists including {name}",
   "music.audio.preferredSource": "Preferred source",
-  "music.audio.preferredSourceHint": "Harbor plays from this first, then falls back to any source that works.",
+  "music.audio.preferredSourceHint":
+    "Harbor plays from this first, then falls back to any source that works.",
+  "music.audio.videoQuality": "Default video quality",
+  "music.audio.videoQualityHint":
+    "Used for music videos. A quality you pick while watching lasts until the next song.",
+  "Video quality": "Video quality",
+  Auto: "Auto",
   "music.spotify.connect": "Spotify Premium",
   "music.spotify.connectDetail": "Connect once for native, ad-free playback.",
   "music.spotify.connectAction": "Connect",
   "music.spotify.connectedAs": "Connected as {username}",
   "music.spotify.premium": "Premium",
+  "music.spotify.playbackReady": "Playback ready",
+  "music.spotify.playbackUnavailable": "Local playback unavailable",
+  "music.spotify.playbackUnavailableHint":
+    "Your account is linked, but Harbor's local player is not ready. Pair Spotify again in Music connections.",
   "music.playlist.alreadyAdded": "Already in playlist",
   "music.playlist.add": "Add to selected playlist",
   "music.playlist.duplicateWarning": "{title} is already in {name}. Add another copy?",
@@ -432,6 +476,7 @@ const music: Record<string, string> = {
   "music.row.artistsSubtitle": "From your library and your history",
   "music.row.charts": "Charts",
   "music.row.chartsSubtitle": "What listeners are actually playing right now",
+  "music.row.ytPlaylists": "Your YouTube Music playlists",
   "music.habit.season.spooky": "Spooky season",
   "music.habit.season.spooky.subtitle": "Halloween is close enough to justify it",
   "music.habit.season.festive": "Festive",
@@ -524,6 +569,21 @@ const music: Record<string, string> = {
   "music.connections.capability.play": "Play",
   "music.connections.capability.library": "Library",
   "music.connections.capability.scrobble": "Scrobble",
+  "music.youtubeAccount.intro":
+    "Harbor browses YouTube Music anonymously. Sign in inside the YouTube Music window to use your own home, mixes and a signed-in stream.",
+  "music.youtubeAccount.signedIn": "Signed in as {account}.",
+  "music.youtubeAccount.open": "Open YouTube Music",
+  "music.youtubeAccount.use": "Use this session",
+  "music.youtubeAccount.checking": "Checking the session",
+  "music.youtubeAccount.signOut": "Sign out",
+  "music.youtubeAccount.hint":
+    "Sign in inside the YouTube Music window, then choose Use this session.",
+  "music.youtubeAccount.sessionNote":
+    "Harbor borrows the session from that window and keeps it in memory; no password is stored.",
+  "music.ytLibrary.title": "YouTube Music library",
+  "music.ytLibrary.notSignedIn":
+    "Sign in to YouTube Music to see your playlists, liked songs and artists here.",
+  "music.ytLibrary.empty": "Your YouTube Music library is empty.",
   "music.footer.setup": "Setup",
   "music.footer.harbor": "Harbor",
   "music.footer.connections": "Connections",
@@ -542,18 +602,18 @@ const music: Record<string, string> = {
   "music.artwork.save": "Save artwork",
   "music.artwork.none": "This item has no artwork to save.",
   "music.artwork.failed": "Could not download the artwork.",
-  "music.card.addToQueue": "Add to queue",
+  "music.card.addToQueue": "Add to listening queue",
   "music.card.goToArtist": "Go to artist",
   "music.card.goToAlbum": "Go to album",
   "music.card.startRadio": "Start radio",
   "music.card.copyTitle": "Copy title and artist",
   "music.card.goToPlaying": "Go to what's playing",
   "music.card.openPlaying": "Open {name}",
-  "music.transport.queue": "Queue",
+  "music.transport.queue": "Listening queue",
   "music.transport.shuffle": "Shuffle",
   "music.transport.repeat": "Repeat",
   "music.transport.repeatOne": "Repeat one",
-  "music.transport.openQueue": "Open queue",
+  "music.transport.openQueue": "Open listening queue",
   "music.transport.clearQueue": "Clear queue",
   "music.search.top": "Top result",
   "music.search.tracks": "Tracks",
@@ -592,7 +652,7 @@ const music: Record<string, string> = {
   "music.transport.repeatAll": "Repeat all",
   "music.queue.count": "{count} up next",
   "music.queue.empty": "Nothing is queued.",
-  "music.queue.close": "Close the queue",
+  "music.queue.close": "Close listening queue",
   "music.queue.nowPlaying": "Now playing",
   "music.queue.reorder": "Reorder {title}",
   "music.queue.moveUp": "Move {title} up",
@@ -639,7 +699,7 @@ const music: Record<string, string> = {
   "music.newRelease.title": "New from artists you play",
   "music.newRelease.subtitle": "Just released",
   "music.newRelease.eyebrow": "New release",
-  "music.newRelease.outNow": "\"{title}\" is out now",
+  "music.newRelease.outNow": '"{title}" is out now',
   "music.newRelease.action": "Listen now",
   "music.newRelease.listen": "Listen to {title}",
   "music.spotifyDevices.title": "Play on",
@@ -651,7 +711,7 @@ const music: Record<string, string> = {
     "No other Spotify devices are awake. Open Spotify on a phone, speaker or desktop and refresh.",
   "music.spotifySetup.createTitle": "Create a Spotify app",
   "music.spotifySetup.createBody":
-    "Use a Spotify Premium account to create an app in the developer dashboard.",
+    "Create a Spotify Developer app for a separate browsing quota. Premium is only required for local playback.",
   "music.spotifySetup.dashboard": "Open Spotify dashboard",
   "music.spotifySetup.redirectTitle": "Add Harbor’s redirect URI",
   "music.spotifySetup.redirectBody":
@@ -672,9 +732,20 @@ const music: Record<string, string> = {
     "No Client ID is saved on this device. Follow the setup steps and paste your Client ID.",
   "music.spotifySetup.rejected":
     "Check the Client ID and redirect URI in your Spotify app settings, then try again.",
-  "music.spotifySetup.pairTitle": "1 · Pair this device for playback",
+  "music.spotifySetup.pairTitle": "Pair your Spotify account",
   "music.spotifySetup.pairBody":
-    "No Spotify app setup needed. Harbor shows a code — enter it at spotify.com/pair from a phone or browser, then approve.",
+    "Play Spotify directly in Harbor with Premium. Enter the pairing code at spotify.com/pair and approve it. No Developer app or Client ID is required.",
+  "music.spotifySetup.intro":
+    "Pair Spotify to stream music in Harbor. Spotify Premium is required. A separate Developer app is recommended for browsing.",
+  "music.spotifySetup.browseOptional": "Optional",
+  "music.spotify.browsingLabel": "Browsing",
+  "music.spotify.browsingOwnApp": "Own app authorized",
+  "music.spotify.browsingShared": "Available through Spotify pairing",
+  "music.spotify.browsingNotConnected": "Not connected",
+  "music.spotify.playbackConnected": "Local playback connected",
+  "music.spotify.playbackNotConnected": "Local playback not connected",
+  "music.spotify.playbackChecking": "Checking playback connection",
+  "music.spotifySetup.repair": "Re-pair this device",
   "music.spotifySetup.pairAction": "Pair with Spotify",
   "music.spotifySetup.pairCodeLabel": "Pairing code",
   "music.spotifySetup.pairWaiting": "Waiting for approval at spotify.com/pair…",
@@ -682,10 +753,10 @@ const music: Record<string, string> = {
   "music.spotifySetup.pairCopy": "Copy code",
   "music.spotifySetup.pairCopied": "Copied",
   "music.spotifySetup.pairCopyFailed": "Select the code and copy it manually.",
-  "music.spotifySetup.pairManual": "2 · Browse with your own Spotify app",
+  "music.spotifySetup.pairManual": "Advanced Spotify browsing",
   "music.spotifySetup.browseRecommended": "Recommended",
   "music.spotifySetup.browseBody":
-    "Browsing on Spotify's shared limit saturates often. Your own app gives browsing a private quota — playback stays paired.",
+    "Authorize your own Spotify Developer app for a separate browsing quota. Recommended for browsing, not required for playback.",
   "music.spotifyBrowse.title": "Browsing shares Spotify's rate limit",
   "music.spotifyBrowse.body":
     "Playback is paired and working. Browsing currently shares librespot's Spotify quota, which saturates often — sign in with your own Spotify app to give browsing its own quota. Playback stays paired.",
@@ -705,7 +776,8 @@ const music: Record<string, string> = {
   "music.recovery.network":
     "Check your connection, then retry. You can also choose another source below.",
   "music.recovery.open": "Open {source}",
-  "music.recovery.spotifySetup": "Set up your Spotify app, then sign in with Premium.",
+  "music.recovery.spotifySetup":
+    "Pair your Spotify Premium account with Harbor to enable playback.",
   "music.recovery.setupAction": "Set up",
   "music.recovery.search": "Sources could not be checked. Check your connection and try again.",
   "music.recovery.retrySource": "Couldn’t load · Retry this source",
@@ -768,6 +840,12 @@ const music: Record<string, string> = {
   "music.search.recent": "Recent searches",
   "music.search.historyEmpty": "Your recent searches will appear here.",
   "music.search.removeRecent": "Remove {title} from recent searches",
+  "music.motion.reduced": "Animation is paused because reduced motion is enabled in your system accessibility settings.",
+  "music.motion.reducedShort": "Reduced motion",
+  "music.motion.override": "Allow animated music visualizers",
+  "music.motion.overrideHelp": "Overrides Windows reduced-motion preference for Miku, custom GIFs and spectrum bars only. Other app animations remain unchanged.",
+  "music.gif.frameCount": "{count} frames",
+  "music.gif.static": "This GIF contains only one frame and cannot move.",
 };
 
 export default music;

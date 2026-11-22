@@ -4,7 +4,10 @@ import whiteBoat from "@/assets/lottie/addons-boat-white.json";
 import darkBoat from "@/assets/lottie/addons-boat-dark.json";
 import harborBoat from "@/assets/lottie/harbor-loader.json";
 import { CustomArtwork } from "./custom-artwork";
-import { prefetchTopAddonLogos, prefetchedTopAddonLogos } from "@/lib/providers/addon-logo-prefetch";
+import {
+  prefetchTopAddonLogos,
+  prefetchedTopAddonLogos,
+} from "@/lib/providers/addon-logo-prefetch";
 
 type Size = "xs" | "sm" | "md" | "lg" | "xl";
 
@@ -21,7 +24,8 @@ const XLINK = "http://www.w3.org/1999/xlink";
 function darkBackground(): boolean {
   if (typeof document === "undefined") return true;
   const probe = document.createElement("div");
-  probe.style.cssText = "background-color:var(--color-canvas);position:absolute;opacity:0;pointer-events:none";
+  probe.style.cssText =
+    "background-color:var(--color-canvas);position:absolute;opacity:0;pointer-events:none";
   document.body.appendChild(probe);
   const m = getComputedStyle(probe).backgroundColor.match(/[\d.]+/g);
   probe.remove();
@@ -84,7 +88,7 @@ export function HarborLoader({
   );
 }
 
-function Boat({size, keyed, logos}: {size:Size;keyed:boolean;logos?:string[]}) {
+function Boat({ size, keyed, logos }: { size: Size; keyed: boolean; logos?: string[] }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const cargo = keyed || logos !== undefined;
   const fetched = useTopAddonLogos(keyed && logos === undefined);
@@ -145,7 +149,5 @@ function Boat({size, keyed, logos}: {size:Size;keyed:boolean;logos?:string[]}) {
     paint();
   }, [effective, paint]);
 
-  return (
-    <div ref={ref} className={`harbor-loader-art ${SIZE_CLASS[size]}`} aria-hidden />
-  );
+  return <div ref={ref} className={`harbor-loader-art ${SIZE_CLASS[size]}`} aria-hidden />;
 }

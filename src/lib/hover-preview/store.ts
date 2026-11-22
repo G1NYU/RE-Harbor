@@ -1,4 +1,5 @@
 import type { Meta } from "../cinemeta";
+import { isScrollActive } from "../scroll-activity";
 import { createDismissListeners } from "./dismiss-listeners";
 import { assemblePreviewData, type PreviewArt, type PreviewAssembly } from "./preview-data";
 import {
@@ -104,7 +105,8 @@ function cancelEverything(): void {
 }
 
 const setListening = createDismissListeners({
-  insidePanel: (target) => !!open && !!panelEl && target instanceof Node && panelEl.contains(target),
+  insidePanel: (target) =>
+    !!open && !!panelEl && target instanceof Node && panelEl.contains(target),
   cancel: cancelEverything,
   escape: () => {
     if (!open) return false;
@@ -268,6 +270,11 @@ function armMorph(meta: Meta, el: HTMLElement): void {
 
 export function hoverPreviewEnter(meta: Meta, el: HTMLElement, buttons = 0): void {
   if (!gatesPass() || buttons !== 0) return;
+  // A card that slides under a still pointer while the page scrolls did not earn
+  // a dwell: the pointer did not move, the page did. Starting the intent fetch
+  // here assembled preview data for a card that was out of view a moment later,
+  // so ignore enters that arrive during an active scroll.
+  if (isScrollActive()) return;
   if (open) {
     if (el === open.el) {
       insideAnchor = true;

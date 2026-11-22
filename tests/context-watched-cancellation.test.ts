@@ -60,13 +60,31 @@ function harness() {
     "./publicmetadb/mappings": {},
     "./publicmetadb/history": {},
     "./publicmetadb/watchlist": {},
+    "./publicmetadb/lists": {},
   };
   const providers = loadModule<Providers>("../src/lib/media-provider-actions.ts", {
+    "./active-profile-id": { activeProfileIsPrimary: () => true },
+    "./refract/client": { getRefractKey: () => null, refractEnabled: () => false },
     ...shared,
     "./anilist/session": disconnected,
+    "./anilist/sync": {},
+    "./anilist/mutations": {},
+    "./mal/mutations": {},
+    "./publicmetadb/scrobble": {},
+    "./publicmetadb/dropped": {},
     "./mal/session": disconnected,
     "./stremio-item-lock": {},
     "./stremio-watched-sync": {},
+    // media-provider-actions gained the Nuvio/local-CW/resume writers after this
+    // harness was written; stubbing them keeps the module boundary assert honest
+    // without pretending the Trakt pagination paths touch them.
+    "./nuvio/nuvio-client": { isNuvioSignedIn: () => false, isNuvioProviderActive: () => false },
+    "./nuvio/nuvio-sync": {},
+    "./nuvio/nuvio-library": {},
+    "./nuvio/nuvio-playback": {},
+    "./settings/load": { loadStoredSettings: () => ({}) },
+    "./local-cw": { saveLocalCw: () => {}, clearLocalCw: () => {} },
+    "./resume": { saveResumeMs: () => {} },
     "./trakt/client": {
       traktRequest: async (path: string) => {
         reads.push(path);
@@ -102,6 +120,7 @@ function harness() {
     "./movie-watched": {},
     "./watched-flag": {},
     "./episode-progress": {},
+    "./series-episodes": {},
   });
   return {
     reads,

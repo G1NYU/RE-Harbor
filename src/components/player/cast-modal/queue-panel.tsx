@@ -98,7 +98,7 @@ function CwSuggestionRow({
       <button
         type="button"
         onClick={() => queueToggle(meta, episode)}
-        aria-label={queued ? t("Remove from queue") : t("Add to queue")}
+        aria-label={queued ? t("Remove from watching queue") : t("Add to watching queue")}
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
           queued
             ? "bg-white text-black"
@@ -116,7 +116,7 @@ export function QueuePanel({
   currentMeta,
   currentEpisode,
 }: {
-  onPlay: (meta: Meta, episode?: PlayEpisode) => void;
+  onPlay: (meta: Meta, episode?: PlayEpisode, queueItemId?: string) => void;
   currentMeta?: Meta | null;
   currentEpisode?: PlayEpisode | null;
 }) {
@@ -188,6 +188,9 @@ export function QueuePanel({
       8,
       {
         tmdbKey: settings.tmdbKey,
+        episodeSources: settings.metadataSources?.episodes,
+        tvdbKey: settings.tvdbKey,
+        tvdbSeasonType: settings.tvdbSeasonType,
       },
     )
       .then((eps) => {
@@ -197,7 +200,16 @@ export function QueuePanel({
     return () => {
       cancelled = true;
     };
-  }, [queue.length, isSeriesCurrent, currentMeta, currentEpisode, settings.tmdbKey]);
+  }, [
+    queue.length,
+    isSeriesCurrent,
+    currentMeta,
+    currentEpisode,
+    settings.tmdbKey,
+    settings.tvdbKey,
+    settings.tvdbSeasonType,
+    settings.metadataSources?.episodes,
+  ]);
 
   const cwList = useContinueWatching(currentMeta?.id);
   const totalMins = queue.reduce((sum, i) => sum + runtimeMinutes(i), 0);
@@ -356,8 +368,7 @@ export function QueuePanel({
                 <button
                   type="button"
                   onClick={() => {
-                    queueRemove(item.id);
-                    onPlay(item.meta, item.episode);
+                    onPlay(item.meta, item.episode, item.id);
                   }}
                   aria-label={t("Play")}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black transition-transform hover:scale-105"
@@ -367,7 +378,7 @@ export function QueuePanel({
                 <button
                   type="button"
                   onClick={() => queueRemove(item.id)}
-                  aria-label={t("Remove from queue")}
+                  aria-label={t("Remove from watching queue")}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"
                 >
                   <X size={18} strokeWidth={2.2} />

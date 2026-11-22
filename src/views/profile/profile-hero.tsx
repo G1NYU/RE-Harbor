@@ -3,17 +3,26 @@ import {
   Check,
   ImagePlus,
   Loader2,
+  LockKeyhole,
   MapPin,
+  MessageCircle,
   Settings2,
   Share2,
   UserMinus,
+  UserCheck,
   UserPlus,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { ConfirmableAction } from "@/components/context-menu/action-items";
 import { ShareModal } from "./share-modal";
+import { ProfileJoinedAt } from "./profile-joined-at";
+import { profileBackgroundUrl } from "@/lib/social/profile-card-appearance";
 import { countryFlagSrc } from "@/components/flag";
 import { acceptFriend, removeFriend, sendFriendRequest } from "@/lib/social/friends";
+import { type DmError } from "@/lib/social/dm";
+import { socialGet } from "@/lib/social/client";
+import { openDmConversation } from "@/lib/social/dm-store";
+import { requestOpenDm, useDmState } from "@/lib/social/dm-store";
 import { PRESENCE_META, useMyPresence } from "@/lib/social/presence";
 import { useT } from "@/lib/i18n";
 import { useView } from "@/lib/view";
@@ -65,6 +74,7 @@ export function ProfileHero({
   badges,
   userFont,
   hideBanner,
+  signedIn = false,
   onEdit,
   onPatch,
 }: {
@@ -75,10 +85,12 @@ export function ProfileHero({
   badges?: HeroBadge[];
   userFont?: string;
   hideBanner?: boolean;
+  signedIn?: boolean;
   onEdit?: () => void;
   onPatch?: (next: ProfileSummary) => void;
 }) {
   const t = useT();
+  const backgroundUrl = profileBackgroundUrl(p);
   const { openFeed } = useView();
   const { open: openContext } = useContextMenu();
   const [relationship, setRelationship] = useState(p.friendStatus);
@@ -121,9 +133,9 @@ export function ProfileHero({
     <header className="relative w-full overflow-hidden">
       <div className="relative h-48 w-full sm:h-60">
         {!hideBanner &&
-          (p.bannerUrl ? (
+          (backgroundUrl ? (
             <img
-              src={p.bannerUrl}
+              src={backgroundUrl}
               alt=""
               className="h-full w-full object-cover"
               draggable={false}
@@ -146,7 +158,7 @@ export function ProfileHero({
             }}
           />
         )}
-        {p.isOwner && !p.bannerUrl && !hideBanner && onEdit && (
+        {p.isOwner && !backgroundUrl && !hideBanner && onEdit && (
           <button
             onClick={onEdit}
             className="absolute end-4 top-24 inline-flex items-center gap-1.5 rounded-full bg-elevated/70 px-3 py-1.5 text-[12px] font-medium text-ink ring-1 ring-edge-soft backdrop-blur transition-colors hover:bg-elevated"
@@ -217,9 +229,14 @@ export function ProfileHero({
                   {countryName(p.location)}
                 </span>
               )}
+              <ProfileJoinedAt
+                value={p.memberSince}
+                show={p.showJoinDate !== false}
+                className="basis-full text-[11.5px] text-ink-subtle"
+              />
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {p.isOwner && onEdit ? (
               <>
                 <button
@@ -245,11 +262,14 @@ export function ProfileHero({
               </>
             ) : (
               !p.isOwner && (
-                <FriendButton
-                  handle={p.handle}
-                  initial={p.friendStatus ?? "none"}
-                  edgeId={p.friendEdgeId}
-                />
+                <>
+                  <MessageButton p={p} signedIn={signedIn} />
+                  <FriendButton
+                    handle={p.handle}
+                    initial={p.friendStatus ?? "none"}
+                    edgeId={p.friendEdgeId}
+                  />
+                </>
               )
             )}
           </div>
@@ -324,15 +344,15 @@ function WatchTimePill({ totalMinutes }: { totalMinutes: number }) {
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
           {a}
         </span>
-        <span className="ml-1 text-[17px] font-semibold text-ink">{pad(aVal)}</span>
-        <span className="ml-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        <span className="ms-1 text-[17px] font-semibold text-ink">{pad(aVal)}</span>
+        <span className="ms-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
           {b}
         </span>
-        <span className="ml-1 text-[17px] font-semibold text-ink">{pad(bVal)}</span>
-        <span className="ml-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        <span className="ms-1 text-[17px] font-semibold text-ink">{pad(bVal)}</span>
+        <span className="ms-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
           {c}
         </span>
-        <span className="ml-1 text-[17px] font-semibold text-ink">{pad(cVal)}</span>
+        <span className="ms-1 text-[17px] font-semibold text-ink">{pad(cVal)}</span>
       </span>
       <span className="text-[11px] uppercase tracking-[0.1em] text-ink-subtle">
         {t("Watch Time")}
@@ -342,6 +362,111 @@ function WatchTimePill({ totalMinutes }: { totalMinutes: number }) {
 }
 
 type FriendRel = NonNullable<ProfileSummary["friendStatus"]>;
+
+function MessageButton({ p, signedIn }: { p: ProfileSummary; signedIn: boolean }) {
+  const t = useT();
+  const dm = useDmState();
+  const noteId = useId();
+  const [busy, setBusy] = useState(false);
+  const [friendsOnly, setFriendsOnly] = useState(false);
+  const [blockedNow, setBlockedNow] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // An existing thread outlives a policy change, so it always wins over the
+  // friends-only gate. Match by id when the API provides one, then by handle.
+  const existing = useMemo(() => {
+    const handle = p.handle.toLowerCase();
+    return dm.conversations.find(
+      (c) => (p.id && c.other?.id === p.id) || c.other?.handle?.toLowerCase() === handle,
+    );
+  }, [dm.conversations, p.id, p.handle]);
+
+  if (!signedIn || p.isOwner) return null;
+
+  const blocked = blockedNow || p.friendStatus === "blocked";
+  // Private profiles return before relationship resolution, so only gate on the
+  // policy when we actually know the friendship state. The server still enforces
+  // it on open.
+  const policyBlocked =
+    p.dmPolicy === "friends" &&
+    p.friendStatus !== undefined &&
+    p.friendStatus !== "friends" &&
+    !existing;
+  const restricted = blocked || friendsOnly || policyBlocked;
+  const reason = blocked
+    ? t("You cannot message this person.")
+    : policyBlocked || friendsOnly
+      ? t("{name} only accepts direct messages from friends.", { name: p.alias })
+      : "";
+  const note = error || reason;
+
+  const start = async () => {
+    if (busy || restricted) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (existing) {
+        requestOpenDm(existing.id);
+        return;
+      }
+      let id = p.id;
+      if (!id) {
+        id = (await socialGet<{ id: string }>(`/social/u/${encodeURIComponent(p.handle)}`)).id;
+      }
+      if (!id) throw new Error(t("This person could not be found."));
+      const conversation = await openDmConversation(id);
+      requestOpenDm(conversation.id);
+    } catch (err) {
+      const e = err as DmError;
+      if (e.code === "dm_friends_only") setFriendsOnly(true);
+      else if (e.code === "blocked") setBlockedNow(true);
+      else setError(e instanceof Error ? e.message : t("The conversation could not be opened."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`group/msg relative ${restricted ? "cursor-not-allowed" : ""}`}>
+      <button
+        type="button"
+        onClick={() => void start()}
+        disabled={busy || restricted}
+        aria-disabled={busy || restricted}
+        aria-busy={busy}
+        aria-describedby={note ? noteId : undefined}
+        title={restricted ? reason : undefined}
+        className={`inline-flex min-h-11 items-center gap-2 rounded-md px-4 text-[14px] font-semibold transition-colors ${
+          restricted
+            ? "pointer-events-none cursor-not-allowed bg-surface/50 text-ink-subtle opacity-60 ring-1 ring-edge-soft"
+            : "bg-surface text-ink ring-1 ring-edge hover:bg-raised"
+        }`}
+      >
+        {busy ? (
+          <Loader2 size={18} className="animate-spin" />
+        ) : restricted ? (
+          <LockKeyhole size={17} />
+        ) : (
+          <MessageCircle size={18} />
+        )}
+        {busy ? t("Opening...") : t("Message")}
+      </button>
+      {note && (
+        <span
+          id={noteId}
+          role={error ? "status" : "tooltip"}
+          className={`pointer-events-none absolute bottom-full end-0 z-30 mb-2 w-60 rounded-lg bg-elevated px-3 py-2 text-[11.5px] font-medium leading-snug shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)] ring-1 ring-edge-soft transition-opacity duration-150 ${
+            error
+              ? "text-danger opacity-100"
+              : "text-ink-muted opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100"
+          }`}
+        >
+          {note}
+        </span>
+      )}
+    </div>
+  );
+}
 
 const FRIEND_BTN =
   "inline-flex min-h-11 items-center gap-2 rounded-md px-4 text-[14px] font-semibold transition-colors disabled:opacity-70";
@@ -394,7 +519,7 @@ function FriendButton({
         actionId="friend:remove"
         className={`${FRIEND_BTN} bg-surface text-ink ring-1 ring-edge hover:bg-danger/12 hover:text-danger`}
       >
-        <Check size={18} strokeWidth={2.6} /> {t("Friends")}
+        <UserCheck size={18} strokeWidth={2.2} /> {t("Friends")}
       </ConfirmableAction>
     );
   }

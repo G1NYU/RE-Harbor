@@ -14,6 +14,7 @@ import stremioPreview from "@/assets/theme-previews/stremio.png";
 import velvetPreview from "@/assets/theme-previews/velvet.png";
 import { getCustomThemes } from "./custom-themes";
 import { t } from "./i18n";
+import { MIDNIGHT_PRESET } from "@/themes/midnight/midnight-preset";
 
 function escapeGeneratedHtml(value: string): string {
   return value
@@ -44,11 +45,12 @@ export type ThemeLayout =
   | "forest"
   | "royal"
   | "cinematic"
-  | "custom";
+  | "custom"
+  | "midnight";
 export type ThemeCardStyle = "flat" | "glass" | "stremio" | "minui" | "crunch" | "noir" | "custom";
 export type ThemeButtonStyle = "flat" | "glossy" | "minui" | "crunch" | "noir" | "custom";
 
-export type ActiveThemeId = ThemePresetId | "custom" | `user:${string}`;
+export type ActiveThemeId = ThemePresetId | "midnight" | "custom" | `user:${string}`;
 
 export type FontPairId =
   | "sentient-switzer"
@@ -89,10 +91,19 @@ export type ChromeConfig = {
   icons?: Partial<Record<ChromeNavId, string>>;
 };
 
+export type ThemeCredit = {
+  name: string;
+  /** GitHub handle, without the owner segment. */
+  github?: string;
+  /** Harbor community handle, used against the configured base URL. */
+  harbor?: string;
+};
+
 export type ThemePreset = {
   id: ThemePresetId;
   name: string;
   blurb: string;
+  credit?: ThemeCredit;
   swatch: [string, string, string];
   tokens: Record<string, string>;
   background?: ThemeBackground;
@@ -424,10 +435,10 @@ aside[data-harbor-sidebar][data-collapsed="true"]:not([aria-hidden="true"]) {
   transition-delay: 0s !important;
 }
 /* The drawer stays fixed during morphing; only the pinned rail occupies page space. */
-html:has(aside[data-harbor-sidebar]:not([aria-hidden="true"])) {
+html:not(:has([data-games-library])):has(aside[data-harbor-sidebar]:not([aria-hidden="true"])) {
   --ef-header-inset: 4.25rem;
 }
-html:has(aside[data-harbor-sidebar][data-collapsed="true"]:not([aria-hidden="true"])) {
+html:not(:has([data-games-library])):has(aside[data-harbor-sidebar][data-collapsed="true"]:not([aria-hidden="true"])) {
   --ef-rail-space: var(--ef-rail-width);
   --ef-header-inset: calc(var(--ef-rail-width) + 1rem);
 }
@@ -890,7 +901,7 @@ textarea {
   color: var(--color-ink);
   opacity: 0.82;
   transition: opacity 125ms ease, background-color 125ms ease;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
 }
 #ef-topleft button:hover {
   opacity: 1;
@@ -912,7 +923,7 @@ textarea {
   border-radius: 999px;
   background: transparent;
   color: var(--color-ink-muted);
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   transition: background-color 125ms ease, color 125ms ease;
 }
 #ef-search:hover {
@@ -932,7 +943,7 @@ textarea {
   overflow: hidden;
   border: var(--ef-border-w) solid color-mix(in srgb, #ffffff 22%, transparent);
   background-color: color-mix(in srgb, var(--color-raised) 40%, transparent);
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   transition: border-color 125ms ease;
 }
 #ef-profile:hover {
@@ -1139,6 +1150,11 @@ function buildElegantFinJs(): string {
   var previousCollapsed = null;
   var originalInert = false;
   var observer = new MutationObserver(syncSidebar);
+  function gamesWorkspaceActive() {
+    if (!sidebar) return false;
+    var shell = sidebar.closest("[data-harbor-shell]");
+    return !!shell && shell.hasAttribute("data-games-library");
+  }
   function gamesNavigationOpen() {
     if (!sidebar) return false;
     var shell = sidebar.closest("[data-harbor-shell]");
@@ -1178,7 +1194,10 @@ function buildElegantFinJs(): string {
       return;
     }
     var collapsed = sidebar.getAttribute("data-collapsed") === "true";
-    if (previousCollapsed !== null && previousCollapsed !== collapsed) setOpen(!collapsed);
+    if (previousCollapsed !== null && previousCollapsed !== collapsed) {
+      // The Games list shares this preference but must not toggle ElegantFin's drawer.
+      setOpen(!collapsed && !gamesWorkspaceActive());
+    }
     previousCollapsed = collapsed;
     syncAccess();
   }
@@ -1362,7 +1381,7 @@ html[data-theme-layout="custom"] .fsh-search {
   background: #141414;
   color: #969696;
   font-size: 13px;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   transition: background 0.15s ease;
 }
 html[data-theme-layout="custom"] .fsh-search:hover { background: #1c1c1c; }
@@ -1379,7 +1398,7 @@ html[data-theme-layout="custom"] .fsh-iconbtn {
   border-radius: 3px;
   background: #141414;
   color: #E1E1E1;
-  cursor: pointer;
+  cursor: var(--harbor-cursor-pointer, pointer);
   transition: background 0.15s ease;
 }
 html[data-theme-layout="custom"] .fsh-iconbtn:hover { background: #1f1f1f; }
@@ -1429,7 +1448,7 @@ html[data-theme-layout="custom"] .fsh-nav button {
   font-size: 14px;
   font-weight: 500;
   text-align: left;
-  cursor: default;
+  cursor: var(--harbor-cursor-default, default);
   transition: color 0.2s ease-in-out, background 0.15s ease;
   white-space: nowrap;
   overflow: hidden;
@@ -1607,6 +1626,7 @@ function buildFeishinJs(): string {
 }
 
 export const BETA_THEMES: ThemePreset[] = [
+  MIDNIGHT_PRESET,
   {
     id: "elegantfin" as ThemePresetId,
     name: "ElegantFin",
@@ -1969,6 +1989,18 @@ export function isKnownPreset(id: string): boolean {
   return getThemeById(id) !== null;
 }
 
+export function getTrayThemes(): Array<{ id: string; name: string }> {
+  const themes = [
+    ...Object.values(THEME_PRESETS),
+    ...FEATURED_CUSTOM_THEMES,
+    ...BETA_THEMES,
+    ...PARKED_THEMES,
+    ...TEMPLATE_THEMES,
+    ...getCustomThemes(),
+  ];
+  return Array.from(new Map(themes.map(({ id, name }) => [id, { id, name }])).values());
+}
+
 const CYCLE_THEME_IDS: ThemePresetId[] = (Object.keys(THEME_PRESETS) as ThemePresetId[]).filter(
   (id) => id !== "crunch",
 );
@@ -1978,7 +2010,7 @@ export function nextColorTheme(current: string): ThemePresetId {
   return CYCLE_THEME_IDS[(i + 1) % CYCLE_THEME_IDS.length];
 }
 
-function resolveTokens(theme: ThemeSettings): Record<string, string> {
+export function resolveTokens(theme: ThemeSettings): Record<string, string> {
   if (theme.preset === "custom" && theme.customColors) {
     return customColorsToTokens(theme.customColors);
   }

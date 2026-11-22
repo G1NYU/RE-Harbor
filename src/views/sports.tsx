@@ -7,6 +7,7 @@ import { SportsRefreshButton } from "./sports/refresh-button";
 import { useT, useUiLanguage } from "@/lib/i18n";
 import { useSettings } from "@/lib/settings";
 import { useScrollMemory, useView } from "@/lib/view";
+import { useSessionState } from "@/lib/session-state";
 import type { EsportsMatch } from "@/lib/sports/esports-feeds";
 import { officialBroadcastSource } from "@/lib/sports/esports-streams";
 import { getGroupLabel, getLeagueLabel, type SportsGame } from "@/lib/sports/espn";
@@ -48,22 +49,42 @@ const EsportsArena = lazy(() =>
 const Personalize = lazy(() =>
   import("./sports/hub-personalize").then((m) => ({ default: m.HubPersonalize })),
 );
-const LinkedEsportsMatch = lazy(() => import("./sports/esports-match").then(m => ({ default: m.EsportsMatchView })));
+const LinkedEsportsMatch = lazy(() =>
+  import("./sports/esports-match").then((m) => ({ default: m.EsportsMatchView })),
+);
 
 export function SportsView({ active = false }: { active?: boolean }) {
   const { sportsEvent } = useView();
   return (
     <SportsAccessGate active={active}>
-      {sportsEvent ? <LinkedEsportsEvent match={sportsEvent} active={active} /> : <SportsHubView active={active} />}
+      {sportsEvent ? (
+        <LinkedEsportsEvent match={sportsEvent} active={active} />
+      ) : (
+        <SportsHubView active={active} />
+      )}
     </SportsAccessGate>
   );
 }
 
 function LinkedEsportsEvent({ match, active }: { match: EsportsMatch; active: boolean }) {
   const { goBack, openPlayer } = useView();
-  return <main className="sh-page"><Suspense fallback={null}>{active && <LinkedEsportsMatch key={`${match.game}:${match.id}`} match={match} onClose={goBack} onWatch={stream => {
-    const source = officialBroadcastSource(stream); if (source) openPlayer(source);
-  }} />}</Suspense></main>;
+  return (
+    <main className="sh-page">
+      <Suspense fallback={null}>
+        {active && (
+          <LinkedEsportsMatch
+            key={`${match.game}:${match.id}`}
+            match={match}
+            onClose={goBack}
+            onWatch={(stream) => {
+              const source = officialBroadcastSource(stream);
+              if (source) openPlayer(source);
+            }}
+          />
+        )}
+      </Suspense>
+    </main>
+  );
 }
 
 function SportsHubView({ active = false }: { active?: boolean }) {
@@ -75,9 +96,9 @@ function SportsHubView({ active = false }: { active?: boolean }) {
   const scrollRef = useRef<HTMLElement>(null);
   useScrollMemory("sports", scrollRef, active);
   const { ref: sportRail, handlers: sportHandlers } = useDragScroll<HTMLDivElement>();
-  const [tab, setTab] = useState("home");
-  const [requestedGroup, setGroup] = useState("all");
-  const [browsing, setBrowsing] = useState(false);
+  const [tab, setTab] = useSessionState("sports.tab", "home");
+  const [requestedGroup, setGroup] = useSessionState("sports.group", "all");
+  const [browsing, setBrowsing] = useSessionState("sports.browsing", false);
   const [esportsHeroTarget, setEsportsHeroTarget] = useState<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -92,7 +113,7 @@ function SportsHubView({ active = false }: { active?: boolean }) {
     return () => animation?.cancel();
   }, [tab, requestedGroup]);
   const [today, setToday] = useState(() => dayStamp(new Date()));
-  const [day, setDay] = useState(today);
+  const [day, setDay] = useSessionState("sports.day", today);
   const [refresh, setRefresh] = useState(0);
   const [setup, setSetup] = useState(false);
   const eventTrigger = useRef<{ element: HTMLElement; label: string | null } | null>(null);
@@ -103,9 +124,13 @@ function SportsHubView({ active = false }: { active?: boolean }) {
     const restore = () => {
       const saved = eventTrigger.current;
       // Schedule rows can be remounted by viewport virtualization while the page is parked.
-      const target = saved?.element.isConnected ? saved.element : saved?.label
-        ? scrollRef.current?.querySelector<HTMLElement>(`[aria-label="${CSS.escape(saved.label)}"]`)
-        : null;
+      const target = saved?.element.isConnected
+        ? saved.element
+        : saved?.label
+          ? scrollRef.current?.querySelector<HTMLElement>(
+              `[aria-label="${CSS.escape(saved.label)}"]`,
+            )
+          : null;
       if (target?.getClientRects().length) {
         target.focus({ preventScroll: true });
         eventTrigger.current = null;
@@ -116,7 +141,7 @@ function SportsHubView({ active = false }: { active?: boolean }) {
     return () => cancelAnimationFrame(frame);
   }, [active]);
   const [showTop, setShowTop] = useState(false);
-  const [leagueFilter, setLeagueFilter] = useState("");
+  const [leagueFilter, setLeagueFilter] = useSessionState("sports.leagueFilter", "");
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => setToday(dayStamp(new Date())), 60_000);
@@ -138,7 +163,12 @@ function SportsHubView({ active = false }: { active?: boolean }) {
   const esportsLeagues = leagues.filter(
     (key) => HUB_LEAGUES.find((l) => l.key === key)?.group === "esports",
   );
+  const sportsLeaguesSeenRef = useRef(false);
   useEffect(() => {
+    if (!sportsLeaguesSeenRef.current) {
+      sportsLeaguesSeenRef.current = true;
+      return;
+    }
     if (!setup) {
       setGroup("all");
       setLeagueFilter("");
@@ -226,15 +256,19 @@ function SportsHubView({ active = false }: { active?: boolean }) {
     board.games.find((g) => g.state === "pre" && hubLeague(g.league)?.group === "soccer");
   const open = (game: SportsGame) => {
     const trigger = document.activeElement;
-    eventTrigger.current = trigger instanceof HTMLElement
-      ? { element: trigger, label: trigger.getAttribute("aria-label") }
-      : null;
+    eventTrigger.current =
+      trigger instanceof HTMLElement
+        ? { element: trigger, label: trigger.getAttribute("aria-label") }
+        : null;
     if (
       game.source === "thesportsdb-hub" ||
       game.source === "opendota" ||
       ["combat", "motorsport", "golf"].includes(hubLeague(game.league)?.group || "")
     )
-      openMatchDetail(game, all.filter((item) => item.league === game.league && item.context?.id === game.context?.id));
+      openMatchDetail(
+        game,
+        all.filter((item) => item.league === game.league && item.context?.id === game.context?.id),
+      );
     else openMatchDetail(game);
   };
   const busy =
@@ -283,10 +317,7 @@ function SportsHubView({ active = false }: { active?: boolean }) {
           <span className="sh-eyebrow">HARBOR SPORTS</span>
           <h1>{t("Every game. Your game.")}</h1>
         </div>
-        <SportsPersonalizeHint
-          active={active && !setup}
-          onPersonalize={() => setSetup(true)}
-        />
+        <SportsPersonalizeHint active={active && !setup} onPersonalize={() => setSetup(true)} />
       </header>
       <nav className="sh-view-tabs" aria-label={t("Sports navigation")}>
         {[
@@ -317,13 +348,11 @@ function SportsHubView({ active = false }: { active?: boolean }) {
             role="status"
             title={brokenLeagues.length ? brokenLeagues.join(", ") : undefined}
           >
-            {busy ? (
-              t("Updating schedules…")
-            ) : failures || statusStale ? (
-              t("Some schedules are unavailable")
-            ) : (
-              t("Up to date")
-            )}
+            {busy
+              ? t("Updating schedules…")
+              : failures || statusStale
+                ? t("Some schedules are unavailable")
+                : t("Up to date")}
           </span>
         )}
         <SportsRefreshButton busy={busy} onRefresh={() => setRefresh((n) => n + 1)} />

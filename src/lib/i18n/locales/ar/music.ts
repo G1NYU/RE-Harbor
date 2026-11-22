@@ -109,14 +109,19 @@ const music: Record<string, string> = {
   "music.broadcast.output": "المخرج",
   "music.broadcast.stop": "أوقف",
   "music.broadcast.start": "ابدأ",
-  "music.broadcast.blurb": "أرسل ما تشغّله إلى ميكروفون افتراضي ليسمعه أصدقاؤك في المكالمة، مع بقاء الصوت في سمّاعاتك.",
+  "music.broadcast.blurb":
+    "أرسل ما تشغّله إلى ميكروفون افتراضي ليسمعه أصدقاؤك في المكالمة، مع بقاء الصوت في سمّاعاتك.",
   "music.broadcast.title": "البث إلى الدردشة الصوتية",
-  "music.cable.mac.installNeeded": "يمكن لـ Harbor تثبيت ميكروفونه الافتراضي. سيطلب منك macOS كلمة مرور المسؤول، ثم يُعاد تشغيل Core Audio.",
-  "music.cable.mac.installMissing": "هذه النسخة من Harbor لا تتضمّن برنامج تشغيل الميكروفون الافتراضي.",
+  "music.cable.mac.installNeeded":
+    "يمكن لـ Harbor تثبيت ميكروفونه الافتراضي. سيطلب منك macOS كلمة مرور المسؤول، ثم يُعاد تشغيل Core Audio.",
+  "music.cable.mac.installMissing":
+    "هذه النسخة من Harbor لا تتضمّن برنامج تشغيل الميكروفون الافتراضي.",
   "music.cable.mac.installCancelled": "تم إلغاء التثبيت.",
   "music.cable.mac.installFailed": "تعذّر تثبيت الميكروفون الافتراضي.",
-  "music.cable.mac.restartNeeded": "الميكروفون الافتراضي مثبَّت، لكن Core Audio لم يتعرّف عليه بعد. أعد تشغيل الـ Mac لإكمال العملية.",
-  "music.cable.mac.updateAvailable": "تتضمّن هذه النسخة من Harbor ميكروفونًا افتراضيًا أحدث. ثبّته ليستمر عمل الكابل.",
+  "music.cable.mac.restartNeeded":
+    "الميكروفون الافتراضي مثبَّت، لكن Core Audio لم يتعرّف عليه بعد. أعد تشغيل الـ Mac لإكمال العملية.",
+  "music.cable.mac.updateAvailable":
+    "تتضمّن هذه النسخة من Harbor ميكروفونًا افتراضيًا أحدث. ثبّته ليستمر عمل الكابل.",
   "music.cable.title": "ميكروفون Harbor الافتراضي",
   "music.cable.blurb": "يهيّئ Harbor الميكروفون الافتراضي بنفسه. لا شيء تنزّله ولا شيء تثبّته.",
   "music.cable.create": "أنشئ الميكروفون الافتراضي",
@@ -192,7 +197,8 @@ const music: Record<string, string> = {
   "music.speed.pitch": "طبقة الصوت",
   "music.speed.reverb": "الصدى",
   "music.speed.keepPitch": "حافظ على الطبقة الأصلية",
-  "music.speed.keepPitchHelp": "عند التفعيل يتغير الإيقاع دون الطبقة. وعند الإيقاف تحصل على صوت nightcore والبطيء.",
+  "music.speed.keepPitchHelp":
+    "عند التفعيل يتغير الإيقاع دون الطبقة. وعند الإيقاف تحصل على صوت nightcore والبطيء.",
   "music.speed.reset": "إعادة تعيين",
   "music.speed.normal": "عادي",
   "music.speed.nightcore": "نايتكور",
@@ -226,7 +232,7 @@ const music: Record<string, string> = {
   ...musicNowPlaying,
   ...musicVideos,
   ...musicSpotifyLibrary,
-  "music.card.addToQueue": "إضافة إلى قائمة الانتظار",
+  "music.card.addToQueue": "إضافة إلى قائمة الاستماع",
   "music.card.addToPlaylist": "إضافة إلى قائمة تشغيل",
   "music.artwork.save": "حفظ صورة الغلاف",
   "music.watch.back": "العودة إلى الموسيقى",
@@ -518,7 +524,8 @@ const music: Record<string, string> = {
   "music.row.scrobbleWaiting": "تم ربط Last.fm. لم يرسل رف وسوم بعد.",
   "music.connect.scrobbleBody": "اربط Last.fm ليُبنى هذا الرف من الوسوم التي تستمع إليها فعلًا.",
   "music.connect.serverName": "خادم وسائط أو مجلد",
-  "music.connect.serverBody": "وجّه Harbor إلى مجلد أو Plex أو Jellyfin أو Navidrome أو Subsonic ليمتلئ هذا الرف بألبومات تملكها بالفعل.",
+  "music.connect.serverBody":
+    "وجّه Harbor إلى مجلد أو Plex أو Jellyfin أو Navidrome أو Subsonic ليمتلئ هذا الرف بألبومات تملكها بالفعل.",
   "music.row.recents": "تابع من حيث توقفت",
   "music.row.fresh": "جديد من فنانين تستمع إليهم",
   "music.row.freshSubtitle": "إصدارات حديثة لفنانين من سجل استماعك",
@@ -583,7 +590,8 @@ const music: Record<string, string> = {
   "music.quickListen.loop": "تكرار المقاطع",
   "music.quickListen.mute": "كتم المقطع",
   "music.quickListen.unmute": "إلغاء الكتم",
-  "music.quickListen.empty": "لم نعثر على أغانٍ لم تسمعها. حاول مجددًا بعد استكشاف المزيد من الموسيقى.",
+  "music.quickListen.empty":
+    "لم نعثر على أغانٍ لم تسمعها. حاول مجددًا بعد استكشاف المزيد من الموسيقى.",
   "music.quickListen.finding": "نبحث عن أغانٍ لم تسمعها…",
   "music.quickListen.more": "المزيد من الخيارات",
   "music.playlist.search": "ابحث في قوائم التشغيل",
@@ -591,6 +599,9 @@ const music: Record<string, string> = {
   "music.search.recent": "عمليات البحث الأخيرة",
   "music.search.historyEmpty": "ستظهر عمليات البحث الأخيرة هنا.",
   "music.search.removeRecent": "إزالة {title} من عمليات البحث الأخيرة",
+  "music.audio.videoQuality": "Default video quality",
+  "music.audio.videoQualityHint":
+    "Used for music videos. A quality you pick while watching lasts until the next song.",
 };
 
 export default music;

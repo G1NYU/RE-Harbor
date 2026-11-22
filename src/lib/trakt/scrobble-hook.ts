@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import type { LiveScrobbleResolution } from "@/lib/identity/use-live-scrobble";
 import { useTrakt } from "./provider";
 import { TRAKT_API_BASE, TRAKT_API_VERSION, TRAKT_CLIENT_ID } from "./config";
 import { getSession } from "./session";
@@ -18,25 +19,45 @@ const STUB_MAX_SEC = 150;
 // CW drops the card (CW_FINISHED_RATIO); only beyond that report stop/watched.
 const WATCHED_MARK_PCT = 90;
 
-export function useTraktScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }): void {
-  const { isConnected, resolveTarget, scrobble } = useTrakt();
+export function useTraktScrobble({
+  src, snap, liveScrobble = { phase: "off", proof: null },
+}: { src: PlayerSrc; snap: Snap; liveScrobble?: LiveScrobbleResolution }): void {
+  const { isConnected: providerConnected, resolveTarget, scrobble } = useTrakt();
+  const verifiedTarget = liveScrobble.proof?.traktTarget ?? undefined;
+  // If the native work is verified but its catalog episode coordinates are
+  // not, never fall back to a guessed franchise episode for this provider.
+  const isConnected = providerConnected && liveScrobble.phase !== "resolving" &&
+    (!liveScrobble.proof || verifiedTarget != null);
+  const scrobbleVerified = useCallback((...args: Parameters<typeof scrobble>) =>
+    scrobble(args[0], { ...args[1], verifiedTarget: args[1].verifiedTarget ?? verifiedTarget }),
+  [scrobble, verifiedTarget]);
   const lastActionRef = useRef<LastAction>(null);
   const lastKeyRef = useRef<string | null>(null);
-  const prevIdentityRef = useRef({ metaId: src.meta.id, episode: src.episode });
+  const prevIdentityRef = useRef({ metaId: src.meta.id, episode: src.episode, verifiedTarget });
   const progressRef = useRef(0);
   const loadResetSeenRef = useRef(true);
 
   const metaId = src.meta.id;
   const season = src.episode?.season;
   const episode = src.episode?.episode;
-  const key = `${metaId}|${season ?? ""}|${episode ?? ""}`;
+  const episodeKey = `${metaId}|${season ?? ""}|${episode ?? ""}`;
+  // Re-verification can change the native owner without changing the visible
+  // episode. That starts a different tracker session, not a continuation of
+  // the old target. Include the pending state so A is closed before B resolves.
+  const proofKey = liveScrobble.phase === "resolving" ? "resolving"
+    : liveScrobble.proof
+      ? [liveScrobble.proof.work.entryId, liveScrobble.proof.work.entryEpisode,
+          JSON.stringify(liveScrobble.proof.traktTarget)].join(":")
+      : liveScrobble.phase;
+  const key = `${episodeKey}|${proofKey}`;
+  const prevEpisodeKeyRef = useRef(episodeKey);
 
-  const stopArgsRef = useRef({ metaId, episode: src.episode, snap });
-  stopArgsRef.current = { metaId, episode: src.episode, snap };
+  const stopArgsRef = useRef({ metaId, episode: src.episode, snap, verifiedTarget });
+  stopArgsRef.current = { metaId, episode: src.episode, snap, verifiedTarget };
 
   useEffect(() => {
     if (!isConnected) return;
-    const target = resolveTarget(metaId, src.episode);
+    const target = verifiedTarget ?? resolveTarget(metaId, src.episode);
     if (!target) return;
     const onPageHide = () => {
       const a = stopArgsRef.current;
@@ -48,35 +69,41 @@ export function useTraktScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
       sendBeacon(target, action === "stop" ? 100 : progress, action);
       // Beacon is fire-and-forget and may drop on exit, so also run the
       // confirmed stop to clear Trakt's "Now Playing" and write history.
-      if (action === "stop") void scrobble("stop", { metaId, episode: a.episode, progress: 100 });
+      if (action === "stop") void scrobbleVerified("stop", { metaId, episode: a.episode, progress: 100, verifiedTarget: a.verifiedTarget });
       lastActionRef.current = action;
     };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [isConnected, resolveTarget, scrobble, metaId, src.episode]);
+  }, [isConnected, resolveTarget, scrobbleVerified, metaId, src.episode, verifiedTarget]);
 
   useEffect(() => {
     if (lastKeyRef.current && lastKeyRef.current !== key) {
       const prev = prevIdentityRef.current;
       const prevProgress = progressRef.current;
       if (lastActionRef.current !== "stop") {
+        // Call the provider with the *outgoing* proof. The current render's
+        // scrobbleVerified callback may already point to the incoming owner.
         if (prevProgress >= WATCHED_MARK_PCT) {
-          scrobble("stop", { metaId: prev.metaId, episode: prev.episode, progress: 100 });
-        } else if (prevProgress > 0) {
-          scrobble("pause", { metaId: prev.metaId, episode: prev.episode, progress: prevProgress });
+          void scrobble("stop", { metaId: prev.metaId, episode: prev.episode, verifiedTarget: prev.verifiedTarget, progress: 100 });
+        } else if (prevProgress > 0 || lastActionRef.current === "start" ||
+                   lastActionRef.current === "pause") {
+          void scrobble("pause", { metaId: prev.metaId, episode: prev.episode, verifiedTarget: prev.verifiedTarget, progress: prevProgress });
         }
       }
       lastActionRef.current = null;
       progressRef.current = 0;
-      loadResetSeenRef.current = false;
+      // Same displayed episode, new proof: no player loading reset is expected.
+      // An actual episode switch must still wait for its own loading transition.
+      loadResetSeenRef.current = prevEpisodeKeyRef.current === episodeKey;
     }
     lastKeyRef.current = key;
-    prevIdentityRef.current = { metaId, episode: src.episode };
-  }, [key, metaId, src.episode, scrobble]);
+    prevEpisodeKeyRef.current = episodeKey;
+    prevIdentityRef.current = { metaId, episode: src.episode, verifiedTarget };
+  }, [key, episodeKey, metaId, src.episode, scrobble]);
 
   useEffect(() => {
     if (!isConnected) return;
-    const target = resolveTarget(metaId, src.episode);
+    const target = verifiedTarget ?? resolveTarget(metaId, src.episode);
     if (!target) return;
     if (snap.status === "ended") {
       if (
@@ -90,7 +117,7 @@ export function useTraktScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
                 Math.max(0, progressRef.current, (getPlaybackPosition() / snap.durationSec) * 100),
               )
             : 100;
-        scrobble("stop", { metaId, episode: src.episode, progress: endPct });
+        scrobbleVerified("stop", { metaId, episode: src.episode, progress: endPct });
         lastActionRef.current = "stop";
       }
       return;
@@ -107,13 +134,13 @@ export function useTraktScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
     if (lastActionRef.current === "stop") return;
 
     if (snap.status === "playing" && lastActionRef.current !== "start") {
-      scrobble("start", { metaId, episode: src.episode, progress });
+      scrobbleVerified("start", { metaId, episode: src.episode, progress });
       lastActionRef.current = "start";
     } else if (snap.status === "paused" && lastActionRef.current === "start") {
-      scrobble("pause", { metaId, episode: src.episode, progress });
+      scrobbleVerified("pause", { metaId, episode: src.episode, progress });
       lastActionRef.current = "pause";
     }
-  }, [isConnected, resolveTarget, scrobble, metaId, src.episode, snap.status, snap.durationSec]);
+  }, [isConnected, resolveTarget, scrobbleVerified, metaId, src.episode, snap.status, snap.durationSec, verifiedTarget]);
 
   const seekTrackRef = useRef({ pos: 0, at: 0, lastResyncAt: 0 });
   useEffect(() => {
@@ -142,10 +169,10 @@ export function useTraktScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
       if (now - ref.lastResyncAt < 30000) return;
       ref.lastResyncAt = now;
       const progress = Math.min(100, Math.max(0, (pos / snap.durationSec) * 100));
-      scrobble("start", { metaId, episode: src.episode, progress });
+      scrobbleVerified("start", { metaId, episode: src.episode, progress });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [isConnected, scrobble, metaId, src.episode, snap.status, snap.durationSec]);
+  }, [isConnected, scrobbleVerified, metaId, src.episode, snap.status, snap.durationSec]);
 
   useEffect(() => {
     return () => {
@@ -155,9 +182,10 @@ export function useTraktScrobble({ src, snap }: { src: PlayerSrc; snap: Snap }):
         const live = (getPlaybackPosition() / a.snap.durationSec) * 100;
         const progress = Math.min(100, Math.max(progressRef.current, live));
         const action = progress >= WATCHED_MARK_PCT ? "stop" : "pause";
-        scrobble(action, {
+        scrobbleVerified(action, {
           metaId: a.metaId,
           episode: a.episode,
+          verifiedTarget: a.verifiedTarget,
           progress: action === "stop" ? 100 : progress,
         });
         lastActionRef.current = action;

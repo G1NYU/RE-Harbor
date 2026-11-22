@@ -7,7 +7,7 @@ import { rpdbPoster } from "@/lib/providers/rpdb";
 import { useSettings } from "@/lib/settings";
 import { claimUniqueArt, releaseUniqueArt } from "@/lib/unique-art";
 import { useView } from "@/lib/view";
-import { Row } from "./row";
+import { queueRowCardUpdate, Row } from "./row";
 import { Poster } from "./poster";
 
 export const GENRE_PALETTE: Record<string, { from: string; to: string; ink: string }> = {
@@ -79,7 +79,7 @@ const TILES: string[] = [
 export function GenreTiles({ title }: { title?: string }) {
   const t = useT();
   return (
-    <Row title={title ?? t("Browse by Genre")} min={210} shape="tile" alwaysActive>
+    <Row title={title ?? t("Browse by Genre")} min={210} shape="tile">
       {TILES.map((g) => (
         <GenreTile key={g} genre={g} />
       ))}
@@ -96,16 +96,21 @@ function GenreTile({ genre }: { genre: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    let cancelArtwork: (() => void) | undefined;
     const key = `genre:${genre}`;
     fetchGenreSample(settings.tmdbKey, genre)
       .then((list) => {
         if (cancelled) return;
-        const pool = list.filter((m) => m.background);
-        setBackdrops(claimUniqueArt(key, pool, (m) => m.id, 3));
+        cancelArtwork = queueRowCardUpdate(() => {
+          cancelArtwork = undefined;
+          const pool = list.filter((m) => m.background);
+          setBackdrops(claimUniqueArt(key, pool, (m) => m.id, 3));
+        });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
+      cancelArtwork?.();
       releaseUniqueArt(key);
     };
   }, [genre, settings.tmdbKey]);

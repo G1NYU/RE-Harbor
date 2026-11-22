@@ -6,7 +6,6 @@ const KEY = "harbor.manga.hiddenRows";
 
 export const MANGA_HIDEABLE_ROWS: Array<{ key: string; label: string }> = [
   { key: "anilist", label: "Your AniList" },
-  { key: "because-you-watched", label: "Because you watched" },
   { key: "popular", label: "Popular Manga" },
 ];
 

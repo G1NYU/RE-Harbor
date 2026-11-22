@@ -236,6 +236,7 @@ export function TogetherPopover({
           <InvitePanel
             relayUrl={settings.togetherRelayUrl}
             room={snapshot.room}
+            mediaTitle={snapshot.syncState?.mediaTitle ?? undefined}
             onClose={() => setView("default")}
           />
         )}

@@ -1,7 +1,9 @@
+import { libraryGroupHomeRows } from "@/lib/library-groups";
 import {
   startTransition,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -10,6 +12,8 @@ import {
 } from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { HeroCarousel, type Slide } from "@/components/hero-carousel";
+import { Profiled } from "@/components/profiled";
+import { isProfilerRunning, recordRender } from "@/lib/memory-profiler";
 import { CollectionsRow } from "@/components/collections-row";
 import { TmdbNudge } from "@/components/nudge";
 import { Row, ScrollRootContext } from "@/components/row";
@@ -35,21 +39,35 @@ import { StreamingRail } from "@/components/streaming-rail";
 import { TopRankCard } from "@/components/top-rank-card";
 import { setTop10Metas } from "@/lib/top10-set";
 import { fetchHeroFeed } from "@/lib/feed/hero-pool";
-import { hasTmdbProviderAddon, loadAddonRows, userAddons, type AddonRow } from "@/lib/addons";
+import { hasTmdbProviderAddon, loadAddonRows, cachedUserAddons, type AddonRow } from "@/lib/addons";
 import { isAnimeRow } from "@/views/anime";
 import { buildArabicHomeRows } from "@/lib/arabic/home-rows";
 import { buildRussianHomeRows } from "@/lib/russian/home-rows";
+import { resolveAddonOrigin } from "@/lib/nuvio/nuvio-addon-registry";
+import {
+  deleteWatchProgressFromNuvio,
+  isNuvioProviderActive,
+  resolveNuvioProfileIndex,
+} from "@/lib/nuvio/nuvio-sync";
+import { isNuvioSignedIn } from "@/lib/nuvio/nuvio-client";
 import { useAuth } from "@/lib/auth";
 import { anyProfileSharesStremioWith, useProfiles } from "@/lib/profiles";
 import { type Meta } from "@/lib/cinemeta";
 import { t, useT, useUiLanguage } from "@/lib/i18n";
 import { useSettings, type StreamingService } from "@/lib/settings";
+import { startupMarkOnce } from "@/lib/startup-trace";
 import { useContentDrag } from "@/lib/window-drag";
 import { trackEvent } from "@/lib/discover";
 import { publishResumeStates } from "@/lib/hover-preview/store";
-import { readResumeEntry, saveResumeBatch } from "@/lib/resume";
+import { clearResume, readResumeEntry, saveResumeBatch } from "@/lib/resume";
 import { dismissCw, isCwDismissed, useCwDismissVersion } from "@/lib/cw-dismiss";
-import { clearLocalCw, listLocalCw, localCwVersion, subscribeLocalCw } from "@/lib/local-cw";
+import {
+  clearLocalCw,
+  listLocalCwMerged,
+  localCwSourceEnabled,
+  localCwVersion,
+  subscribeLocalCw,
+} from "@/lib/local-cw";
 import {
   dismissManualWatched,
   manualWatchedLibraryItems,
@@ -60,10 +78,30 @@ import { repairLibraryNames } from "@/lib/stremio-repair";
 import { reconcileRemoteWatched } from "@/lib/stremio-watched-pull";
 import { isCorruptAnimeEntry } from "@/lib/anime-cw-repair";
 import { absorbCloudAnimeCw } from "@/lib/anime-cw-absorb";
-import { franchiseRoot, franchiseRootSync } from "@/lib/providers/anime-franchise-root";
-import { franchiseDedupKey } from "@/lib/providers/jikan";
+import { animeCwIdsVersion, subscribeAnimeCwIds } from "@/lib/anime-cw-ids";
+import {
+  cwTitleKey,
+  cwWarmIdentityKey,
+  dedupeAnimeCw,
+  warmCwAnimeIdentities,
+} from "@/lib/cw-anime-identity";
+import { sortCwFinal } from "@/lib/cw-order";
+import { buildCwShareSnapshot } from "@/lib/cw-share-snapshot";
+import { copyText } from "@/lib/clipboard-text";
+import { reconcileCompletedMovies, movieCompletionAliasWarmRows, isCompletedMovieCheckpoint } from "@/lib/cw-movie-completion";
+import { cwCacheOwnerKey } from "@/lib/cw-derived-caches";
+import {
+  cwAnimeVersion,
+  cwAnimeWarmEnd,
+  cwAnimeWarmStart,
+  cwCaptureCohort,
+  cwMarkEmptyState,
+  cwMarkFirstVisible,
+  cwMutation,
+} from "@/lib/cw-instrumentation";
 import {
   ANIME_CLOUD_ID,
+  CW_FINISHED_RATIO,
   cwSortKey,
   episodeFromVideoId,
   isAnimeCwItem,
@@ -75,17 +113,15 @@ import { useTrakt } from "@/lib/trakt/provider";
 import { buildTraktHomeRows } from "@/lib/trakt/home-rails";
 import { fetchWatchedKeySet } from "@/lib/trakt/history";
 import { peekTraktWatched } from "@/lib/trakt/watched-keys";
-import { usePublicMetaDb } from "@/lib/publicmetadb/provider";
-import {
-  loadPmdbTitleWatchedKeys,
-  peekPmdbWatched,
-  rememberPmdbWatched,
-} from "@/lib/publicmetadb/watched-keys";
 import { recentlyPlayed, subscribePlayback, type WatchedSet } from "@/lib/playback-history";
 import { collapseWatchedKeys, isTitleWatched } from "@/lib/watched-title";
 import { useWatchedFlagIds } from "@/lib/watched-flag";
 import { useMovieWatchedIds } from "@/lib/movie-watched";
-import { detectAnimeForCw, useDetectedAnimeVersion } from "@/lib/anime-detect";
+import {
+  detectAnimeForCw,
+  useDetectedAnimeVersion,
+  warmCwAnimeRoomAliases,
+} from "@/lib/anime-detect";
 import { buildSimklHomeRows } from "@/lib/simkl/home-rails";
 import {
   loadSimklWatchedMap,
@@ -95,7 +131,7 @@ import {
   peekSimklWatchedMap,
   type WatchlistStatus,
 } from "@/lib/simkl/list-status";
-import { useExternalCw } from "@/lib/feed/external-cw";
+import { removeExternalCwItem, setExternalCwSources, useExternalCw } from "@/lib/feed/external-cw";
 import { useSimkl } from "@/lib/simkl/provider";
 import { useAnilist } from "@/lib/anilist/provider";
 import { loadAnilistWatchedMap } from "@/lib/anilist/watched-map";
@@ -104,7 +140,6 @@ import { buildLetterboxdHomeRows } from "@/lib/stremboxd/home-rails";
 import { useMediaFavorites, type MediaEntry } from "@/lib/media-favorites";
 import { useLocalWatchlist } from "@/lib/local-watchlist";
 import { useScrollMemory, useHomeResetTick } from "@/lib/view";
-import { recordRenderCause } from "@/lib/render-cause";
 import { CustomizableRows } from "./home/customizable-rows";
 import { CustomizeBar } from "./home/customize-bar";
 import { CWSection } from "./home/cw-section";
@@ -124,23 +159,53 @@ import type { HomeRow } from "./home/home-types";
 import { mergeLoadedHomeRows } from "./home/merge-loaded-rows";
 import { RowSkeleton } from "./home/row-skeleton";
 import { AddSourceModal } from "@/components/add-source-modal";
-import type { SourceRow } from "@/lib/custom-sources";
+import { updateSourceFolder, type SourceRow } from "@/lib/custom-sources";
+
+function baseCwId(id: string): string {
+  return id.replace(/^(series|movie|tmdb):/, "").trim();
+}
+
+/** A manual/local card belongs to the same title as an existing row when any
+ *  canonical id matches or the normalized display title is identical. */
+function sameCwCard(a: LibraryItem, b: LibraryItem): boolean {
+  const aIds = new Set([a._id, ...(a.altIds ?? [])].map((id) => baseCwId(id)).filter(Boolean));
+  for (const id of [b._id, ...(b.altIds ?? [])]) {
+    if (id && aIds.has(baseCwId(id))) return true;
+  }
+  const aTitle = cwTitleKey(a);
+  return !!aTitle && aTitle === cwTitleKey(b);
+}
+
+function unrepresentedCwItems(manual: LibraryItem[], pool: LibraryItem[]): LibraryItem[] {
+  const out: LibraryItem[] = [];
+  for (const item of manual) {
+    if (pool.some((existing) => sameCwCard(existing, item))) continue;
+    if (out.some((existing) => sameCwCard(existing, item))) continue;
+    out.push(item);
+  }
+  return out;
+}
 
 export function Home({
   active = true,
   onReady,
   seasonalInvitation,
+  seasonalInvitationPlacement = "small",
 }: {
   active?: boolean;
   onReady?: () => void;
   seasonalInvitation?: ReactNode;
+  seasonalInvitationPlacement?: "small" | "below-hero";
 }) {
-  recordRenderCause("view.home");
+  const selfStarted = isProfilerRunning() ? performance.now() : null;
   const { authKey, user } = useAuth();
   const { activeProfile, profiles } = useProfiles();
   const { settings, update } = useSettings();
+  const isNuvioProvider = settings.accountProvider === "nuvio";
   const hideSharedCw =
-    settings.cwPerProfile && anyProfileSharesStremioWith(activeProfile, profiles);
+    !isNuvioProvider &&
+    settings.cwPerProfile &&
+    anyProfileSharesStremioWith(activeProfile, profiles);
   const heroFull = settings.heroFull;
   const contentDrag = useContentDrag();
   const t = useT();
@@ -155,11 +220,24 @@ export function Home({
   const [simklRows, setSimklRows] = useState<HomeRow[]>([]);
   const [letterboxdRows, setLetterboxdRows] = useState<HomeRow[]>([]);
   const externalCw = useExternalCw(
-    !hideSharedCw &&
-      (settings.cwSources.trakt || settings.cwSources.simkl || settings.cwSources.publicmetadb),
+    isNuvioProvider ||
+      (!hideSharedCw &&
+        (settings.cwSources.trakt || settings.cwSources.simkl || settings.cwSources.publicmetadb)),
   );
+  useEffect(() => {
+    setExternalCwSources({
+      trakt: settings.cwSources.trakt,
+      simkl: settings.cwSources.simkl,
+      publicmetadb: settings.cwSources.publicmetadb,
+      nuvio: isNuvioProvider,
+    });
+  }, [
+    settings.cwSources.trakt,
+    settings.cwSources.simkl,
+    settings.cwSources.publicmetadb,
+    isNuvioProvider,
+  ]);
   const [traktWatched, setTraktWatched] = useState<Set<string>>(() => peekTraktWatched());
-  const [pmdbWatched, setPmdbWatched] = useState<Set<string>>(() => peekPmdbWatched());
   const [simklWatchedMap, setSimklWatchedMap] = useState<Map<string, Set<string>>>(() =>
     peekSimklWatchedMap(),
   );
@@ -175,19 +253,25 @@ export function Home({
   const [heroRows, setHeroRows] = useState<string[]>([]);
   const [heroReady, setHeroReady] = useState(false);
   useEffect(() => {
+    if (rows.length > 0) startupMarkOnce("home.rows-committed");
+  }, [rows]);
+  useEffect(() => {
+    if (heroReady) startupMarkOnce("home.hero-ready");
+  }, [heroReady]);
+  useEffect(() => {
     if (!active || !heroReady) return;
+    startupMarkOnce("home.ready");
     onReady?.();
   }, [active, heroReady, onReady]);
   const [items, setItems] = useState<LibraryItem[]>([]);
   const cwVersion = useCwDismissVersion();
-  const [cwRootVersion, setCwRootVersion] = useState(0);
+  const animeIdsVersion = useSyncExternalStore(subscribeAnimeCwIds, animeCwIdsVersion);
   const [tmdbProvidedByAddon, setTmdbProvidedByAddon] = useState(false);
   const [addonsTick, setAddonsTick] = useState(0);
   const [buildTick, setBuildTick] = useState(0);
   const { isConnected: traktConnected, session: traktSession } = useTrakt();
-  const { isConnected: pmdbConnected } = usePublicMetaDb();
   const { isConnected: simklConnected } = useSimkl();
-  const { isConnected: anilistConnected } = useAnilist();
+  const { isConnected: anilistConnected, session: anilistSession } = useAnilist();
   const letterboxd = useLetterboxd();
   const rowsRef = useRef<HomeRow[]>([]);
   const loadingRef = useRef(new Map<string, NonNullable<HomeRow["fetcher"]>>());
@@ -242,6 +326,7 @@ export function Home({
     let cancelled = false;
     let retryTimer: number | null = null;
     (async () => {
+      startupMarkOnce("home.build-start");
       const isClassic = settings.homeMode === "classic";
 
       let built: { rows: HomeRow[]; hero: Meta[]; heroRows?: string[]; failed?: number } = {
@@ -269,10 +354,16 @@ export function Home({
         }
       }
       if (cancelled) return;
+      startupMarkOnce("home.build-done");
+      startupMarkOnce("home.data-ready");
       let degraded = (built.failed ?? 0) > 0;
       const commitRows = (next: HomeRow[]) =>
-        setRows((prev) =>
-          degraded && next.length === 0 && prev.length > 0 ? prev : mergeLoadedHomeRows(prev, next),
+        startTransition(() =>
+          setRows((prev) =>
+            degraded && next.length === 0 && prev.length > 0
+              ? prev
+              : mergeLoadedHomeRows(prev, next),
+          ),
         );
       commitRows(mergeRows(built.rows, []));
       if (!degraded || built.hero.length > 0) {
@@ -299,8 +390,21 @@ export function Home({
         return [] as AddonRow[];
       });
       if (cancelled) return;
+      const classicSource = settings.classicCatalogSource;
+      const classicFiltered =
+        classicSource === "all"
+          ? addons
+          : classicSource === "nuvio"
+            ? addons.filter((a) => {
+                const o = resolveAddonOrigin(a.more?.base || a.key);
+                return o === "nuvio" || o === "both";
+              })
+            : addons.filter((a) => {
+                const o = resolveAddonOrigin(a.more?.base || a.key);
+                return o === "stremio" || o === "both";
+              });
       const usable = isClassic
-        ? addons
+        ? classicFiltered
         : addons.filter((a) => !isAnimeRow(a) && !isStreamingServiceRow(a.name));
       const nextRows = mergeRows(built.rows, usable, { dedup: dedupRows });
       startTransition(() => {
@@ -316,7 +420,7 @@ export function Home({
       }
 
       if (authKey) {
-        const installed = await userAddons(authKey).catch(() => []);
+        const installed = await cachedUserAddons(authKey).catch(() => []);
         if (cancelled) return;
         setTmdbProvidedByAddon(hasTmdbProviderAddon(installed));
       }
@@ -331,6 +435,7 @@ export function Home({
     settings.tmdbLanguage,
     settings.region,
     settings.homeMode,
+    settings.classicCatalogSource,
     settings.homeShowAllAddonRows,
     settings.heroFeed,
     addonsTick,
@@ -402,32 +507,6 @@ export function Home({
       cancelled = true;
     };
   }, [uiLang, settings.homeMode, settings.tmdbKey, settings.tmdbLanguage]);
-
-  // PMDB keys arrive Trakt-shaped (see watched-keys.ts), so one merged set
-  // serves both the catalog truncation and the CW full-key check.
-  const watchedSetCombined = useMemo(
-    () => new Set([...traktWatched, ...pmdbWatched]),
-    [traktWatched, pmdbWatched],
-  );
-
-  useEffect(() => {
-    if (!pmdbConnected) {
-      setPmdbWatched(new Set());
-      return;
-    }
-    let cancelled = false;
-    loadPmdbTitleWatchedKeys()
-      .then((set) => {
-        if (!cancelled) {
-          setPmdbWatched(set);
-          rememberPmdbWatched(set);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [pmdbConnected, activeProfile?.id]);
 
   useEffect(() => {
     if (!traktConnected) {
@@ -540,7 +619,7 @@ export function Home({
 
   const trackedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!authKey) {
+    if (isNuvioProvider || !authKey) {
       setItems([]);
       return;
     }
@@ -553,8 +632,8 @@ export function Home({
             ? libItems.filter((i) => !isCorruptAnimeEntry(i))
             : libItems;
           setItems(view);
-          if (!hideSharedCw) absorbCloudAnimeCw(view);
-          reconcileRemoteWatched(view);
+          if (!hideSharedCw && !isNuvioProvider) absorbCloudAnimeCw(view);
+          if (!isNuvioProvider) reconcileRemoteWatched(view);
           const importKey = `harbor.discover.libImported.${user?._id ?? "anon"}`;
           let importedSince = 0;
           try {
@@ -570,7 +649,9 @@ export function Home({
           for (const i of libItems) {
             const rawMt = i._mtime as unknown;
             const mt = typeof rawMt === "number" ? rawMt : Date.parse(String(rawMt ?? ""));
-            if (i.state?.timeOffset && i.state.timeOffset > 0) {
+            // A dismissed card must not get its resume re-created from a library
+            // timestamp; genuine progress is already visible to isCwDismissed.
+            if (i.state?.timeOffset && i.state.timeOffset > 0 && !isCwDismissed(i)) {
               const vid = i.state.video_id ?? "";
               const kitsuThreeSeg =
                 /^(kitsu|mal|anilist|anidb):/.test(i._id) && vid.split(":").length === 3;
@@ -633,7 +714,25 @@ export function Home({
     return () => {
       cancelled = true;
     };
-  }, [authKey, active, hideSharedCw]);
+  }, [authKey, active, hideSharedCw, isNuvioProvider]);
+
+  const [nuvioProfileSwitching, setNuvioProfileSwitching] = useState(false);
+  useEffect(() => {
+    let timer: any = null;
+    const onProfile = () => {
+      setNuvioProfileSwitching(true);
+      setBuildTick((n) => n + 1);
+      clearTimeout(timer);
+      timer = setTimeout(() => setNuvioProfileSwitching(false), 300);
+    };
+    window.addEventListener("harbor:nuvio-profile-changed", onProfile);
+    window.addEventListener("harbor:account-provider-changed", onProfile);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("harbor:nuvio-profile-changed", onProfile);
+      window.removeEventListener("harbor:account-provider-changed", onProfile);
+    };
+  }, []);
 
   const localCwVer = useSyncExternalStore(subscribeLocalCw, localCwVersion);
   const manualWatchedVer = useSyncExternalStore(subscribeManualWatched, manualWatchedVersion);
@@ -645,140 +744,270 @@ export function Home({
   }, [items]);
   const localCwItems = useMemo<LibraryItem[]>(() => {
     void localCwVer;
-    return listLocalCw(hideSharedCw).map((e) => ({
-      _id: e.id,
-      type: e.type,
-      name: e.name,
-      poster: e.poster,
-      background: e.background,
-      isAnime: e.isAnime,
-      state: {
-        timeOffset: e.positionMs,
-        duration: e.durationMs,
-        season: e.season,
-        episode: e.episode,
-        video_id:
-          e.videoId ??
-          (e.season != null && e.episode != null ? `${e.id}:${e.season}:${e.episode}` : undefined),
-        flaggedWatched: e.durationMs > 0 && e.positionMs / e.durationMs >= 0.9 ? 1 : 0,
-        lastWatched: new Date(e.t).toISOString(),
-      },
-      removed: false,
-      temp: false,
-      _ctime: new Date(e.t).toISOString(),
-      _mtime: new Date(e.t).toISOString(),
-      local: true,
-    }));
-  }, [localCwVer, hideSharedCw, activeProfile?.id]);
+    return listLocalCwMerged(isNuvioProvider ? false : hideSharedCw)
+      .filter((e) => isNuvioProvider || localCwSourceEnabled(e, settings.cwSources))
+      .map((e) => ({
+        _id: e.id,
+        type: e.type,
+        name: e.name,
+        poster: e.poster,
+        background: e.background,
+        isAnime: e.isAnime,
+        state: {
+          timeOffset: e.positionMs,
+          duration: e.durationMs,
+          season: e.season,
+          episode: e.episode,
+          video_id:
+            e.videoId ??
+            (e.season != null && e.episode != null
+              ? `${e.id}:${e.season}:${e.episode}`
+              : undefined),
+          flaggedWatched: e.durationMs > 0 && e.positionMs / e.durationMs >= 0.9 ? 1 : 0,
+          lastWatched: new Date(e.t).toISOString(),
+        },
+        upNext: e.type === "series" && e.positionMs === 0,
+        external: (e as any).external,
+        removed: false,
+        temp: false,
+        _ctime: new Date(e.t).toISOString(),
+        _mtime: new Date(e.t).toISOString(),
+        local: true,
+      }));
+  }, [localCwVer, hideSharedCw, activeProfile?.id, isNuvioProvider, settings.cwSources]);
+  // Warm only potential completed/incomplete movie pairs. Matching titles are
+  // discovery hints, NEVER proof; suppression needs verified IMDb/TMDB aliases.
+  useEffect(() => {
+    if (isNuvioProvider) return;
+    const pool = [
+      ...(!hideSharedCw && settings.cwSources.library
+        ? items.filter((i) => !ANIME_CLOUD_ID.test(i._id)) : []),
+      ...localCwItems.filter((i) => i.external !== "nuvio"),
+    ];
+    if (!hideSharedCw) pool.push(...externalCw.filter((row) =>
+      row.external === "trakt" ? settings.cwSources.trakt :
+      row.external === "simkl" ? settings.cwSources.simkl :
+      row.external === "publicmetadb" ? settings.cwSources.publicmetadb : false));
+    const candidates = movieCompletionAliasWarmRows(pool);
+    if (candidates.length > 0)
+      void warmCwAnimeIdentities(candidates, { tmdbKey: settings.tmdbKey }).catch(() => {});
+  }, [items, externalCw, localCwItems, hideSharedCw, isNuvioProvider,
+      settings.cwSources, settings.tmdbKey]);
+
   const continueWatching = useMemo(() => {
-    const cwBase = hideSharedCw
-      ? []
-      : [...items.filter((i) => !ANIME_CLOUD_ID.test(i._id)), ...externalCw];
-    const eligible = [...cwBase, ...localCwItems]
+    const disabledSources = new Set<string>();
+    if (!settings.cwSources.simkl) disabledSources.add("simkl");
+    if (!settings.cwSources.trakt) disabledSources.add("trakt");
+    if (!settings.cwSources.publicmetadb) disabledSources.add("publicmetadb");
+
+    const externalAllowed = externalCw.filter((i) => {
+      if (!i.external) return false;
+      if (i.external === "nuvio") return true;
+      if (disabledSources.has(i.external)) return false;
+      if (hideSharedCw) return false;
+      if (i.external === "simkl" || i.external === "trakt" || i.external === "publicmetadb") {
+        if (i.upNext || i.waitingForAir || i.caughtUp) return true;
+        // Completion evidence from an enabled tracker must remain in the pool
+        // until the older local/IMDb/TMDB checkpoint is reconciled.
+        if (isCompletedMovieCheckpoint(i)) return true;
+        const offset = i.state?.timeOffset ?? 0;
+        const dur = i.state?.duration ?? 0;
+        if (offset <= 0 || (i.state?.flaggedWatched ?? 0) > 0) return false;
+        if (dur > 0 && offset / dur >= CW_FINISHED_RATIO) return false;
+      }
+      return true;
+    });
+
+    const cwBase = isNuvioProvider
+      ? externalAllowed
+      : hideSharedCw
+        ? []
+        : [
+            ...(settings.cwSources.library ? items.filter((i) => !ANIME_CLOUD_ID.test(i._id)) : []),
+            ...externalAllowed.filter((i) => i.external !== "nuvio"),
+          ];
+    // A finished movie must remain in the source pool long enough to veto an
+    // OLDER incomplete checkpoint (including one under a verified IMDb/TMDB
+    // alias). isCwMember discards finished movies, so reconcile BEFORE it.
+    const cwPool = isNuvioProvider
+      ? cwBase
+      : [...cwBase, ...localCwItems.filter((i) => i.external !== "nuvio")];
+    const eligible = reconcileCompletedMovies(cwPool).rows
       .filter(
         (i) =>
           (i.type as string) !== "other" &&
           !i._id.startsWith("iptv:") &&
           !isCwDismissed(i) &&
           isCwMember(i) &&
+          (!isNuvioProvider ? i.external !== "nuvio" : true) &&
           !((settings.animeOnlyInAnimeRoom || settings.hideContent.anime) && isAnimeCwItem(i)),
       )
       .map((i) => ({ i, k: cwSortKey(i) }))
       .sort((a, b) => b.k - a.k)
       .map((e) => e.i);
-    const norm = (s: string) => franchiseDedupKey(s);
-    const lastWatchedOf = (i: LibraryItem) => {
-      const lw = Date.parse(i.state?.lastWatched ?? "");
-      if (Number.isFinite(lw) && lw > 0) return lw;
-      const m = i._mtime as unknown;
-      const mt = typeof m === "number" ? m : Date.parse(String(m ?? ""));
-      return Number.isFinite(mt) ? mt : 0;
-    };
-    const byId = new Map<string, LibraryItem>();
-    const byName = new Map<string, LibraryItem>();
-    for (const i of eligible) {
-      if (byId.has(i._id)) continue;
-      const nm = norm(i.name ?? "");
-      const key = `${i.type}:${nm}`;
-      if (nm) {
-        const held = byName.get(key);
-        if (held) {
-          if (lastWatchedOf(i) > lastWatchedOf(held)) {
-            byId.delete(held._id);
-            byName.set(key, i);
-            byId.set(i._id, i);
-          }
+
+    const manual = manualWatchedLibraryItems();
+    let candidateEligible = eligible;
+    if (manual.length > 0 && !isNuvioProvider) {
+      const manualToAdd: LibraryItem[] = [];
+      for (const m of manual) {
+        if (!isCwMember(m) || isCwDismissed(m) || m.external === "nuvio") continue;
+        if ((settings.animeOnlyInAnimeRoom || settings.hideContent.anime) && isAnimeCwItem(m)) {
           continue;
         }
-        byName.set(key, i);
+        if (eligible.some((e) => sameCwCard(e, m))) continue;
+        if (manualToAdd.some((e) => sameCwCard(e, m))) continue;
+        manualToAdd.push(m);
       }
-      byId.set(i._id, i);
-      if (byId.size >= 100) break;
+      if (manualToAdd.length > 0) candidateEligible = [...eligible, ...manualToAdd];
     }
-    const seenRoot = new Set<string>();
-    for (const i of [...byId.values()].sort((a, b) => lastWatchedOf(b) - lastWatchedOf(a))) {
-      const root = franchiseRootSync(i._id);
-      if (root && seenRoot.has(root)) byId.delete(i._id);
-      if (root) seenRoot.add(root);
-    }
-    return [...byId.values()].sort((a, b) => cwSortKey(b) - cwSortKey(a));
+
+    return sortCwFinal(dedupeAnimeCw(candidateEligible)).slice(0, 100);
   }, [
     items,
     externalCw,
     localCwItems,
     cwVersion,
-    cwRootVersion,
+    animeIdsVersion,
     settings.animeOnlyInAnimeRoom,
     settings.hideContent.anime,
+    settings.cwSources.trakt,
+    settings.cwSources.simkl,
+    settings.cwSources.publicmetadb,
     hideSharedCw,
     animeDetectVer,
+    manualWatchedVer,
+    isNuvioProvider,
+    settings.cwSources,
   ]);
   useEffect(() => {
-    let cancelled = false;
-    const ids = [...localCwItems, ...externalCw].filter((i) => isCwMember(i)).map((i) => i._id);
-    if (ids.length === 0) return;
-    if (ids.every((id) => franchiseRootSync(id))) return;
-    const load = async () => {
-      await Promise.allSettled(ids.map((id) => franchiseRoot(id)));
-      if (!cancelled) setCwRootVersion((v) => v + 1);
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [localCwItems, externalCw]);
+    cwAnimeVersion(animeIdsVersion);
+  }, [animeIdsVersion]);
+  // Equivalent card arrays may be recreated by provider updates and deduping.
+  // Warm only when a source identity/checkpoint or the account owner changes.
+  const cwWarmBatchKey = useMemo(
+    () =>
+      continueWatching
+        .map((item) => cwWarmIdentityKey(item))
+        .sort()
+        .join("||"),
+    [continueWatching],
+  );
+  const cwWarmOwner = cwCacheOwnerKey();
+  const cwWarmItemsRef = useRef(continueWatching);
+  cwWarmItemsRef.current = continueWatching;
+  useEffect(() => {
+    if (!cwWarmBatchKey) return;
+    cwAnimeWarmStart();
+    void warmCwAnimeIdentities(cwWarmItemsRef.current, { tmdbKey: settings.tmdbKey })
+      .catch(() => {})
+      .finally(cwAnimeWarmEnd);
+  }, [cwWarmBatchKey, cwWarmOwner, settings.tmdbKey]);
   const resurfaceLibrary = useMemo(() => {
-    const pool = [
-      ...items.filter((i) => !ANIME_CLOUD_ID.test(i._id)),
-      ...localCwItems.filter((i) => i.type === "series"),
-    ];
+    const disabledSources = new Set<string>();
+    if (!settings.cwSources.simkl) disabledSources.add("simkl");
+    if (!settings.cwSources.trakt) disabledSources.add("trakt");
+    if (!settings.cwSources.publicmetadb) disabledSources.add("publicmetadb");
+
     const manual = manualWatchedLibraryItems();
+    if (isNuvioProvider) {
+      const externalSeries = externalCw.filter((i) => {
+        if (!i.external || i.type !== "series") return false;
+        if (disabledSources.has(i.external)) return false;
+        if (i.external === "simkl" || i.external === "trakt" || i.external === "publicmetadb") {
+          if (i.upNext || i.waitingForAir || i.caughtUp) return true;
+          const offset = i.state?.timeOffset ?? 0;
+          const dur = i.state?.duration ?? 0;
+          if (offset <= 0 || (i.state?.flaggedWatched ?? 0) > 0) return false;
+          if (dur > 0 && offset / dur >= CW_FINISHED_RATIO) return false;
+        }
+        return i.external === "nuvio" || i.external === "trakt" || i.external === "simkl";
+      });
+      const externalIds = new Set(externalSeries.map((i) => i._id));
+      const cleanExternalIds = new Set(
+        externalSeries.map((i) => i._id.replace(/^(series|movie|tmdb):/, "")),
+      );
+      const nuvioPool = [
+        ...externalSeries,
+        ...localCwItems.filter(
+          (i) =>
+            i.type === "series" &&
+            !externalIds.has(i._id) &&
+            !cleanExternalIds.has(i._id.replace(/^(series|movie|tmdb):/, "")),
+        ),
+      ];
+      if (manual.length === 0) return nuvioPool;
+      const usable = unrepresentedCwItems(manual, nuvioPool);
+      if (usable.length === 0) return nuvioPool;
+      const overrideIds = new Set(usable.map((i) => i._id));
+      return [...nuvioPool.filter((i) => !overrideIds.has(i._id)), ...usable];
+    }
+    const externalForStremio = hideSharedCw
+      ? []
+      : externalCw.filter((i) => {
+          if (!i.external || i.external === "nuvio" || i.type !== "series") return false;
+          return !disabledSources.has(i.external);
+        });
+    const pool = [
+      ...(hideSharedCw || !settings.cwSources.library
+        ? []
+        : items.filter((i) => !ANIME_CLOUD_ID.test(i._id))),
+      ...localCwItems.filter((i) => i.type === "series" && i.external !== "nuvio"),
+      ...externalForStremio,
+    ];
     if (manual.length === 0) return pool;
-    const cwMemberIds = new Set(pool.filter(isCwMember).map((i) => i._id));
-    const usable = manual.filter((i) => !cwMemberIds.has(i._id));
+    const usable = unrepresentedCwItems(manual, pool);
     if (usable.length === 0) return pool;
     const overrideIds = new Set(usable.map((i) => i._id));
     return [...pool.filter((i) => !overrideIds.has(i._id)), ...usable];
-  }, [items, localCwItems, manualWatchedVer]);
+  }, [
+    items,
+    localCwItems,
+    manualWatchedVer,
+    isNuvioProvider,
+    externalCw,
+    settings.cwSources,
+    hideSharedCw,
+  ]);
+  const anilistCwIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          continueWatching.filter((i) => /^(kitsu|mal|anilist):/.test(i._id)).map((i) => i._id),
+        ),
+      ].sort(),
+    [continueWatching],
+  );
+  const anilistCwIdsKey = anilistCwIds.join("|");
   useEffect(() => {
     if (!anilistConnected) {
       setAnilistWatchedMap((prev) => (prev.size ? new Map() : prev));
       return;
     }
     let cancelled = false;
-    const ids = continueWatching
-      .filter((i) => /^(kitsu|mal|anilist):/.test(i._id))
-      .map((i) => i._id);
-    loadAnilistWatchedMap(ids)
+    loadAnilistWatchedMap(anilistCwIds)
       .then((m) => {
-        if (!cancelled) setAnilistWatchedMap(m);
+        if (cancelled) return;
+        setAnilistWatchedMap((prev) => {
+          if (prev.size !== m.size) return m;
+          for (const [id, watched] of m) {
+            const old = prev.get(id);
+            if (!old || old.size !== watched.size) return m;
+            for (const episode of watched) if (!old.has(episode)) return m;
+          }
+          return prev;
+        });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [anilistConnected, continueWatching]);
+  }, [anilistConnected, anilistCwIdsKey, anilistSession]);
 
+  const cwProgressPool = useMemo(
+    () => [...items, ...localCwItems, ...externalCw],
+    [items, localCwItems, externalCw],
+  );
   const cwItems = useCwAdvance(
     continueWatching,
     settings.tmdbKey,
@@ -793,11 +1022,65 @@ export function Home({
     animeDetectVer,
     settings.episodeHiding,
     settings.animeCwEnd,
+    cwProgressPool,
   );
+
+  const copyCurrentCw = useCallback(async (): Promise<boolean> => {
+    const sources = {
+      library: !isNuvioProvider && !hideSharedCw && settings.cwSources.library
+        ? items.filter((item) => !ANIME_CLOUD_ID.test(item._id)) : [],
+      local: isNuvioProvider ? [] : localCwItems.filter((item) => item.external !== "nuvio"),
+      external: externalCw.filter((item) =>
+        item.external === "nuvio" ? isNuvioProvider :
+          !isNuvioProvider && !hideSharedCw &&
+          (item.external === "simkl" ? settings.cwSources.simkl :
+            item.external === "trakt" ? settings.cwSources.trakt :
+              item.external === "publicmetadb" ? settings.cwSources.publicmetadb : false)),
+      manual: isNuvioProvider ? [] : manualWatchedLibraryItems(),
+    };
+    const snapshot = buildCwShareSnapshot({
+      sources,
+      eligible: continueWatching,
+      displayed: cwItems,
+      flags: {
+        perProfile: settings.cwPerProfile,
+        sharedHidden: hideSharedCw,
+        accountProvider: settings.accountProvider,
+        enabledSources: {
+          library: settings.cwSources.library,
+          local: settings.cwSources.local,
+          trakt: settings.cwSources.trakt,
+          simkl: settings.cwSources.simkl,
+          publicmetadb: settings.cwSources.publicmetadb,
+        },
+      },
+    });
+    return copyText(JSON.stringify(snapshot, null, 2));
+  }, [
+    items, localCwItems, externalCw, continueWatching, cwItems,
+    isNuvioProvider, hideSharedCw, settings.cwSources,
+    settings.accountProvider, settings.cwPerProfile,
+  ]);
 
   useEffect(() => {
     void detectAnimeForCw(items);
   }, [items]);
+
+  // The IMDb anime can be detected while its TMDB CW alias is still unknown.
+  // Verify external IDs for watched entries, then re-filter on detection bump.
+  useEffect(() => {
+    if (!settings.animeOnlyInAnimeRoom && !settings.hideContent.anime) return;
+    void warmCwAnimeRoomAliases(
+      cwProgressPool.filter((item) => isCwMember(item)),
+      settings.tmdbKey,
+    );
+  }, [
+    cwProgressPool,
+    settings.animeOnlyInAnimeRoom,
+    settings.hideContent.anime,
+    settings.tmdbKey,
+    animeDetectVer,
+  ]);
 
   useEffect(() => {
     publishResumeStates(cwItems);
@@ -805,17 +1088,38 @@ export function Home({
 
   const onDismissCw = useCallback(
     (item: LibraryItem) => {
+      if (item.cwMembers?.length) return dismissCw(item, authKey);
       if (item.manualWatched) {
         dismissManualWatched(item._id, { acknowledged: true });
         return;
       }
-      if (item.local) {
-        clearLocalCw(item._id, { acknowledged: true });
-        return dismissCw(item, authKey, { acknowledged: true });
+      if (
+        isNuvioProvider ||
+        item.external === "nuvio" ||
+        (isNuvioSignedIn() && isNuvioProviderActive())
+      ) {
+        const slot = resolveNuvioProfileIndex();
+        removeExternalCwItem(item);
+        clearLocalCw(item._id, `nuvio-${slot}`);
+        clearLocalCw(item._id);
+        const se = episodeFromVideoId(item.state?.video_id);
+        const season = item.state?.season ?? se?.season;
+        const episode = item.state?.episode ?? se?.episode;
+        clearResume(item._id, undefined, undefined, `nuvio-${slot}`);
+        clearResume(item._id);
+        dismissCw(item, authKey);
+        void deleteWatchProgressFromNuvio(slot, item._id, undefined, season, episode);
+        return;
       }
-      return dismissCw(item, authKey, { acknowledged: true });
+      if (item.local) {
+        clearLocalCw(item._id);
+        dismissCw(item, authKey);
+        return;
+      }
+      clearLocalCw(item._id, { acknowledged: true });
+      dismissCw(item, authKey, { acknowledged: true });
     },
-    [authKey],
+    [authKey, isNuvioProvider],
   );
 
   const { items: favItems } = useMediaFavorites();
@@ -1133,8 +1437,21 @@ export function Home({
   );
   const shownFilterableRows = useHideAnimeRows(filterableRows);
   const allCustomizableRows = useMemo(
-    () => [...sourceRows, ...shownFilterableRows],
-    [sourceRows, shownFilterableRows],
+    () => [
+      ...libraryGroupHomeRows(settings.libraryGroups, settings.libraryGroupSections).map((row) => ({
+        key: row.key,
+        type: "movie" as const,
+        name: row.name,
+        metas: [],
+        page: 1,
+        hasMore: false,
+        libraryGroups: row.groups,
+        noDedup: true,
+      })),
+      ...sourceRows,
+      ...shownFilterableRows,
+    ],
+    [sourceRows, shownFilterableRows, settings.libraryGroups, settings.libraryGroupSections],
   );
   const visibleRows = useMemo(
     () => applyHomeRowCustomization(allCustomizableRows, homeRowsCustom, false),
@@ -1219,22 +1536,19 @@ export function Home({
   );
 
   const handleEditFolderImages = useCallback(
-    (sourceId: string, folderId: string, coverImageUrl: string, focusGifUrl: string) => {
+    (
+      sourceId: string,
+      folderId: string,
+      coverImageUrl: string,
+      focusGifUrl: string,
+      layout?: "CLASSIC" | "GRID",
+    ) => {
       mutateHomeRows({
         ...homeRowsCustom,
-        customSources: (homeRowsCustom.customSources || []).map((sr) => {
-          if (sr.id !== sourceId) return sr;
-          return {
-            ...sr,
-            folders: sr.folders.map((f) => {
-              if (f.id !== folderId) return f;
-              return {
-                ...f,
-                coverImageUrl: coverImageUrl || null,
-                focusGifUrl: focusGifUrl || null,
-              };
-            }),
-          };
+        customSources: updateSourceFolder(homeRowsCustom.customSources || [], sourceId, folderId, {
+          coverImageUrl: coverImageUrl || null,
+          focusGifUrl: focusGifUrl || null,
+          layout,
         }),
       });
     },
@@ -1253,6 +1567,55 @@ export function Home({
 
   const cwHidden = homeRowsCustom.hidden.includes("cw");
   const cwTop = !!homeRowsCustom.cwTop;
+
+  useLayoutEffect(() => {
+    if (cwHidden || nuvioProfileSwitching) return;
+    cwCaptureCohort(cwItems);
+  }, [cwItems, cwHidden, nuvioProfileSwitching]);
+
+  useEffect(() => {
+    if (cwHidden || nuvioProfileSwitching) return;
+    if (cwItems.length > 0) cwMarkFirstVisible();
+  }, [cwItems, cwHidden, nuvioProfileSwitching]);
+
+  const cwVisibleRef = useRef<{ ids: string; progress: string; data: string } | null>(null);
+  useEffect(() => {
+    if (cwHidden || nuvioProfileSwitching) return;
+    if (cwItems.length === 0) {
+      if (cwVisibleRef.current?.ids) cwMutation("empty");
+      cwVisibleRef.current = { ids: "", progress: "", data: "" };
+      cwMarkEmptyState();
+      return;
+    }
+    const visible = cwItems.slice(0, 12);
+    const ids = visible.map((item) => item._id).join("|");
+    const progress = visible
+      .map(
+        (item) =>
+          `${item._id}:${item.state?.season ?? ""}:${item.state?.episode ?? ""}:${
+            item.state?.video_id ?? ""
+          }|${item.upNext ? 1 : 0}|${item.waitingForAir ? 1 : 0}`,
+      )
+      .join("~");
+    const data = visible
+      .map((item) => `${item._id}:${item.name}:${item.poster ?? ""}:${item.background ?? ""}`)
+      .join("~");
+    const previous = cwVisibleRef.current;
+    cwVisibleRef.current = { ids, progress, data };
+    if (!previous) return;
+    if (previous.ids !== ids) {
+      const before = new Set(previous.ids ? previous.ids.split("|") : []);
+      const after = new Set(ids.split("|"));
+      const added = [...after].some((id) => !before.has(id));
+      const removed = [...before].some((id) => !after.has(id));
+      cwMutation(added && removed ? "replace" : removed ? "removal" : added ? "insert" : "reorder");
+    } else if (previous.progress !== progress) {
+      cwMutation("progress");
+    } else if (previous.data !== data) {
+      cwMutation("enrichment");
+    }
+  }, [cwItems, cwHidden, nuvioProfileSwitching]);
+
   const cwBlock =
     cwHidden && !editMode ? null : (
       <div data-scroll-anchor="cw">
@@ -1264,12 +1627,17 @@ export function Home({
           />
         )}
         {!cwHidden && (
-          <CWSection
-            signedIn={!!authKey}
-            items={cwItems}
-            watchedSet={watchedSetCombined}
-            onDismiss={onDismissCw}
-          />
+          <Profiled id="home.continue-watching">
+            <CWSection
+              signedIn={isNuvioProvider ? isNuvioProviderActive() && isNuvioSignedIn() : !!authKey}
+              isNuvio={isNuvioProvider}
+              items={cwItems}
+              watchedSet={traktWatched}
+              onDismiss={onDismissCw}
+              onCopyCw={copyCurrentCw}
+              loading={nuvioProfileSwitching}
+            />
+          </Profiled>
         )}
         {settings.homeNewEpisodes && !newEpisodesHidden && (
           <NewEpisodesSection
@@ -1281,17 +1649,15 @@ export function Home({
       </div>
     );
 
+  if (selfStarted !== null)
+    recordRender("home.self-calculation-attempt", performance.now() - selfStarted);
   return (
     <main
       ref={scrollCb}
       className="flex-1 overflow-y-auto overflow-x-hidden px-5 pt-24 pb-14 sm:px-8 lg:px-12 lg:pt-28"
     >
       <ScrollRootContext.Provider value={scrollEl}>
-        <div
-          {...contentDrag}
-          data-context-page-background
-          className="relative flex flex-col gap-12"
-        >
+        <div {...contentDrag} className="relative flex flex-col gap-12">
           <div className={tmdbNudgePosition}>
             <div className="pointer-events-auto">
               <TmdbNudge suppress={tmdbProvidedByAddon || settings.homeMode === "classic"} />
@@ -1331,15 +1697,17 @@ export function Home({
                     onToggleHidden={() => handleToggleHidden("hero")}
                   />
                 )}
-                <HeroCarousel
-                  slides={shownHeroSlides}
-                  full={heroFull}
-                  fullQuality={settings.heroFullQuality}
-                  playTrailers={settings.heroTrailers}
-                  bottomAlign
-                  playSquare={!!homeRowsCustom.playButtonSquare}
-                  moreInfo={!!homeRowsCustom.secondaryMoreInfo}
-                />
+                <Profiled id="home.hero">
+                  <HeroCarousel
+                    slides={shownHeroSlides}
+                    full={heroFull}
+                    fullQuality={settings.heroFullQuality}
+                    playTrailers={settings.heroTrailers}
+                    bottomAlign
+                    playSquare={!!homeRowsCustom.playButtonSquare}
+                    moreInfo={!!homeRowsCustom.secondaryMoreInfo}
+                  />
+                </Profiled>
                 {!editMode && (
                   <div className="pointer-events-none absolute -bottom-3 end-5 z-20 flex justify-end [&>*]:pointer-events-auto">
                     <CustomizeBar
@@ -1350,7 +1718,7 @@ export function Home({
                     />
                   </div>
                 )}
-                {seasonalInvitation && (
+                {seasonalInvitation && seasonalInvitationPlacement === "small" && (
                   <div
                     data-hero-overlay-slot="seasonal"
                     className="pointer-events-none absolute end-5 top-5 z-20 flex w-[min(360px,42%)] justify-end [&>*]:pointer-events-auto"
@@ -1379,14 +1747,17 @@ export function Home({
                 />
               </div>
             )}
-          {(settings.homeMode === "classic" ||
+          {(seasonalInvitationPlacement === "below-hero" ||
+            settings.homeMode === "classic" ||
             homeRowsCustom.hidden.includes("hero") ||
             !showHero) &&
             seasonalInvitation}
           {!cwTop && cwBlock}
           {settings.homeMode !== "classic" && (
             <div data-scroll-anchor="streaming">
-              <StreamingRail services={enabledServices} />
+              <Profiled id="home.services">
+                <StreamingRail services={enabledServices} />
+              </Profiled>
             </div>
           )}
           {settings.homeMode !== "classic" &&
@@ -1436,7 +1807,9 @@ export function Home({
                     onToggleHidden={() => handleToggleHidden("collections")}
                   />
                 )}
-                <CollectionsRow />
+                <Profiled id="home.collections">
+                  <CollectionsRow />
+                </Profiled>
               </div>
             )}
           {editMode &&
@@ -1457,25 +1830,27 @@ export function Home({
           russianRows.length === 0 ? (
             Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={`skel-${i}`} />)
           ) : (
-            <CustomizableRows
-              rows={editMode ? editRows : visibleRows}
-              editMode={editMode}
-              customization={homeRowsCustom}
-              orderKeys={orderKeys}
-              onMove={handleMove}
-              onToggleHidden={handleToggleHidden}
-              onRename={handleRename}
-              onToggleNumerals={handleToggleNumerals}
-              onToggleHero={handleToggleHero}
-              onLoadMore={loadMore}
-              onDeleteCustomSource={handleDeleteCustomSource}
-              onEditFolderImages={handleEditFolderImages}
-              hideWatched={settings.hideWatchedInCatalogs}
-              watchedSet={watchedSetCombined}
-              localWatched={localWatched}
-              stremioWatched={stremioWatchedIds}
-              homeLanguages={settings.homeLanguages}
-            />
+            <Profiled id="home.catalog-rows">
+              <CustomizableRows
+                rows={editMode ? editRows : visibleRows}
+                editMode={editMode}
+                customization={homeRowsCustom}
+                orderKeys={orderKeys}
+                onMove={handleMove}
+                onToggleHidden={handleToggleHidden}
+                onRename={handleRename}
+                onToggleNumerals={handleToggleNumerals}
+                onToggleHero={handleToggleHero}
+                onLoadMore={loadMore}
+                onDeleteCustomSource={handleDeleteCustomSource}
+                onEditFolderImages={handleEditFolderImages}
+                hideWatched={settings.hideWatchedInCatalogs}
+                watchedSet={traktWatched}
+                localWatched={localWatched}
+                stremioWatched={stremioWatchedIds}
+                homeLanguages={settings.homeLanguages}
+              />
+            </Profiled>
           )}
         </div>
       </ScrollRootContext.Provider>

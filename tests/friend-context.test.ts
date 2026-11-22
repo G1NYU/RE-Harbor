@@ -22,6 +22,7 @@ function confirmationHarness() {
   const account = { handle: "owner" };
   const writes: Array<{ path: string; body: unknown; author: string }> = [];
   const reads: string[] = [];
+  const cardUpdates: Array<{ handle: string; status: string }> = [];
   const changed: Array<{ handle: string; status: string }> = [];
   let relationship = "friends";
   const unexpected = () => {
@@ -79,8 +80,13 @@ function confirmationHarness() {
         return { handle, friendStatus: relationship, friendEdgeId: "fixture-edge" };
       },
     },
+    "@/lib/social/profile-card-summary": {
+      updateProfileCardFriendStatus: (handle: string, status: string) =>
+        cardUpdates.push({ handle, status }),
+    },
     "@/lib/social/friends": friends,
     "@/lib/social/friend-command": { friendCommand },
+    "@/lib/social/share-dm": { requestShareToDm: unexpected },
     "@/lib/dialog": {
       confirmDialog: unexpected,
     },
@@ -96,6 +102,7 @@ function confirmationHarness() {
     writes,
     reads,
     changed,
+    cardUpdates,
     remove,
     source: { actions: () => api.friendContextActions("Friend", "friends") },
     setRelationship: (next) => {
@@ -158,6 +165,7 @@ test("confirmed friend removal for the unchanged account writes once and publish
     { path: "/social/friends/remove", body: { handle: "friend" }, author: "owner" },
   ]);
   assert.deepEqual(h.changed, [{ handle: "Friend", status: "none" }]);
+  assert.deepEqual(h.cardUpdates, h.changed, "shared cards receive the acknowledged relationship");
 });
 
 test("a changed relationship is rechecked after confirmation and cannot remove a different edge", async () => {

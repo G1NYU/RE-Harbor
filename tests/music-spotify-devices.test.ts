@@ -26,7 +26,7 @@ function load() {
   return { api: module.exports as typeof import("../src/lib/music/spotify-devices"), calls };
 }
 
-const device = (over: Partial<{ id: string; restricted: boolean }>) => ({
+const device = (over: Partial<{ id: string; name: string; restricted: boolean }>) => ({
   id: "abc",
   name: "Kitchen",
   kind: "Speaker",
@@ -47,6 +47,20 @@ test("a restricted device can never be chosen as a target", () => {
     kept.map((entry) => entry.id),
     ["one"],
   );
+});
+
+test("the managed Harbor Soloist device is not an independent remote output", () => {
+  const { api } = load();
+  const options = [
+    device({ id: "managed", name: "Harbor Soloist" }),
+    device({ id: "other", name: "Bedroom Speaker" }),
+    device({ id: "another", name: "Other Soloist" }),
+  ];
+  assert.deepEqual(
+    api.selectableSpotifyDevices(options, "Harbor Soloist").map((entry) => entry.id),
+    ["other", "another"],
+  );
+  assert.equal(api.selectableSpotifyDevices(options).length, 3);
 });
 
 test("clearing the target sends null, so playback returns to Harbor", async () => {

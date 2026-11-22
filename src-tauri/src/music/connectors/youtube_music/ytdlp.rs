@@ -5,46 +5,192 @@
 //! to everything else. ffmpeg opens every stream with `Range: bytes=0-`, so it is refused on
 //! its very first read and mpv reports MPV_ERROR_LOADING_FAILED. yt-dlp carries the PO token
 //! and signature work that keeps a URL whole, and it is updated as YouTube tightens.
+//!
+//! The borrowed session is a fallback, never the first choice: anonymous extraction resolves
+//! public audio faster, so the session is only used when anonymous extraction is refused and
+//! the media actually needs the account.
 
 use super::super::super::{MusicStream, MusicVideoStream};
+use std::path::PathBuf;
 use std::time::Duration;
 
 const TIMEOUT: Duration = Duration::from_secs(45);
 const FORMAT: &str = "bestaudio[acodec=opus]/bestaudio/best";
 // Muxed YouTube formats stop at 720p, so the video track is fetched on its own and mpv is
 // handed the audio alongside it. `best` is the fallback for anything with no split rendition.
-const VIDEO_FORMAT: &str = "bestvideo[height<=1080][vcodec^=avc1][protocol^=https]+bestaudio[acodec^=mp4a][protocol^=https]/bestvideo[height<=1080][protocol^=https]+bestaudio[protocol^=https]/best";
 const SEPARATOR: &str = "|||";
 
-pub async fn stream(app: &tauri::AppHandle, video_id: &str) -> Result<MusicStream, String> {
-    let args = vec![
-        "--no-warnings".to_string(),
+/// yt-dlp only accepts cookies from a file. The file holds the listener's Google session, so
+/// it lives for the extraction and is removed on the way out, never persisted.
+struct CookieFile(PathBuf);
+
+impl Drop for CookieFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+fn cookie_file() -> Option<CookieFile> {
+    let session = super::auth::current()?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default();
+    let path = std::env::temp_dir().join(format!(
+        "harbor-ytmusic-{}-{stamp}.cookies",
+        std::process::id()
+    ));
+    if let Err(error) = std::fs::write(&path, super::auth::netscape(&session.cookies)) {
+        // Never fail playback for a filesystem hiccup, but do not hide the downgrade either.
+        note_downgrade(&format!(
+            "session cookie file could not be written ({:?})",
+            error.kind()
+        ));
+        return None;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+    Some(CookieFile(path))
+}
+
+fn cookie_args(file: &Option<CookieFile>) -> Vec<String> {
+    file.as_ref()
+        .map(|file| {
+            vec![
+                "--cookies".to_string(),
+                file.0.to_string_lossy().into_owned(),
+            ]
+        })
+        .unwrap_or_default()
+}
+
+/// The session is an upgrade, not a requirement: extraction still works anonymously when the
+/// borrowed cookies cannot be used. Say so instead of pretending the account was ignored.
+fn note_downgrade(reason: &str) {
+    crate::music::trace::log(format!("music session downgraded to anonymous: {reason}"));
+    eprintln!("[harbor::music] session downgraded to anonymous: {reason}");
+}
+
+/// Anonymous extraction answers public audio about 1.7s faster than a cookie-authenticated
+/// one, so the session is the retry for the content that actually needs it.
+fn note_session_retry(reason: &str) {
+    crate::music::trace::log(format!(
+        "anonymous extraction failed, retrying with the session: {reason}"
+    ));
+}
+
+fn stream_args(video_id: &str, cookies: &Option<CookieFile>) -> Vec<String> {
+    let mut args = vec![
+        "--js-runtimes".to_string(),
+        "node".to_string(),
+        "--extractor-args".to_string(),
+        "youtube:player_client=tv_embedded".to_string(),
         "--no-playlist".to_string(),
         "-f".to_string(),
         FORMAT.to_string(),
         "--print".to_string(),
         format!("%(url)s{SEPARATOR}%(ext)s{SEPARATOR}%(abr)s{SEPARATOR}%(http_headers)j"),
-        format!("https://www.youtube.com/watch?v={video_id}"),
     ];
-    let output = super::ytdlp_update::run(app, args, TIMEOUT, "music stream").await?;
-    parse(&String::from_utf8_lossy(&output.stdout))
+    args.extend(cookie_args(cookies));
+    args.push(format!("https://www.youtube.com/watch?v={video_id}"));
+    args
+}
+
+async fn extract_audio(
+    app: &tauri::AppHandle,
+    video_id: &str,
+    cookies: &Option<CookieFile>,
+) -> Result<MusicStream, String> {
+    crate::ytdlp_update::run_validated(
+        app,
+        stream_args(video_id, cookies),
+        TIMEOUT,
+        "music stream",
+        |output| async move {
+            let stream = parse(&String::from_utf8_lossy(&output.stdout))?;
+            super::super::super::stream_probe::validate_stream(stream).await
+        },
+    )
+    .await
+}
+
+pub async fn stream(app: &tauri::AppHandle, video_id: &str) -> Result<MusicStream, String> {
+    let cookies = cookie_file();
+    // Public audio extracts faster anonymously; only restricted media needs the account. Try
+    // anonymously first and fall back to the session, rather than paying that cost on every song.
+    match extract_audio(app, video_id, &None).await {
+        Ok(stream) => Ok(stream),
+        Err(anonymous_error) if cookies.is_some() => {
+            note_session_retry(&anonymous_error);
+            extract_audio(app, video_id, &cookies).await
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn video_args(video_id: &str, cap: u32, cookies: &Option<CookieFile>) -> Vec<String> {
+    let mut args = vec![
+        "--js-runtimes".to_string(),
+        "node".to_string(),
+        "--extractor-args".to_string(),
+        "youtube:player_client=tv_embedded".to_string(),
+        "--no-playlist".to_string(),
+        "-f".to_string(),
+        video_format(cap),
+        "--dump-single-json".to_string(),
+    ];
+    args.extend(cookie_args(cookies));
+    args.push(format!("https://www.youtube.com/watch?v={video_id}"));
+    args
+}
+
+async fn extract_video(
+    app: &tauri::AppHandle,
+    video_id: &str,
+    cap: u32,
+    cookies: &Option<CookieFile>,
+) -> Result<MusicVideoStream, String> {
+    let output =
+        crate::ytdlp_update::run(app, video_args(video_id, cap, cookies), TIMEOUT, "music video")
+            .await?;
+    parse_video(&String::from_utf8_lossy(&output.stdout))
 }
 
 /// The music video behind a track, for the YouTube Music style video pane.
 pub async fn video_stream(
     app: &tauri::AppHandle,
     video_id: &str,
+    max_height: Option<u32>,
 ) -> Result<MusicVideoStream, String> {
-    let args = vec![
-        "--no-warnings".to_string(),
-        "--no-playlist".to_string(),
-        "-f".to_string(),
-        VIDEO_FORMAT.to_string(),
-        "--dump-single-json".to_string(),
-        format!("https://www.youtube.com/watch?v={video_id}"),
-    ];
-    let output = super::ytdlp_update::run(app, args, TIMEOUT, "music video").await?;
-    parse_video(&String::from_utf8_lossy(&output.stdout))
+    let cap = max_height.unwrap_or(1080).clamp(144, 2160);
+    let cookies = cookie_file();
+    match extract_video(app, video_id, cap, &None).await {
+        Ok(stream) => Ok(stream),
+        Err(anonymous_error) if cookies.is_some() => {
+            note_session_retry(&anonymous_error);
+            extract_video(app, video_id, cap, &cookies).await
+        }
+        Err(error) => Err(error),
+    }
+}
+
+/// Format selection for a video height cap.
+///
+/// H.264 tops out at 1080p on YouTube, so above that the cap has to outrank the codec or a
+/// 1440/2160 request silently came back as 1080. Below it, keep the compatible avc1 pick.
+fn video_format(cap: u32) -> String {
+    if cap <= 1080 {
+        format!(
+            "bestvideo[height<={cap}][vcodec^=avc1][protocol^=https]+bestaudio[acodec^=mp4a][protocol^=https]/bestvideo[height<={cap}][protocol^=https]+bestaudio[protocol^=https]/best"
+        )
+    } else {
+        format!(
+            "bestvideo[height<={cap}][protocol^=https]+bestaudio[acodec^=mp4a][protocol^=https]/bestvideo[height<={cap}][protocol^=https]+bestaudio[protocol^=https]/best"
+        )
+    }
 }
 
 fn parse_video(stdout: &str) -> Result<MusicVideoStream, String> {
@@ -86,6 +232,23 @@ fn parse_video(stdout: &str) -> Result<MusicVideoStream, String> {
             "YouTube Music returned incompatible audio and video request headers".to_string(),
         );
     }
+    let mut heights: Vec<u32> = payload
+        .get("formats")
+        .and_then(serde_json::Value::as_array)
+        .map(|formats| {
+            formats
+                .iter()
+                .filter(|format| format.get("vcodec").and_then(serde_json::Value::as_str) != Some("none"))
+                .filter_map(|format| format.get("height").and_then(serde_json::Value::as_u64))
+                .filter_map(|height| u32::try_from(height).ok())
+                .filter(|height| (144..=2160).contains(height))
+                .collect::<std::collections::BTreeSet<u32>>()
+                .into_iter()
+                .rev()
+                .collect()
+        })
+        .unwrap_or_default();
+    heights.truncate(12);
     MusicStream {
         url: String::new(),
         mime_type: String::new(),
@@ -97,6 +260,7 @@ fn parse_video(stdout: &str) -> Result<MusicVideoStream, String> {
         url: read_url(video)?,
         audio_url: audio.map(read_url).transpose()?,
         http_headers,
+        available_heights: heights,
     })
 }
 
@@ -148,6 +312,48 @@ fn mime_of(extension: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn anonymous_extraction_never_passes_a_cookie_file() {
+        let args = stream_args("dQw4w9WgXcQ", &None);
+        assert!(!args.iter().any(|arg| arg == "--cookies"));
+    }
+
+    #[test]
+    fn a_session_extraction_passes_a_short_lived_cookie_file() {
+        let path = std::env::temp_dir().join(format!(
+            "harbor-ytmusic-test-{}-{}.cookies",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_nanos())
+                .unwrap_or_default()
+        ));
+        std::fs::write(&path, "# Netscape HTTP Cookie File\n").expect("test cookie file");
+        let cookies = Some(CookieFile(path.clone()));
+        let audio = stream_args("dQw4w9WgXcQ", &cookies);
+        let at = audio
+            .iter()
+            .position(|arg| arg == "--cookies")
+            .expect("cookie argument");
+        assert_eq!(audio[at + 1].as_str(), path.to_string_lossy().as_ref());
+        assert!(audio
+            .iter()
+            .any(|arg| arg == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+        let video = video_args("dQw4w9WgXcQ", 1080, &cookies);
+        assert!(video.iter().any(|arg| arg == "--cookies"));
+        drop(cookies);
+        assert!(!path.exists(), "the borrowed cookie file is removed on drop");
+    }
+
+    #[test]
+    fn a_high_cap_does_not_prefer_h264() {
+        assert!(video_format(1080).contains("vcodec^=avc1"));
+        assert!(video_format(720).contains("vcodec^=avc1"));
+        assert!(!video_format(1440).contains("avc1"));
+        assert!(!video_format(2160).contains("avc1"));
+        assert!(video_format(1440).contains("height<=1440"));
+    }
 
     #[test]
     fn video_resolution_rejects_audio_only_and_accepts_reordered_tracks() {
@@ -245,7 +451,7 @@ mod tests {
 /// Regular YouTube search, not the restricted YouTube Music catalogue.
 pub async fn search_interviews(app: &tauri::AppHandle, query: &str, limit: usize) -> Result<Vec<super::super::super::MusicTrack>, String> {
     let args = vec!["--no-warnings".into(), "--flat-playlist".into(), "--dump-single-json".into(), "--skip-download".into(), "--".into(), format!("ytsearch{}:{}", limit.clamp(1, 24), query)];
-    let output = super::ytdlp_update::run(app, args, Duration::from_secs(25), "YouTube interviews").await?;
+    let output = crate::ytdlp_update::run(app, args, Duration::from_secs(25), "YouTube interviews").await?;
     interview_results(&String::from_utf8_lossy(&output.stdout), limit)
 }
 
@@ -275,7 +481,7 @@ pub async fn search_video_page(app: &tauri::AppHandle, query: &str, offset: usiz
     let args = vec!["--no-warnings".into(), "--flat-playlist".into(), "--dump-single-json".into(), "--skip-download".into(),
         "--playlist-start".into(), (offset + 1).to_string(), "--playlist-end".into(), end.to_string(),
         "--".into(), format!("ytsearch{end}:{query}")];
-    let output = super::ytdlp_update::run(app, args, Duration::from_secs(32), "YouTube video search").await?;
+    let output = crate::ytdlp_update::run(app, args, Duration::from_secs(32), "YouTube video search").await?;
     let raw = String::from_utf8_lossy(&output.stdout);
     let value: serde_json::Value = serde_json::from_str(&raw).map_err(|_| "YouTube search returned invalid metadata")?;
     let entries = value.get("entries").and_then(serde_json::Value::as_array).ok_or("YouTube search returned no entries")?;
@@ -298,3 +504,17 @@ mod interview_tests {
         assert_eq!(tracks[0].duration_seconds, 125);
     }
 }
+    #[test]
+    fn available_heights_list_the_upload() {
+        let stream = parse_video(
+            r#"{"url":"https://example.test/v","vcodec":"avc1","formats":[
+                {"height":1080,"vcodec":"avc1"},
+                {"height":720,"vcodec":"vp9"},
+                {"height":2160,"vcodec":"none"},
+                {"height":480,"vcodec":"avc1"},
+                {"height":1440,"vcodec":"vp9"}
+            ]}"#,
+        )
+        .expect("video");
+        assert_eq!(stream.available_heights, vec![1440, 1080, 720, 480]);
+    }

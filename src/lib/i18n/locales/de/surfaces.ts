@@ -247,6 +247,8 @@ const surfaces: Record<string, string> = {
   "Get theme": "Design herunterladen",
   "Get your free TheTVDB key": "Hol dir deinen kostenlosen TheTVDB-Schlüssel",
   "Gilded Trophies": "Vergoldete Trophäen",
+  "Episode pages": "Episodenseiten",
+  "Go to page": "Gehe zu Seite",
   "Go to page {page}": "Zu Seite {page} gehen",
   "Go to pages {pages}": "Zu den Seiten {pages} wechseln",
   Good: "Gut",

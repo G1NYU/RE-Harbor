@@ -73,3 +73,21 @@ export async function socialPatch<T>(path: string, body?: Record<string, unknown
   );
   return unwrap<T>(r, isCurrent);
 }
+
+/**
+ * PUT, for the two routes that replace a whole collection rather than patch a row
+ * (group auto-moderation rules). Everything else is PATCH.
+ */
+export async function socialPut<T>(path: string, body?: Record<string, unknown>): Promise<T> {
+  const isCurrent = captureSessionScope();
+  const r = await authenticatedFetch(
+    `${API}${path}`,
+    {
+      method: "PUT",
+      headers: headers(!!body),
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    fetch,
+  );
+  return unwrap<T>(r, isCurrent);
+}

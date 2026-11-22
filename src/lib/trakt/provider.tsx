@@ -36,6 +36,8 @@ type ScrobbleArgs = {
   metaId: string;
   episode?: TraktEpisodeRef;
   progress: number;
+  /** A directly verified database-backed live episode. */
+  verifiedTarget?: TraktTarget;
 };
 
 type Value = {
@@ -121,17 +123,20 @@ export function TraktProvider({ children }: { children: ReactNode }) {
 
   const scrobble = useCallback(
     async (action: "start" | "pause" | "stop", args: ScrobbleArgs) => {
-      const target = resolveTarget(args.metaId, args.episode);
+      const target = args.verifiedTarget ?? resolveTarget(args.metaId, args.episode);
       if (!target) return;
       const owner = getSession();
       const profile = activeProfileId();
       if (!owner) return;
       const progress = Math.max(0, Math.min(100, args.progress));
-      if (action === "start") await commitPlaybackState("start", target, args.metaId, progress);
+      if (action === "start")
+        await commitPlaybackState("start", target, args.metaId, progress, undefined, Boolean(args.verifiedTarget));
       else if (action === "pause")
-        await commitPlaybackState("pause", target, args.metaId, progress);
+        await commitPlaybackState("pause", target, args.metaId, progress, undefined, Boolean(args.verifiedTarget));
       else {
-        const outcome = await commitWatchedEpisode(target, args.metaId, progress);
+        const outcome = await commitWatchedEpisode(
+          target, args.metaId, progress, undefined, Boolean(args.verifiedTarget),
+        );
         const current = getSession();
         if (
           !current ||
@@ -141,7 +146,10 @@ export function TraktProvider({ children }: { children: ReactNode }) {
           return;
         const settled =
           outcome === "recorded" || outcome === "already-recorded" || outcome === "not-found";
-        if (!settled) recordPendingStop(args.metaId, args.episode, progress);
+        // The legacy queue stores catalog coordinates, not a verified target.
+        // Never replay a failed native episode as an unrelated inferred ID.
+        if (!settled && !args.verifiedTarget)
+          recordPendingStop(args.metaId, args.episode, progress);
       }
     },
     [resolveTarget],

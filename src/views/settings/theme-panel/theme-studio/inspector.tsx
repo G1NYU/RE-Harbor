@@ -34,6 +34,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 export function Inspector({
   draft,
+  baseline,
   onPatch,
   onSeed,
   onChromeChange,
@@ -41,6 +42,7 @@ export function Inspector({
   onExpand,
 }: {
   draft: Draft;
+  baseline: Draft;
   onPatch: (patch: Partial<Draft>) => void;
   onSeed: (theme: ThemePreset) => void;
   onChromeChange: (config: ChromeConfig) => void;
@@ -129,7 +131,9 @@ export function Inspector({
               <StudioSection title={t("Surfaces")}>
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-2">
-                    <span className="text-[13px] font-extrabold uppercase leading-[18px] tracking-[0.72px] text-ink-subtle">{t("Cards")}</span>
+                    <span className="text-[13px] font-extrabold uppercase leading-[18px] tracking-[0.72px] text-ink-subtle">
+                      {t("Cards")}
+                    </span>
                     <StylePicker
                       kind="card"
                       value={draft.cardStyle}
@@ -138,7 +142,9 @@ export function Inspector({
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <span className="text-[13px] font-extrabold uppercase leading-[18px] tracking-[0.72px] text-ink-subtle">{t("Buttons")}</span>
+                    <span className="text-[13px] font-extrabold uppercase leading-[18px] tracking-[0.72px] text-ink-subtle">
+                      {t("Buttons")}
+                    </span>
                     <StylePicker
                       kind="button"
                       value={draft.buttonStyle}
@@ -156,12 +162,20 @@ export function Inspector({
               <StudioSection
                 title={t("Layout")}
                 hint={t("Where the navigation lives. Pick one to see it live.")}
+                action={
+                  <HeaderAction
+                    icon={<RotateCcw size={16} strokeWidth={2.2} />}
+                    label={t("Reset")}
+                    onClick={() => onPatch({ layout: baseline.layout })}
+                  />
+                }
               >
                 <LayoutPicker value={draft.layout} onChange={(layout) => onPatch({ layout })} />
               </StudioSection>
               {draft.layout === "custom" && (
                 <CustomChromeBuilder
                   config={draft.chrome}
+                  resetConfig={baseline.chrome}
                   dirty={draft.chromeDirty}
                   onChange={onChromeChange}
                   onRegenerate={onRegenerateChrome}
@@ -172,8 +186,27 @@ export function Inspector({
                 <StudioSection
                   title={t("Navigation items")}
                   hint={t("Reorder, rename, or hide what appears in your nav.")}
+                  action={
+                    <HeaderAction
+                      icon={<RotateCcw size={16} strokeWidth={2.2} />}
+                      label={t("Reset")}
+                      onClick={() =>
+                        onPatch({
+                          navCustomization: {
+                            order: [...baseline.navCustomization.order],
+                            hidden: [...baseline.navCustomization.hidden],
+                            renamed: { ...baseline.navCustomization.renamed },
+                          },
+                        })
+                      }
+                    />
+                  }
                 >
-                  <NavEditor layout={draft.layout} value={draft.navCustomization} onChange={(navCustomization) => onPatch({ navCustomization })} />
+                  <NavEditor
+                    layout={draft.layout}
+                    value={draft.navCustomization}
+                    onChange={(navCustomization) => onPatch({ navCustomization })}
+                  />
                 </StudioSection>
               )}
             </div>

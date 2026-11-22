@@ -31,6 +31,12 @@ function load(handle: (name: string, args: any) => unknown = async () => null) {
             return () => {};
           },
         };
+      if (name === "./video-quality")
+        return {
+          musicVideoQuality: () => "auto",
+          musicVideoMaxHeight: (quality: string) => (quality === "auto" ? null : Number(quality)),
+          defaultMusicVideoQuality: () => "auto",
+        };
       throw Error(name);
     },
     module,
@@ -81,10 +87,10 @@ test("cache lifetime follows the signature on the URLs and falls back to a bound
     ),
     now + 90_000,
   );
-  assert.equal(api.streamExpiry(stream(at(100_000)), now), now + 8 * 60_000);
+  assert.equal(api.streamExpiry(stream(at(100_000)), now), now + 30 * 60_000);
   assert.equal(
     api.streamExpiry({ url: "https://example.test/video.mp4", audioUrl: null }, now),
-    now + 8 * 60_000,
+    now + 30 * 60_000,
   );
 });
 
@@ -96,7 +102,7 @@ test("concurrent resolution shares one native call, a replay reuses it and refre
     fixture.api.musicVideoStream(track),
   ]);
   assert.equal(fixture.count("music_video_stream"), 1);
-  assert.deepEqual(fixture.calls[0].args, { track });
+  assert.deepEqual(fixture.calls[0].args, { track, maxHeight: null });
   assert.equal(one, two);
   assert.equal(
     await fixture.api.musicVideoStream({ ...track, id: "other", title: "renamed" }),
@@ -122,4 +128,16 @@ test("a lapsed signature is never cached and a failed resolution stays retryable
   await assert.rejects(broken.api.musicVideoStream(track), /offline/);
   assert.ok(await broken.api.musicVideoStream(track));
   assert.equal(broken.count("music_video_stream"), 2);
+});
+test("the chosen quality caps the native request", async () => {
+  const fixture = load(() => stream(Date.now() / 1000 + 600));
+  await fixture.api.musicVideoStream(track, false, undefined, "720");
+  assert.equal(fixture.calls[0].args.maxHeight, 720);
+  await fixture.api.musicVideoStream(
+    { ...track, id: "other", sourceId: "other" },
+    false,
+    undefined,
+    "2160",
+  );
+  assert.equal(fixture.calls[1].args.maxHeight, 2160);
 });

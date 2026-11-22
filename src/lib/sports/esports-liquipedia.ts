@@ -2,7 +2,7 @@
  * Liquipedia metadata cassette: text and structure only, never a bitmap.
  *
  * Measured, and the reason nothing here returns an image URL: their CDN runs nginx valid_referers
- * and answered every real Harbor origin with 403 (tauri.localhost, localhost:1420, harbor.site),
+ * and answered every real Harbor origin with 403 (tauri.localhost, localhost:1420, harborcommunity.site),
  * and the 403 body is itself a valid PNG "no hotlinking" banner that would render inside a card.
  * Independently, event and team logos carry license=fairuselogo and the photography carries
  * license=permission naming Liquipedia as the only grantee. CC BY-SA 3.0 covers the wiki text, so
@@ -83,7 +83,11 @@ export interface LpTemplate {
 }
 
 const NOISE = /<!--[\s\S]*?-->|<ref\b[^>]*\/>|<ref\b[^>]*>[\s\S]*?<\/ref>|<\/?nowiki\s*\/?>/gi;
-const normName = (value: string) => value.replace(/[_\s]+/g, " ").trim().toLowerCase();
+const normName = (value: string) =>
+  value
+    .replace(/[_\s]+/g, " ")
+    .trim()
+    .toLowerCase();
 
 /** Comments and <ref> blocks carry stray pipes and braces that would desync the scanner. */
 const denoise = (src: string) => (src ?? "").replace(NOISE, "");
@@ -530,7 +534,7 @@ export function parseBrackets(wikitext: string): LiquipediaBracket[] {
   });
 }
 
-const AGENT = "HarborEsports/1.0 (https://harbor.site; bugs@harbor.site)";
+const AGENT = "HarborEsports/1.0 (https://harborcommunity.site; bugs@harborcommunity.site)";
 
 /**
  * Api-User-Agent is MediaWiki's own channel for platforms that own the User-Agent header. Harbor's
@@ -696,7 +700,10 @@ async function cacheWrite(key: string, entry: Cached): Promise<void> {
   }
   clearTimeout(indexTimer);
   const snapshot = { ...map };
-  indexTimer = setTimeout(() => void idbCacheSet(INDEX_KEY, { at: Date.now(), data: snapshot }), 1000);
+  indexTimer = setTimeout(
+    () => void idbCacheSet(INDEX_KEY, { at: Date.now(), data: snapshot }),
+    1000,
+  );
 }
 
 // The durable copy survives either way, so only an aggressive pass gives up the warm pages.

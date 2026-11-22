@@ -7,6 +7,10 @@ import { registerHooks } from "node:module";
 
 const replacements = new Map([
   [
+    new URL("../src/lib/social/profile-card-summary.ts", import.meta.url).href,
+    "export const publishProfileCardSummary = () => {};",
+  ],
+  [
     new URL("../src/lib/safe-fetch.ts", import.meta.url).href,
     "export const safeFetch = (...args) => globalThis.commentFetch(...args);",
   ],

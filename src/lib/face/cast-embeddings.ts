@@ -1,3 +1,4 @@
+import { appCacheDir, appLocalDataDir } from "@tauri-apps/api/path";
 import { BaseDirectory, exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import type { CastEntry } from "@/lib/providers/tmdb";
 import { embedLargestFace } from "./face-engine";
@@ -24,13 +25,23 @@ function cachePath(key: string): string {
   return `${CACHE_DIR}/${key.replace(/[^a-z0-9_-]/gi, "_")}.json`;
 }
 
+// fs:default denies $APPLOCALDATA/** everywhere. That's AppData on Linux and
+// AppCache on Windows, so use AppCache unless it is the denied directory.
+let cacheBase: Promise<BaseDirectory> | null = null;
+function cacheBaseDir(): Promise<BaseDirectory> {
+  cacheBase ??= Promise.all([appCacheDir(), appLocalDataDir()]).then(
+    ([cache, local]) => (cache === local ? BaseDirectory.AppData : BaseDirectory.AppCache),
+    () => BaseDirectory.AppData,
+  );
+  return cacheBase;
+}
+
 async function readCache(key: string): Promise<GalleryEntry[] | null> {
   const path = cachePath(key);
-  if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) return null;
   try {
-    const raw = JSON.parse(
-      await readTextFile(path, { baseDir: BaseDirectory.AppData }),
-    ) as CacheShape;
+    const baseDir = await cacheBaseDir();
+    if (!(await exists(path, { baseDir }))) return null;
+    const raw = JSON.parse(await readTextFile(path, { baseDir })) as CacheShape;
     if (raw.version !== MODEL_VERSION) return null;
     return raw.entries.map((e) => ({ ...e, emb: Float32Array.from(e.emb) }));
   } catch {
@@ -39,7 +50,8 @@ async function readCache(key: string): Promise<GalleryEntry[] | null> {
 }
 
 async function writeCache(key: string, entries: GalleryEntry[]): Promise<void> {
-  await mkdir(CACHE_DIR, { baseDir: BaseDirectory.AppData, recursive: true });
+  const baseDir = await cacheBaseDir();
+  await mkdir(CACHE_DIR, { baseDir, recursive: true });
   const shape: CacheShape = {
     version: MODEL_VERSION,
     entries: entries.map((e) => ({
@@ -50,7 +62,7 @@ async function writeCache(key: string, entries: GalleryEntry[]): Promise<void> {
       emb: Array.from(e.emb),
     })),
   };
-  await writeTextFile(cachePath(key), JSON.stringify(shape), { baseDir: BaseDirectory.AppData });
+  await writeTextFile(cachePath(key), JSON.stringify(shape), { baseDir });
 }
 
 async function runPool<T>(

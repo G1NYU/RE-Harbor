@@ -141,8 +141,16 @@ async function cached<T>(
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < ttl) return hit.p as Promise<T>;
 
+  const provider = activeMangaProvider();
+  const owner = ["detail", "chapters", "chapters.own", "pages"].includes(kind)
+    ? (routeById(parts)?.provider ?? provider)
+    : provider;
   const call = () =>
-    attempt(() => run(activeMangaProvider()), opts.tries ?? TRIES, opts.timeout ?? CALL_TIMEOUT);
+    attempt(
+      () => run(provider),
+      opts.tries ?? TRIES,
+      Math.max(opts.timeout ?? CALL_TIMEOUT, owner.requestTimeoutMs ?? 0),
+    );
 
   if (!opts.disk) return remember(key, call(), "");
 
@@ -211,6 +219,22 @@ export function searchManga(query: string, offset = 0, tagId?: string) {
     5 * MIN,
     (p) => withProviderTag(p, tagId, (tag) => p.search(query, offset, tag)),
   );
+}
+
+/** Detail-page recommendations belong to the opened title, not the browse filter. */
+export async function searchMangaForTitleSource(
+  mangaId: string,
+  query: string,
+): Promise<MangaSummary[]> {
+  await ensureMangaSources();
+  const routed = routeById(mangaId);
+  if (routed) {
+    const items = await routed.provider.search(query, 0);
+    return items.map((item) => ({ ...item, id: `${routed.provider.id}::${item.id}` }));
+  }
+  // Do not reinterpret an unavailable routed source as a different extension.
+  if (mangaId.includes("::") || activeMangaSourceId() === "all") return [];
+  return activeMangaProvider().search(query, 0);
 }
 
 export function searchMangaEverywhere(query: string) {
@@ -352,14 +376,17 @@ export function mangaDetail(id: string) {
   );
 }
 
-export function mangaChapters(id: string, opts?: { tries?: number; timeout?: number }) {
+export function mangaChapters(
+  id: string,
+  opts?: { tries?: number; timeout?: number; refresh?: boolean },
+) {
   return cached(
     "chapters",
     id,
-    20 * MIN,
+    opts?.refresh ? 0 : 20 * MIN,
     (provider) => {
       const routed = routeById(id);
-      return routed ? routed.provider.chapters(routed.orig) : provider.chapters(id);
+      return routed ? routed.provider.chapters(routed.orig, opts) : provider.chapters(id, opts);
     },
     { timeout: 15_000, ...opts },
   );
@@ -406,17 +433,19 @@ export function resumeChapters(id: string): Promise<MangaChapter[]> {
 export async function streamChapters(
   id: string,
   onChunk: (chs: MangaChapter[]) => void,
+  opts?: { refresh?: boolean },
 ): Promise<void> {
   await ensureMangaSources();
+  if (opts?.refresh) cache.delete(`${activeMangaSourceId()}|chapters.own|${id}`);
   const subs = aggregateSubProviders();
   if (subs.length < 2) {
-    const chs = await mangaChapters(id).catch(() => [] as MangaChapter[]);
+    const chs = await mangaChapters(id, opts).catch(() => [] as MangaChapter[]);
     if (chs.length) onChunk(chs);
     return;
   }
   const key = `all|chaptersAll|${id}`;
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < 20 * MIN) {
+  if (!opts?.refresh && hit && Date.now() - hit.at < 20 * MIN) {
     onChunk((await hit.p) as MangaChapter[]);
     return;
   }
@@ -428,6 +457,7 @@ export async function streamChapters(
       onChunk(chunk);
     },
     activeMangaProvider().id,
+    opts,
   );
   if (all.length) settle(key, all);
 }

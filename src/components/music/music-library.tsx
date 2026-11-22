@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { Link } from "lucide-react";
+import { MusicPlaylistLinkDialog } from "./music-playlist-link";
 import {
   ChevronRight,
   FileUp,
@@ -24,6 +26,7 @@ import { Dropdown } from "@/components/dropdown";
 import { ModalShell, useModalExit } from "@/components/modal-shell";
 import { MusicLocalCollection } from "./music-local-collection";
 import { MusicSpotifyLibrary } from "./music-spotify-library";
+import { MusicYtMusicLibrary } from "./music-ytmusic-library";
 import { MusicTrackMenu, type MusicTrackMenuItem } from "./music-track-menu";
 import { useMusicItemMenu } from "./music-item-menu";
 import { MusicPlaylistEditDialog } from "./music-playlist-edit-dialog";
@@ -39,9 +42,11 @@ import { MusicPlaylistGridSkeleton } from "@/components/music/music-skeletons";
 import { MusicServiceLogo } from "./music-service-logo";
 import { MusicCollectionGrid } from "./music-collection-grid";
 import { MusicLibraryEmptyState } from "./music-library-empty-state";
+import { confirmAction } from "@/lib/confirm-action";
 import { useT } from "@/lib/i18n";
 import {
   addTracksToMusicPlaylist,
+  confirmLinkedMusicPlaylistEdit,
   createMusicPlaylist,
   deleteMusicPlaylist,
   exportMusicM3u,
@@ -69,8 +74,16 @@ import {
 import type { MusicCatalogItem, MusicPlaylist } from "@/lib/music/types";
 import "./music-library.css";
 
-type LibraryFilter = "all" | "playlists" | "albums" | "artists" | "tracks" | "spotify";
-const FILTERS: LibraryFilter[] = ["all", "playlists", "albums", "artists", "tracks", "spotify"];
+type LibraryFilter = "all" | "playlists" | "albums" | "artists" | "tracks" | "spotify" | "youtube";
+const FILTERS: LibraryFilter[] = [
+  "all",
+  "playlists",
+  "albums",
+  "artists",
+  "tracks",
+  "spotify",
+  "youtube",
+];
 const LOCAL: LibraryFilter[] = ["albums", "artists", "tracks"];
 
 export function MusicLibrary({
@@ -111,13 +124,15 @@ export function MusicLibrary({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<MusicCollectionSort>("recent");
   const [creating, setCreating] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [playlistName, setPlaylistName] = useState("");
   const [contextEntry, setContextEntry] = useState<MusicCollectionEntry | null>(null);
   const [contextPosition, setContextPosition] = useState<{ x: number; y: number } | null>(null);
   const contextAnchor = useRef<HTMLElement | null>(null);
   const [renameTarget, setRenameTarget] = useState<MusicPlaylist | null>(null);
   const [editTarget, setEditTarget] = useState<MusicPlaylist | null>(null);
-  const contextPlaylistId = contextEntry?.kind === "playlist" ? (contextEntry.playlist?.id ?? "") : "";
+  const contextPlaylistId =
+    contextEntry?.kind === "playlist" ? (contextEntry.playlist?.id ?? "") : "";
   const contextPlaylistPinned = useMusicPlaylistPinned(contextPlaylistId);
   const closeContextMenu = useCallback(() => {
     setContextEntry(null);
@@ -184,7 +199,10 @@ export function MusicLibrary({
       built.push(likedEntry(player.likedTracks, t("music.saved"), t("music.library.savedTracks")));
     if (player.recents.length > 0)
       built.push(recentEntry(player.recents, t("music.library.recent"), t("music.library.recent")));
-    for (const playlist of playlists) built.push(playlistEntry(playlist, t("music.playlists")));
+    for (const playlist of playlists)
+      built.push(
+        playlistEntry(playlist, t(playlist.source ? "music.linked.source" : "music.playlists")),
+      );
     if (filter === "all")
       for (const item of shelf) {
         const entry = catalogEntry(item, t("music.connections.local"));
@@ -193,9 +211,10 @@ export function MusicLibrary({
     return built;
   }, [player.likedTracks, player.recents, playlists, shelf, filter, t]);
 
+  const arrangeKind = filter === "spotify" || filter === "youtube" ? "all" : filter;
   const arranged = useMemo(
-    () => arrangeCollections(entries, filter === "spotify" ? "all" : filter, sort, query),
-    [entries, filter, sort, query],
+    () => arrangeCollections(entries, arrangeKind, sort, query),
+    [entries, arrangeKind, sort, query],
   );
 
   const createPlaylist = (event: FormEvent) => {
@@ -241,11 +260,7 @@ export function MusicLibrary({
     const playlist = entry.kind === "playlist" ? entry.playlist : undefined;
     const tracks =
       playlist?.tracks ??
-      (entry.kind === "liked"
-        ? player.likedTracks
-        : entry.kind === "recent"
-          ? player.recents
-          : []);
+      (entry.kind === "liked" ? player.likedTracks : entry.kind === "recent" ? player.recents : []);
     const first = tracks[0];
     if (!first) return;
     if (playlist) recordMusicPlaylistPlayback(playlist, tracks);
@@ -277,7 +292,16 @@ export function MusicLibrary({
   };
 
   const removePlaylist = async (playlist: MusicPlaylist) => {
-    if (working || !window.confirm(t("music.playlist.deleteConfirm"))) return;
+    if (
+      working ||
+      !(await confirmAction({
+        title: t("music.playlist.deleteTitle"),
+        message: t("music.playlist.deleteConfirm"),
+        confirmLabel: t("common.delete"),
+        destructive: true,
+      }))
+    )
+      return;
     setWorking(true);
     setError(null);
     try {
@@ -303,9 +327,7 @@ export function MusicLibrary({
     itemMenu.close();
     contextAnchor.current = event.currentTarget;
     setContextPosition(
-      event.clientX !== 0 || event.clientY !== 0
-        ? { x: event.clientX, y: event.clientY }
-        : null,
+      event.clientX !== 0 || event.clientY !== 0 ? { x: event.clientX, y: event.clientY } : null,
     );
     setContextEntry(entry);
   };
@@ -313,7 +335,8 @@ export function MusicLibrary({
   const contextItems: MusicTrackMenuItem[] = [];
   if (contextEntry) {
     const playlist = contextEntry.kind === "playlist" ? contextEntry.playlist : undefined;
-    const tracks = playlist?.tracks ??
+    const tracks =
+      playlist?.tracks ??
       (contextEntry.kind === "liked"
         ? player.likedTracks
         : contextEntry.kind === "recent"
@@ -360,7 +383,7 @@ export function MusicLibrary({
   }
 
   const updateRenamedPlaylist = useCallback((playlist: MusicPlaylist) => {
-    setPlaylists((current) => current.map((item) => item.id === playlist.id ? playlist : item));
+    setPlaylists((current) => current.map((item) => (item.id === playlist.id ? playlist : item)));
     // The pinned shelf keeps a copy of the name; keep it in step.
     renamePinnedMusicPlaylist(playlist.id, playlist.name);
   }, []);
@@ -369,13 +392,15 @@ export function MusicLibrary({
   const filterLabel = (value: LibraryFilter) =>
     value === "spotify"
       ? "Spotify"
-      : t(
-          value === "all"
-            ? "music.library.all"
-            : value === "playlists"
-              ? "music.playlists"
-              : `music.search.${value}`,
-        );
+      : value === "youtube"
+        ? "YouTube Music"
+        : t(
+            value === "all"
+              ? "music.library.all"
+              : value === "playlists"
+                ? "music.playlists"
+                : `music.search.${value}`,
+          );
   const countFor = (value: LibraryFilter) =>
     value === "playlists" ? playlists.length + (player.likedTracks.length > 0 ? 1 : 0) : 0;
 
@@ -388,40 +413,51 @@ export function MusicLibrary({
         </div>
         <div className="music-library-actions music-library-header-actions">
           <HoverTooltip label={t("music.home.addFolder")} align="center">
-              <button
-                type="button"
-                className="music-library-icon-action"
-                aria-label={t("music.home.addFolder")}
-                onClick={() => openConnections("local")}
-              >
-                <FolderOpen size={28} aria-hidden="true" />
-              </button>
+            <button
+              type="button"
+              className="music-library-icon-action"
+              aria-label={t("music.home.addFolder")}
+              onClick={() => openConnections("local")}
+            >
+              <FolderOpen size={28} aria-hidden="true" />
+            </button>
           </HoverTooltip>
           <HoverTooltip label={t("music.m3u.import")} align="center">
-              <button
-                type="button"
-                className="music-library-icon-action"
-                aria-label={t("music.m3u.import")}
-                aria-busy={working}
-                disabled={working}
-                onClick={importM3u}
-              >
-                <FileUp size={28} aria-hidden="true" />
-              </button>
+            <button
+              type="button"
+              className="music-library-icon-action"
+              aria-label={t("music.m3u.import")}
+              aria-busy={working}
+              disabled={working}
+              onClick={importM3u}
+            >
+              <FileUp size={28} aria-hidden="true" />
+            </button>
+          </HoverTooltip>
+          <HoverTooltip label={t("music.linked.import")} align="center">
+            <button
+              type="button"
+              className="music-library-icon-action"
+              aria-label={t("music.linked.import")}
+              disabled={working}
+              onClick={() => setLinking(true)}
+            >
+              <Link size={28} aria-hidden="true" />
+            </button>
           </HoverTooltip>
           <HoverTooltip label={t("music.row.newPlaylist")} align="end">
-              <button
-                type="button"
-                className="music-library-icon-action"
-                aria-label={t("music.row.newPlaylist")}
-                aria-expanded={creating}
-                onClick={() => {
-                  setFilter("playlists");
-                  setCreating((value) => !value);
-                }}
-              >
-                <Plus size={28} aria-hidden="true" />
-              </button>
+            <button
+              type="button"
+              className="music-library-icon-action"
+              aria-label={t("music.row.newPlaylist")}
+              aria-expanded={creating}
+              onClick={() => {
+                setFilter("playlists");
+                setCreating((value) => !value);
+              }}
+            >
+              <Plus size={28} aria-hidden="true" />
+            </button>
           </HoverTooltip>
         </div>
       </header>
@@ -439,7 +475,9 @@ export function MusicLibrary({
                 setQuery("");
               }}
             >
-              {value === "spotify" && <MusicServiceLogo source="spotify" size={18} />}
+              {(value === "spotify" || value === "youtube") && (
+                <MusicServiceLogo source={value} size={18} />
+              )}
               {filterLabel(value)}
               {countFor(value) > 0 && <small>{countFor(value)}</small>}
             </button>
@@ -546,7 +584,14 @@ export function MusicLibrary({
           <MusicCollectionGrid
             entries={arranged}
             emptyCopy={t(query ? "music.searchEmpty" : "music.playlist.first")}
-            emptyState={!query && !readError ? <MusicLibraryEmptyState onConnect={() => openConnections("local")} onTastes={onTastes} /> : undefined}
+            emptyState={
+              !query && !readError ? (
+                <MusicLibraryEmptyState
+                  onConnect={() => openConnections("local")}
+                  onTastes={onTastes}
+                />
+              ) : undefined
+            }
             onOpen={(entry) => (entry.item ? onOpen(entry.item, shelf) : onCollection(entry))}
             onContextMenu={openEntryMenu}
           />
@@ -561,6 +606,7 @@ export function MusicLibrary({
           onTastes={onTastes}
         />
       )}
+      {filter === "youtube" && <MusicYtMusicLibrary active={active} onOpen={onOpen} />}
       {filter === "spotify" && (
         <MusicSpotifyLibrary
           active={active}
@@ -583,6 +629,25 @@ export function MusicLibrary({
         items={contextItems}
         position={contextPosition}
       />
+      {linking && (
+        <MusicPlaylistLinkDialog
+          onClose={() => setLinking(false)}
+          onImported={(playlist) => {
+            setPlaylists((current) => [
+              playlist,
+              ...current.filter((item) => item.id !== playlist.id),
+            ]);
+            setFilter("playlists");
+            setError(null);
+            setNotice(
+              t("music.linked.importedNotice", {
+                count: playlist.tracks.length,
+                name: playlist.name,
+              }),
+            );
+          }}
+        />
+      )}
       {renameTarget && (
         <MusicPlaylistRenameDialog
           key={renameTarget.id}
@@ -597,6 +662,7 @@ export function MusicLibrary({
           target={{
             id: editTarget.id,
             name: editTarget.name,
+            source: editTarget.source,
             artwork: editTarget.tracks.map((track) => track.artwork),
           }}
           onClose={() => setEditTarget(null)}
@@ -644,6 +710,7 @@ function MusicPlaylistRenameDialog({
       close();
       return;
     }
+    if (!(await confirmLinkedMusicPlaylistEdit(playlist))) return;
     setWorking(true);
     setError("");
     try {
@@ -678,13 +745,19 @@ function MusicPlaylistRenameDialog({
           aria-label={t("music.playlist.nameLabel")}
           className="min-h-11 w-full rounded-md bg-elevated px-3 py-2 text-[15px] text-ink outline-none placeholder:text-ink-subtle focus-visible:outline-2 focus-visible:outline-accent"
         />
-        {error && <p role="alert" className="text-[13px] text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-[13px] text-danger">
+            {error}
+          </p>
+        )}
         <div className="flex justify-end gap-2">
           <button type="button" className="music-library-text" disabled={working} onClick={close}>
             {t("common.cancel")}
           </button>
           <button type="submit" className="music-library-button" disabled={!name.trim() || working}>
-            {working ? <LoaderCircle size={17} className="animate-spin motion-reduce:animate-none" /> : null}
+            {working ? (
+              <LoaderCircle size={17} className="animate-spin motion-reduce:animate-none" />
+            ) : null}
             {t("common.save")}
           </button>
         </div>

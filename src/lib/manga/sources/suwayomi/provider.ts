@@ -84,9 +84,13 @@ function mapChapters(
   return mapped;
 }
 
-export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): MangaProvider {
+export function makeSuwayomiProvider(
+  baseUrl: string,
+  basicAuth?: string,
+  background = false,
+): MangaProvider {
   const server = makeServer(baseUrl, basicAuth);
-  const client = makeClient(server);
+  const client = makeClient(server, 150, background);
 
   async function browse(
     sourceId: string,
@@ -250,7 +254,7 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
       while (!exactFound) {
         const source = sources[nextSource++];
         if (!source) return;
-        const requestClient = makeClient(server, 0);
+        const requestClient = makeClient(server, 0, background);
         const items = await browse(source.id, "search", 0, q, requestClient).catch(() => []);
         for (const item of items) unique.set(item.id, item);
         if (!exhaustive && items.some((item) => isStrongSearchMatch(item, q))) {
@@ -277,17 +281,28 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
     return raw ? mapManga(server, parsed.sourceId, raw) : null;
   }
 
-  async function chapters(id: string): Promise<MangaChapter[]> {
+  const chapterRefreshes = new Map<string, Promise<MangaChapter[]>>();
+
+  async function chapters(id: string, opts?: { refresh?: boolean }): Promise<MangaChapter[]> {
     const parsed = decodeMangaId(id);
     if (!parsed) return [];
-    return withTransportFallback(client, async (t) => {
+    const pending = chapterRefreshes.get(id);
+    if (pending) return pending;
+    const request = withTransportFallback(client, async (t) => {
       const raw =
         t === "rest"
-          ? await restChapters(client, parsed.mangaId)
-          : await gqlChapters(client, parsed.mangaId);
+          ? await restChapters(client, parsed.mangaId, opts?.refresh)
+          : await gqlChapters(client, parsed.mangaId, opts?.refresh);
       const lang = await sourceLang(client, t, parsed.sourceId);
       return mapChapters(parsed.sourceId, parsed.mangaId, lang, raw);
     });
+    if (!opts?.refresh) return request;
+    chapterRefreshes.set(id, request);
+    try {
+      return await request;
+    } finally {
+      if (chapterRefreshes.get(id) === request) chapterRefreshes.delete(id);
+    }
   }
 
   function registerPageAuth(urls: string[]): void {
@@ -329,7 +344,9 @@ export function makeSuwayomiProvider(baseUrl: string, basicAuth?: string): Manga
       ),
       loadSources(client, t),
     ]);
-    if (categories.status === "rejected" && sources.status === "rejected") throw categories.reason;
+    // Categories can succeed when source discovery fails. Avoid caching an
+    // apparently valid category-only list when extensions are unavailable.
+    if (sources.status === "rejected") throw sources.reason;
     const categoryTags: MangaTag[] = (categories.status === "fulfilled" ? categories.value : [])
       .filter((c) => c?.id != null && /^\d+$/.test(String(c.id)) && typeof c.name === "string")
       .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))

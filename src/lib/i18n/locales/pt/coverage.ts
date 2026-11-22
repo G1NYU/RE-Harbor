@@ -1,7 +1,10 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Waiting for {name}…": "Aguardando {name}…",
+  "Keeping the source you were watching.": "Mantendo a fonte que você estava assistindo.",
   "Sound descriptions": "Descrições de som",
   "Hide sound effects and speaker names": "Ocultar efeitos sonoros e nomes de personagens",
-  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Remove descrições entre colchetes como [porta a ranger] e nomes de personagens em maiúsculas como JOHN: enquanto as legendas passam, para que um lançamento que só traz uma faixa SDH continue a ler-se como diálogo normal. Letras de músicas, parênteses normais e escritas não latinas ficam intactos. Não se aplica a faixas forçadas nem a faixas de imagem.",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
+    "Remove descrições entre colchetes como [porta a ranger] e nomes de personagens em maiúsculas como JOHN: enquanto as legendas passam, para que um lançamento que só traz uma faixa SDH continue a ler-se como diálogo normal. Letras de músicas, parênteses normais e escritas não latinas ficam intactos. Não se aplica a faixas forçadas nem a faixas de imagem.",
   "Play from": "Tocar de",
   end: "fim",
   "m:ss": "m:ss",
@@ -649,6 +652,18 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "Chave da API NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Escolha se o Harbor prefere fontes diretas e debrid, torrents ponto a ponto ou mostra ambos.",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

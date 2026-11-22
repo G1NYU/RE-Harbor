@@ -121,7 +121,7 @@ test("Book Mode keeps the current pages visible while settings regenerate replac
     new URL("../src/views/ebook/harbor-reader.tsx", import.meta.url),
     "utf8",
   );
-  const effectStart = reader.indexOf('if (prefs.mode !== "book") return;');
+  const effectStart = reader.indexOf('if (readingMode !== "book") return;');
   const effectEnd = reader.indexOf("useEffect(() => {", effectStart + 1);
   const generationEffect = reader.slice(effectStart, effectEnd);
   assert.doesNotMatch(generationEffect, /setFlipPages\(\{ urls: \[\], paragraphStarts: \[\] \}\)/);
@@ -152,6 +152,25 @@ test("Book Mode double-buffers the WebGL book until replacement pages are ready"
   assert.match(bookView, /d\.name !== instanceName/);
 });
 
+test("Book Mode cannot stay stuck on the preparing screen", async () => {
+  const reader = await readFile(
+    new URL("../src/views/ebook/harbor-reader.tsx", import.meta.url),
+    "utf8",
+  );
+  const bookView = await readFile(
+    new URL("../src/views/manga/manga-reader/book-view.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(bookView, /ASPECT_TIMEOUT_MS/);
+  assert.match(bookView, /sampleAspect\(srcs\[i\]\)/);
+  assert.match(bookView, /onError\?:/);
+  assert.match(bookView, /failed\.current\?\.\(error\)/);
+  assert.match(reader, /onError=\{/);
+  assert.match(reader, /flipFailed/);
+  assert.match(reader, /This chapter could not be loaded\./);
+});
+
 test("returning from Book Mode remounts and restores the Harbor line tracker", async () => {
   const reader = await readFile(
     new URL("../src/views/ebook/harbor-reader.tsx", import.meta.url),
@@ -160,7 +179,7 @@ test("returning from Book Mode remounts and restores the Harbor line tracker", a
 
   assert.match(
     reader,
-    /if \(prefs\.mode !== "harbor"\) return;[\s\S]*traceY\.current = null;[\s\S]*updateTrace\(\)/,
+    /if \(readingMode !== "harbor"\) return;[\s\S]*traceY\.current = null;[\s\S]*updateTrace\(\)/,
   );
-  assert.match(reader, /\[prefs\.mode, updateTrace\]/);
+  assert.match(reader, /\[readingMode, updateTrace\]/);
 });

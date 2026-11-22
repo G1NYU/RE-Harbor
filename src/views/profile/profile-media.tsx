@@ -1,9 +1,8 @@
-import { Camera, ImageIcon, Trash2 } from "lucide-react";
+import { Camera, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useProfiles } from "@/lib/profiles";
 import { useSettings } from "@/lib/settings";
-import { fileToBannerWebp, removeBanner, uploadBanner } from "@/lib/social/banner";
 import { removeAvatar as removeEcosystemAvatar, uploadAvatar } from "@/lib/social/avatar";
 import { markAvatarSynced } from "@/lib/account/avatar-sync";
 import { currentAuthor } from "@/lib/theme-auth";
@@ -29,7 +28,9 @@ async function fileToWebp(file: File, max: number, t: ReturnType<typeof useT>): 
     const w = img.width * scale;
     const h = img.height * scale;
     ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/webp", 0.9));
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/webp", 0.9),
+    );
     if (!blob) throw new Error(t("Could not process image."));
     return blob;
   } finally {
@@ -47,13 +48,12 @@ export function ProfileMedia({
   const t = useT();
   const { activeProfile, updateProfile } = useProfiles();
   const { update: updateSettings } = useSettings();
-  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(summary.avatarUrl || currentAuthor()?.avatar || undefined);
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(
+    summary.avatarUrl || currentAuthor()?.avatar || undefined,
+  );
   const [avatarBusy, setAvatarBusy] = useState(false);
-  const [bannerUrl, setBannerUrl] = useState<string | undefined>(summary.bannerUrl || undefined);
-  const [bannerBusy, setBannerBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const bannerRef = useRef<HTMLInputElement>(null);
 
   const syncLocalAvatar = (url: string | null) => {
     updateSettings({ harborAvatar: url });
@@ -96,37 +96,6 @@ export function ProfileMedia({
     }
   };
 
-  const pickBanner = async (file: File | undefined) => {
-    if (!file || bannerBusy) return;
-    setBannerBusy(true);
-    setError(null);
-    try {
-      const blob = await fileToBannerWebp(file);
-      const next = await uploadBanner(blob);
-      setBannerUrl(next.bannerUrl);
-      onSaved({ ...summary, bannerUrl: next.bannerUrl });
-    } catch (e) {
-      setError((e as Error).message || t("Could not update banner."));
-    } finally {
-      setBannerBusy(false);
-    }
-  };
-
-  const clearBanner = async () => {
-    if (bannerBusy) return;
-    setBannerBusy(true);
-    setError(null);
-    try {
-      const next = await removeBanner();
-      setBannerUrl(undefined);
-      onSaved({ ...summary, bannerUrl: next.bannerUrl });
-    } catch (e) {
-      setError((e as Error).message || t("Could not remove banner."));
-    } finally {
-      setBannerBusy(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -152,7 +121,9 @@ export function ProfileMedia({
               </button>
             )}
           </div>
-          <span className="text-[12px] text-ink-subtle">{t("Stored as a small optimized webp.")}</span>
+          <span className="text-[12px] text-ink-subtle">
+            {t("Stored as a small optimized webp.")}
+          </span>
         </div>
         <input
           ref={fileRef}
@@ -160,47 +131,6 @@ export function ProfileMedia({
           accept="image/png,image/jpeg,image/webp,image/gif"
           className="hidden"
           onChange={(e) => void pickAvatar(e.target.files?.[0])}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <span className="text-[13px] font-medium text-ink">{t("Profile background")}</span>
-        <div className="relative aspect-[3/1] w-full overflow-hidden rounded-lg bg-elevated ring-1 ring-edge-soft">
-          {bannerUrl ? (
-            <img src={bannerUrl} alt="" className="h-full w-full object-cover" draggable={false} />
-          ) : (
-            <div
-              className="h-full w-full"
-              style={{ background: "linear-gradient(135deg, var(--color-elevated), var(--color-surface) 55%, var(--color-canvas))" }}
-            />
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => bannerRef.current?.click()}
-            disabled={bannerBusy}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-elevated px-3 text-[13px] font-medium text-ink ring-1 ring-edge-soft hover:bg-raised disabled:opacity-50"
-          >
-            <ImageIcon size={20} /> {bannerBusy ? t("Saving") : bannerUrl ? t("Change banner") : t("Add banner")}
-          </button>
-          {bannerUrl && (
-            <button
-              type="button"
-              onClick={clearBanner}
-              disabled={bannerBusy}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-ink-muted transition-colors hover:text-danger disabled:opacity-50"
-            >
-              <Trash2 size={15} /> {t("Remove")}
-            </button>
-          )}
-        </div>
-        <input
-          ref={bannerRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={(e) => void pickBanner(e.target.files?.[0])}
         />
       </div>
 

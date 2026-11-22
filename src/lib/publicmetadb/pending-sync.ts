@@ -11,11 +11,13 @@ export type PendingResume = {
   positionMs: number;
   runtimeMs: number;
   at: number;
+  playbackId?: string;
+  watchedAt?: string;
 };
 
 export type ResumeFlushDeps = {
   hasSession: () => boolean;
-  save: (target: PmdbTarget, positionMs: number, runtimeMs: number) => Promise<boolean>;
+  save: (snapshot: PendingResume) => Promise<boolean>;
 };
 
 export function pendingResumeKey(target: PmdbTarget): string {
@@ -79,8 +81,11 @@ export function listPendingResumes(): PendingResume[] {
 
 function sameSnapshot(a: PendingResume, b: PendingResume): boolean {
   return (
-    a.key === b.key && a.at === b.at &&
-    a.positionMs === b.positionMs && a.runtimeMs === b.runtimeMs
+    a.key === b.key &&
+    a.at === b.at &&
+    a.positionMs === b.positionMs &&
+    a.runtimeMs === b.runtimeMs &&
+    a.playbackId === b.playbackId
   );
 }
 
@@ -94,6 +99,7 @@ export function recordPendingResume(
   positionMs: number,
   runtimeMs: number,
   at: number = Date.now(),
+  playback?: Pick<PendingResume, "playbackId" | "watchedAt">,
 ): string | null {
   if (!validTarget(target)) return null;
   if (!Number.isFinite(positionMs) || !Number.isFinite(runtimeMs) || runtimeMs <= 0) return null;
@@ -105,6 +111,7 @@ export function recordPendingResume(
     positionMs: Math.round(positionMs),
     runtimeMs: Math.round(runtimeMs),
     at,
+    ...playback,
   };
   const rest = load().filter((p) => {
     if (p.key !== key) return true;
@@ -118,27 +125,75 @@ export function recordPendingResume(
 
 let flushDeps: ResumeFlushDeps | null = null;
 
+const sending = new Map<string, Promise<boolean>>();
+
+async function sendPendingResume(
+  snapshot: PendingResume,
+  send: ResumeFlushDeps["save"],
+): Promise<boolean> {
+  const owner = storageKey();
+  const started = generation;
+  const id = JSON.stringify([
+    owner,
+    started,
+    snapshot.key,
+    snapshot.at,
+    snapshot.positionMs,
+    snapshot.runtimeMs,
+    snapshot.playbackId,
+  ]);
+  const current = sending.get(id);
+  if (current) return current;
+
+  const request = (async () => {
+    try {
+      const ok = await send(snapshot);
+      if (ok && owner === storageKey() && started === generation) {
+        removePendingResume(snapshot.key, snapshot);
+      }
+      return ok;
+    } catch {
+      return false;
+    }
+  })();
+  sending.set(id, request);
+  try {
+    return await request;
+  } finally {
+    sending.delete(id);
+  }
+}
+
+export function retainPendingCompletion(snapshot: PendingResume, watchedAt: string): void {
+  const items = load();
+  const current = items.find((item) => sameSnapshot(item, snapshot));
+  if (current && current.watchedAt !== watchedAt) {
+    current.watchedAt = watchedAt;
+    save(items);
+  }
+}
+
 export async function syncPendingResume(
   target: PmdbTarget,
   positionMs: number,
   runtimeMs: number,
-  send: () => Promise<boolean>,
+  send: ResumeFlushDeps["save"],
+  playback?: Pick<PendingResume, "playbackId" | "watchedAt">,
 ): Promise<boolean> {
-  const owner = storageKey();
-  const started = generation;
   const at = Date.now();
-  const key = recordPendingResume(target, positionMs, runtimeMs, at);
+  const key = recordPendingResume(target, positionMs, runtimeMs, at, playback);
   if (!key) return false;
-  const snapshot = { key, target, at, positionMs: Math.round(positionMs), runtimeMs: Math.round(runtimeMs) };
-  try {
-    const ok = await send();
-    if (ok && owner === storageKey() && started === generation) {
-      removePendingResume(key, snapshot);
-    }
-    return ok;
-  } catch {
-    return false;
-  }
+  return sendPendingResume(
+    {
+      key,
+      target,
+      at,
+      positionMs: Math.round(positionMs),
+      runtimeMs: Math.round(runtimeMs),
+      ...playback,
+    },
+    send,
+  );
 }
 
 export async function flushPendingResumes(
@@ -158,17 +213,11 @@ export async function flushPendingResumes(
   let flushed = 0;
   for (const p of fresh) {
     if (!stillOwned()) break;
-    if (!load().some((current) => sameSnapshot(current, p))) continue;
-    let ok = false;
-    try {
-      ok = await d.save(p.target, p.positionMs, p.runtimeMs);
-    } catch {
-      ok = false;
-    }
-    if (!stillOwned()) break;
-    if (!ok) break;
+    const current = load().find((item) => sameSnapshot(item, p));
+    if (!current) continue;
+    const ok = await sendPendingResume(current, d.save);
+    if (!stillOwned() || !ok) break;
     flushed += 1;
-    removePendingResume(p.key, p);
   }
   return { flushed, remaining: load().length };
 }

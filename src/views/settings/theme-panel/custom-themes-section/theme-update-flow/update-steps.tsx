@@ -1,6 +1,7 @@
 import { Check, Copy, ImagePlus, Plus, Trash2 } from "../../../icons";
 import type { CustomTheme } from "@/lib/custom-themes";
 import { useT } from "@/lib/i18n";
+import { THEME_SUBMISSION_SCREENSHOT_LIMIT } from "@/lib/theme-store";
 import { Field } from "../field";
 
 export const STEPS = ["Version", "Cover", "Screenshots", "Changes"];
@@ -116,6 +117,11 @@ export function ShotsStep({
       <p className="text-[13.5px] text-ink-muted">
         {t("Optional. Adding any screenshots replaces your current set.")}
       </p>
+      <p className="text-[13.5px] text-ink-muted">
+        {t("Add up to {n} screenshots to show your theme in action. Screenshots are optional.", {
+          n: THEME_SUBMISSION_SCREENSHOT_LIMIT,
+        })}
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {shots.map((s, i) => (
           <div key={i} className="group relative aspect-video overflow-hidden rounded-md">
@@ -129,7 +135,7 @@ export function ShotsStep({
             </button>
           </div>
         ))}
-        {shots.length < 6 && (
+        {shots.length < THEME_SUBMISSION_SCREENSHOT_LIMIT && (
           <button
             onClick={onAdd}
             className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-edge text-ink-subtle transition-colors hover:border-accent hover:text-ink"

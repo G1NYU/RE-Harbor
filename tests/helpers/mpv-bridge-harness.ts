@@ -5,7 +5,13 @@ import * as snapshots from "../../src/lib/player/bridge.ts";
 import * as selection from "../../src/lib/player/subtitle-selection.ts";
 import * as cleanups from "../../src/lib/player/prepared-subtitle-cleanups.ts";
 import * as seeds from "../../src/lib/subtitles/seed-batch.ts";
+import * as autoload from "../../src/lib/subtitles/autoload.ts";
 import * as failures from "../../src/lib/player/mpv-failure.ts";
+import * as translationJobs from "../../src/lib/subtitles/translation-jobs.ts";
+import * as addedSubs from "../../src/lib/subtitles/added-subs.ts";
+import * as language from "../../src/lib/subtitles/language.ts";
+import * as pauseTrace from "../../src/lib/player/pause-trace.ts";
+import { SubtitlePreparationError as RealSubtitlePreparationError } from "../../src/lib/subtitles/prepare.ts";
 import type { PlayerBridge, PlayerSnapshot } from "../../src/lib/player/bridge.ts";
 import type { MpvOptions } from "../../src/lib/player/mpv.ts";
 
@@ -36,10 +42,9 @@ export function playerSnapshotChanged() {
   const compiled = ts.transpileModule(comparator.getText(ast), {
     compilerOptions: { target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  return new Function(`${compiled}; return snapChangedIgnoringClock;`)() as (
-    a: PlayerSnapshot,
-    b: PlayerSnapshot,
-  ) => boolean;
+  return new Function(
+    `const AUTOMATIC_SUBTITLE_BUFFER_SEC = ${autoload.AUTOMATIC_SUBTITLE_BUFFER_SEC}; ${compiled}; return snapChangedIgnoringClock;`,
+  )() as (a: PlayerSnapshot, b: PlayerSnapshot) => boolean;
 }
 
 export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }, options?: MpvOptions) {
@@ -50,6 +55,17 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }, options
   const handlers = new Map<string, (event: { payload: unknown }) => void>();
   const commands: Array<{ command: string; args: Record<string, unknown> }> = [];
   const errors: string[] = [];
+  // Fixed RAM and buffer values keep playback tests independent of the test machine.
+  const totalPhysBytes = 16 * 1024 ** 3;
+  const autoBufferProfile = () => ({
+    cacheSecs: 300,
+    readaheadSecs: 300,
+    maxBytes: 768 * 1024 ** 2,
+    maxBackBytes: 256 * 1024 ** 2,
+    pauseWaitSecs: 1,
+  });
+  const formatMpvBytes = (bytes: number) =>
+    bytes % 1024 ** 3 === 0 ? `${bytes / 1024 ** 3}GiB` : `${Math.round(bytes / 1024 ** 2)}MiB`;
   const properties = new Map<string, unknown>([
     ["sid", "no"],
     ["secondary-sid", "no"],
@@ -82,16 +98,15 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }, options
         return () => handlers.delete(name);
       },
     },
+    "./buffer-profile": {
+      autoBufferProfile,
+      formatMpvBytes,
+      isBlockedDiskCacheOptionLine: () => false,
+    },
+    "@/lib/native-memory": { getTotalPhysBytes: () => totalPhysBytes },
     "@/lib/subtitles/prepare": {
       prepareSubtitle: (input: { url: string }) => prepare(input),
-      SubtitlePreparationError: class SubtitlePreparationError extends Error {
-        reason: string;
-        constructor(reason: string, message: string) {
-          super(message);
-          this.name = "SubtitlePreparationError";
-          this.reason = reason;
-        }
-      },
+      SubtitlePreparationError: RealSubtitlePreparationError,
     },
     "@/lib/subtitles/provider-auth": { subtitleTrackDownloadHeaders: () => undefined },
     "@/lib/subtitles/prepared-registry": { takePreparedSubtitle: () => null },
@@ -101,8 +116,12 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }, options
       clearPendingSub() {},
       wasPendingSub: () => false,
     },
-    "@/lib/subtitles/translation-jobs": { registerTranslationJob() {} },
+    "@/lib/subtitles/autoload": autoload,
+    "@/lib/subtitles/translation-jobs": translationJobs,
+    "@/lib/subtitles/added-subs": addedSubs,
+    "@/lib/subtitles/language": language,
     "./mpv-failure": failures,
+    "./pause-trace": pauseTrace,
     "@/lib/platform": {
       isWindowsDesktop: () => true,
       isLinuxDesktop: () => false,
@@ -160,7 +179,9 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }, options
     },
     { warn() {}, info() {} },
     {
-      get visibilityState() { return visibilityState; },
+      get visibilityState() {
+        return visibilityState;
+      },
       addEventListener: documentEvents.addEventListener.bind(documentEvents),
       removeEventListener: documentEvents.removeEventListener.bind(documentEvents),
     },
@@ -174,7 +195,9 @@ export function mpvBridgeHarness(prefs = { volume: 0.35, muted: false }, options
     bridge,
     commands,
     errors,
-    emitWindow(name: string) { windowEvents.dispatchEvent(new Event(name)); },
+    emitWindow(name: string) {
+      windowEvents.dispatchEvent(new Event(name));
+    },
     emitVisibility(state: DocumentVisibilityState) {
       visibilityState = state;
       documentEvents.dispatchEvent(new Event("visibilitychange"));

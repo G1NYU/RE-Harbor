@@ -209,7 +209,10 @@ function checkOne(
   }
 
   if (strict && opts.kind === "movie" && opts.expectedTitle && s.parsedTitle) {
-    if (!titleMatches(opts.expectedTitle, s.parsedTitle, s.year, opts.expectedYear ?? null)) {
+    const titles = [opts.expectedTitle, ...(opts.expectedTitles ?? [])];
+    if (
+      !titles.some((title) => titleMatches(title, s.parsedTitle, s.year, opts.expectedYear ?? null))
+    ) {
       return "title-mismatch";
     }
   }
@@ -270,7 +273,10 @@ function checkOne(
   }
 
   if (strict && opts.kind === "series" && !opts.isAnime && opts.expectedTitle && s.parsedTitle) {
-    if (!titleMatches(opts.expectedTitle, s.parsedTitle, s.year, opts.expectedYear ?? null)) {
+    const titles = [opts.expectedTitle, ...(opts.expectedTitles ?? [])];
+    if (
+      !titles.some((title) => titleMatches(title, s.parsedTitle, s.year, opts.expectedYear ?? null))
+    ) {
       return "title-mismatch";
     }
   }
@@ -288,6 +294,17 @@ function checkOne(
   }
 
   const hasFileIdx = s.fileIdx != null;
+  if (
+    strict &&
+    opts.kind === "series" &&
+    !opts.isAnime &&
+    opts.expectedEpisode != null &&
+    s.seasonPack &&
+    !opts.allowSeasonPacks &&
+    !hasFileIdx
+  ) {
+    return "season-pack-not-episode";
+  }
 
   if (
     strict &&
@@ -409,11 +426,9 @@ function sequelMarker(title: string): number | null {
 }
 
 function tokenize(text: string): string[] {
-  const lower = text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "");
-  const words = lower.match(/[a-z0-9]+/g) ?? [];
+  const lower = text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
+  // Keep Arabic, CJK and other scripts instead of silently discarding them.
+  const words = lower.match(/[\p{L}\p{N}]+/gu) ?? [];
   return words.filter((w) => w.length >= 3 && !TITLE_STOPWORDS.has(w));
 }
 

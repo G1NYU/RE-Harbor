@@ -1,10 +1,13 @@
 import { ChevronDown, Copy, Heart, Reply, Trash2, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useT } from "@/lib/i18n";
+import { parseQuotedBody, type RatingQuote } from "@/lib/ratings/quote";
+import type { RatingSource } from "@/lib/ratings/trigger";
 import { segmentMentions } from "@/lib/social/mentions";
 import { Avatar, timeAgo } from "./profile-bits";
 import { CommentCompose } from "./comment-compose";
 import { MentionLink } from "./mention-link";
+import { QuotedRating } from "./quoted-rating";
 import { segmentProfanity, type ComposeIssue } from "./text-safety";
 import { UserHoverCard } from "./user-hover-card";
 import { useSelfAvatar } from "./use-self-avatar";
@@ -65,6 +68,8 @@ export function CommentItem({
   replyToId,
   replies,
   sending,
+  sources,
+  onOpenMeta,
 }: {
   c: Comment;
   canDelete: boolean;
@@ -72,19 +77,24 @@ export function CommentItem({
   onDelete: (id: string) => void | Promise<void>;
   onToggleLike?: (id: string) => void | Promise<void>;
   onOpenAuthor?: (handle: string) => void;
-  onReply?: (raw: string, parentId: string) => Promise<ComposeIssue>;
+  onReply?: (raw: string, parentId: string, quote?: RatingQuote | null) => Promise<ComposeIssue>;
   replyToId?: string;
   replies?: Comment[];
   sending?: boolean;
+  /** Whose ratings the reply composer offers through "#", same as the main composer. */
+  sources?: RatingSource[];
+  onOpenMeta?: (metaId: string, kind?: string, hint?: { name?: string; poster?: string }) => void;
 }) {
   const t = useT();
   const self = useSelfAvatar();
+  const { quote, text } = parseQuotedBody(c.body);
   const [replying, setReplying] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const mine = !!self.handle && self.handle.toLowerCase() === c.authorHandle.toLowerCase();
   const avatarSrc = mine ? (self.avatar ?? c.authorAvatarUrl) : c.authorAvatarUrl;
   const avatarFallback = mine ? c.authorAvatarUrl : undefined;
   const canReply = !!onReply && !!signedIn && !!replyToId;
+  const [replyQuote, setReplyQuote] = useState<RatingQuote | null>(null);
   const [actionError, setActionError] = useState("");
   const actor = captureSocialActor();
   const deleteAction: ContextAction = {
@@ -95,9 +105,9 @@ export function CommentItem({
     danger: true,
     disabled: !canDelete,
     confirmation: {
-      key: JSON.stringify(["profile-comment:delete", actor, c.id, c.authorHandle, c.body]),
+      key: JSON.stringify(["profile-comment:delete", actor, c.id, c.authorHandle, text]),
       title: t("Delete comment"),
-      description: `${t("Delete the comment by @{handle}? This cannot be undone.", { handle: c.authorHandle })}\n\n${c.body.slice(0, 160)}${c.body.length > 160 ? "…" : ""}`,
+      description: `${t("Delete the comment by @{handle}? This cannot be undone.", { handle: c.authorHandle })}\n\n${text.trim().slice(0, 160)}${text.trim().length > 160 ? "…" : ""}`,
       confirmLabel: t("Delete comment"),
       pendingLabel: t("Deleting…"),
       successLabel: t("Comment deleted"),
@@ -138,8 +148,7 @@ export function CommentItem({
         id: "comment:copy",
         label: t("Copy Text"),
         icon: <Copy size={16} />,
-        quickCopy: true,
-        run: () => copyContextText(c.body),
+        run: () => copyContextText(text.trim()),
       },
       ...(signedIn && onToggleLike
         ? [
@@ -200,14 +209,17 @@ export function CommentItem({
               </span>
             )}
           </div>
-          <SafeBody body={c.body} onOpenAuthor={onOpenAuthor} />
+          {quote && (
+            <QuotedRating quote={quote} onOpenMeta={onOpenMeta} onOpenAuthor={onOpenAuthor} />
+          )}
+          {text.trim() ? <SafeBody body={text} onOpenAuthor={onOpenAuthor} /> : null}
           <div className="mt-1.5 flex items-center gap-1">
             <button
               onClick={() => void act(() => onToggleLike?.(c.id))}
               disabled={!signedIn}
               aria-pressed={!!c.liked}
               aria-label={c.liked ? t("Unlike comment") : t("Like comment")}
-              className={`-ml-2 inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2 text-[12px] tabular-nums transition-colors disabled:cursor-default ${
+              className={`-ms-2 inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2 text-[12px] tabular-nums transition-colors disabled:cursor-default ${
                 c.liked
                   ? "text-danger"
                   : `text-ink-subtle ${signedIn ? "hover:text-ink-muted" : ""}`
@@ -218,7 +230,11 @@ export function CommentItem({
             </button>
             {canReply && (
               <button
-                onClick={() => setReplying((v) => !v)}
+                onClick={() => {
+                  const next = !replying;
+                  setReplying(next);
+                  if (!next) setReplyQuote(null);
+                }}
                 aria-expanded={replying}
                 className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2 text-[12px] text-ink-subtle transition-colors hover:bg-elevated/70 hover:text-ink-muted"
               >
@@ -231,12 +247,18 @@ export function CommentItem({
               <CommentCompose
                 autoFocus
                 onSubmit={async (raw) => {
-                  const res = await onReply!(raw, replyToId!);
-                  if (!res) setReplying(false);
+                  const res = await onReply!(raw, replyToId!, replyQuote);
+                  if (!res) {
+                    setReplying(false);
+                    setReplyQuote(null);
+                  }
                   return res;
                 }}
                 sending={!!sending}
                 disabled={!signedIn}
+                quote={replyQuote}
+                onQuoteChange={setReplyQuote}
+                sources={sources}
               />
             </div>
           )}
@@ -257,7 +279,7 @@ export function CommentItem({
         </p>
       )}
       {replies && replies.length > 0 && (
-        <div className="ml-12 flex flex-col">
+        <div className="ms-12 flex flex-col">
           <button
             type="button"
             onClick={() => setShowReplies((v) => !v)}
@@ -275,7 +297,7 @@ export function CommentItem({
                 : t("Show {count} replies", { count: replies.length })}
           </button>
           {showReplies && (
-            <div className="flex flex-col border-l border-edge-soft pl-2">
+            <div className="flex flex-col border-s border-edge-soft ps-2">
               {replies.map((r) => (
                 <CommentItem
                   key={r.id}
@@ -287,7 +309,9 @@ export function CommentItem({
                   onToggleLike={onToggleLike}
                   onReply={onReply}
                   sending={sending}
+                  sources={sources}
                   onOpenAuthor={onOpenAuthor}
+                  onOpenMeta={onOpenMeta}
                 />
               ))}
             </div>

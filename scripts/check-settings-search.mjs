@@ -66,6 +66,7 @@ const TOP_RESULT = [
   ["theme", "Theme"],
   ["download", "Downloads"],
   ["language", "Languages"],
+  ["mouse cursor size", "Harbor cursor size"],
   ["player", "Player"],
   ["spoilers", "Spoilers (blur)"],
   ["backup", "Backup & restore"],
@@ -120,19 +121,35 @@ try {
   console.log("  queries checked: " + checked);
   console.log("  mean results:    " + (total / checked).toFixed(1));
   console.log("");
-  console.log((dead.length ? "  FAIL  " : "  ok    ") + dead.length + "  queries a person would type that find nothing");
+  console.log(
+    (dead.length ? "  FAIL  " : "  ok    ") +
+      dead.length +
+      "  queries a person would type that find nothing",
+  );
   dead.forEach((q) => console.log("          - " + q));
-  console.log((broad.length ? "  FAIL  " : "  ok    ") + broad.length + "  queries returning more than " + MAX_HITS + " results");
+  console.log(
+    (broad.length ? "  FAIL  " : "  ok    ") +
+      broad.length +
+      "  queries returning more than " +
+      MAX_HITS +
+      " results",
+  );
   broad.forEach((q) => console.log("          - " + q));
 
   const misranked = [];
   for (const [q, expected] of TOP_RESULT) {
     const top = find(q)[0];
     if (!top || top.label !== expected) {
-      misranked.push(q + '  ->  expected "' + expected + '", got "' + (top ? top.label : "nothing") + '"');
+      misranked.push(
+        q + '  ->  expected "' + expected + '", got "' + (top ? top.label : "nothing") + '"',
+      );
     }
   }
-  console.log((misranked.length ? "  FAIL  " : "  ok    ") + misranked.length + "  queries whose first result is not the obvious one");
+  console.log(
+    (misranked.length ? "  FAIL  " : "  ok    ") +
+      misranked.length +
+      "  queries whose first result is not the obvious one",
+  );
   misranked.forEach((m) => console.log("          - " + m));
 
   failed = (dead.length ? 1 : 0) + (broad.length ? 1 : 0) + (misranked.length ? 1 : 0);

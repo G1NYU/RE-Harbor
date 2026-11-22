@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { withTimeout } from "@/lib/progressive-rows";
-import { invalidateMusicHealth, lanePool, mergeMusicSearchLanes, searchAcrossMusicSources } from "./sources";
+import {
+  invalidateMusicHealth,
+  lanePool,
+  mergeMusicSearchLanes,
+  searchAcrossMusicSources,
+} from "./sources";
 import type { RankedMusicSearchResults } from "./sources";
 import type {
   MusicAlbumRef,
@@ -25,6 +30,11 @@ export function loadHomeRows(refresh = false): Promise<MusicCatalogRow[]> {
 
 export function browseConnector(connector: string): Promise<MusicCatalogRow[]> {
   return invoke<MusicCatalogRow[]>("music_browse_connector", { connector });
+}
+
+/** Grouped rows for a source's own library surface (for example YouTube Music's saved items). */
+export function loadConnectorLibrary(connector: string): Promise<MusicCatalogRow[]> {
+  return invoke<MusicCatalogRow[]>("music_library_rows", { connector });
 }
 
 export function albumTracks(album: MusicAlbumRef): Promise<MusicTrack[]> {
@@ -52,6 +62,17 @@ export function catalogPlaylistTracks(playlist: MusicPlaylistRef): Promise<Music
   return invoke<MusicTrack[]>("music_catalog_playlist_tracks", { playlist });
 }
 
+/** One page of a catalog playlist; pass the last page's `nextCursor` to continue. */
+export function catalogPlaylistPage(
+  playlist: MusicPlaylistRef,
+  cursor?: string | null,
+): Promise<MusicCatalogPage> {
+  return invoke<MusicCatalogPage>("music_catalog_playlist_page", {
+    playlist,
+    cursor: cursor ?? null,
+  });
+}
+
 export function stationTracks(station: MusicStationRef): Promise<MusicTrack[]> {
   return invoke<MusicTrack[]>("music_station_tracks", { station });
 }
@@ -72,7 +93,11 @@ export async function searchTyped(
   if (!trimmed) return { tracks: [], albums: [], artists: [], playlists: [] };
   if (!connector) return searchAcrossMusicSources(trimmed, limit);
   const results = await withTimeout(
-    invoke<MusicSearchResults>("music_search_typed", { query: trimmed, limit: lanePool(limit), connector }),
+    invoke<MusicSearchResults>("music_search_typed", {
+      query: trimmed,
+      limit: lanePool(limit),
+      connector,
+    }),
     SINGLE_SOURCE_TIMEOUT_MS,
   );
   return mergeMusicSearchLanes([{ id: connector, results }], limit);

@@ -4,8 +4,8 @@ const settings: Record<string, string> = {
   "Syncing display name…": "جارٍ مزامنة اسم العرض…",
   "Display name saved to your Harbor account.": "تم حفظ اسم العرض في حسابك في هاربور.",
   "Content advisory theme": "سمة التنبيه بالمحتوى",
-  "Choose whether the content advisory appears in full color or a restrained monochrome tone.":
-    "اختر ما إذا كان التنبيه بالمحتوى سيظهر بألوان كاملة أو بنمط أحادي اللون هادئ.",
+  "Choose whether the content advisory appears in full color or a restrained monochrome tone. Also affects the Content Advisory section on detail pages.":
+    "اختر ما إذا كان التنبيه بالمحتوى سيظهر بألوان كاملة أو بنمط أحادي اللون هادئ. يؤثر أيضاً على قسم التنبيه بالمحتوى في صفحات التفاصيل.",
   Monochrome: "أحادي اللون",
   "Press Enter or Space to type": "اضغط Enter أو Space للكتابة",
   "Text mode — Esc to exit": "وضع الكتابة — Esc للخروج",
@@ -186,7 +186,7 @@ const settings: Record<string, string> = {
     "تتبّع ما تشاهده تلقائيًا وحفظ تقدّم المشاهدة في الوقت الفعلي.",
   "Auto-play trailer on detail pages": "تشغيل المقطع الدعائي تلقائيًا في صفحات التفاصيل",
   "Award Icons": "أيقونات الجوائز",
-  "Award tab on cards": "علامة تبويب الجوائز على البطاقات",
+  "Award display mode": "وضع الجوائز",
   "Award tab position": "موضع علامة تبويب الجوائز",
   Backdrop: "الخلفية",
   "Badge art": "صور الشارات",
@@ -206,7 +206,8 @@ const settings: Record<string, string> = {
   "Browse all releases": "تصفّح جميع الإصدارات",
   "Buffer fill": "تعبئة المخزن المؤقت",
   "Reveal the dot on hover": "إظهار النقطة عند التمرير فوقها",
-  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.": "تبقى النقطة بعيدة عن الطريق وتظهر عندما توجّه المؤشر إلى الشريط. أوقف هذا الخيار لإبقائها ظاهرة طوال الوقت.",
+  "The dot stays out of the way and appears when you point at the bar. Turn this off to keep it on screen the whole time.":
+    "تبقى النقطة بعيدة عن الطريق وتظهر عندما توجّه المؤشر إلى الشريط. أوقف هذا الخيار لإبقائها ظاهرة طوال الوقت.",
   "Buffer fill brightness": "سطوع تعبئة المخزن المؤقت",
   Build: "البناء",
   "Build a named quality preference once and set it active. The picker prefers streams that match it, including the instant pick, and falls back to the next best source when nothing matches. Each filter ANDs its dimensions and ignores any you leave blank.":
@@ -258,8 +259,8 @@ const settings: Record<string, string> = {
   "Could not send: {error}": "تعذّر الإرسال: {error}",
   "Couldn't reach Trakt. Check your connection and try again.":
     "تعذّر الوصول إلى Trakt. تحقق من اتصالك وحاول مرة أخرى.",
-  "Couldn't reach harbor.site to load earlier builds. Check your connection and try again.":
-    "تعذّر الوصول إلى harbor.site لتحميل الإصدارات السابقة. تحقق من اتصالك وحاول مرة أخرى.",
+  "Couldn't reach GitHub to load earlier builds. Check your connection and try again.":
+    "تعذّر الوصول إلى GitHub لتحميل الإصدارات السابقة. تحقق من اتصالك وحاول مرة أخرى.",
   "Couldn't reach that pack": "تعذّر الوصول إلى تلك الحزمة",
   "Couldn't reach that pack (HTTP {n})": "تعذّر الوصول إلى تلك الحزمة (HTTP {n})",
   "Couldn't read your watchlist. Try again.": "تعذّرت قراءة قائمة مشاهدتك. حاول مرة أخرى.",
@@ -620,6 +621,9 @@ const settings: Record<string, string> = {
   "Scan for corruption": "الفحص بحثًا عن التلف",
   "Scanning your library…": "جارٍ فحص مكتبتك…",
   "Scanning…": "جارٍ الفحص…",
+  "Scale TV score badges": "تحجيم شارات التقييم في بطاقات المسلسلات",
+  "Shrink the score stack when several ratings are enabled.":
+    "تصغير مجموعة شارات التقييم عند تفعيل عدة تقييمات.",
   "Score badges on cards": "شارات التقييم على البطاقات",
   "Score position": "موضع التقييم",
   "Scrobble to SIMKL": "تسجيل المشاهدات في SIMKL",
@@ -647,8 +651,8 @@ const settings: Record<string, string> = {
   "Show Simkl Trending Today rail": "إظهار صف Simkl الرائج اليوم",
   "Show Simkl rails on Home": "إظهار صفوف Simkl في الصفحة الرئيسية",
   "Show Up Next on Simkl rail": 'إظهار "التالي" في صف Simkl',
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "إظهار زر تخطّي المقدمة / تخطّي الشارة عندما يكتشف Harbor واحداً منها. عطّل هذا الخيار لعدم إظهاره أبداً. يمكنك أيضاً النقر على X على الزر لتجاهل زر خاطئ لبقية الحلقة.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "إظهار زر تخطّي المقدمة / تخطّي الشارة عندما يكتشف Harbor واحداً منها. عطّل هذا الخيار لعدم إظهاره أبداً. يُخفي الزر نفسه عند انتهاء المقدمة أو الشارة، أو بعد المهلة أدناه.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "إظهار زر تخطّي عند تشغيل إعلان مُدرَج معروف، وزر إبلاغ صغير على الإصدارات الجديدة لتتمكّن من وضع علامة على الإعلانات للمراجعة.",
   "Show a bookmark on saved titles": "إظهار إشارة مرجعية على العناوين المحفوظة",
@@ -916,8 +920,8 @@ const settings: Record<string, string> = {
   "Stretch the featured hero edge to edge and taller, across every layout.":
     "تمدّد لافتة البطل من الحافة إلى الحافة وبارتفاع أكبر، في جميع التخطيطات.",
   "Full quality hero image": "صورة البطل بأعلى جودة",
-  "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.":
-    "تحميل صورة البطل المميّز بأعلى دقة. يستهلك بيانات أكثر.",
+  "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.":
+    "تحميل الصورة بأعلى دقة للبطل المميّز، ولصورة صفحة التفاصيل، ولخلفيات منتقي المصادر غير المشوّشة. يستهلك بيانات وذاكرة فيديو أكثر.",
   "Display language": "لغة العرض",
   "Interface language": "لغة الواجهة",
   "Metadata language": "لغة البيانات الوصفية",
@@ -1116,8 +1120,8 @@ const settings: Record<string, string> = {
   "Hero carousel, Top 10, Trending, In Theaters, per-service rails.":
     "عرض دوّار، Top 10، الأكثر رواجاً، في دور السينما، صفوف لكل خدمة.",
   Updates: "التحديثات",
-  "Harbor checks harbor.site for new versions and installs them in place.":
-    "يتحقق Harbor من harbor.site من إصدارات جديدة ويثبّتها في مكانها.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place.":
+    "يتحقق Harbor من harborcommunity.site من إصدارات جديدة ويثبّتها في مكانها.",
   "Backup & restore": "النسخ الاحتياطي والاستعادة",
   "Export your entire Harbor setup to a single file, then restore it on a new computer or keep it as a backup.":
     "صدّر إعداداتك الكاملة لملف واحد، ثم استعدها على جهاز جديد.",
@@ -1523,6 +1527,11 @@ const settings: Record<string, string> = {
   "Make everything bigger and easier to read: sidebar, menus, popups, every page. The whole interface scales live as you drag, so you can see the change right here. Great on 4K and ultrawide monitors, or whenever the text feels small.":
     "اجعل كل شيء أكبر وأسهل للقراءة: الشريط الجانبي، القوائم، النوافذ المنبثقة، كل صفحة. الواجهة بأكملها تتغير أثناء السحب. ممتاز للشاشات الكبيرة.",
   "Interface scale": "حجم الواجهة",
+  "Harbor cursor": "مؤشر هاربور",
+  "Harbor cursor size": "حجم مؤشر هاربور",
+  "settings.harborCursor.scale": "حجم المؤشر",
+  "Use Harbor's anchor as your mouse pointer.": "استخدم مرساة هاربور كمؤشر للماوس.",
+  "Adjust the size of Harbor's mouse pointer.": "ضبط حجم مؤشر Harbor.",
   "Trailer quality": "جودة العرض الدعائي",
   "How sharp the trailer is when you hit the preview button. Auto picks from your connection speed. 1080p and Best merge separate video and audio with the bundled ffmpeg, so they take a beat longer to start.":
     "مدى دقة المقطع الدعائي عند النقر على زر المعاينة. 'تلقائي' يختار بناءً على سرعة اتصالك. '1080p' و'الأفضل' يدمجان الفيديو والصوت المنفصلين عبر ffmpeg، لذا قد يستغرقان وقتاً أطول قليلاً للبدء.",
@@ -1964,8 +1973,8 @@ const settings: Record<string, string> = {
   "My library": "مكتبتي",
   Anticipated: "المنتظرة",
   "Custom calendar": "التقويم المخصص",
-  "Harbor checks harbor.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
-    "يتحقق Harbor من harbor.site للبحث عن إصدارات جديدة ويثبتها في مكانها. لا يتم تثبيت أي شيء حتى تختار ذلك، ولن يزعجك إشعار التحديث المرفوض مرة أخرى.",
+  "Harbor checks harborcommunity.site for new versions and installs them in place. Nothing installs until you choose to, and a dismissed update never nags you again.":
+    "يتحقق Harbor من harborcommunity.site للبحث عن إصدارات جديدة ويثبتها في مكانها. لا يتم تثبيت أي شيء حتى تختار ذلك، ولن يزعجك إشعار التحديث المرفوض مرة أخرى.",
   "Library, watch progress, and addon collection sync from this account.":
     "المكتبة، وتقدم المشاهدة، ومجموعة الإضافات تتزامن من هذا الحساب.",
   "Export your entire Harbor setup to a single file, then restore it on a new computer or keep it as a backup. Everything is included except your Stremio sign-in.":
@@ -2311,7 +2320,8 @@ const settings: Record<string, string> = {
     "تنبيه: إن كان Stremio مثبّتًا أيضًا، فقد يسأل Windows عن أي تطبيق تستخدمه في أول مرة يُطلق فيها رابط ‎stremio://‎. اختر Harbor ليثبت ذلك.",
   "stremio:// links now open in the Stremio app. Harbor will only install when you trigger it from inside Harbor.":
     "تُفتح روابط ‎stremio://‎ الآن في تطبيق Stremio. ولن يثبّت Harbor إلا عندما تطلقه من داخل Harbor.",
-  "Checking harbor.site for a newer build.": "يتحقّق من harbor.site بحثًا عن إصدار أحدث.",
+  "Checking harborcommunity.site for a newer build.":
+    "يتحقّق من harborcommunity.site بحثًا عن إصدار أحدث.",
   "Downloading {pct}%": "جارٍ التنزيل {pct}%",
   "Downloaded. Ready to install and restart.": "تم التنزيل. جاهز للتثبيت وإعادة التشغيل.",
   "Installing. Harbor will restart.": "جارٍ التثبيت. سيُعاد تشغيل Harbor.",

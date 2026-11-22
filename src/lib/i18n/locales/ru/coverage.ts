@@ -1,7 +1,10 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Waiting for {name}…": "Ожидание {name}…",
+  "Keeping the source you were watching.": "Сохраняем источник, который вы смотрели.",
   "Sound descriptions": "Описания звуков",
   "Hide sound effects and speaker names": "Скрывать звуковые эффекты и имена говорящих",
-  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Убирает из идущих субтитров описания в квадратных скобках вроде [скрип двери] и имена говорящих заглавными латинскими буквами вроде JOHN:, чтобы релиз, в котором есть только дорожка SDH, читался как обычный диалог. Тексты песен, обычные круглые скобки и нелатинские алфавиты остаются нетронутыми. Не применяется к форсированным и графическим дорожкам.",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
+    "Убирает из идущих субтитров описания в квадратных скобках вроде [скрип двери] и имена говорящих заглавными латинскими буквами вроде JOHN:, чтобы релиз, в котором есть только дорожка SDH, читался как обычный диалог. Тексты песен, обычные круглые скобки и нелатинские алфавиты остаются нетронутыми. Не применяется к форсированным и графическим дорожкам.",
   "Play from": "Играть с",
   end: "конец",
   "m:ss": "м:сс",
@@ -650,6 +653,18 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "Ключ API NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Выберите, должен ли Harbor предпочитать прямые и debrid-источники, одноранговые торренты или показывать оба варианта.",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

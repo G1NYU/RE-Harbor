@@ -16,6 +16,7 @@ import {
   Volume2,
 } from "../icons";
 import { useSettings } from "@/lib/settings";
+import { setExternalCwSources } from "@/lib/feed/external-cw";
 import { clearAllSnapshots, snapshotCount } from "@/lib/snapshots";
 import { useT } from "@/lib/i18n";
 import { Dropdown, type DropdownOption } from "@/components/dropdown";
@@ -26,10 +27,12 @@ import { CwSnapshotShowcase } from "../cw-snapshot-showcase";
 import { PreviewImage } from "../preview-image";
 import { HeroShadowPreview } from "./hero-shadow-preview";
 import { CwEndPreview } from "./cw-end-preview";
+import { AnimeIdentityStatus } from "./anime-identity-status";
 
 export function HomeTab() {
   const { settings, update } = useSettings();
   const t = useT();
+  const isNuvio = settings.accountProvider === "nuvio";
   return (
     <>
       <Section
@@ -68,7 +71,7 @@ export function HomeTab() {
           <ToggleRow
             label={t("Full quality hero image")}
             sub={t(
-              "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.",
+              "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.",
             )}
             value={settings.heroFullQuality}
             onChange={(v) => update({ heroFullQuality: v })}
@@ -226,6 +229,14 @@ export function HomeTab() {
           </SettingRow>
           <CwEndPreview mode={settings.animeCwEnd} />
           <ToggleRow
+            label={t("Allow playing unreleased episodes")}
+            sub={t(
+              "On by default: Continue Watching lets you play the next episode even when its release date is still in the future. Turn this off to block Play until it airs. The countdown and Upcoming label stay visible either way.",
+            )}
+            value={settings.cwPlayUnreleased}
+            onChange={(v) => update({ cwPlayUnreleased: v })}
+          />
+          <ToggleRow
             label={t("Keep anime in the Anime room only")}
             sub={t(
               "Hides anime from the Home Continue Watching row. It still appears in the Anime tab's own Continue Watching.",
@@ -234,14 +245,16 @@ export function HomeTab() {
             onChange={(v) => update({ animeOnlyInAnimeRoom: v })}
             preview={<HomeRowPreview kind="anime-room" />}
           />
-          <ToggleRow
-            label={t("Keep Continue Watching private to each profile")}
-            sub={t(
-              "Only show Continue Watching for the profile that's active. Each profile sees just its own progress, so what you watch stays hidden from the other profiles that share this Stremio account.",
-            )}
-            value={settings.cwPerProfile}
-            onChange={(v) => update({ cwPerProfile: v })}
-          />
+          {!isNuvio && (
+            <ToggleRow
+              label={t("Keep Continue Watching private to each profile")}
+              sub={t(
+                "Only show Continue Watching for the profile that's active. Each profile sees just its own progress, so what you watch stays hidden from the other profiles that share this Stremio account.",
+              )}
+              value={settings.cwPerProfile}
+              onChange={(v) => update({ cwPerProfile: v })}
+            />
+          )}
         </SettingGroup>
 
         <SettingGroup label={t("Continue Watching sources")}>
@@ -251,12 +264,16 @@ export function HomeTab() {
             )}
           </p>
           <ToggleRow
-            label={t("Harbor library")}
-            sub={t("Your own Harbor account progress. The primary source for almost everyone.")}
+            label={isNuvio ? t("Nuvio library") : t("Harbor library")}
+            sub={
+              isNuvio
+                ? t("Your own Nuvio account progress. The primary source for almost everyone.")
+                : t("Your own Harbor account progress. The primary source for almost everyone.")
+            }
             value={settings.cwSources.library}
             onChange={(v) => update({ cwSources: { ...settings.cwSources, library: v } })}
             lockReason={
-              settings.cwPerProfile
+              !isNuvio && settings.cwPerProfile
                 ? t("Unavailable while Continue Watching is kept private to each profile.")
                 : undefined
             }
@@ -274,9 +291,17 @@ export function HomeTab() {
               "Pulls what you have part-watched on Trakt into the row, marked with the Trakt logo. Requires a connected Trakt account.",
             )}
             value={settings.cwSources.trakt}
-            onChange={(v) => update({ cwSources: { ...settings.cwSources, trakt: v } })}
+            onChange={(v) => {
+              update({ cwSources: { ...settings.cwSources, trakt: v } });
+              setExternalCwSources({
+                trakt: v,
+                simkl: settings.cwSources.simkl,
+                publicmetadb: settings.cwSources.publicmetadb,
+                nuvio: isNuvio,
+              });
+            }}
             lockReason={
-              settings.cwPerProfile
+              !isNuvio && settings.cwPerProfile
                 ? t(
                     "Unavailable while Continue Watching is kept private to each profile, because Trakt progress is shared across every profile on this account.",
                   )
@@ -290,9 +315,17 @@ export function HomeTab() {
               "Pulls what you have part-watched on Simkl into the row, marked with the Simkl logo. Requires a connected Simkl account.",
             )}
             value={settings.cwSources.simkl}
-            onChange={(v) => update({ cwSources: { ...settings.cwSources, simkl: v } })}
+            onChange={(v) => {
+              update({ cwSources: { ...settings.cwSources, simkl: v } });
+              setExternalCwSources({
+                trakt: settings.cwSources.trakt,
+                simkl: v,
+                publicmetadb: settings.cwSources.publicmetadb,
+                nuvio: isNuvio,
+              });
+            }}
             lockReason={
-              settings.cwPerProfile
+              !isNuvio && settings.cwPerProfile
                 ? t(
                     "Unavailable while Continue Watching is kept private to each profile, because Simkl progress is shared across every profile on this account.",
                   )
@@ -305,7 +338,28 @@ export function HomeTab() {
               "Pulls what you have part-watched on PublicMetaDB into the row, marked with the PublicMetaDB logo. Requires a connected PublicMetaDB account.",
             )}
             value={settings.cwSources.publicmetadb}
-            onChange={(v) => update({ cwSources: { ...settings.cwSources, publicmetadb: v } })}
+            onChange={(v) => {
+              update({ cwSources: { ...settings.cwSources, publicmetadb: v } });
+              setExternalCwSources({
+                trakt: settings.cwSources.trakt,
+                simkl: settings.cwSources.simkl,
+                publicmetadb: v,
+                nuvio: isNuvio,
+              });
+            }}
+          />
+          <ToggleRow
+            label={t("Also clear provider playback progress")}
+            sub={t(
+              "When you dismiss a Continue Watching card, also delete its saved playback position from every connected provider. Watch history, ratings, and watchlist statuses are unchanged.",
+            )}
+            value={settings.cwClearProviderProgress}
+            onChange={(v) => update({ cwClearProviderProgress: v })}
+            lockReason={
+              !isNuvio && settings.cwPerProfile
+                ? t("Unavailable while Continue Watching is kept private to each profile.")
+                : undefined
+            }
           />
         </SettingGroup>
 
@@ -359,6 +413,46 @@ export function HomeTab() {
           onChange={(v) => update({ cwPreferEpisodeStill: v })}
         />
         <ClearSnapshotsButton />
+      </Section>
+
+      <Section
+        title={t("Anime identity (experimental)")}
+        subtitle={t(
+          "Download a local anime mapping database so Continue Watching can group parts of the same show and write progress to the correct tracker entry. Off by default.",
+        )}
+      >
+        <ToggleRow
+          label={t("Use the local anime identity database")}
+          newId="home:anime-identity"
+          sub={t(
+            "Downloads about six megabytes once a week and keeps a small local database. Without it, the app behaves exactly as before.",
+          )}
+          value={settings.animeIdentityEnabled}
+          onChange={(v) => update({ animeIdentityEnabled: v })}
+        />
+        {settings.animeIdentityEnabled && (
+          <ToggleRow
+            label={t("Repair verified anime Continue Watching identities")}
+            newId="home:anime-identity-repair"
+            sub={t(
+              "Opt in to a display-only correction when a saved native stream or exact catalog episode proof and the local database establish one anime owner. Saved progress stays intact; external tracker, next-up and ambiguous cards are untouched.",
+            )}
+            value={settings.animeIdentityRepairEnabled}
+            onChange={(v) => update({ animeIdentityRepairEnabled: v })}
+          />
+        )}
+        {settings.animeIdentityEnabled && (
+          <ToggleRow
+            label={t("Use the anime database for live scrobbling")}
+            newId="home:anime-identity-live-scrobble"
+            sub={t(
+              "Resolve an anime episode once as playback starts and use its verified owner for AniList, MAL, Simkl, Trakt and PublicMetaDB. Does not backfill history or synchronize accounts. Off by default.",
+            )}
+            value={settings.animeIdentityLiveScrobbleEnabled}
+            onChange={(v) => update({ animeIdentityLiveScrobbleEnabled: v })}
+          />
+        )}
+        <AnimeIdentityStatus enabled={settings.animeIdentityEnabled} />
       </Section>
     </>
   );

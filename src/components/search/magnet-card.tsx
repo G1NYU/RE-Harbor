@@ -173,7 +173,7 @@ export function MagnetCard({ raw, onClose }: { raw: string; onClose: () => void 
     }
 
     setEngine(null);
-    const added = await torrentEngineAdd(raw, parsed.trackers);
+    const added = await torrentEngineAdd(raw, parsed.trackers, undefined, "magnet-card");
     if (!added || added.files.length === 0) {
       setMode("error");
       const e = lastEngineAddError();

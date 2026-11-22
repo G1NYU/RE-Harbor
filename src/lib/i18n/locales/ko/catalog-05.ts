@@ -766,7 +766,8 @@ const catalog05: Record<string, string> = {
   "Live preview": "실시간 미리보기",
   "Live preview is on. Done and Save both keep what you've picked as your Custom theme. Reset reverts the editor to the saved palette.":
     "실시간 미리보기가 켜져 있습니다. 완료와 저장 모두 선택한 내용을 사용자 지정 테마로 유지합니다. 초기화를 누르면 편집기가 저장된 팔레트로 되돌아갑니다.",
-  "Live state of Harbor's own P2P engine on this machine.": "이 기기에서 실행 중인 Harbor 자체 P2P 엔진의 실시간 상태입니다.",
+  "Live state of Harbor's own P2P engine on this machine.":
+    "이 기기에서 실행 중인 Harbor 자체 P2P 엔진의 실시간 상태입니다.",
   "Live streams that actually work.": "실제로 작동하는 라이브 스트림입니다.",
   "Live sync": "실시간 동기화",
   "Live web": "실시간 웹",
@@ -780,8 +781,8 @@ const catalog05: Record<string, string> = {
   "Load file": "파일 불러오기",
   "Load more": "더 불러오기",
   "Load more comments": "댓글 더 보기",
-  "Load the highest-resolution artwork for the featured hero. Uses more bandwidth.":
-    "추천 히어로에 최고 해상도 아트워크를 불러옵니다. 데이터 사용량이 늘어납니다.",
+  "Load the highest-resolution artwork for the featured hero, the detail page hero, and unblurred stream picker backgrounds. Uses more bandwidth and video memory.":
+    "추천 히어로, 상세 페이지 히어로, 흐림 효과가 없는 스트림 선택 화면 배경에 최고 해상도 아트워크를 불러옵니다. 데이터와 비디오 메모리 사용량이 늘어납니다.",
   "Loaded {loaded} of {total} movies...": "영화 {total}개 중 {loaded}개 불러오는 중...",
   "Loaded {loaded} of {total} shows...": "시리즈 {total}개 중 {loaded}개 불러오는 중...",
   "Loaded {name}": "{name} 불러옴",

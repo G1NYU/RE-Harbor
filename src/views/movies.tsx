@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePinnedCatalogRows } from "./home/hooks/use-pinned-rows";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackToTop } from "@/components/back-to-top";
 import { CatalogRows } from "@/components/catalog/catalog-rows";
 import { CatalogCustomizeBar } from "@/components/catalog/customize-bar";
@@ -129,7 +130,7 @@ export function Movies({ active = true }: { active?: boolean }) {
               hasMore: !spec.noPaginate && metas.length >= 14,
               fetcher: spec.noPaginate ? undefined : spec.fetcher,
             };
-            setRows((current) => upsertOrdered(current, row, order));
+            startTransition(() => setRows((current) => upsertOrdered(current, row, order)));
             return true;
           }),
         );
@@ -195,7 +196,7 @@ export function Movies({ active = true }: { active?: boolean }) {
         hasMore: false,
         fetcher: blackAndWhitePage,
       });
-      setRows(built);
+      if (!cancelled) startTransition(() => setRows(built));
     })().catch(console.error);
     return () => {
       cancelled = true;
@@ -277,7 +278,15 @@ export function Movies({ active = true }: { active?: boolean }) {
         })),
     [movieCollections],
   );
-  const allRestRows = useMemo(() => [...collectionRows, ...restRows], [collectionRows, restRows]);
+  const pinnedRows = usePinnedCatalogRows("movies");
+  const allRestRows = useMemo(
+    () => [
+      ...pinnedRows.map((row) => ({ ...row, title: row.name })),
+      ...collectionRows,
+      ...restRows,
+    ],
+    [pinnedRows, collectionRows, restRows],
+  );
   const catalogRows = useMemo<MovieRow[]>(() => {
     if (top10.length < 10) return allRestRows;
     const trending = rows.find((r) => r.key === "trending");

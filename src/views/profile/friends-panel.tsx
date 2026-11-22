@@ -2,7 +2,7 @@ import { UserPlus, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { PRESENCE_META, resolvePresence, type PresenceStatus } from "@/lib/social/presence";
-import { AddFriendsModal } from "./add-friends-modal";
+import { useView } from "@/lib/view";
 import { Avatar } from "./profile-bits";
 import { UserHoverCard } from "./user-hover-card";
 import type { Friend } from "./profile-types";
@@ -55,7 +55,7 @@ export function FriendsPanel({
   visibilityPrivate?: boolean;
 }) {
   const t = useT();
-  const [addOpen, setAddOpen] = useState(false);
+  const { openUserDiscovery } = useView();
   const [shown, setShown] = useState(FRIENDS_PAGE);
   const online = friends.filter(friendIsOnline);
   const offline = friends.filter((f) => !friendIsOnline(f));
@@ -85,7 +85,7 @@ export function FriendsPanel({
         <div className="flex items-center gap-2">
           {isOwner && (
             <button
-              onClick={() => setAddOpen(true)}
+              onClick={openUserDiscovery}
               className="inline-flex h-8 items-center gap-1.5 rounded-full bg-elevated px-3 text-[12px] font-semibold text-ink-muted ring-1 ring-edge-soft transition-colors hover:bg-raised hover:text-ink"
             >
               <UserPlus size={14} /> {t("Add")}
@@ -159,12 +159,6 @@ export function FriendsPanel({
             </button>
           )}
         </div>
-      )}
-      {isOwner && addOpen && (
-        <AddFriendsModal
-          onClose={() => setAddOpen(false)}
-          existingHandles={friends.map((f) => f.handle)}
-        />
       )}
     </section>
   );

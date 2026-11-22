@@ -9,6 +9,7 @@ import * as lucide from "lucide-react";
 import ts from "typescript";
 import * as contextMenu from "../src/lib/context-menu.tsx";
 import { dispatchKeyboardContextMenu } from "../src/lib/context-content.ts";
+import { pickTmdbTitle, tmdbEnglishTitle } from "../src/lib/providers/tmdb/tmdb-title-fallback.ts";
 
 function componentLoader(extra: Record<string, unknown> = {}) {
   const wrap = ({ children }: { children?: React.ReactNode }) =>
@@ -24,6 +25,9 @@ function componentLoader(extra: Record<string, unknown> = {}) {
       Poster: ({ src }: { src?: string }) => React.createElement("img", { src, alt: "Poster" }),
     },
     "@/components/arrowed-scroll-row": { ArrowedScrollRow: wrap },
+    "@/components/ratings/mutual-match-badge": { MutualMatchBadge: () => null },
+    "@/components/icons/written-review-icon": { WrittenReviewIcon: () => null },
+    "./mutual-ratings": { MutualRatings: () => null },
     "@/components/row": { Row: wrap },
     "@/lib/ratings/poster": {
       useRatingPoster: (_id: string, _type: string, _title: string, poster?: string) => poster,
@@ -43,6 +47,7 @@ function componentLoader(extra: Record<string, unknown> = {}) {
     "@/lib/providers/tmdb/tmdb-imdb-resolve": { tmdbIdFromImdb: async () => null },
     "@/lib/providers/tmdb/tmdb-client": { get: async () => null },
     "@/lib/providers/tmdb/tmdb-images": { tmdbLocalizedPoster: async () => undefined },
+    "@/lib/providers/tmdb/tmdb-title-fallback": { pickTmdbTitle, tmdbEnglishTitle },
     "./section-header": { SectionHeader: () => null },
     "./list-heart": { ListHeart: () => null },
     "./list-share-button": { ListShareButton: () => null },
@@ -284,6 +289,9 @@ test("expanded public ratings bind both poster and title without changing the di
   try {
     const { UserRatings } = componentLoader({
       "@/components/ratings/rating-stars": { RatingStars: () => null },
+      "@/views/profile/profile-theme-context": { useProfileThemeSurfaceStyle: () => ({}) },
+      "@/components/icons/search-icon": { Search: () => null },
+      "@/lib/ratings/actions": { REVIEW_MAX: 4000, rate: async () => {} },
       "@/lib/social/ratings-api": {
         fetchUserRatings: async () => ({
           items: [

@@ -693,7 +693,8 @@ const catalog: Record<string, string> = {
   "Fast Hands": "Tangan Cepat",
   "Fast Mouth": "Mulut Cepat",
   "Fast · recommended for chapters": "Cepat · direkomendasikan untuk bab",
-  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.": "Lebih cepat dan senyap daripada P2P jika Anda sudah berlangganan Usenet. Konfigurasikan di halaman addon, lalu tempel URL manifes yang diberikan.",
+  "Faster and quieter than P2P if you already pay for Usenet. Configure on the addon page, paste the manifest URL it returns.":
+    "Lebih cepat dan senyap daripada P2P jika Anda sudah berlangganan Usenet. Konfigurasikan di halaman addon, lalu tempel URL manifes yang diberikan.",
   "Favicon must be an https URL.": "Favicon harus berupa URL https.",
   Favorite: "Favorit",
   "Favorite Anime": "Anime Favorit",
@@ -732,7 +733,8 @@ const catalog: Record<string, string> = {
   Feishin: "Feishin",
   "Fetches DuckDuckGo results and feeds top hits into the model prompt.":
     "Mengambil hasil DuckDuckGo dan memasukkan hasil teratas ke prompt model.",
-  "Fetches a small public test file over P2P, then reports UDP and HTTPS egress, DHT bootstrap and tracker reachability step by step.": "Mengambil file uji publik berukuran kecil melalui P2P, lalu melaporkan egress UDP dan HTTPS, bootstrap DHT, serta keterjangkauan tracker langkah demi langkah.",
+  "Fetches a small public test file over P2P, then reports UDP and HTTPS egress, DHT bootstrap and tracker reachability step by step.":
+    "Mengambil file uji publik berukuran kecil melalui P2P, lalu melaporkan egress UDP dan HTTPS, bootstrap DHT, serta keterjangkauan tracker langkah demi langkah.",
   "Fetching library index…": "Mengambil indeks perpustakaan…",
   "Fetching {n} items…": "Mengambil {n} item…",
   "Fetching {n} items…#few": "Mengambil {n} item…#few",
@@ -890,8 +892,8 @@ const catalog: Record<string, string> = {
   "Font name can only use letters, numbers, and spaces.":
     "Nama font hanya boleh menggunakan huruf, angka, dan spasi.",
   "Font tokens": "Token font",
-  "For Application URL anything works, for example https://harbor.site. TMDB never visits it.":
-    "Untuk URL Aplikasi, apa pun bisa digunakan, misalnya https://harbor.site. TMDB tidak pernah mengunjunginya.",
+  "For Application URL anything works, for example https://harborcommunity.site. TMDB never visits it.":
+    "Untuk URL Aplikasi, apa pun bisa digunakan, misalnya https://harborcommunity.site. TMDB tidak pernah mengunjunginya.",
   "For Everyone": "Untuk Semua Orang",
   "For a link or image you usually want an attribute:":
     "Untuk tautan atau gambar, biasanya Anda memerlukan atribut:",

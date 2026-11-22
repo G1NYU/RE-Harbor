@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -8,7 +9,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { needsImdbForPoster, needsTmdbForPoster, rpdbPoster } from "@/lib/providers/rpdb";
+import {
+  needsImdbForPoster,
+  needsTmdbForPoster,
+  rpdbBackdrop,
+  rpdbPoster,
+} from "@/lib/providers/rpdb";
 import { useTitlePoster } from "@/lib/title-poster";
 import {
   tmdbIdFromImdb,
@@ -17,13 +23,21 @@ import {
   useTmdbImdbId,
 } from "@/lib/providers/tmdb/tmdb-imdb-resolve";
 import { useSettings } from "@/lib/settings";
+import { firstPosterTransform, posterTransformEnabled } from "@/lib/metadata-sources";
 import { externalToKitsu, kitsuToImdb, kitsuToTvdb } from "@/lib/providers/anime-mapping";
+import { simklAnimeArtworkIds } from "@/lib/simkl/anime-artwork-ids";
 import { tmdbLocalizedPoster } from "@/lib/providers/tmdb/tmdb-images";
-import { sizeImageUrl, qualityMultiplier } from "@/lib/img-size";
+import {
+  nativePosterThumbnailWidth,
+  posterThumbnailWidth,
+  qualityMultiplier,
+  sizeImageUrl,
+} from "@/lib/img-size";
 import { shouldLocalizePosters } from "@/lib/providers/tmdb/tmdb-image-lang";
 import { useProxiedImageSrc } from "@/lib/remote-image-proxy";
 import { observeResize, observeWithin } from "@/lib/visibility";
 import { noteProbe, recordRenderCause } from "@/lib/render-cause";
+import { resolveRowScrollRoot, ScrollRootContext } from "./row";
 
 type Ratio = "portrait" | "landscape" | "wide" | "square";
 
@@ -83,8 +97,13 @@ export function useRpdbAltId(
   type?: "movie" | "series",
 ): { altId: string | undefined; pending: boolean } {
   const { settings } = useSettings();
-  const wantImdb = needsImdbForPoster(rpdbKey, metaId);
-  const wantTmdb = needsTmdbForPoster(rpdbKey, metaId);
+  const chain = settings.metadataSources?.poster?.length
+    ? settings.metadataSources.poster
+    : ["rpdb", "posterService"];
+  const transform = firstPosterTransform(chain, settings);
+  const transformBase = transform?.id === "posterService" ? settings.posterBaseUrl : "";
+  const wantImdb = needsImdbForPoster(rpdbKey, metaId, transformBase);
+  const wantTmdb = needsTmdbForPoster(rpdbKey, metaId, transformBase);
   const imdb = useTmdbImdbId(wantImdb ? metaId : undefined);
   const tmdb = useTmdbIdFromImdb(wantTmdb ? metaId : undefined);
   useEffect(() => {
@@ -106,14 +125,14 @@ function useAnimeRpdbIds(
   const { settings } = useSettings();
   const [animeImdb, setAnimeImdb] = useState<string>();
   const [animeTvdb, setAnimeTvdb] = useState<string>();
-  const isAnime = /^(kitsu|mal|anilist|anidb):/.test(metaId);
+  const isAnime = /^(kitsu|mal|anilist|anidb|simkl):/.test(metaId);
   useEffect(() => {
     setAnimeImdb(undefined);
     setAnimeTvdb(undefined);
   }, [metaId]);
   useEffect(() => {
     if (!isAnime || (!rpdbKey && !settings.posterBaseUrl)) return;
-    const m = metaId.match(/^(kitsu|mal|anilist|anidb):(\d+)/);
+    const m = metaId.match(/^(kitsu|mal|anilist|anidb|simkl):(\d+)/);
     if (!m) return;
     const source = m[1];
     const idNum = Number(m[2]);
@@ -121,18 +140,34 @@ function useAnimeRpdbIds(
     let cancelled = false;
     (async () => {
       let kitsuId: number | null = source === "kitsu" ? idNum : null;
-      if (kitsuId == null) {
+      let directImdb: string | undefined;
+      let directTvdb: number | undefined;
+      if (source === "simkl") {
+        const ids = await simklAnimeArtworkIds(idNum);
+        if (cancelled) return;
+        directImdb = ids.imdb;
+        directTvdb = ids.tvdb;
+        if (kitsuId == null) {
+          if (ids.kitsu) kitsuId = ids.kitsu;
+          else if (ids.mal)
+            kitsuId = await externalToKitsu("myanimelist", ids.mal).catch(() => null);
+          else if (ids.anidb) kitsuId = await externalToKitsu("anidb", ids.anidb).catch(() => null);
+        }
+      } else if (kitsuId == null) {
         const armSource = source === "mal" ? "myanimelist" : source;
         kitsuId = await externalToKitsu(armSource, idNum).catch(() => null);
       }
-      if (cancelled || kitsuId == null) return;
+      if (cancelled) return;
+      if (directImdb) setAnimeImdb(directImdb);
+      if (directTvdb) setAnimeTvdb(String(directTvdb));
+      if (kitsuId == null) return;
       const [tt, tv] = await Promise.all([
         kitsuToImdb(kitsuId).catch(() => null),
         kitsuToTvdb(kitsuId).catch(() => null),
       ]);
       if (cancelled) return;
-      if (tt) setAnimeImdb(tt);
-      if (tv) setAnimeTvdb(String(tv));
+      if (tt && !directImdb) setAnimeImdb(tt);
+      if (tv && !directTvdb) setAnimeTvdb(String(tv));
     })();
     return () => {
       cancelled = true;
@@ -148,6 +183,13 @@ export function usePosterChain(
   metaPoster?: string,
   type?: "movie" | "series",
 ) {
+  const { settings } = useSettings();
+  const transformPoster = posterTransformEnabled(settings);
+  const transformChain = settings.metadataSources?.poster?.length
+    ? settings.metadataSources.poster
+    : ["rpdb", "posterService"];
+  const transform = firstPosterTransform(transformChain, settings);
+  const transformBase = transform?.id === "posterService" ? settings.posterBaseUrl : "";
   const { altId, pending } = useRpdbAltId(rpdbKey, metaId, type);
   const { animeImdb, animeTvdb, animeTmdb } = useAnimeRpdbIds(rpdbKey, metaId);
   const { url: localized, localizing } = useLocalizedPoster(metaId);
@@ -162,9 +204,15 @@ export function usePosterChain(
     const fallbacks = localizing
       ? [pinned]
       : [
-          animeImdb ? rpdbPoster(rpdbKey, animeImdb, base, animeTmdb) : undefined,
-          animeTvdb ? rpdbPoster(rpdbKey, `tvdb:${animeTvdb}`, base) : undefined,
-          rpdbPoster(rpdbKey, metaId, base, altId),
+          transformPoster && animeImdb
+            ? rpdbPoster(rpdbKey, animeImdb, base, animeTmdb, transformBase, type)
+            : undefined,
+          transformPoster && animeTvdb
+            ? rpdbPoster(rpdbKey, `tvdb:${animeTvdb}`, base, undefined, transformBase, type)
+            : undefined,
+          transformPoster
+            ? rpdbPoster(rpdbKey, metaId, base, altId, transformBase, type)
+            : undefined,
           localized,
           metaPoster,
         ];
@@ -177,6 +225,9 @@ export function usePosterChain(
     return out;
   }, [
     rpdbKey,
+    settings.posterBaseUrl,
+    transformBase,
+    type,
     metaId,
     altId,
     metaPoster,
@@ -187,8 +238,33 @@ export function usePosterChain(
     localizing,
     pending,
     pinned,
+    transformPoster,
   ]);
   const sig = candidates.join("|");
+  const backdrop = useMemo(() => {
+    if (pending || !transformPoster) return undefined;
+    return (
+      (animeImdb
+        ? rpdbBackdrop(rpdbKey, animeImdb, undefined, animeTmdb, transformBase, type)
+        : undefined) ??
+      (animeTvdb
+        ? rpdbBackdrop(rpdbKey, `tvdb:${animeTvdb}`, undefined, undefined, transformBase, type)
+        : undefined) ??
+      rpdbBackdrop(rpdbKey, metaId, undefined, altId, transformBase, type)
+    );
+  }, [
+    rpdbKey,
+    settings.posterBaseUrl,
+    transformBase,
+    type,
+    metaId,
+    altId,
+    animeImdb,
+    animeTvdb,
+    animeTmdb,
+    pending,
+    transformPoster,
+  ]);
   const failedRef = useRef<Set<string>>(new Set());
   const sigRef = useRef(sig);
   const [, bump] = useReducer((n: number) => n + 1, 0);
@@ -197,14 +273,16 @@ export function usePosterChain(
     failedRef.current = new Set();
   }
   const src = candidates.find((u) => !failedRef.current.has(u));
+  const onError = useCallback(() => {
+    if (src && !failedRef.current.has(src)) {
+      failedRef.current.add(src);
+      bump();
+    }
+  }, [src]);
   return {
     src,
-    onError: () => {
-      if (src && !failedRef.current.has(src)) {
-        failedRef.current.add(src);
-        bump();
-      }
-    },
+    onError,
+    backdrop,
   };
 }
 
@@ -236,6 +314,7 @@ function PosterBody({
   children,
   onError,
   lazy = false,
+  preferDirect = false,
   fallbacks,
   retryOnError = true,
   fallbackColor,
@@ -248,6 +327,8 @@ function PosterBody({
   children?: React.ReactNode;
   onError?: () => void;
   lazy?: boolean | "release";
+  /** For public browse-grid covers, try HTTPS img loading before the native proxy. */
+  preferDirect?: boolean;
   fallbacks?: Array<string | null | undefined>;
   /** Suppress repeated failed image requests for static catalogs with missing cover art. */
   retryOnError?: boolean;
@@ -262,66 +343,94 @@ function PosterBody({
   } | null>(null);
   const propKey = `${src ?? ""}|${seed}|${ratio}|${className}|${String(lazy)}|${retryOnError}|${fallbackColor ?? ""}`;
   const prevRender = renderCauseRef.current;
-  recordRenderCause(
-    "poster",
-    !prevRender
-      ? "mount"
-      : prevRender.key !== propKey
-        ? "props"
-        : prevRender.children !== children
-          ? "children"
-          : prevRender.onError !== onError
-            ? "onError"
-            : prevRender.fallbacks !== fallbacks
-              ? "fallbacks"
-              : "state",
-  );
+  const propCause = !prevRender
+    ? "mount"
+    : prevRender.key !== propKey
+      ? "props"
+      : prevRender.children !== children
+        ? "children"
+        : prevRender.onError !== onError
+          ? "onError"
+          : prevRender.fallbacks !== fallbacks
+            ? "fallbacks"
+            : undefined;
   renderCauseRef.current = { key: propKey, children, onError, fallbacks };
   const effect = settings.posterEffect;
+  const pageScrollRoot = useContext(ScrollRootContext);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [imageEnabled, setImageEnabled] = useState(!lazy);
+  const imageEnabledRef = useRef(!lazy);
   const [targetPx, setTargetPx] = useState(0);
+  const targetPxRef = useRef(0);
+  const measuredPxRef = useRef(0);
   const qMult = qualityMultiplier(settings.posterQuality);
-  // Visibility is a DOM attribute, not React state. `inView`/`eager` used to be state, so every
-  // poster that crossed the viewport boundary re-rendered — scrolling up and down made that the
-  // largest render source in the profiler (~19 renders per poster). Because the `<img>` also stays
-  // mounted now, a poster that leaves and comes back no longer has to decode its image again.
+  const rawCandidates = [src, ...(fallbacks ?? [])].filter((u): u is string => !!u);
+  const rawCandidatesRef = useRef(rawCandidates);
+  rawCandidatesRef.current = rawCandidates;
+  // Wake lazy images once, and pause the shimmer outside the artwork loading range.
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    return observeWithin(el, "1200px", (e) => {
-      const near = e.isIntersecting;
-      el.toggleAttribute("data-near", near);
-      el.toggleAttribute("data-idle", !near);
-      const img = el.querySelector<HTMLImageElement>("img.harbor-poster-img");
-      if (!img) return;
-      if (near) img.fetchPriority = "high";
-      else img.removeAttribute("fetchpriority");
-    });
-  }, []);
+    return observeWithin(
+      el,
+      "360px",
+      (entry) => {
+        const near = entry.isIntersecting;
+        el.toggleAttribute("data-idle", !near);
+        if (!near || imageEnabledRef.current) return;
+        imageEnabledRef.current = true;
+        setImageEnabled(true);
+      },
+      resolveRowScrollRoot(pageScrollRoot, el),
+    );
+  }, [pageScrollRoot]);
   useEffect(() => {
     if (qMult === 0) return;
     const el = rootRef.current;
     if (!el) return;
-    return observeResize(el, () => {
-      const box = el.getBoundingClientRect();
+    return observeResize(el, (box) => {
       if (box.width <= 0) return;
       const need = Math.max(box.width, box.height * RATIO_AR[ratio]);
       // Capped at 2. An Android TV WebView reports devicePixelRatio 4 because it is
       // describing the 4K panel, while the window it rasterises is 1920x1080, so the
       // raw value asks for a bucket twice as wide and four times the pixels.
       const t = Math.ceil(need * Math.min(2, window.devicePixelRatio || 1) * qMult);
-      setTargetPx((prev) => (t > prev ? t : prev));
+      measuredPxRef.current = t;
+      const prev = targetPxRef.current;
+      if (t <= prev) return;
+      // During expansion, only update when the requested CDN URL or native thumbnail changes.
+      if (
+        prev > 0 &&
+        posterThumbnailWidth(prev) === posterThumbnailWidth(t) &&
+        rawCandidatesRef.current.every((url) => sizeImageUrl(url, prev) === sizeImageUrl(url, t))
+      )
+        return;
+      targetPxRef.current = t;
+      setTargetPx(t);
     });
   }, [qMult, ratio]);
-  const rawCandidates = [src, ...(fallbacks ?? [])].filter((u): u is string => !!u);
+  const rawSig = rawCandidates.join("|");
+  useEffect(() => {
+    // A non-resizable provider can be replaced by a CDN URL without any box resize.
+    // Reuse the latest measurement rather than keeping the old provider's size rung.
+    const measured = measuredPxRef.current;
+    if (qMult === 0 || measured <= targetPxRef.current) return;
+    targetPxRef.current = measured;
+    setTargetPx(measured);
+  }, [rawSig, qMult]);
   const candidates =
     qMult === 0 || targetPx <= 0
       ? rawCandidates
       : rawCandidates.map((u) => sizeImageUrl(u, targetPx));
   const sig = candidates.join("|");
   const [idx, setIdx] = useState(0);
+  const candidatesRef = useRef(candidates);
+  candidatesRef.current = candidates;
   const [displayed, setDisplayed] = useState<string | undefined>(undefined);
+  const displayedRef = useRef(displayed);
+  displayedRef.current = displayed;
   const [retry, setRetry] = useState(0);
+  const [nativeRetryUrl, setNativeRetryUrl] = useState<string | undefined>();
   const failedRef = useRef<Set<string>>(new Set());
   const firedRef = useRef(false);
   const failBurstRef = useRef<{ t: number; n: number }>({ t: 0, n: 0 });
@@ -347,25 +456,82 @@ function PosterBody({
     setRetry(0);
     failedRef.current = new Set();
     firedRef.current = false;
-    rootRef.current?.removeAttribute("data-loaded");
-    // A previous candidate is still on screen; keep it underneath until the new one lands.
-    if (shownRef.current) setDisplayed(shownRef.current);
+    const shown = shownRef.current;
+    const next = candidatesRef.current[0];
+    // Cached images can load before this effect runs. Do not hide that same image
+    // or create a redundant crossfade base that then needs a second cleanup render.
+    if (shown !== next) {
+      rootRef.current?.removeAttribute("data-loaded");
+      if (shown && displayedRef.current !== shown) setDisplayed(shown);
+    } else if (displayedRef.current) {
+      setDisplayed(undefined);
+    }
   }, [sig]);
 
   // `lazy="release"` used to unmount the `<img>` once a poster sat more than 2400px away for 1.5s.
-  // That freed the bitmap but made every return re-decode and re-render, which is what made
-  // scrolling up and down expensive. The `<img>` now stays mounted, the 1200px observer above owns
-  // the idle flag, and the far-card release in row.tsx (300px / 15s) is what unmounts a card — so
-  // the prop is kept only for call sites, not for eviction.
+  // The image stays mounted once loaded. Catalog rows can release the entire card when far away.
 
   let cursor = idx;
   while (cursor < candidates.length && failedRef.current.has(candidates[cursor])) cursor++;
   const current: string | undefined = candidates[cursor];
   const exhausted = cursor >= candidates.length;
+  const posterWidth = qMult > 0 && targetPx > 0 ? posterThumbnailWidth(targetPx) : 0;
+  const thumbWidthPx = nativePosterThumbnailWidth(current, posterWidth);
+  const displayedThumbWidth = nativePosterThumbnailWidth(displayed, posterWidth);
   // Remote plain-HTTP images (e.g. a Suwayomi server on a VPS) are mixed-content
   // blocked by the WebView; resolve them to a same-origin blob URL.
-  const currentSrc = useProxiedImageSrc(current);
-  const displayedSrc = useProxiedImageSrc(displayed);
+  const currentSrc = useProxiedImageSrc(current, {
+    forceProxy:
+      /^https?:\/\//.test(current ?? "") &&
+      (!preferDirect || nativeRetryUrl === current || !current?.startsWith("https://")),
+    persistent: true,
+    enabled: imageEnabled && (qMult === 0 || targetPx > 0),
+    thumbWidthPx,
+    originalSize: thumbWidthPx === undefined,
+  });
+  const displayedSrc = useProxiedImageSrc(displayed, {
+    forceProxy:
+      /^https?:\/\//.test(displayed ?? "") &&
+      (!preferDirect || nativeRetryUrl === displayed || !displayed?.startsWith("https://")),
+    persistent: true,
+    enabled: imageEnabled && displayed !== current,
+    thumbWidthPx: displayedThumbWidth,
+    originalSize: displayedThumbWidth === undefined,
+  });
+  const stateCauseRef = useRef<{
+    targetPx: number;
+    idx: number;
+    displayed: string | undefined;
+    retry: number;
+    currentSrc: string | undefined;
+    displayedSrc: string | undefined;
+    settings: unknown;
+  } | null>(null);
+  const previousState = stateCauseRef.current;
+  const stateChanges: string[] = [];
+  if (previousState) {
+    if (previousState.targetPx !== targetPx) stateChanges.push("size");
+    if (previousState.idx !== idx) stateChanges.push("fallback");
+    if (previousState.displayed !== displayed) stateChanges.push("crossfade");
+    if (previousState.retry !== retry) stateChanges.push("retry");
+    if (previousState.currentSrc !== currentSrc || previousState.displayedSrc !== displayedSrc)
+      stateChanges.push("proxy");
+    if (previousState.settings !== settings) stateChanges.push("settings");
+  }
+  recordRenderCause(
+    "poster",
+    propCause ?? (stateChanges.length ? stateChanges.join("+") : "unchanged-inputs"),
+  );
+  stateCauseRef.current = { targetPx, idx, displayed, retry, currentSrc, displayedSrc, settings };
+  const renderAttemptRef = useRef(0);
+  const committedAttemptRef = useRef(0);
+  renderAttemptRef.current += 1;
+  useLayoutEffect(() => {
+    // Strict Mode replays mount effects; count a committed render only once.
+    if (committedAttemptRef.current === renderAttemptRef.current) return;
+    committedAttemptRef.current = renderAttemptRef.current;
+    noteProbe("poster:committed-render");
+  });
 
   useEffect(() => {
     if (exhausted && !firedRef.current) {
@@ -420,20 +586,33 @@ function PosterBody({
       imgElRef.current = el;
       if (!el) return;
       if (el.complete) {
+        // complete=true with no decoded pixels can mean a deferred or
+        // not-yet-started load. Only the img onError event is a failure.
         if (el.naturalWidth > 0) markLoaded(currentRef.current);
-        else if (currentRef.current) fail(currentRef.current);
         return;
       }
-      const target = currentRef.current;
-      el.decode().then(
-        () => {
-          if (imgElRef.current === el && currentRef.current === target) markLoaded(target);
-        },
-        () => {},
-      );
     },
     [fail, markLoaded],
   );
+  useEffect(() => {
+    if (!displayed) return;
+    const el = imgElRef.current;
+    if (!el) return;
+    let timer: number | undefined;
+    const releaseBase = () => {
+      // Keep the old bitmap only through the 300ms reveal. Retaining it indefinitely
+      // doubles the decoded artwork for posters that changed size or provider.
+      timer = window.setTimeout(() => {
+        if (displayedRef.current === displayed) setDisplayed(undefined);
+      }, 350);
+    };
+    if (el.complete && el.naturalWidth > 0) releaseBase();
+    else el.addEventListener("load", releaseBase, { once: true });
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      el.removeEventListener("load", releaseBase);
+    };
+  }, [displayed, current, currentSrc]);
   useEffect(() => {
     if (!current) return;
     const el = imgElRef.current;
@@ -444,11 +623,13 @@ function PosterBody({
   // which would flash the shimmer even though the bytes are cached.
   useLayoutEffect(() => {
     if (exhausted) return;
-    if (current && decodedPosters.has(current)) {
+    // A decoded URL only skips the wait when this mount already has the blob
+    // src; otherwise the proxy is still loading and there is nothing to show yet.
+    if (current && currentSrc && decodedPosters.has(current)) {
       shownRef.current = current;
       rootRef.current?.setAttribute("data-loaded", "1");
     }
-  }, [current, exhausted]);
+  }, [current, currentSrc, exhausted]);
   const showShimmer = !exhausted;
   const showPlate = exhausted;
   const hue = hash(seed) % 360;
@@ -480,8 +661,22 @@ function PosterBody({
           alt=""
           draggable={false}
           decoding="async"
+          // Rows already gate mounting ahead of the viewport; browser lazy loading
+          // would postpone that prefetch until the user is almost on top of the card.
+          loading="eager"
           onLoad={() => markLoaded(current)}
-          onError={() => fail(current)}
+          onError={() => {
+            if (
+              preferDirect &&
+              current.startsWith("https://") &&
+              currentSrc === current &&
+              nativeRetryUrl !== current
+            ) {
+              // Retry a rejected public HTTPS cover through native HTTP before showing a plate.
+              rootRef.current?.removeAttribute("data-loaded");
+              setNativeRetryUrl(current);
+            } else fail(current);
+          }}
           className="harbor-poster-img absolute inset-0 h-full w-full object-cover"
         />
       )}

@@ -1,7 +1,9 @@
 import { safeFetch as fetch } from "@/lib/safe-fetch";
+import { invoke } from "@tauri-apps/api/core";
 import { dwarn } from "@/lib/debug";
 import { completedTorrentDownloadFor } from "@/lib/download/downloads-store";
 import { hasUncachedMarker, isP2pStream } from "./cached";
+import { prewarmP2pStream } from "./p2p-prewarm";
 import { streamSubtitles } from "./stream-subtitles";
 import {
   magnetFromHash,
@@ -167,7 +169,14 @@ export async function resolveStream(
     return { ok: false, code: "external-url-only", tried: [] };
   }
   if (stream.ytId) {
-    return { ok: false, code: "youtube-only", tried: [] };
+    if (signal.aborted) return { ok: false, code: "aborted", tried };
+    try {
+      const data = await invoke<DirectLink>("resolve_youtube_stream", { videoId: stream.ytId });
+      if (signal.aborted) return { ok: false, code: "aborted", tried };
+      return { ok: true, data: { ...data, subtitles: streamSubtitles(stream) }, via: "youtube" };
+    } catch {
+      return { ok: false, code: signal.aborted ? "aborted" : "youtube-only", tried };
+    }
   }
   if (stream.nzbUrl) {
     return { ok: false, code: "nzb-needs-external-player", tried: [] };
@@ -305,6 +314,8 @@ export async function resolveViaDebrids(
   userCommitted = false,
   inLibrary: Record<string, boolean> = {},
   hint?: EpisodeHint,
+  /** A previous media-open failed; never retry the same prepared signed link. */
+  refreshAfterFailure = false,
 ): Promise<ResolveResult> {
   if (!hash || debrids.length === 0) return { ok: false, code: "no-debrid-configured", tried: [] };
   const stream = { infoHash: hash, fileIdx, cached } as unknown as ScoredStream;
@@ -319,7 +330,10 @@ export async function resolveViaDebrids(
   const tried: Array<{ slug: string; code: string }> = [];
   for (const d of sorted) {
     if (signal.aborted) return { ok: false, code: "aborted", tried };
-    const prepared = await getPreparedDebridLink(stream, d, hint, signal);
+    if (refreshAfterFailure) invalidatePreparedDebridLink(stream, d, hint);
+    const prepared = refreshAfterFailure
+      ? null
+      : await getPreparedDebridLink(stream, d, hint, signal);
     const r: DebridResult<DirectLink> = prepared
       ? { ok: true, data: prepared }
       : await d.playableUrl(magnet, fileIdx, signal, hint);
@@ -347,11 +361,17 @@ async function tryLocalEngine(
   if (remoteStreamServerStrict()) return null;
   const addIdx =
     typeof stream.fileIdx === "number" && stream.fileIdx >= 0 ? stream.fileIdx : undefined;
-  const added = await torrentEngineAdd(
-    magnetFromHash(stream.infoHash),
-    trackersFromSources(stream.sources),
-    addIdx,
-  );
+  // A hover/focus/consent prewarm may already be adding this exact magnet. Reuse
+  // that add instead of starting a second concurrent metadata resolution.
+  const prewarmed = prewarmP2pStream(stream);
+  const added = prewarmed
+    ? await prewarmed
+    : await torrentEngineAdd(
+        magnetFromHash(stream.infoHash),
+        trackersFromSources(stream.sources),
+        addIdx,
+        "resolve",
+      );
   if (!added) return null;
   const releaseAbortCleanup = registerAbortCleanup(added, signal);
   let handedOff = false;

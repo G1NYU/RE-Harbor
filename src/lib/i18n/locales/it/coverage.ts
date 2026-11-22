@@ -1,4 +1,6 @@
 const coverage: Record<string, string> = {
+  "Waiting for {name}…": "In attesa di {name}…",
+  "Keeping the source you were watching.": "Mantengo la sorgente che stavi guardando.",
   "Sound descriptions": "Descrizioni sonore",
   "Hide sound effects and speaker names": "Nascondi effetti sonori e nomi dei personaggi",
   "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
@@ -1291,6 +1293,35 @@ const coverage: Record<string, string> = {
     "Facoltativo. TheIntroDB risponde anche senza chiave, ma una chiave aumenta il limite di richieste, così i tempi continuano ad arrivare durante le maratone. Ottienine una su",
   "Linking your Discord account also joins you to Harbor's Discord server, so the bot can send your Backup keys privately.":
     "Linking your Discord account also joins you to Harbor's Discord server, so the bot can send your Backup keys privately.",
+  "Largest first": "Prima i più grandi",
+  "Smallest first": "Prima i più piccoli",
+  "Default order": "Ordine predefinito",
+  "Sort sources: {value}": "Ordina fonti: {value}",
+  "Show keyboard shortcuts": "Mostra scorciatoie da tastiera",
+  "Show or hide the list of player shortcuts.":
+    "Mostra o nasconde l'elenco delle scorciatoie del lettore.",
+  "Press {key} to close. Change these in Settings.":
+    "Premi {key} per chiudere. Puoi modificarle nelle Impostazioni.",
+  "Cycle audio tracks": "Cambia traccia audio",
+  "Switch to the next available audio track.": "Passa alla traccia audio successiva disponibile.",
+  "Smaller subtitles": "Sottotitoli più piccoli",
+  "Decrease the subtitle text size.": "Riduce la dimensione del testo dei sottotitoli.",
+  "Larger subtitles": "Sottotitoli più grandi",
+  "Increase the subtitle text size.": "Aumenta la dimensione del testo dei sottotitoli.",
+  "Audio: {name}": "Audio: {name}",
+  "Subtitle size: {size}": "Dimensione sottotitoli: {size}",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

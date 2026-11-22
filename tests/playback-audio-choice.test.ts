@@ -27,6 +27,16 @@ test("ambiguous indistinguishable tracks are not guessed after their ids change"
   );
 });
 
+test("untagged dubs restore by unique track title despite incomplete decoder metadata", () => {
+  const english = { ...track("2", "English : DTS-HD Master Audio 5.1"), lang: undefined };
+  const choice = playbackAudioChoice({ ...english, codec: "DTS", channelCount: 6 });
+  const french = { ...english, id: "1", title: "French (International) : Dolby Digital 5.1" };
+  const reopened = { ...english, id: "3", lang: "und", codec: undefined };
+  assert.equal(selectPlaybackAudio([french, reopened], choice), reopened);
+  assert.equal(selectPlaybackAudio([french], choice), null);
+  assert.equal(selectPlaybackAudio([reopened, { ...reopened, id: "4" }], choice), null);
+});
+
 test("mpv codec description enrichment does not change the identity of the same audio codec", () => {
   const choice = playbackAudioChoice({
     ...track("2", "Commentary"),

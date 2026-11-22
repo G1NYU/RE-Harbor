@@ -281,8 +281,8 @@ const wired: Record<string, string> = {
   "Folder selection is available in the Harbor app": "フォルダーの選択はHarborアプリで利用できます",
   "Follow them out?": "外部サイトへ移動しますか？",
   "Font tokens": "フォントトークン",
-  "For Application URL anything works, for example https://harbor.site. TMDB never visits it.":
-    "Application URLには、https://harbor.siteなど任意のURLを指定できます。TMDBがアクセスすることはありません。",
+  "For Application URL anything works, for example https://harborcommunity.site. TMDB never visits it.":
+    "Application URLには、https://harborcommunity.siteなど任意のURLを指定できます。TMDBがアクセスすることはありません。",
   "Frame grab failed": "フレームの取得に失敗しました",
   "Free forever for personal use. No payment, ever.":
     "個人利用は永久無料。料金は一切かかりません。",
@@ -298,6 +298,8 @@ const wired: Record<string, string> = {
   "Get your free TMDB key": "無料のTMDBキーを取得",
   "Get your free TheTVDB key": "無料のTheTVDBキーを取得",
   "Gilded Trophies": "金色のトロフィー",
+  "Episode pages": "エピソードページ",
+  "Go to page": "ページへ移動",
   "Go to page {page}": "ページ{page}へ移動",
   "Go to pages {pages}": "ページ{pages}へ移動",
   Good: "良好",
@@ -1470,7 +1472,8 @@ const wired: Record<string, string> = {
   "Report sent": "レポートを送信しました",
   "Reset to original": "オリジナルに戻す",
   "Resolving manifest": "マニフェストを解決中",
-  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.": "Real-Debridと同じ読み取り専用で使用します。また、未キャッシュのソースを再生選択画面からキューに追加できます。",
+  "Same read-only usage as Real-Debrid. Also lets you queue uncached sources from the play picker.":
+    "Real-Debridと同じ読み取り専用で使用します。また、未キャッシュのソースを再生選択画面からキューに追加できます。",
   "Saved to your library.": "ライブラリに保存しました。",
   "Say a title, actor, or genre": "タイトル、俳優、ジャンルを話してください",
   "Scanning your network...": "ネットワークをスキャン中...",
@@ -1543,7 +1546,8 @@ const wired: Record<string, string> = {
     "プロジェクト用ではなく、「personal」キーを使用してください。",
   "Use the v3 key, not the read access token.":
     "読み取りアクセストークンではなく、v3キーを使用してください。",
-  "Used to check cache and unrestrict links. Harbor never adds or removes anything on your account on its own.": "キャッシュの確認とリンクの制限解除に使用します。Harborがアカウントに独自に何かを追加または削除することはありません。",
+  "Used to check cache and unrestrict links. Harbor never adds or removes anything on your account on its own.":
+    "キャッシュの確認とリンクの制限解除に使用します。Harborがアカウントに独自に何かを追加または削除することはありません。",
   "Uses the directdl endpoint, which skips queueing for anything already cached.":
     "directdlエンドポイントを使用し、キャッシュ済みのものはキューをスキップします。",
   "Uses up to 150 MB": "最大150 MBを使用",

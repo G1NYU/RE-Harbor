@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Meta } from "@/lib/cinemeta";
 import { resolveLogo } from "@/lib/logo";
+import { animeArtworkKind } from "@/lib/providers/anime-format";
 import { staticHeroArt } from "@/lib/providers/anime-hero-art-static";
 import { imageLangParam } from "@/lib/providers/tmdb/tmdb-image-lang";
 
@@ -67,7 +68,8 @@ export function useHeroLogos(slides: Meta[], settings: LogoSettings): Record<str
         const m = queue.shift();
         if (!m) return;
         const resolved = await resolveLogo(tmdbKey, m, { preferOwn: true }).catch(() => undefined);
-        const url = resolved ?? (await staticHeroArt(m.id).catch(() => undefined))?.logo;
+        const url =
+          resolved ?? (await staticHeroArt(m.id, animeArtworkKind(m)).catch(() => undefined))?.logo;
         if (cancelled) return;
         setCache((prev) => {
           const next = { ...prev, [`${m.id}::${languageKey}`]: { u: url ?? null, t: Date.now() } };

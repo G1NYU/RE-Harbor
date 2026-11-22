@@ -103,8 +103,8 @@ const miscC: Record<string, string> = {
   "Show TMDB score on cards": "Kartlarda TMDB puanını göster",
   "Show Trakt score on cards": "Kartlarda Trakt puanını göster",
   "Show Up Next on Simkl rail": "Simkl şeridinde Sıradaki'ni göster",
-  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. You can also tap the X on the button to dismiss a wrong one for the rest of the episode.":
-    "Harbor algıladığında Jeneriği Atla / Kapanış Jeneriğini Atla düğmesini gösterir. Hiç gösterilmemesi için bunu kapatın. Hatalı bir düğmeyi bölümün geri kalanında gizlemek için düğmedeki X'e de dokunabilirsiniz.",
+  "Show a Skip Intro / Skip Credits button when Harbor detects one. Turn this off to never show it. The button hides itself when the intro or credits end, or after the delay below.":
+    "Harbor algıladığında Jeneriği Atla / Kapanış Jeneriğini Atla düğmesini gösterir. Hiç gösterilmemesi için bunu kapatın. Düğme, jenerik veya kapanış jeneriği bittiğinde ya da aşağıdaki gecikmeden sonra kendini gizler.",
   "Show a Skip button when a known injected ad plays, and a small report button on new releases so you can mark ads for review.":
     "Bilinen bir gömülü reklam oynatıldığında Atla düğmesini, yeni çıkan içeriklerdeyse reklamları incelenmek üzere işaretleyebilmeniz için küçük bir bildirme düğmesini gösterir.",
   "Show a button on the detail page to mark a title or episode as watched. Syncs to Trakt and Simkl if connected.":
@@ -163,7 +163,8 @@ const miscC: Record<string, string> = {
     "Oynatıcıdaki Şarkıyı Tanımla düğmesini ve Şimdi Çalıyor kartını göster.",
   "Show the player controls when you pause or resume using the keyboard. Turn off to keep them hidden so they do not cover subtitles.":
     "Klavye ile duraklattığınızda veya devam ettirdiğinizde oynatıcı kontrollerini gösterir. Altyazıların üzerini kaplamamaları için kontrolleri gizli tutmak üzere kapatın.",
-  "Show the report button on every P2P stream, not just likely new releases.": "Bildirme düğmesini yalnızca yeni çıkmış olması muhtemel içeriklerde değil, tüm P2P yayınlarında gösterir.",
+  "Show the report button on every P2P stream, not just likely new releases.":
+    "Bildirme düğmesini yalnızca yeni çıkmış olması muhtemel içeriklerde değil, tüm P2P yayınlarında gösterir.",
   "Show them anyway": "Yine de göster",
   "Show title": "Başlığı göster",
   "Show release name": "Sürüm adını göster",
@@ -596,7 +597,8 @@ const miscC: Record<string, string> = {
   "The editor is a working copy of the player. Click any control on it to move, resize, restyle or hide that control.":
     "Düzenleyici, oynatıcının işlevsel bir kopyasıdır. Bir denetimi taşımak, yeniden boyutlandırmak, stilini değiştirmek veya gizlemek için üzerine tıklayın.",
   "The end time has to be after the start.": "Bitiş zamanı başlangıçtan sonra olmalıdır.",
-  "The engine listens on a local port and joins the DHT to find peers. Active transfers are the streams it currently has open.": "Motor yerel bir bağlantı noktasını dinler ve eşleri bulmak için DHT'ye katılır. Etkin aktarımlar, şu anda açık tuttuğu yayınlardır.",
+  "The engine listens on a local port and joins the DHT to find peers. Active transfers are the streams it currently has open.":
+    "Motor yerel bir bağlantı noktasını dinler ve eşleri bulmak için DHT'ye katılır. Etkin aktarımlar, şu anda açık tuttuğu yayınlardır.",
   "The full annual amount upfront": "Yıllık tutarın tamamını peşin olarak",
   "The generated audio could not be played": "Oluşturulan ses oynatılamadı",
   "The hourly rate": "Saatlik ücret",

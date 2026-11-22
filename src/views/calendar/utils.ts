@@ -67,7 +67,10 @@ function calendarBaseId(id: string): string {
 }
 
 function calendarBaseName(name: string): string {
-  return name.replace(/ S\d{2,}E\d{2,}.*$/, "").replace(/ \(premiere\)$/, "");
+  return name
+    .replace(/ S\d{2,}E\d{2,}.*$/, "")
+    .replace(/ E\d{1,3}(?::.*)?$/i, "")
+    .replace(/ \(premiere\)$/, "");
 }
 
 export function normalizeName(s: string): string {

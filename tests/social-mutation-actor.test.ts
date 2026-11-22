@@ -45,6 +45,12 @@ function fixture(transport: (url: string, init: RequestInit) => Promise<Response
   const dependencies: Record<string, unknown> = {
     "@/lib/config/endpoints": { HARBOR_API_BASE: "https://fixture.invalid" },
     "@/lib/safe-fetch": { safeFetch: fetch },
+    "@/lib/storage-recovery": {
+      persistCritical: (key: string, value: string) => {
+        values.set(key, value);
+        return true;
+      },
+    },
   };
   function load<T>(path: string): T {
     const output = ts.transpileModule(

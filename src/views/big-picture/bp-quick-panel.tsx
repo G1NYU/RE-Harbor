@@ -158,8 +158,10 @@ export function BpQuickPanel({ onClose }: { onClose: () => void }) {
               autofocus
             />
             <BpQuickAction
-              icon={saved ? <Check size={17} strokeWidth={2.4} /> : <Plus size={17} strokeWidth={2.4} />}
-              label={saved ? t("Saved") : t("Watchlist")}
+              icon={
+                saved ? <Check size={17} strokeWidth={2.4} /> : <Plus size={17} strokeWidth={2.4} />
+              }
+              label={saved ? t("In library") : t("Save to library")}
               onPress={() =>
                 toggleWatchlist({
                   id: focused.id,
@@ -205,7 +207,13 @@ export function BpQuickPanel({ onClose }: { onClose: () => void }) {
           autofocus={!focused}
         />
         <BpQuickAction
-          icon={soundOn ? <Volume2 size={17} strokeWidth={2.2} /> : <VolumeX size={17} strokeWidth={2.2} />}
+          icon={
+            soundOn ? (
+              <Volume2 size={17} strokeWidth={2.2} />
+            ) : (
+              <VolumeX size={17} strokeWidth={2.2} />
+            )
+          }
           label={t("Interface sounds")}
           detail={
             soundOn

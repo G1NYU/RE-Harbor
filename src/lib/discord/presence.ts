@@ -7,9 +7,7 @@ const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in windo
 // Discord strips buttons that link to its own invites: discord.gg makes it
 // reject the whole activity (presence vanishes), discord.com/invite is dropped
 // silently. A community-invite button needs a redirect on a domain we own.
-const STATIC_BUTTONS = [
-  { label: "Harbor Website", url: "https://github.com/Harborofficial/Harbor" },
-];
+const STATIC_BUTTONS = [{ label: "Harbor Website", url: "https://harborcommunity.site" }];
 /** How long a paused song keeps its presence before it clears. */
 const MUSIC_PAUSED_HIDE_MS = 3500;
 
@@ -168,8 +166,10 @@ function computeBase(): Base {
         state,
         stateUrl: music.artistUrl ?? music.trackUrl,
         posterUrl: config.showPoster ? music.artwork : undefined,
-        largeText: music.album,
-        largeUrl: music.albumUrl ?? music.trackUrl,
+        // Discord requires asset hover text to contain at least two characters.
+        largeText: music.album && Array.from(music.album).length >= 2 ? music.album : undefined,
+        // Asset URLs have a stricter 256-character limit than activity buttons.
+        largeUrl: [music.albumUrl, music.trackUrl].find((url) => url && url.length <= 256),
         smallUrl: STATIC_BUTTONS[0].url,
         startTs: live && config.showTimestamp ? nowSec - Math.floor(music.positionSec) : undefined,
         endTs: live && config.showTimestamp ? nowSec + Math.floor(remaining) : undefined,

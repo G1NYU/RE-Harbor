@@ -14,26 +14,35 @@ import { InstallOverlay } from "./installer-viewport/install-overlay";
 
 const EVENT = "harbor:open-installer";
 
-type InstallerDetail = { url: string; title?: string; logo?: string | null };
+type InstallerDetail = { url: string; title?: string; logo?: string | null; replaceUrl?: string };
 
-export function openInstallerViewport(url: string, title?: string, logo?: string | null): void {
+export function openInstallerViewport(
+  url: string,
+  title?: string,
+  logo?: string | null,
+  replaceUrl?: string,
+): void {
   if (typeof window === "undefined") return;
   // Linux: the in-page iframe can't capture the addon's stremio:// install link
   // (WebKitGTK refuses the scheme). Route through the Harbor Browser window, where
   // browser.rs intercepts the link and feeds it into the deep-link install bridge.
+  // That bridge has no replace context, so installFromUrl only falls back to the
+  // manifest id when a single instance of it is installed.
   if (isLinuxDesktop()) {
     void import("@tauri-apps/api/core").then(({ invoke }) => {
       invoke("browser_open", { url }).catch(() => {
         window.__harborInstallerOpen = true;
         window.dispatchEvent(
-          new CustomEvent<InstallerDetail>(EVENT, { detail: { url, title, logo } }),
+          new CustomEvent<InstallerDetail>(EVENT, { detail: { url, title, logo, replaceUrl } }),
         );
       });
     });
     return;
   }
   window.__harborInstallerOpen = true;
-  window.dispatchEvent(new CustomEvent<InstallerDetail>(EVENT, { detail: { url, title, logo } }));
+  window.dispatchEvent(
+    new CustomEvent<InstallerDetail>(EVENT, { detail: { url, title, logo, replaceUrl } }),
+  );
 }
 
 export function InstallerViewportRoot() {
@@ -52,6 +61,7 @@ export function InstallerViewportRoot() {
       url={request.url}
       title={request.title ?? new URL(request.url).hostname}
       logo={request.logo ?? null}
+      replaceUrl={request.replaceUrl}
       onClose={() => setRequest(null)}
     />
   );
@@ -81,11 +91,13 @@ function InstallerViewport({
   url,
   title,
   logo,
+  replaceUrl,
   onClose,
 }: {
   url: string;
   title: string;
   logo: string | null;
+  replaceUrl?: string;
   onClose: () => void;
 }) {
   const t = useT();
@@ -169,7 +181,7 @@ function InstallerViewport({
       }
       setPhase({ kind: "installing", name: null });
       try {
-        const result = await installFromUrl(normalized);
+        const result = await installFromUrl(normalized, { replaceUrl });
         const name = result.addon.manifest.name ?? t("Addon");
         const logo = result.addon.manifest.logo ?? null;
         const id = result.addon.manifest.id;
@@ -185,7 +197,7 @@ function InstallerViewport({
         setPhase({ kind: "error", message: msg });
       }
     },
-    [onClose, t],
+    [onClose, replaceUrl, t],
   );
 
   useEffect(() => {

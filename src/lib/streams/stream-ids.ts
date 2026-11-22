@@ -1,4 +1,5 @@
 import type { PlayEpisode } from "@/lib/view";
+import { splitAnimeStreamCoordinates } from "./anime-identity-core";
 
 const ANIME_SCHEME_RX = /^(kitsu|mal|anilist|anidb):/;
 
@@ -21,9 +22,14 @@ export function preferredAnimeImdbStreamId(
   if (episode) {
     const { imdbSeason, imdbEpisode } = episode;
     if (
-      typeof imdbSeason !== "number" || !Number.isInteger(imdbSeason) || imdbSeason < 0 ||
-      typeof imdbEpisode !== "number" || !Number.isInteger(imdbEpisode) || imdbEpisode < 1
-    ) return undefined;
+      typeof imdbSeason !== "number" ||
+      !Number.isInteger(imdbSeason) ||
+      imdbSeason < 0 ||
+      typeof imdbEpisode !== "number" ||
+      !Number.isInteger(imdbEpisode) ||
+      imdbEpisode < 1
+    )
+      return undefined;
     candidate = `${id}:${imdbSeason}:${imdbEpisode}`;
   }
   // Only prefer identities already emitted by the episode-aware candidate builder.
@@ -39,6 +45,19 @@ export function unverifiedAnimeSeasonId(
   if (typeof episode.imdbSeason !== "number" || episode.imdbSeason < 2) return null;
   const [scheme, entry] = metaId.split(":");
   return `${scheme}:${entry}:${episode.episode}`;
+}
+
+/** A catalog's originating addon must receive episode coordinates, not the series ID. */
+export function catalogEpisodeStreamId(
+  metaId: string,
+  episode: Pick<PlayEpisode, "season" | "episode" | "videoId"> | undefined,
+  streamIds: readonly string[],
+): string {
+  if (!episode) return metaId;
+  // Native addon metadata may give a nonstandard per-video identifier.
+  if (episode.videoId && streamIds.includes(episode.videoId)) return episode.videoId;
+  const scoped = `${metaId}:${episode.season}:${episode.episode}`;
+  return streamIds.find((id) => id === scoped) ?? scoped;
 }
 
 export function buildStreamIds(
@@ -163,5 +182,11 @@ export function buildStreamIds(
 
   if (unverifiedAnimeId) push(unverifiedAnimeId);
 
+  // A split-franchise child (e.g. TYBW) shares its provider id with the base
+  // show. That provider's season/episode numbering belongs to the base entry,
+  // not this cour, so keep it as an alias only and never query it.
+  if (splitAnimeStreamCoordinates(episode?.kitsuStreamId)) {
+    return out.filter((id) => !id.startsWith("tt") && !id.startsWith("tmdb:"));
+  }
   return out;
 }

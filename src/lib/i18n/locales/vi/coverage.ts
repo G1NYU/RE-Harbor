@@ -1,7 +1,10 @@
-const coverage: Record<string, string> = {
+const coverage: Record<string, string> = {
+  "Waiting for {name}…": "Đang chờ {name}…",
+  "Keeping the source you were watching.": "Giữ nguyên nguồn bạn đang xem.",
   "Sound descriptions": "Mô tả âm thanh",
   "Hide sound effects and speaker names": "Ẩn hiệu ứng âm thanh và tên người nói",
-  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.": "Xóa các mô tả trong ngoặc vuông như [tiếng cửa kẽo kẹt] và tên người nói viết hoa như JOHN: khi phụ đề đang chạy, để một bản chỉ có phụ đề SDH vẫn đọc như hội thoại bình thường. Lời bài hát, ngoặc đơn thông thường và chữ viết không phải Latinh được giữ nguyên. Không áp dụng cho phụ đề bắt buộc và phụ đề dạng ảnh.",
+  "Removes bracketed descriptions like [door creaks] and shouted speaker labels like JOHN: while subtitles play, so a release that only ships an SDH track still reads as plain dialogue. Song lyrics, ordinary parentheses and non-Latin scripts are left alone. Skipped on forced and picture-based tracks.":
+    "Xóa các mô tả trong ngoặc vuông như [tiếng cửa kẽo kẹt] và tên người nói viết hoa như JOHN: khi phụ đề đang chạy, để một bản chỉ có phụ đề SDH vẫn đọc như hội thoại bình thường. Lời bài hát, ngoặc đơn thông thường và chữ viết không phải Latinh được giữ nguyên. Không áp dụng cho phụ đề bắt buộc và phụ đề dạng ảnh.",
   "Play from": "Phát từ",
   end: "kết thúc",
   "m:ss": "m:ss",
@@ -657,6 +660,18 @@ const coverage: Record<string, string> = {
   "NYT Books API key": "Khóa API NYT Books",
   "Choose whether Harbor prefers direct and debrid sources, peer-to-peer torrents, or shows both.":
     "Chọn Harbor ưu tiên nguồn trực tiếp và debrid, torrent ngang hàng hay hiển thị cả hai.",
+  "Save to library": "Save to library",
+  "In library": "In library",
+  "In your library": "In your library",
+  'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.':
+    'Right-click any title in Harbor or hit "Save to library" on its detail page to add it here.',
+  "Add to all trackers": "Add to all trackers",
+  "Remove from all trackers": "Remove from all trackers",
+  "Remove from all trackers?": "Remove from all trackers?",
+  "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.":
+    "This removes the title from every connected tracker. Simkl completed or watching titles stay unchanged; AniList and MyAnimeList list progress may be removed.",
+  "Updated: {providers}.": "Updated: {providers}.",
+  "No changes were made.": "No changes were made.",
 };
 
 export default coverage;

@@ -116,6 +116,55 @@ pub fn video_id_of(value: &Value) -> Option<String> {
     None
 }
 
+/// The provider's own label for a list entry's video. Audio tracks declare `ATV` (or nothing),
+/// so only real video uploads should play in the video surface.
+pub fn video_media_kind(value: &Value) -> Option<&'static str> {
+    const VIDEO_TYPES: [&str; 3] = [
+        "MUSIC_VIDEO_TYPE_OMV",
+        "MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC",
+        "MUSIC_VIDEO_TYPE_UGC",
+    ];
+    for path in [
+        &[
+            "overlay",
+            "musicItemThumbnailOverlayRenderer",
+            "content",
+            "musicPlayButtonRenderer",
+            "playNavigationEndpoint",
+            "watchEndpoint",
+            "watchEndpointMusicSupportedConfigs",
+            "watchEndpointMusicConfig",
+            "musicVideoType",
+        ][..],
+        &[
+            "thumbnailOverlay",
+            "musicItemThumbnailOverlayRenderer",
+            "content",
+            "musicPlayButtonRenderer",
+            "playNavigationEndpoint",
+            "watchEndpoint",
+            "watchEndpointMusicSupportedConfigs",
+            "watchEndpointMusicConfig",
+            "musicVideoType",
+        ][..],
+        &[
+            "navigationEndpoint",
+            "watchEndpoint",
+            "watchEndpointMusicSupportedConfigs",
+            "watchEndpointMusicConfig",
+            "musicVideoType",
+        ][..],
+    ] {
+        if nav(value, path)
+            .and_then(Value::as_str)
+            .is_some_and(|kind| VIDEO_TYPES.contains(&kind))
+        {
+            return Some("video");
+        }
+    }
+    None
+}
+
 pub fn browse_id_of(value: &Value) -> Option<String> {
     for path in [
         &["navigationEndpoint", "browseEndpoint", "browseId"][..],
@@ -271,6 +320,24 @@ mod tests {
         ]}}}});
         assert_eq!(artwork_of(&value).as_deref(), Some("large.jpg"));
         assert!(artwork_of(&json!({})).is_none());
+    }
+
+    #[test]
+    fn music_video_types_are_separated_from_audio_tracks() {
+        let endpoint = |kind: &str| {
+            json!({"watchEndpoint": {"watchEndpointMusicSupportedConfigs": {
+                "watchEndpointMusicConfig": {"musicVideoType": kind}
+            }}})
+        };
+        let listed = json!({"overlay": {"musicItemThumbnailOverlayRenderer": {"content":
+            {"musicPlayButtonRenderer": {"playNavigationEndpoint": endpoint("MUSIC_VIDEO_TYPE_OMV")}}}}});
+        assert_eq!(video_media_kind(&listed), Some("video"));
+        let card = json!({"navigationEndpoint": endpoint("MUSIC_VIDEO_TYPE_UGC")});
+        assert_eq!(video_media_kind(&card), Some("video"));
+        let audio = json!({"overlay": {"musicItemThumbnailOverlayRenderer": {"content":
+            {"musicPlayButtonRenderer": {"playNavigationEndpoint": endpoint("MUSIC_VIDEO_TYPE_ATV")}}}}});
+        assert!(video_media_kind(&audio).is_none());
+        assert!(video_media_kind(&json!({})).is_none());
     }
 
     #[test]

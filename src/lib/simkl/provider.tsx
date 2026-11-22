@@ -84,11 +84,13 @@ export function SimklProvider({ children }: { children: ReactNode }) {
         // An entry Simkl already holds needs no write, and replaying it would
         // re-mark an item the user may have removed from their history.
         isWatched: (metaId, episode, imdb) => isSimklEpisodeWatched(metaId, episode, imdb),
-        hasActivePlayback: (metaId, episode, imdb) =>
-          hasActiveSimklPlayback(metaId, episode, imdb),
-        stopScrobble: (metaId, episode) => simklScrobble("stop", metaId, episode, 100),
+        hasActivePlayback: (metaId, episode, imdb) => hasActiveSimklPlayback(metaId, episode, imdb),
+        stopScrobble: (metaId, episode) => simklScrobble(
+          "stop", metaId, episode, 100, undefined, Boolean(episode?.sourceMetaId),
+        ),
         recordWatched: (metaId, episode, imdb) =>
-          recordWatchedFallback(metaId, episode, imdb ? { imdb } : undefined),
+          recordWatchedFallback(metaId, episode, imdb ? { imdb } : undefined,
+            Boolean(episode?.sourceMetaId)),
       }),
     [],
   );

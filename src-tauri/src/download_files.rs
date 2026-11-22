@@ -1,4 +1,6 @@
-use crate::download_file_policy::{inspect_download_file, remove_download_file, same_file_path};
+use crate::download_file_policy::{
+    inspect_download_file, remove_download_file, remove_empty_folder, same_file_path,
+};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
@@ -27,6 +29,11 @@ pub fn download_file_info(path: String) -> Result<DownloadFileInfo, String> {
             canonical_path: None,
         },
     })
+}
+
+#[tauri::command]
+pub fn download_remove_empty_folder(folder: String) {
+    remove_empty_folder(Path::new(&folder));
 }
 
 #[tauri::command]
