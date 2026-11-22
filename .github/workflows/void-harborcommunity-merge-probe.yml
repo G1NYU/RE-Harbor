@@ -94,7 +94,7 @@ jobs:
     name: Validate tentative merge (prefer VOID for conflicting hunks)
     needs: merge-probe
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -195,13 +195,31 @@ jobs:
             tests/void-sidebar-order.test.ts tests/music-audio-meter.test.ts \
             tests/music-ui-polish.test.ts 2>&1 | tee candidate-report/focused-tests.txt
 
+      - name: Run full frontend regression suite
+        id: full-tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee candidate-report/full-tests.txt
+
+      - name: Build merged frontend bundle
+        id: frontend-build
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run build 2>&1 | tee candidate-report/frontend-build.txt
+
       - name: Evaluate candidate validation
         if: always() && steps.typecheck.outcome != 'skipped'
         shell: bash
         run: |
           echo "typecheck=${{ steps.typecheck.outcome }}" >> candidate-report/SUMMARY.txt
           echo "focused_regressions=${{ steps.regressions.outcome }}" >> candidate-report/SUMMARY.txt
-          if [[ "${{ steps.typecheck.outcome }}" != 'success' || "${{ steps.regressions.outcome }}" != 'success' ]]; then
+          echo "full_tests=${{ steps.full-tests.outcome }}" >> candidate-report/SUMMARY.txt
+          echo "frontend_build=${{ steps.frontend-build.outcome }}" >> candidate-report/SUMMARY.txt
+          if [[ "${{ steps.typecheck.outcome }}" != 'success' || "${{ steps.regressions.outcome }}" != 'success' || "${{ steps.full-tests.outcome }}" != 'success' || "${{ steps.frontend-build.outcome }}" != 'success' ]]; then
             exit 1
           fi
 
@@ -213,3 +231,63 @@ jobs:
           path: candidate-report/
           if-no-files-found: warn
           retention-days: 30
+
+publish-isolated-candidate:
+    name: Publish reviewed merge as isolated candidate branch
+    needs: merge-candidate-check
+    if: github.ref == 'refs/heads/upgrade/void-to-harborcommunity-1.0.4-beta'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      VOID_EXPECTED: b81ee522fbb931be0c1d3b63691c7bcb37b030ef
+      OFFICIAL_EXPECTED: c4f0242a65e9a0b57da4f877e0df8b8f360aab06
+      ANCESTOR_EXPECTED: cd2a0aff335fb9936146b6434098a7e10b14a421
+      TARGET_BRANCH: feature/void-harborcommunity-v1.0.4-beta-candidate
+    steps:
+      - name: Checkout only approved upgrade branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reproduce validated merge and create NEW candidate ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/upgrade/void-to-harborcommunity-1.0.4-beta" ]]
+          git merge-base --is-ancestor "$VOID_EXPECTED" HEAD
+          CHANGED_SINCE_BASE="$(git diff --name-only "$VOID_EXPECTED" HEAD)"
+          EXPECTED_CHANGED="$(printf '%s\n' '.github/scripts/void-harborcommunity-merge-fixes.py' '.github/workflows/void-harborcommunity-merge-probe.yml')"
+          [[ "$CHANGED_SINCE_BASE" == "$EXPECTED_CHANGED" ]] || {
+            printf 'Unexpected changed paths:\n%s\n' "$CHANGED_SINCE_BASE"
+            exit 1
+          }
+          if [[ -n "$(git ls-remote --heads origin "refs/heads/$TARGET_BRANCH")" ]]; then
+            echo "Candidate branch already exists. Refusing to overwrite."
+            exit 1
+          fi
+          git remote add harborcommunity https://github.com/HarborCommunity/Harbor.git
+          git fetch --no-tags harborcommunity refs/tags/v1.0.4-beta
+          [[ "$(git rev-parse 'FETCH_HEAD^{commit}')" == "$OFFICIAL_EXPECTED" ]]
+          [[ "$(git merge-base HEAD "$OFFICIAL_EXPECTED")" == "$ANCESTOR_EXPECTED" ]]
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge -X ours --no-ff --no-commit "$OFFICIAL_EXPECTED"
+          python3 .github/scripts/void-harborcommunity-merge-fixes.py
+          git add -u -- src/ tests/
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git diff --cached --check
+          git commit -m "merge(void): integrate HarborCommunity 1.0.4 beta into VOID candidate" \
+            -m "Provisional merge for integration testing only. Pinned to $OFFICIAL_EXPECTED; preserve VOID customizations and official Refract/Nuvio behavior. No release or installer is published."
+          [[ "$(git rev-parse HEAD^2)" == "$OFFICIAL_EXPECTED" ]]
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+
+      - name: Report exact candidate commit
+        shell: bash
+        run: |
+          echo "candidate_branch=$TARGET_BRANCH"
+          echo "candidate_commit=$(git rev-parse HEAD)"
+          echo "upstream_parent=$(git rev-parse HEAD^2)"
+          echo "void_parent=$(git rev-parse HEAD^1)"
