@@ -1,0 +1,51 @@
+name: VOID 1.0.4 visual regression
+on:
+  push:
+    branches: [feature/void-harborcommunity-v1.0.4-beta-candidate]
+    paths:
+      - ".github/workflows/void-1.0.4-visual-smoke.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: void-1.0.4-visual-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  screenshots:
+    name: Inspect dock, album and artist in Edge
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+      - run: pnpm install --frozen-lockfile
+      - name: Capture source-controlled music UI
+        shell: pwsh
+        run: |
+          $env:MUSIC_BROWSER_DEPS = Join-Path $env:RUNNER_TEMP 'harbor-music-browser'
+          npm install --prefix $env:MUSIC_BROWSER_DEPS --no-audit --no-fund playwright-core@1.56.1
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install Playwright core for Edge' }
+          $server = Start-Process node -ArgumentList 'node_modules/vite/bin/vite.js','--host','127.0.0.1' -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              try { $ready = (Invoke-WebRequest http://127.0.0.1:1420 -TimeoutSec 2).StatusCode -eq 200 } catch {}
+              if ($ready) { break }
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Vite server did not start' }
+            node tests/music-polish-browser.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'Music UI smoke failed' }
+          } finally { Stop-Process -Id $server.Id -ErrorAction SilentlyContinue }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harbor-void-1.0.4-visual-layouts
+          path: music-polish-screenshots/
+          if-no-files-found: warn
+          retention-days: 7
