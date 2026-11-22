@@ -17,6 +17,7 @@ import type { NavItemId } from "@/chrome/nav-items";
 import { NavHiddenTray, NavEditableItem, useNavDrag } from "@/chrome/nav-edit";
 import { useNavEditMode } from "@/chrome/nav-edit-mode";
 import { useSidebarNavigation } from "./context-page-navigation";
+import { VoidNavIcon, hasVoidNavIcon } from "./void-nav-icon";
 
 export function Sidebar() {
   const editing = useNavEditMode();
@@ -29,6 +30,7 @@ export function Sidebar() {
 
   const { mark: customMark, wordmark: customWordmark } = useHarborLogo();
   const collapsed = settings.sidebarCollapsed;
+  const voidNative = settings.theme.preset === "void-native" && !kid;
   const retainLabels = (settings.theme.preset as string) === "elegantfin" && !kid;
   const hybridBar =
     typeof window !== "undefined" &&
@@ -59,7 +61,12 @@ export function Sidebar() {
             collapsed ? "" : "lg:justify-start lg:px-7"
           } ${hybridBar ? "h-12" : "h-20"}`}
         >
-          {!hybridBar && (
+          {!hybridBar && voidNative && (
+            <span className="void-native-wordmark" aria-label="VOID">
+              {collapsed ? "V" : "VOID"}
+            </span>
+          )}
+          {!hybridBar && !voidNative && (
             <span data-harbor-sidebar-mark className="inline-flex shrink-0">
               {customMark ? (
                 <img
@@ -74,6 +81,7 @@ export function Sidebar() {
             </span>
           )}
           {!hybridBar &&
+            !voidNative &&
             (!collapsed || retainLabels) &&
             (customWordmark ? (
               <img
@@ -387,6 +395,10 @@ function NavItem({
   view?: View;
 }) {
   const t = useT();
+  const { settings } = useSettings();
+  const navGlyphId = String(view ?? id ?? "");
+  const nativeVoidGlyph =
+    settings.theme.preset === "void-native" && hasVoidNavIcon(navGlyphId);
   const text = t(label);
   const [hovered, setHovered] = useState(false);
   const { open: openContextMenu } = useContextMenu();
@@ -429,7 +441,11 @@ function NavItem({
           data-harbor-sidebar-icon
           className={`relative ${big ? "scale-110" : ""} ${gated ? "opacity-70" : ""}`}
         >
-          {render(Boolean(active || hovered), hovered)}
+          {nativeVoidGlyph ? (
+            <VoidNavIcon id={navGlyphId} />
+          ) : (
+            render(Boolean(active || hovered), hovered)
+          )}
           {gated && (
             <span className="absolute -bottom-1 -end-1 flex h-4 w-4 items-center justify-center rounded-full bg-canvas text-ink-subtle ring-1 ring-edge">
               <Lock size={9} strokeWidth={2.4} />

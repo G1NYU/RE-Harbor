@@ -24,6 +24,7 @@ function escapeGeneratedHtml(value: string): string {
 }
 
 export type ThemePresetId =
+  | "void-native"
   | "cool-grey"
   | "nord"
   | "stremio"
@@ -122,6 +123,33 @@ export type FontPair = {
 };
 
 export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
+  "void-native": {
+    id: "void-native",
+    name: "VOID Native",
+    blurb:
+      "Experimental first-class VOID layout: native icons, night-purple colors, and selective glass chrome. No theme injection.",
+    previewImage: harborPreview,
+    swatch: ["#0d0b15", "#1d192b", "#a19acb"],
+    tokens: {
+      "--color-canvas": "#0d0b15",
+      "--color-surface": "#15121f",
+      "--color-elevated": "#1d192b",
+      "--color-raised": "#2b263b",
+      "--color-ink": "#dfdbe9",
+      "--color-ink-muted": "#b5aec6",
+      "--color-ink-subtle": "#827c98",
+      "--color-edge": "#302b41",
+      "--color-edge-soft": "#272238",
+      "--color-accent": "#a19acb",
+      "--color-accent-soft": "#a19acb24",
+      "--color-danger": "#b77677",
+    },
+    layout: "sidebar",
+    cardStyle: "flat",
+    buttonStyle: "flat",
+    fontPair: "general-sans",
+    bokeh: false,
+  },
   "cool-grey": {
     id: "cool-grey",
     name: "Harbor default",
@@ -1912,8 +1940,10 @@ export const DEFAULT_CUSTOM_COLORS: CustomColors = {
   danger: "#d35a3a",
 };
 
+// Experimental VOID fork: fresh profiles start in the native VOID appearance.
+// Existing users keep their saved theme until they select VOID Native.
 export const DEFAULT_THEME: ThemeSettings = {
-  preset: "cool-grey",
+  preset: "void-native",
   backgroundImage: null,
   backgroundDim: 0.65,
   fontPair: "sentient-switzer",
@@ -2008,6 +2038,7 @@ export function applyTheme(theme: ThemeSettings): void {
     root.style.setProperty(k, v);
   }
   root.dataset.themeMode = isLightColor(tokens["--color-canvas"]) ? "light" : "dark";
+  root.dataset.voidNative = theme.preset === "void-native" ? "true" : "false";
   // light-dark() is how album-art colours pick a readable lightness. Without a real
   // color-scheme it always resolves dark, so light themes got an invisible tint.
   root.style.colorScheme = root.dataset.themeMode;
