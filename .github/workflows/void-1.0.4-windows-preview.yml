@@ -84,6 +84,17 @@ jobs:
       - name: Compile isolated VOID app with Harbor 1.0.4 native features
         shell: pwsh
         run: |
+          # ort-sys 2.0.0-rc.10 uses copy-dylibs on Windows and copies DirectML.dll
+          # into release/examples and release/deps. Fresh CI checkouts may not
+          # contain those folders; make the copy destinations before compilation.
+          foreach ($dir in @(
+            'src-tauri/target/release/examples',
+            'src-tauri/target/release/deps',
+            'src-tauri/target/release/build/examples',
+            'src-tauri/target/release/build/deps'
+          )) {
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          }
           pnpm tauri build --no-bundle --config src-tauri/tauri.music-preview.conf.json
           if ($LASTEXITCODE -ne 0) { throw 'Native 1.0.4 Tauri compilation failed' }
           if (-not (Test-Path src-tauri/target/release/harbor.exe)) { throw 'Compiled app executable missing' }
