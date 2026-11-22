@@ -299,7 +299,9 @@ def fix_nav_edit(text):
 
 
 def fix_anime_view(text):
-    return replace_once(text, 'import {', 'import { usePinnedCatalogRows } from "./home/hooks/use-pinned-rows";\nimport {')
+    if text.count('usePinnedCatalogRows("anime")') != 1 or 'import { usePinnedCatalogRows }' in text:
+        raise RuntimeError("Unexpected Anime pinned catalog hook state")
+    return 'import { usePinnedCatalogRows } from "./home/hooks/use-pinned-rows";\n' + text
 
 
 def fix_tab_registry(text):
