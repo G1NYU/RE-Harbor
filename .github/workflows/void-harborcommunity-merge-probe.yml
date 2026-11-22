@@ -132,14 +132,14 @@ jobs:
           git diff --name-only --diff-filter=U > candidate-report/remaining-conflicts.txt
           test ! -s candidate-report/remaining-conflicts.txt
           python3 .github/scripts/void-harborcommunity-merge-fixes.py
-          git add -- src/components/music/music-dock.tsx src/components/music/music-gif-settings.tsx src/components/music/music-miku-visualizer.tsx src/components/music/music-now-playing.tsx src/views/settings/theme-panel/startup-artwork.tsx
+          git add -u -- src/ tests/
           git diff --cached --stat > candidate-report/merged-stat.txt
           git diff --cached --name-status > candidate-report/merged-files.txt
           git diff HEAD "$OFFICIAL_EXPECTED" --stat -- src/ src-tauri/ installer/ scripts/ > candidate-report/custom-vs-upstream-stat.txt
           {
             echo "official_ref=$OFFICIAL_EXPECTED"
             echo "void_ref=$VOID_EXPECTED"
-            echo 'strategy=git merge -X ours, then five reviewed JSX overlap repairs'
+            echo 'strategy=git merge -X ours, five JSX repairs, verified 1.0.4 tracking and types'
             echo 'commit_created=false'
             echo 'pushed=false'
           } > candidate-report/SUMMARY.txt
@@ -148,7 +148,15 @@ jobs:
             src/components/music/music-gif-settings.tsx \
             src/components/music/music-miku-visualizer.tsx \
             src/components/music/music-now-playing.tsx \
-            src/views/settings/theme-panel/startup-artwork.tsx; do
+            src/views/settings/theme-panel/startup-artwork.tsx \
+            src/lib/settings/types.ts \
+            src/lib/watchlist.ts \
+            src/views/library/watchlist-tab.tsx \
+            src/components/music/music-queue.tsx \
+            src/chrome/topbar.tsx \
+            src/chrome/nav-edit.tsx \
+            src/components/anime-hero.tsx \
+            src/main.tsx; do
             mkdir -p "candidate-report/merged-sources/$(dirname "$file")"
             cp "$file" "candidate-report/merged-sources/$file"
           done
