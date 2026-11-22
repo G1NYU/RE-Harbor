@@ -228,15 +228,20 @@ function quickCluster(): string {
   ].join("\n");
 }
 
+// Custom chrome replaces the title bar, so it has to offer the window drag itself. Tauri's bare
+// attribute only covers the element it sits on; "deep" also covers what is inside, apart from
+// buttons and other controls.
+const DRAG = 'data-tauri-drag-region="deep"';
+
 export function buildChrome(config: ChromeConfig): { html: string; css: string } {
   const brand = config.brand.trim();
   if (config.position === "topbar") {
-    const html = `<header class="myc-bar">\n${
+    const html = `<header class="myc-bar" ${DRAG}>\n${
       brand ? `  <div class="myc-brand">${esc(brand)}</div>\n` : ""
     }  <nav class="myc-nav">\n${buttons(config)}\n  </nav>\n${quickCluster()}\n</header>`;
     return { html, css: TOPBAR_CSS };
   }
-  const html = `<aside class="myc-rail">\n${
+  const html = `<aside class="myc-rail" ${DRAG}>\n${
     brand ? `  <div class="myc-brand">${esc(brand)}</div>\n` : ""
   }  <nav class="myc-nav">\n${buttons(config)}\n  </nav>\n${quickCluster()}\n</aside>`;
   return { html, css: SIDEBAR_CSS };

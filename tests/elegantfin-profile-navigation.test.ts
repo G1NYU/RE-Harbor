@@ -253,6 +253,17 @@ function mountElegantFin(api?: ImmediateApi, collapsed = false) {
     sidebar,
     drawerOpen: () => root.classList.contains("ef-drawer-open"),
     setDrawerOpen: (open: boolean) => root.classList.toggle("ef-drawer-open", open),
+    facts: (names: string[]) => names.filter((name) => root.classList.contains(name)),
+    // Counts document-wide searches from now on; returns a reader for the count.
+    countDocumentSearches: () => {
+      let count = 0;
+      const search = dom.document.querySelector;
+      dom.document.querySelector = (selector: string) => {
+        count += 1;
+        return search(selector);
+      };
+      return () => count;
+    },
     cleanup: () => themeWindow.__harborThemeCleanup?.(),
     clickListenerCount: () => dom.listeners("click"),
     keyListenerCount: () => dom.listeners("keydown"),
@@ -342,8 +353,140 @@ test("ElegantFin reserves its pinned rail only outside the Games workspace", () 
   const themeSource = readFileSync(new URL("../src/lib/theme.ts", import.meta.url), "utf8");
   assert.match(
     themeSource,
-    /html:not\(:has\(\[data-games-library\]\)\):has\(aside\[data-harbor-sidebar\]\[data-collapsed="true"\]:not\(\[aria-hidden="true"\]\)\) \{\s*--ef-rail-space: var\(--ef-rail-width\);/,
+    /html\.ef-sidebar-rail:not\(\.ef-games\) \{\s*--ef-rail-space: var\(--ef-rail-width\);/,
   );
+  const harness = mountElegantFin({}, true);
+  const shell = harness.document.querySelector("[data-harbor-shell]")!;
+  assert.deepEqual(harness.facts(["ef-sidebar-rail", "ef-games"]), ["ef-sidebar-rail"]);
+  shell.setAttribute("data-games-library", "");
+  harness.flush();
+  assert.deepEqual(harness.facts(["ef-sidebar-rail", "ef-games"]), ["ef-sidebar-rail", "ef-games"]);
+  shell.removeAttribute("data-games-library");
+  harness.flush();
+  assert.deepEqual(harness.facts(["ef-sidebar-rail", "ef-games"]), ["ef-sidebar-rail"]);
+  harness.cleanup();
+});
+
+const ELEGANTFIN_FACTS = [
+  "ef-games",
+  "ef-sidebar",
+  "ef-sidebar-shown",
+  "ef-sidebar-rail",
+  "ef-sidebar-collapsed",
+  "ef-sidebar-expanded",
+  "ef-topbar",
+];
+
+test("ElegantFin keeps the page facts its CSS reads as classes on html", () => {
+  const harness = mountElegantFin({});
+  const facts = () => harness.facts(ELEGANTFIN_FACTS);
+  assert.deepEqual(facts(), ["ef-sidebar", "ef-sidebar-shown", "ef-sidebar-expanded", "ef-topbar"]);
+
+  harness.sidebar.setAttribute("data-collapsed", "true");
+  harness.flush();
+  assert.deepEqual(facts(), [
+    "ef-sidebar",
+    "ef-sidebar-shown",
+    "ef-sidebar-rail",
+    "ef-sidebar-collapsed",
+    "ef-topbar",
+  ]);
+
+  harness.sidebar.setAttribute("aria-hidden", "true");
+  harness.flush();
+  assert.deepEqual(facts(), ["ef-sidebar", "ef-sidebar-collapsed", "ef-topbar"]);
+
+  harness.sidebar.remove();
+  harness.flush();
+  assert.deepEqual(facts(), ["ef-topbar"]);
+
+  harness.document.querySelector("header")!.remove();
+  harness.flush();
+  assert.deepEqual(facts(), []);
+  harness.cleanup();
+});
+
+test("ElegantFin picks up a sidebar that mounts elsewhere in the page", () => {
+  const harness = mountElegantFin({});
+  harness.sidebar.remove();
+  harness.flush();
+  assert.deepEqual(harness.facts(["ef-sidebar", "ef-sidebar-shown"]), []);
+
+  // Settings brings its own sidebar, deeper in the page than the shell's one.
+  const page = harness.document.createElement("section");
+  const settingsSidebar = harness.document.createElement("aside");
+  settingsSidebar.setAttribute("data-harbor-sidebar", "");
+  page.appendChild(settingsSidebar);
+  harness.document.querySelector("[data-harbor-shell]")!.appendChild(page);
+  harness.flush();
+  assert.deepEqual(harness.facts(["ef-sidebar", "ef-sidebar-shown"]), [
+    "ef-sidebar",
+    "ef-sidebar-shown",
+  ]);
+  harness.cleanup();
+});
+
+test("ElegantFin leaves the document alone while unrelated nodes come and go", () => {
+  const harness = mountElegantFin({});
+  const page = harness.document.createElement("main");
+  harness.document.querySelector("[data-harbor-shell]")!.appendChild(page);
+  harness.flush();
+  const searches = harness.countDocumentSearches();
+
+  // What scrolling does all the time: cards are added, change and are removed again.
+  const card = harness.document.createElement("div");
+  card.appendChild(harness.document.createElement("button"));
+  page.appendChild(card);
+  card.setAttribute("class", "harbor-poster");
+  card.setAttribute("aria-hidden", "true");
+  card.remove();
+  harness.flush();
+  assert.equal(searches(), 0);
+
+  page.appendChild(harness.document.createElement("header"));
+  harness.flush();
+  assert.ok(searches() > 0, "a node the facts depend on must trigger a fresh look");
+  harness.cleanup();
+});
+
+test("ElegantFin cleanup takes its fact classes off html", () => {
+  const harness = mountElegantFin({}, true);
+  assert.ok(harness.facts(ELEGANTFIN_FACTS).length > 0);
+  harness.cleanup();
+  assert.deepEqual(harness.facts(ELEGANTFIN_FACTS), []);
+  assert.equal(harness.activeObservers(), 0);
+});
+
+test("ElegantFin notices a top bar that stops being one", () => {
+  const harness = mountElegantFin({});
+  assert.deepEqual(harness.facts(["ef-topbar"]), ["ef-topbar"]);
+  // header.fixed.inset-x-0.top-0 is the question; a header without one of the classes is not it.
+  harness.document.querySelector("header")!.setAttribute("class", "inset-x-0 top-0");
+  harness.flush();
+  assert.deepEqual(harness.facts(["ef-topbar"]), []);
+  harness.document.querySelector("header")!.setAttribute("class", "fixed inset-x-0 top-0");
+  harness.flush();
+  assert.deepEqual(harness.facts(["ef-topbar"]), ["ef-topbar"]);
+  harness.cleanup();
+});
+
+test("ElegantFin's CSS reads exactly the state classes its script keeps", () => {
+  // A class the CSS reads and the script never sets would switch a rule off for good.
+  const themeSource = readFileSync(new URL("../src/lib/theme.ts", import.meta.url), "utf8");
+  const css = themeSource.slice(
+    themeSource.indexOf("const elegantFinCss = `"),
+    themeSource.indexOf("function buildElegantFinHtml"),
+  );
+  const read = new Set<string>();
+  for (const rule of css.matchAll(/^html[^\s{,]*/gm)) {
+    for (const name of rule[0].matchAll(/\.(ef-[a-z-]+)/g)) read.add(name[1]);
+  }
+  assert.deepEqual([...read].sort(), [...ELEGANTFIN_FACTS, "ef-drawer-open"].sort());
+
+  const script = elegantFinScript();
+  for (const name of ELEGANTFIN_FACTS) {
+    assert.ok(script.includes(`["${name}", `), `the script must keep ${name}`);
+  }
 });
 
 test("ElegantFin releases the scrim state when navigation unmounts the sidebar", () => {
@@ -400,10 +543,12 @@ test("ElegantFin hands the revealed Games navigation back to the shell", () => {
 
 test("ElegantFin yields its corner menu and drawer to the Games workspace", () => {
   const themeSource = readFileSync(new URL("../src/lib/theme.ts", import.meta.url), "utf8");
-  assert.match(
-    themeSource,
-    /html:has\(\[data-games-library\]\) #ef-topleft \{\s*display: none !important;/,
-  );
+  assert.match(themeSource, /html\.ef-games #ef-topleft \{\s*display: none !important;/);
+  const harness = mountElegantFin({});
+  harness.document.querySelector("[data-harbor-shell]")!.setAttribute("data-games-library", "");
+  harness.flush();
+  assert.deepEqual(harness.facts(["ef-games"]), ["ef-games"]);
+  harness.cleanup();
   assert.match(
     themeSource,
     /\[data-games-library\]\[data-games-navigation\][\s\S]{0,200}aside\[data-harbor-sidebar\] \{\s*transform: translateX\(0\) !important;[\s\S]{0,200}visibility: visible !important;/,
