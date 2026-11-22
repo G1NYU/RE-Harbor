@@ -4,9 +4,16 @@ on:
   push:
     branches:
       - feature/void-harborcommunity-v1.0.4-beta-candidate
+      - build/void-1.0.4-pr4-og-glass-preview
     paths:
       - .github/workflows/void-1.0.4-windows-preview.yml
       - src-tauri/src/music/commands/playback.rs
+      - src/lib/theme.ts
+      - src/components/custom-code-mount.tsx
+      - src/components/theme-chrome-bridge.tsx
+      - src/index.css
+      - src/components/music/**
+      - src/views/music.tsx
   workflow_dispatch:
 
 permissions:
