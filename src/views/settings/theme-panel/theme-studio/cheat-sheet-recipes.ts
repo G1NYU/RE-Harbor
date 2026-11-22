@@ -76,7 +76,8 @@ export const RECIPES: Recipe[] = [
   {
     title: "Custom sidebar (replaces built-in chrome)",
     lang: "html",
-    code: `<aside style="pointer-events:auto; position:fixed; inset:0 auto 0 0;
+    code: `<aside data-tauri-drag-region="deep"
+       style="pointer-events:auto; position:fixed; inset:0 auto 0 0;
               width:220px; display:flex; flex-direction:column; gap:18px;
               padding:26px 16px; background:var(--color-surface);
               border-right:1px solid var(--color-edge); z-index:60;">
