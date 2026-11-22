@@ -88,3 +88,94 @@ jobs:
           path: merge-report/
           if-no-files-found: warn
           retention-days: 30
+
+merge-candidate-check:
+    name: Validate tentative merge (prefer VOID for conflicting hunks)
+    needs: merge-probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      VOID_EXPECTED: b81ee522fbb931be0c1d3b63691c7bcb37b030ef
+      OFFICIAL_EXPECTED: c4f0242a65e9a0b57da4f877e0df8b8f360aab06
+      ANCESTOR_EXPECTED: cd2a0aff335fb9936146b6434098a7e10b14a421
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - name: Checkout isolated upgrade branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare candidate without committing or pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-report
+          test "$(git merge-base "$VOID_EXPECTED" HEAD)" = "$VOID_EXPECTED"
+          CHANGED_SINCE_BASE="$(git diff --name-only "$VOID_EXPECTED" HEAD)"
+          [[ "$CHANGED_SINCE_BASE" == '.github/workflows/void-harborcommunity-merge-probe.yml' ]] || {
+            printf 'Unexpected changed paths:\n%s\n' "$CHANGED_SINCE_BASE"
+            exit 1
+          }
+          git remote add harborcommunity https://github.com/HarborCommunity/Harbor.git
+          git fetch --no-tags harborcommunity refs/tags/v1.0.4-beta
+          [[ "$(git rev-parse 'FETCH_HEAD^{commit}')" == "$OFFICIAL_EXPECTED" ]]
+          [[ "$(git merge-base HEAD "$OFFICIAL_EXPECTED")" == "$ANCESTOR_EXPECTED" ]]
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" -c merge.conflictStyle=zdiff3 merge -X ours --no-commit --no-ff "$OFFICIAL_EXPECTED" \
+            > candidate-report/merge-output.txt 2>&1 || {
+              cat candidate-report/merge-output.txt
+              git diff --name-only --diff-filter=U > candidate-report/remaining-conflicts.txt
+              exit 1
+            }
+          git diff --name-only --diff-filter=U > candidate-report/remaining-conflicts.txt
+          test ! -s candidate-report/remaining-conflicts.txt
+          git diff --cached --stat > candidate-report/merged-stat.txt
+          git diff --cached --name-status > candidate-report/merged-files.txt
+          git diff HEAD "$OFFICIAL_EXPECTED" --stat -- src/ src-tauri/ installer/ scripts/ > candidate-report/custom-vs-upstream-stat.txt
+          {
+            echo "official_ref=$OFFICIAL_EXPECTED"
+            echo "void_ref=$VOID_EXPECTED"
+            echo 'strategy=git merge -X ours (only overlapping hunks prefer VOID)'
+            echo 'commit_created=false'
+            echo 'pushed=false'
+          } > candidate-report/SUMMARY.txt
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install candidate dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck merged candidate
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run typecheck 2>&1 | tee candidate-report/typecheck.txt
+
+      - name: Run targeted VOID + Refract + Music regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          node --import ./scripts/node-test-environment.mjs --experimental-loader ./scripts/node-test-loader.mjs --test \
+            tests/refract-sync.test.mjs tests/refract-library-removal.test.mjs \
+            tests/void-sidebar-order.test.ts tests/music-audio-meter.test.ts \
+            tests/music-ui-polish.test.ts 2>&1 | tee candidate-report/focused-tests.txt
+
+      - name: Upload candidate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: void-1.0.4-tentative-merge-validation
+          path: candidate-report/
+          if-no-files-found: warn
+          retention-days: 30
