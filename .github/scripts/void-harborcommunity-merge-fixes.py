@@ -390,19 +390,171 @@ for relative in ("src/lib/media-context-actions.ts", "src/lib/i18n/locales/ui-fa
     target.write_text(resolved, encoding="utf-8")
     print(f"Restored 1.0.4 source contract: {relative}")
 
-# The 1.0.4 player now uses literal 'Caching'/'Cached' tooltip strings; ensure
-# its English fallback covers both while localized translations are loaded.
+# The official fallback already contains unquoted Cached/Caching keys; adding
+# quoted duplicates is a TS1117 compile error. Only restore genuinely VOID-only
+# strings absent from the upstream translation coverage.
 fallback_path = ROOT / "src/lib/i18n/locales/ui-fallback.ts"
 fallback = fallback_path.read_text(encoding="utf-8")
-for term in ("Cached", "Caching"):
-    if f'"{term}": "{term}"' in fallback:
-        raise RuntimeError(f"Tooltip translation already exists: {term}")
+extra_ui = {
+    "Tab": "Tab",
+    "music.motion.reduced": "Animation is paused because reduced motion is enabled in your system accessibility settings.",
+    "music.motion.override": "Allow animated music visualizers",
+    "music.motion.overrideHelp": "Overrides Windows reduced-motion preference for Miku, custom GIFs and spectrum bars only. Other app animations remain unchanged.",
+    "music.gif.frameCount": "{count} frames",
+    "music.gif.static": "This GIF contains only one frame and cannot move.",
+}
+for key in extra_ui:
+    if f'"{key}":' in fallback:
+        raise RuntimeError(f"Upstream already contains custom fallback {key}")
+import json
+lines = [f"  {json.dumps(key, ensure_ascii=False)}: {json.dumps(value, ensure_ascii=False)}," for key, value in extra_ui.items()]
 fallback = replace_once(
-    fallback,
-    "};\n\nexport default uiFallback;\n",
-    '  "Cached": "Cached",\n  "Caching": "Caching",\n};\n\nexport default uiFallback;\n',
+    fallback, "};\n\nexport default uiFallback;\n",
+    "\n".join(lines) + "\n};\n\nexport default uiFallback;\n",
 )
 fallback_path.write_text(fallback, encoding="utf-8")
+print("Preserved 1.0.4 core translation fallbacks and six VOID-specific keys")
+
+# The overlapping en/music object chose old VOID keys, dropping 51 new official
+# translations including linked YouTube Music playlists and signed-in Spotify.
+# Start from pinned official values and restore the six VOID-exclusive keys,
+# rather than retaining stale Spotify setup instructions.
+old_music = subprocess.check_output(
+    ["git", "show", f"{os.environ['VOID_EXPECTED']}:src/lib/i18n/locales/en/music.ts"], cwd=ROOT
+).decode("utf-8")
+import re
+custom_keys = (
+    "music.motion.reduced",
+    "music.motion.reducedShort",
+    "music.motion.override",
+    "music.motion.overrideHelp",
+    "music.gif.frameCount",
+    "music.gif.static",
+)
+custom_lines = []
+for key in custom_keys:
+    match = re.search(r'(?m)^  "' + re.escape(key) + r'": (".*"),
+# VOID's styling deliberately overrides the official dock, but it must retain
+# native 1.0.4 reveal, reduced-motion and fixed Now Playing containment rules.
+css_rel = "src/components/music/music-dock.css"
+css = (ROOT / css_rel).read_text(encoding="utf-8")
+official_css = official_file(css_rel)
+marker = "/* Auto-hide the full dock beneath the viewport;"
+if marker not in official_css or marker in css:
+    raise RuntimeError("Unexpected music dock auto-hide CSS state")
+css = css.rstrip() + "\n\n" + official_css[official_css.index(marker):]
+old_entrance = "[data-music-dock]:not([data-music-dock-tab]) {"
+new_entrance = "[data-music-dock]:where([data-entering]):not([data-music-dock-tab]) {"
+if new_entrance not in css:
+    css = replace_once(css, old_entrance, new_entrance)
+(ROOT / css_rel).write_text(css, encoding="utf-8")
+print("Preserved VOID dock appearance and restored official auto-hide/reduced-motion CSS")
+
+# The original VOID hero had an unmeasured, duplicate HeroBackdrop component.
+# Keep the existing VOID slider, manga actions, scrims and layout, but use the
+# official shared component to reject low-resolution/failed artwork.
+hero_rel = "src/components/anime-hero.tsx"
+hero = (ROOT / hero_rel).read_text(encoding="utf-8")
+hero = replace_once(
+    hero,
+    'import { useArtFallback } from "./anime-hero-art-fallback";\n',
+    'import { useArtFallback } from "./anime-hero-art-fallback";\n'
+    'import { HeroBackdrop } from "./hero-backdrop";\n',
+)
+hero = replace_once(
+    hero,
+    "<HeroBackdrop meta={m} />",
+    '<HeroBackdrop\n'
+    '                  url={m.background ?? m.poster ?? ""}\n'
+    '                  fallbacks={m.poster ? [m.poster] : []}\n'
+    '                  objectPosition={m.background ? "75% center" : "82% center"}\n'
+    '                />',
+)
+start_hero = hero.index("function HeroBackdrop({ meta }: { meta: Meta }) {")
+end_hero = hero.index("function HeroLogoImage(", start_hero)
+hero = hero[:start_hero] + hero[end_hero:]
+(ROOT / hero_rel).write_text(hero, encoding="utf-8")
+print("Restored measured shared anime hero artwork without changing VOID layout")
+
+# The navigation tests simulate the context module through an injected CommonJS
+# loader. Supply the actual VOID order function instead of an identity stub so
+# their navigation/parental-policy assertions remain meaningful.
+navigation_tests = {
+    "tests/context-menu-actor-scope.test.ts":
+        "  const deps: Record<string, unknown> = {\n",
+    "tests/context-reload.test.ts":
+        "  const dependencies = {\n",
+    "tests/player-settings-policy.test.ts":
+        "  const deps: Record<string, any> = {\n",
+}
+for relative, anchor in navigation_tests.items():
+    file = ROOT / relative
+    src = file.read_text(encoding="utf-8")
+    src = replace_once(
+        src,
+        'import test from "node:test";\n',
+        'import test from "node:test";\n'
+        'import { withVoidDefaultNavOrder } from "../src/chrome/void-sidebar-order.ts";\n',
+    )
+    src = replace_once(
+        src,
+        anchor,
+        anchor + '    "./void-sidebar-order": { withVoidDefaultNavOrder },\n',
+    )
+    file.write_text(src, encoding="utf-8")
+    print(f"Exercised real VOID sidebar order in navigation test fixture: {relative}")
+
+# The VOID UI tests must tolerate line breaks added by 1.0.4's formatter; keep
+# testing the same runtime DOM/CSS contracts rather than insisting on one layout.
+write_fix("tests/music-void-ui.test.ts", lambda s: replace_once(
+    s, r'/setProperty\("--harbor-music-dock"/',
+    r'/setProperty\(\s*"--harbor-music-dock"/',
+))
+write_fix("tests/void-native-cohesion.test.ts", lambda s: replace_once(
+    s, r'/<CustomArtwork role=\{role\}/',
+    r'/<CustomArtwork\s+role=\{role\}/',
+))
+
+# Custom VOID intentionally replaces Harbor default's greyscale palette. Tray
+# fallback assertions should guard that intentional palette rather than
+# claiming that the official upstream default is still active.
+def fix_tray_test(src: str) -> str:
+    src = replace_once(src, '"oklch(0.18 0.004 260)"', '"#11111b"')
+    src = replace_once(src, '"oklch(0.22 0.004 260)"', '"#181825"')
+    return replace_once(
+        src,
+        '''    assert.equal(
+      snapshots.at(-1)?.tokens["--tray-row-hover"],
+      "oklch(0.27 0.004 260)",
+      "the popup needs its own row highlight tone",
+    );''',
+        '''    assert.notEqual(
+      snapshots.at(-1)?.tokens["--tray-row-hover"],
+      snapshots.at(-1)?.tokens["--color-surface"],
+      "the popup needs a row highlight distinct from its surface",
+    );''',
+    )
+write_fix("tests/tray-menu-state.test.ts", fix_tray_test)
+, old_music)
+    if not match:
+        raise RuntimeError(f"Cannot locate preserved VOID music label: {key}")
+    custom_lines.append('  "' + key + '": ' + match.group(1) + ',')
+music_path = ROOT / "src/lib/i18n/locales/en/music.ts"
+merged_music = music_path.read_text(encoding="utf-8")
+official_music = subprocess.check_output(
+    ["git", "show", f"{upstream_commit}:src/lib/i18n/locales/en/music.ts"], cwd=ROOT
+).decode("utf-8")
+for key in custom_keys:
+    if f'"{key}":' in official_music:
+        raise RuntimeError(f"Upstream music already contains {key}; manual reconciliation required")
+if merged_music == official_music:
+    raise RuntimeError("The merged English music catalog unexpectedly equals official baseline")
+music = replace_once(
+    official_music, "};\n\nexport default music;",
+    "\n".join(custom_lines) + "\n};\n\nexport default music;",
+)
+music_path.write_text(music, encoding="utf-8")
+print("Merged all official music labels with six original VOID visualizer labels")
 
 # VOID's styling deliberately overrides the official dock, but it must retain
 # native 1.0.4 reveal, reduced-motion and fixed Now Playing containment rules.
@@ -505,3 +657,34 @@ def fix_tray_test(src: str) -> str:
     );''',
     )
 write_fix("tests/tray-menu-state.test.ts", fix_tray_test)
+
+
+# The second navigation reload test has its own standalone injection object.
+# Use the genuine VOID order function here as in its first fixture.
+write_fix("tests/context-reload.test.ts", lambda src: replace_once(
+    src,
+    '  const page = load("src/chrome/context-page-navigation.tsx", {\n',
+    '  const page = load("src/chrome/context-page-navigation.tsx", {\n'
+    '    "./void-sidebar-order": { withVoidDefaultNavOrder },\n',
+))
+
+# JSDOM cannot create a canvas, whereas VOID's base surface/elevated tokens
+# are identical. Derive a visible contrast from actual HEX palette tokens in
+# that fallback, keeping the native canvas sampling path unchanged.
+def fix_tray_bridge(src: str) -> str:
+    old = '''    const surface = readColor(tokens["--color-surface"]);
+    const elevated = readColor(tokens["--color-elevated"]);
+    const raised = readColor(tokens["--color-raised"]);
+    if (!surface || !elevated || !raised) return defaults["--color-elevated"];'''
+    new = '''    const hex = (value: string): TrayRgb | null => {
+      const match = /^#([0-9a-f]{6})$/i.exec(value.trim());
+      if (!match) return null;
+      const rgb = Number.parseInt(match[1], 16);
+      return { r: (rgb >> 16) & 255, g: (rgb >> 8) & 255, b: rgb & 255 };
+    };
+    const surface = readColor(tokens["--color-surface"]) ?? hex(tokens["--color-surface"]);
+    const elevated = readColor(tokens["--color-elevated"]) ?? hex(tokens["--color-elevated"]);
+    const raised = readColor(tokens["--color-raised"]) ?? hex(tokens["--color-raised"]);
+    if (!surface || !elevated || !raised) return defaults["--color-raised"];'''
+    return replace_once(src, old, new)
+write_fix("src/lib/tray-menu-bridge.ts", fix_tray_bridge)
