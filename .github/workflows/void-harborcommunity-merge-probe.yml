@@ -6,6 +6,7 @@ on:
       - upgrade/void-to-harborcommunity-1.0.4-beta
     paths:
       - .github/workflows/void-harborcommunity-merge-probe.yml
+      - .github/scripts/void-harborcommunity-merge-fixes.py
   workflow_dispatch:
 
 permissions:
