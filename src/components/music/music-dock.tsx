@@ -963,7 +963,7 @@ export function MusicDock() {
               aria-expanded={queueOpen}
               aria-label={t("music.transport.openQueue")}
               data-music-tooltip=""
-              className={`${speaker.active ? "hidden @[700px]:grid" : ""} @[1050px]:hidden ${queueOpen ? ICON_BUTTON_ON : ICON_BUTTON}`}
+              className={`${speaker.active ? "hidden @[700px]:grid" : ""} ${queueOpen ? ICON_BUTTON_ON : ICON_BUTTON}`}
             >
               <MusicGlyph name="queue" size={18} aria-hidden="true" />
             </button>
