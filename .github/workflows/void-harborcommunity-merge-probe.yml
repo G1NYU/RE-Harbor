@@ -55,7 +55,7 @@ jobs:
             exit 1
           }
           set +e
-          git -c merge.conflictStyle=zdiff3 merge --no-commit --no-ff "$OFFICIAL_EXPECTED" \
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" -c merge.conflictStyle=zdiff3 merge --no-commit --no-ff "$OFFICIAL_EXPECTED" \
             > merge-report/merge-output.txt 2>&1
           MERGE_EXIT=$?
           set -e
