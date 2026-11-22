@@ -278,7 +278,13 @@ jobs:
           python3 .github/scripts/void-harborcommunity-merge-fixes.py
           git add -u -- src/ tests/
           test -z "$(git diff --name-only --diff-filter=U)"
-          git diff --cached --check
+          # Two unchanged official 1.0.4 files have upstream-only whitespace debt.
+          # Confirm exact official bytes before excluding them from this diff gate.
+          git diff --quiet "$OFFICIAL_EXPECTED" -- .coderabbit.yaml src/components/music/music-video-surface.css || {
+            echo "Upstream whitespace exemptions differ from pinned official source."
+            exit 1
+          }
+          git diff --cached --check -- . ':(exclude).coderabbit.yaml' ':(exclude)src/components/music/music-video-surface.css'
           git commit -m "merge(void): integrate HarborCommunity 1.0.4 beta into VOID candidate" \
             -m "Provisional merge for integration testing only. Pinned to $OFFICIAL_EXPECTED; preserve VOID customizations and official Refract/Nuvio behavior. No release or installer is published."
           [[ "$(git rev-parse HEAD^2)" == "$OFFICIAL_EXPECTED" ]]
