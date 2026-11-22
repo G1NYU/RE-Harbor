@@ -180,3 +180,190 @@ if not now_text.endswith("  );\n}\n"):
 now_text = now_text[:-2] + "});\n"
 now_path.write_text(now_text, encoding="utf-8")
 print("Restored v1.0.4 Now Playing memoized helper components")
+
+# Merge-only semantic corrections: retain VOID components while restoring
+# v1.0.4's interface contracts and modern event handling. Fail closed on drift.
+def write_fix(relative, fix):
+    target = ROOT / relative
+    before = target.read_text(encoding="utf-8")
+    after = fix(before)
+    if after == before:
+        raise RuntimeError(f"No semantic correction applied to {relative}")
+    target.write_text(after, encoding="utf-8")
+    print(f"Reconciled {relative}")
+
+
+def fix_music_queue(text):
+    text = replace_once(
+        text, 'useState, type DragEvent } from "react"',
+        'useState, type PointerEvent as ReactPointerEvent } from "react"',
+    )
+    text = replace_once(
+        text,
+        '''      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={(event) => {
+        if (draggable) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }
+      }}
+''',
+        "",
+    )
+    return replace_once(text, '      onDrop={onDrop}\n', "")
+
+
+def fix_music_dock(text):
+    text = replace_once(
+        text,
+        'import { useMusicAppearance } from "@/lib/music/appearance";',
+        'import { useMusicAppearance, useMusicArtworkColor } from "@/lib/music/appearance";',
+    )
+    text = replace_once(
+        text,
+        '  const { profile: recording, display } = useRecordingProfile(player.current);\n',
+        '  const { profile: recording, display } = useRecordingProfile(player.current);\n'
+        '  const artworkColor = useMusicArtworkColor(display?.artwork, appearance.artworkColors);\n',
+    )
+    return replace_once(
+        text, '  return (\n    <>\n      <aside\n',
+        '''  return (
+    <>
+      {autoHideAllowed && autoHidden && (
+        <div
+          data-music-dock-reveal
+          className="music-dock-reveal-zone"
+          style={{
+            insetInlineStart: topKind === "games" ? inset : 0,
+            insetInlineEnd: 0,
+            height: MUSIC_DOCK_REVEAL_ZONE_PX,
+            bottom: "var(--harbor-viewport-bottom, 0px)",
+          }}
+          onPointerEnter={showAutoHiddenDock}
+          onPointerMove={showAutoHiddenDock}
+        />
+      )}
+      <aside
+''',
+    )
+
+
+def fix_now_playing_meter(text):
+    return replace_once(
+        text,
+        '''  const meter = useMusicAudioMeter(
+    current,
+    Boolean(
+      current &&
+      player.phase !== "resolving" &&
+      panel === "signal" &&
+      !isMusicVideoActive() &&
+      !speaker.active,
+    ),
+  );
+''', "",
+    )
+
+
+def fix_topbar(text):
+    text = replace_once(
+        text,
+        '''  const scrollBlur =
+    !chromeHidden &&
+    view !== "settings" &&
+    settings.topbarScrollBlur &&
+    settings.topbarAppearance !== "transparent";''',
+        '''  const scrollBlur =
+    !chromeHidden &&
+    view !== "settings" &&
+    (view === "music" || settings.topbarScrollBlur || settings.topbarAppearance === "transparent");''',
+    )
+    return replace_once(text, 'opacity: scrolled ? 1 : 0,', 'opacity: 0,')
+
+
+def fix_anime_hero(text):
+    return replace_once(text, 'import { HeroBackdrop } from "./hero-backdrop";\n', "")
+
+
+def fix_appearance(text):
+    return replace_once(text, '      immersive: false,\n    };',
+        '      immersive: false,\n      theatre: false,\n    };')
+
+
+def fix_nav_edit(text):
+    return replace_once(text, 'import { useSettings } from "@/lib/settings";\n',
+        'import { useSettings } from "@/lib/settings";\n'
+        'import { useInstallFeatures } from "@/lib/features/install";\n')
+
+
+def fix_anime_view(text):
+    return replace_once(text, 'import {', 'import { usePinnedCatalogRows } from "./home/hooks/use-pinned-rows";\nimport {')
+
+
+def fix_tab_registry(text):
+    return replace_once(text, 'import stremioLogo from "@/assets/stremio.png";\n',
+        'import stremioLogo from "@/assets/stremio.png";\n'
+        'import nuvioLogo from "@/assets/nuvio.png";\n')
+
+
+def fix_play_picker(text):
+    return replace_once(text, 'ref={mainRef}', 'ref={setMainRef}')
+
+
+def fix_main(text):
+    original = subprocess.check_output(
+        ["git", "show", f"{upstream_commit}:src/main.tsx"], cwd=ROOT
+    ).decode("utf-8")
+    start = original.index('  if (themes.timedOut || themes.failed) markBootFallback("themes");')
+    end = original.index('  // Retry queued Refract watches only from the regular app window.', start)
+    segment = original[start:end]
+    if 'secretsUnavailable' not in segment:
+        raise RuntimeError("Official boot-health segment was unexpectedly missing")
+    return replace_once(
+        text, '  // Refract\'s retry queue is owned by the main application, never a player overlay.',
+        segment + '  // Refract\'s retry queue is owned by the main application, never a player overlay.',
+    )
+
+
+def fix_startup_artwork(_old):
+    text = subprocess.check_output(
+        ["git", "show", f"{upstream_commit}:src/views/settings/theme-panel/startup-artwork.tsx"],
+        cwd=ROOT
+    ).decode("utf-8")
+    text = replace_once(text,
+        'import { HarborLoader } from "@/components/harbor-loader";',
+        'import { HarborLoader, VoidDefaultArtwork } from "@/components/harbor-loader";')
+    text = replace_once(text, 'import { saveArtwork } from "@/lib/custom-artwork-store";\n',
+        'import { saveArtwork } from "@/lib/custom-artwork-store";\n'
+        'import { useSettings } from "@/lib/settings";\n')
+    text = replace_once(text,
+        '    choice = useCustomArtwork(role);\n',
+        '    choice = useCustomArtwork(role);\n'
+        '  const { settings } = useSettings();\n'
+        '  const voidNative = settings.theme.preset === "cool-grey";\n')
+    text = replace_once(text,
+        'fallback={\n              role === "loading" ? (',
+        'fallback={\n              voidNative ? (\n'
+        '                <VoidDefaultArtwork size="sm" />\n'
+        '              ) : role === "loading" ? (')
+    return replace_once(text, '{choice?.name ?? t("artwork.original")}',
+        '{choice?.name ?? (voidNative ? "VOID default" : t("artwork.original"))}')
+
+
+for relative, repair in [
+    ("src/chrome/nav-edit.tsx", fix_nav_edit),
+    ("src/chrome/topbar.tsx", fix_topbar),
+    ("src/components/anime-hero.tsx", fix_anime_hero),
+    ("src/components/music/music-dock.tsx", fix_music_dock),
+    ("src/components/music/music-now-playing.tsx", fix_now_playing_meter),
+    ("src/components/music/music-queue.tsx", fix_music_queue),
+    ("src/lib/music/appearance.ts", fix_appearance),
+    ("src/main.tsx", fix_main),
+    ("src/views/anime.tsx", fix_anime_view),
+    ("src/views/play-picker.tsx", fix_play_picker),
+    ("src/views/settings/tab-registry.ts", fix_tab_registry),
+    ("src/views/settings/theme-panel/startup-artwork.tsx", fix_startup_artwork),
+]:
+    write_fix(relative, repair)
