@@ -1,4 +1,6 @@
 use super::super::engine::MusicDeckState;
+use std::sync::atomic::Ordering;
+use tauri::Manager;
 use super::super::{
     library, m3u, spotify, MusicState, MusicTrack, ACTIVE_NONE, ACTIVE_SPOTIFY, ACTIVE_STREAM, ACTIVE_MODULE, ACTIVE_MODULE_SPOTIFY, ACTIVE_SOLOIST,
 };
@@ -18,7 +20,7 @@ pub async fn music_play_track(
         track.connector_id.as_deref().unwrap_or("direct"),
         track.id
     );
-    let result = play_track(app, state, track, volume).await;
+    let result = play_track(app, state, track, volume, refresh_stream).await;
     let outcome = match &result {
         Ok(()) => "ok".to_string(),
         Err(error) => format!("error: {error}"),
@@ -35,6 +37,7 @@ async fn play_track(
     state: tauri::State<'_, MusicState>,
     track: MusicTrack,
     volume: Option<f64>,
+    refresh_stream: Option<bool>,
 ) -> Result<(), String> {
     let request = state.begin_play_request();
     let volume = volume.unwrap_or(0.82);
