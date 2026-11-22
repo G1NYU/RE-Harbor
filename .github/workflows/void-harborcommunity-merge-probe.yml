@@ -1,0 +1,90 @@
+name: VOID + Harbor 1.0.4 merge audit
+
+on:
+  push:
+    branches:
+      - upgrade/void-to-harborcommunity-1.0.4-beta
+    paths:
+      - .github/workflows/void-harborcommunity-merge-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  merge-probe:
+    name: Audit non-committing upstream merge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      VOID_EXPECTED: b81ee522fbb931be0c1d3b63691c7bcb37b030ef
+      OFFICIAL_EXPECTED: c4f0242a65e9a0b57da4f877e0df8b8f360aab06
+      ANCESTOR_EXPECTED: cd2a0aff335fb9936146b6434098a7e10b14a421
+    steps:
+      - name: Checkout protected VOID snapshot
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Three-way merge all 1.0.4 changes (audit only, no push)
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p merge-report
+          git merge-base --is-ancestor "$VOID_EXPECTED" HEAD || {
+            echo 'Upgrade branch is not descended from the pinned VOID commit.'
+            exit 1
+          }
+          # The workflow addition itself introduces one commit on this branch.
+          CHANGED_SINCE_BASE="$(git diff --name-only "$VOID_EXPECTED" HEAD)"
+          [[ "$CHANGED_SINCE_BASE" == '.github/workflows/void-harborcommunity-merge-probe.yml' ]] || {
+            echo 'Unexpected source changes since pinned VOID. Stop before merging.'
+            printf '%s\n' "$CHANGED_SINCE_BASE"
+            exit 1
+          }
+          git remote add harborcommunity https://github.com/HarborCommunity/Harbor.git
+          git fetch --no-tags harborcommunity refs/tags/v1.0.4-beta
+          [[ "$(git rev-parse 'FETCH_HEAD^{commit}')" == "$OFFICIAL_EXPECTED" ]] || {
+            echo 'Official release tag moved. Stopping rather than merging an unexpected commit.'
+            exit 1
+          }
+          [[ "$(git merge-base HEAD "$OFFICIAL_EXPECTED")" == "$ANCESTOR_EXPECTED" ]] || {
+            echo 'Unexpected common ancestor. Stop for inspection.'
+            exit 1
+          }
+          set +e
+          git -c merge.conflictStyle=zdiff3 merge --no-commit --no-ff "$OFFICIAL_EXPECTED" \
+            > merge-report/merge-output.txt 2>&1
+          MERGE_EXIT=$?
+          set -e
+          git diff --name-only --diff-filter=U > merge-report/conflicted-files.txt
+          git ls-files -u > merge-report/unmerged-index.txt
+          git status --short > merge-report/status.txt
+          git diff --cached --stat > merge-report/staged-stat.txt
+          git diff --cc > merge-report/conflict-hunks.diff || true
+          {
+            echo "void_commit=$VOID_EXPECTED"
+            echo "official_commit=$OFFICIAL_EXPECTED"
+            echo "common_ancestor=$ANCESTOR_EXPECTED"
+            echo "merge_exit=$MERGE_EXIT"
+            echo "conflicted_path_count=$(wc -l < merge-report/conflicted-files.txt)"
+            echo 'no_commit=true'
+            echo 'no_push=true'
+            echo 'no_deployment=true'
+          } > merge-report/SUMMARY.txt
+          cat merge-report/SUMMARY.txt
+          if ((MERGE_EXIT > 1)); then
+            echo 'Git merge failed abnormally; see merge-output.txt.'
+            exit "$MERGE_EXIT"
+          fi
+
+      - name: Upload merge audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: void-1.0.4-merge-audit
+          path: merge-report/
+          if-no-files-found: warn
+          retention-days: 30
