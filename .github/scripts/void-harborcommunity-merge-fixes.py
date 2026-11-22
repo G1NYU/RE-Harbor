@@ -288,8 +288,8 @@ def fix_anime_hero(text):
 
 
 def fix_appearance(text):
-    return replace_once(text, '      immersive: false,\n    };',
-        '      immersive: false,\n      theatre: false,\n    };')
+    return replace_once(text, 'visualizerMotion: false, immersive: false };',
+        'visualizerMotion: false, immersive: false, theatre: false };')
 
 
 def fix_nav_edit(text):
