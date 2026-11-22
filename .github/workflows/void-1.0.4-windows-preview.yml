@@ -1,0 +1,145 @@
+name: VOID 1.0.4 isolated Windows preview
+
+on:
+  push:
+    branches:
+      - feature/void-harborcommunity-v1.0.4-beta-candidate
+    paths:
+      - .github/workflows/void-1.0.4-windows-preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: void-1.0.4-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-native:
+    name: Build and verify portable VOID 1.0.4 (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      HARBOR_CHANNEL: beta
+      HARBOR_CAPSTAN_OPTIONAL: "1"
+      HARBOR_POKEMON_OPTIONAL: "1"
+      HARBOR_EXPECTED_UPSTREAM: c4f0242a65e9a0b57da4f877e0df8b8f360aab06
+      HARBOR_EXPECTED_VOID: b81ee522fbb931be0c1d3b63691c7bcb37b030ef
+    steps:
+      - name: Checkout isolated candidate without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify ancestry, release version and isolated updater
+        shell: pwsh
+        run: |
+          git merge-base --is-ancestor $env:HARBOR_EXPECTED_UPSTREAM HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Official 1.0.4 commit is not an ancestor' }
+          git merge-base --is-ancestor $env:HARBOR_EXPECTED_VOID HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Verified original VOID commit is not an ancestor' }
+          $app = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $preview = Get-Content src-tauri/tauri.music-preview.conf.json -Raw | ConvertFrom-Json
+          if ($app.version -ne '1.0.4') { throw 'Unexpected app version' }
+          if ($preview.identifier -ne 'app.harbor.voidnativepreview') { throw 'The preview must have an isolated Tauri identity' }
+          if ($preview.plugins.updater.endpoints.Count -ne 0) { throw 'The preview updater must be disabled' }
+          if ($preview.plugins.'deep-link'.desktop.schemes -contains 'harbor') { throw 'Production deep link conflict' }
+          Write-Host "Official 1.0.4 ancestor: $env:HARBOR_EXPECTED_UPSTREAM"
+          Write-Host "Preview identifier: $($preview.identifier); updater disabled."
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+            installer/src-tauri
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install pinned dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Stage native media tools and fonts
+        shell: pwsh
+        run: |
+          $env:HARBOR_CAPSTAN_SRC = Join-Path $env:RUNNER_TEMP 'void-preview-no-capstan'
+          "HARBOR_CAPSTAN_SRC=$env:HARBOR_CAPSTAN_SRC" >> $env:GITHUB_ENV
+          pnpm run setup
+          if ($LASTEXITCODE -ne 0) { throw 'Native tool setup failed' }
+
+      - name: Compile isolated VOID app with Harbor 1.0.4 native features
+        shell: pwsh
+        run: |
+          pnpm tauri build --no-bundle --config src-tauri/tauri.music-preview.conf.json
+          if ($LASTEXITCODE -ne 0) { throw 'Native 1.0.4 Tauri compilation failed' }
+          if (-not (Test-Path src-tauri/target/release/harbor.exe)) { throw 'Compiled app executable missing' }
+
+      - name: Build payload uninstaller without installing anything
+        shell: pwsh
+        run: |
+          cargo build --manifest-path installer/src-tauri/Cargo.toml --release --no-default-features --features tauri/custom-protocol --bin harbor-uninstall --locked
+          if ($LASTEXITCODE -ne 0) { throw 'Payload uninstaller compilation failed' }
+
+      - name: Assemble and verify isolated portable payload
+        shell: pwsh
+        run: |
+          node installer/scripts/make-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Payload assembly failed' }
+          node scripts/verify-managed-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Payload integrity check failed' }
+          New-Item -ItemType Directory -Force -Path void-1.0.4-preview | Out-Null
+          Expand-Archive -LiteralPath installer/src-tauri/payload/harbor-payload.zip -DestinationPath void-1.0.4-preview -Force
+          foreach ($name in @('harbor.exe','libmpv-2.dll','mpv.exe','ffmpeg.exe','ffprobe.exe','yt-dlp.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path 'void-1.0.4-preview' $name) -PathType Leaf)) {
+              throw "Missing essential portable media binary: $name"
+            }
+          }
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path 'void-1.0.4-preview/harbor.exe').Path)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw 'Invalid Windows executable' }
+          Remove-Item -LiteralPath void-1.0.4-preview/uninstall.exe -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -LiteralPath void-1.0.4-preview -File |
+            Where-Object { $_.Extension -in @('.exe','.dll') } |
+            ForEach-Object { "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash) *$($_.Name)" } |
+            Set-Content -LiteralPath void-1.0.4-preview/SHA256SUMS.txt -Encoding UTF8
+          @'
+          VOID 1.0.4 NATIVE PREVIEW - WINDOWS x64
+
+          This is a separate, unsigned, portable test build. Extract the complete ZIP
+          and run harbor.exe. Do not copy its files over a current Harbor/VOID install.
+
+          Source: HarborCommunity v1.0.4-beta with VOID's custom UI/music/Refract
+          and the full passing frontend regression suite.
+
+          This preview uses app.harbor.voidnativepreview and has no updater endpoints.
+          It does NOT ship the optional Capstan Android extension runtime or
+          Pokemon game engine. Those features need a separate full-release build.
+
+          Acceptance tests: startup, real media playback, audio meters and visualizers,
+          Now Playing dock and queue, Music providers, Refract watchlist and watched
+          logging, sidebar drag reordering, anime/manga pages and native window controls.
+
+          This artifact is not a user-accepted or signed production release.
+          '@ | Set-Content -LiteralPath void-1.0.4-preview/README-VOID-1.0.4.txt -Encoding UTF8
+          Write-Host 'Portable app and SHA-256 manifest verified.'
+
+      - name: Upload Windows preview (no release, install, or deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-void-1.0.4-beta-windows-x64-preview
+          path: void-1.0.4-preview/
+          if-no-files-found: error
+          retention-days: 7
