@@ -39,7 +39,7 @@ jobs:
           }
           # The workflow addition itself introduces one commit on this branch.
           CHANGED_SINCE_BASE="$(git diff --name-only "$VOID_EXPECTED" HEAD)"
-          [[ "$CHANGED_SINCE_BASE" == '.github/workflows/void-harborcommunity-merge-probe.yml' ]] || {
+          [[ "$CHANGED_SINCE_BASE" == "$(printf '%s\n' '.github/scripts/void-harborcommunity-merge-fixes.py' '.github/workflows/void-harborcommunity-merge-probe.yml')" ]] || {
             echo 'Unexpected source changes since pinned VOID. Stop before merging.'
             printf '%s\n' "$CHANGED_SINCE_BASE"
             exit 1
@@ -115,7 +115,7 @@ jobs:
           mkdir -p candidate-report
           test "$(git merge-base "$VOID_EXPECTED" HEAD)" = "$VOID_EXPECTED"
           CHANGED_SINCE_BASE="$(git diff --name-only "$VOID_EXPECTED" HEAD)"
-          [[ "$CHANGED_SINCE_BASE" == '.github/workflows/void-harborcommunity-merge-probe.yml' ]] || {
+          [[ "$CHANGED_SINCE_BASE" == "$(printf '%s\n' '.github/scripts/void-harborcommunity-merge-fixes.py' '.github/workflows/void-harborcommunity-merge-probe.yml')" ]] || {
             printf 'Unexpected changed paths:\n%s\n' "$CHANGED_SINCE_BASE"
             exit 1
           }
@@ -131,13 +131,15 @@ jobs:
             }
           git diff --name-only --diff-filter=U > candidate-report/remaining-conflicts.txt
           test ! -s candidate-report/remaining-conflicts.txt
+          python3 .github/scripts/void-harborcommunity-merge-fixes.py
+          git add -- src/components/music/music-dock.tsx src/components/music/music-gif-settings.tsx src/components/music/music-miku-visualizer.tsx src/components/music/music-now-playing.tsx src/views/settings/theme-panel/startup-artwork.tsx
           git diff --cached --stat > candidate-report/merged-stat.txt
           git diff --cached --name-status > candidate-report/merged-files.txt
           git diff HEAD "$OFFICIAL_EXPECTED" --stat -- src/ src-tauri/ installer/ scripts/ > candidate-report/custom-vs-upstream-stat.txt
           {
             echo "official_ref=$OFFICIAL_EXPECTED"
             echo "void_ref=$VOID_EXPECTED"
-            echo 'strategy=git merge -X ours (only overlapping hunks prefer VOID)'
+            echo 'strategy=git merge -X ours, then five reviewed JSX overlap repairs'
             echo 'commit_created=false'
             echo 'pushed=false'
           } > candidate-report/SUMMARY.txt
