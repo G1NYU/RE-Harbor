@@ -6,6 +6,7 @@ on:
       - feature/void-harborcommunity-v1.0.4-beta-candidate
     paths:
       - .github/workflows/void-1.0.4-windows-preview.yml
+      - src-tauri/src/music/commands/playback.rs
   workflow_dispatch:
 
 permissions:
