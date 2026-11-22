@@ -283,7 +283,7 @@ try {
   const now = page.locator(".music-now-playing");
   await now.waitFor();
   const visualizer = now.getByRole("button", { name: "Visualizer", exact: true });
-  const spectrum = now.locator(".music-now-artwork .music-now-spectrum");
+  const spectrum = now.locator(".music-now-art-column > .music-now-spectrum");
   if ((await visualizer.getAttribute("aria-pressed")) === "true") await visualizer.click();
   await visualizer.click();
   await spectrum.waitFor();
