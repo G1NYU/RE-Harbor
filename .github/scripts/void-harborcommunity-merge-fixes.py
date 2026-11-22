@@ -177,6 +177,6 @@ now_text = replace_once(
 )
 if not now_text.endswith("  );\n}\n"):
     raise RuntimeError("Unexpected Now Playing export closing")
-now_text = now_text[:-4] + "});\n"
+now_text = now_text[:-2] + "});\n"
 now_path.write_text(now_text, encoding="utf-8")
 print("Restored v1.0.4 Now Playing memoized helper components")
