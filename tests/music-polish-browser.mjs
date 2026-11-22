@@ -243,7 +243,7 @@ try {
     "Dock must reach the right window edge",
   );
   await page.screenshot({ path: folder + "/dock-1600.png" });
-  const openQueue = bar.getByRole("button", { name: "Open queue", exact: true });
+  const openQueue = bar.getByRole("button", { name: "Open listening queue", exact: true });
   await openQueue.click();
   const queue = page.locator("[data-music-queue]");
   assert.match(await queue.locator("header p").innerText(), /11 up next · 45 min/);
