@@ -141,6 +141,15 @@ jobs:
             echo 'commit_created=false'
             echo 'pushed=false'
           } > candidate-report/SUMMARY.txt
+          for file in \
+            src/components/music/music-dock.tsx \
+            src/components/music/music-gif-settings.tsx \
+            src/components/music/music-miku-visualizer.tsx \
+            src/components/music/music-now-playing.tsx \
+            src/views/settings/theme-panel/startup-artwork.tsx; do
+            mkdir -p "candidate-report/merged-sources/$(dirname "$file")"
+            cp "$file" "candidate-report/merged-sources/$file"
+          done
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
@@ -157,12 +166,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck merged candidate
+        id: typecheck
+        continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
           pnpm run typecheck 2>&1 | tee candidate-report/typecheck.txt
 
       - name: Run targeted VOID + Refract + Music regressions
+        id: regressions
+        continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
@@ -170,6 +183,16 @@ jobs:
             tests/refract-sync.test.mjs tests/refract-library-removal.test.mjs \
             tests/void-sidebar-order.test.ts tests/music-audio-meter.test.ts \
             tests/music-ui-polish.test.ts 2>&1 | tee candidate-report/focused-tests.txt
+
+      - name: Evaluate candidate validation
+        if: always() && steps.typecheck.outcome != 'skipped'
+        shell: bash
+        run: |
+          echo "typecheck=${{ steps.typecheck.outcome }}" >> candidate-report/SUMMARY.txt
+          echo "focused_regressions=${{ steps.regressions.outcome }}" >> candidate-report/SUMMARY.txt
+          if [[ "${{ steps.typecheck.outcome }}" != 'success' || "${{ steps.regressions.outcome }}" != 'success' ]]; then
+            exit 1
+          fi
 
       - name: Upload candidate report
         if: always()
