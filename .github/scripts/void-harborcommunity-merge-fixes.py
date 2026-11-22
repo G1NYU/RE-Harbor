@@ -6,6 +6,8 @@ duplication from overlapping VOID and upstream JSX hunks; it is not an applicati
 source file, nor is the resulting trial merge automatically committed or published.
 """
 from pathlib import Path
+import os
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -113,3 +115,68 @@ for relative, repair in FIXES.items():
         raise RuntimeError(f"No change in {relative}; refusing to continue")
     path.write_text(after, encoding="utf-8")
     print(f"Resolved merge overlap: {relative}")
+
+# The v1.0.4 upstream logic is the authoritative implementation of these shared
+# structures (including Nuvio profile scoping and Refract watchlist operations).
+# Copy it from the pinned commit, not a moving branch. This is a TRIAL ONLY.
+upstream_commit = os.environ.get("OFFICIAL_EXPECTED", "")
+if upstream_commit != "c4f0242a65e9a0b57da4f877e0df8b8f360aab06":
+    raise RuntimeError("Unexpected upstream SHA")
+upstream_paths = [
+    "src/lib/active-profile-id.ts",
+    "src/lib/watchlist.ts",
+    "src/views/library/watchlist-tab.tsx",
+    "src/lib/settings/types.ts",
+    "tests/refract-library-removal.test.mjs",
+    "tests/refract-api.test.mjs",
+    "src/lib/i18n/locales/ar.ts",
+    "src/lib/i18n/locales/de.ts",
+    "src/lib/i18n/locales/es.ts",
+    "src/lib/i18n/locales/fr.ts",
+    "src/lib/i18n/locales/hi.ts",
+    "src/lib/i18n/locales/id.ts",
+    "src/lib/i18n/locales/it.ts",
+]
+for relative in upstream_paths:
+    data = subprocess.check_output(
+        ["git", "show", f"{upstream_commit}:{relative}"], cwd=ROOT
+    ).decode("utf-8")
+    if relative == "src/lib/settings/types.ts":
+        data = replace_once(
+            data,
+            'soundTheme: "none" | "glass" | "modern" | "retro" | "cinematic";',
+            'soundTheme: "none" | "glass" | "modern" | "retro" | "cinematic" | "void";',
+        )
+    (ROOT / relative).write_text(data, encoding="utf-8")
+    print(f"Selected reviewed official v1.0.4 implementation: {relative}")
+
+# Restore official 1.0.4's extracted subcomponents and memoized rendering while
+# keeping the VOID audio-visualizer caption and the merged, repaired JSX body.
+relative = "src/components/music/music-now-playing.tsx"
+now_path = ROOT / relative
+now_text = now_path.read_text(encoding="utf-8")
+upstream = subprocess.check_output(
+    ["git", "show", f"{upstream_commit}:{relative}"], cwd=ROOT
+).decode("utf-8")
+caption_start = now_text.index("/** Keep 20Hz meter re-renders scoped")
+now_start = now_text.index("const NOW_LIKE_SPOKES =")
+body_start = now_text.index("export function MusicNowPlaying({")
+caption = now_text[caption_start:body_start]
+upstream_start = upstream.index("const NOW_LIKE_SPOKES =")
+upstream_body = upstream.index("export const MusicNowPlaying = memo(function MusicNowPlaying({")
+now_text = (
+    now_text[:now_start]
+    + upstream[upstream_start:upstream_body]
+    + caption
+    + now_text[body_start:]
+)
+now_text = replace_once(
+    now_text,
+    "export function MusicNowPlaying({",
+    "export const MusicNowPlaying = memo(function MusicNowPlaying({",
+)
+if not now_text.endswith("  );\n}\n"):
+    raise RuntimeError("Unexpected Now Playing export closing")
+now_text = now_text[:-4] + "});\n"
+now_path.write_text(now_text, encoding="utf-8")
+print("Restored v1.0.4 Now Playing memoized helper components")
