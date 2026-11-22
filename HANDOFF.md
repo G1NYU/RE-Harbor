@@ -202,3 +202,10 @@ The Anime slide's reading-source link and counter share an opaque surface. Title
 - `3cb851641c671619c92496aff1874f466ba9e4f0`: the Windows preview workflow now runs when the native playback module is changed, as well as when the workflow file is updated.
 - A new Edge visual test started at [run 45010589144](https://github.com/G1NYU/RE-Harbor/actions/runs/45010589144). **Its result is not yet verified**; native rebuild result is also not yet verified. Continue from actual logs before declaring either successful.
 - No production release, installer replacement, user-profile migration, or deployed application update was made. Before completing, verify Edge geometry and audio visualization; then Windows Rust compile, portable exe, runtime sidecar hashes, Refract, music playback, GIF/Miku, and installer isolation. Maintain the old verified setup as rollback.
+
+
+### Harbor 1.0.4 validated preview results (2026-11-22)
+- Edge visual regression [45010589144](https://github.com/G1NYU/RE-Harbor/actions/runs/45010589144) **success**, source SHA `4372a2207022560cda7eb6c5449ee9ae2b82387c`. Visual screenshot artifact `harbor-void-1.0.4-visual-layouts`, artifact ID `14749607815`, GitHub artifact SHA-256 `9936ea564e0722be8cb95ab26d3221db6a11d953d107f795a185f8d59493cb0b`.
+- Isolated native Windows preview [45010609357](https://github.com/G1NYU/RE-Harbor/actions/runs/45010609357) **success**, source SHA `3cb851641c671619c92496aff1874f466ba9e4f0`. Rust/Tauri compilation, uninstaller compilation and portable payload assembly/verification passed.
+- Portable GitHub artifact `harbor-void-1.0.4-beta-windows-x64-preview`, ID `14750179381`, compressed size `440092937` bytes, GitHub artifact SHA-256 `68491c4d60e9de6e8c7da03fe78c2fcd0005c98e0e87c0b293d7ed8dd59e8adc`. Artifact is not expired at this check.
+- No Windows installer release or installed-user profile migration performed. Remaining verification: download/extract and interactively run the preview on a Windows machine, test actual native audio/visualizer, Refract, app settings, identity separation, and later installer packaging/upgrade. CI success does not prove live provider playback.
