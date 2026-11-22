@@ -4,6 +4,8 @@ on:
     branches: [feature/void-harborcommunity-v1.0.4-beta-candidate]
     paths:
       - ".github/workflows/void-1.0.4-visual-smoke.yml"
+      - "src/components/music/music-dock.tsx"
+      - "tests/music-polish-browser.mjs"
   workflow_dispatch:
 permissions:
   contents: read
