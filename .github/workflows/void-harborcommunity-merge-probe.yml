@@ -232,7 +232,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-publish-isolated-candidate:
+  publish-isolated-candidate:
     name: Publish reviewed merge as isolated candidate branch
     needs: merge-candidate-check
     if: github.ref == 'refs/heads/upgrade/void-to-harborcommunity-1.0.4-beta'
