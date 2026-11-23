@@ -89,7 +89,8 @@ function warmAssetPath(key: string): string | undefined {
 function rememberAssetPath(key: string, src: string): string {
   assetPathCache.delete(key);
   assetPathCache.set(key, { src, expires: Date.now() + ASSET_PATH_TTL_MS });
-  if (assetPathCache.size > ASSET_PATH_LIMIT) assetPathCache.delete(assetPathCache.keys().next().value!);
+  if (assetPathCache.size > ASSET_PATH_LIMIT)
+    assetPathCache.delete(assetPathCache.keys().next().value!);
   return src;
 }
 type BlobEntry = NonNullable<ReturnType<typeof blobCache.get>>;
@@ -175,8 +176,7 @@ function proxyImage(
           width: thumbWidthPx ?? 0,
         }).catch(() => null);
         if (generation !== cacheGeneration) return null;
-        if (typeof path === "string" && path)
-          return rememberAssetPath(key, convertFileSrc(path));
+        if (typeof path === "string" && path) return rememberAssetPath(key, convertFileSrc(path));
       }
       if (persist && migrateLegacy) {
         const legacyKeys = await getLegacyPosterKeys();
@@ -332,7 +332,11 @@ export function useProxiedImageSrc(
   const [blob, setBlob] = useState<{ key: string; src: string } | undefined>(() => {
     const cached = url && need ? blobCache.get(imageKey) : undefined;
     const asset = url && need && !cached ? warmAssetPath(imageKey) : undefined;
-    return cached ? { key: imageKey, src: cached.src } : asset ? { key: imageKey, src: asset } : undefined;
+    return cached
+      ? { key: imageKey, src: cached.src }
+      : asset
+        ? { key: imageKey, src: asset }
+        : undefined;
   });
   const [failed, setFailed] = useState(() =>
     url && need && isDead(imageKey) ? imageKey : undefined,
@@ -393,5 +397,7 @@ export function useProxiedImageSrc(
   if (!need) return url;
   // Loading -> undefined (caller shows its placeholder/shimmer). Failed -> the
   // original url so the <img> errors and the caller's fallback/plate logic runs.
-  return blob?.key === imageKey ? blob.src : (warmAssetPath(imageKey) ?? (failed === imageKey ? url : undefined));
+  return blob?.key === imageKey
+    ? blob.src
+    : (warmAssetPath(imageKey) ?? (failed === imageKey ? url : undefined));
 }
