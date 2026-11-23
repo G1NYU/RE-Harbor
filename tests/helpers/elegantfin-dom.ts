@@ -2,7 +2,14 @@ import { load, type CheerioAPI } from "cheerio";
 
 type Selection = ReturnType<CheerioAPI>;
 type Listener = (event: unknown) => void;
-type Mutation = { type: "attributes" | "childList"; target: DomElement; attributeName?: string };
+type Mutation = {
+  type: "attributes" | "childList";
+  target: DomElement;
+  attributeName?: string;
+  // The element children that came and went, as a real MutationRecord lists them.
+  addedNodes?: DomElement[];
+  removedNodes?: DomElement[];
+};
 
 // Cheerio provides the real HTML parser and CSS selector engine. The adapter supplies
 // the browser mutation/event boundaries used by a generated theme script; layout is
@@ -75,16 +82,24 @@ export function createThemeDom(html: string) {
     get innerHTML() {
       return this.selection.html() ?? "";
     }
+    private childElements() {
+      return this.selection
+        .children()
+        .toArray()
+        .map((node) => wrap($(node))!);
+    }
     set innerHTML(value: string) {
+      const removedNodes = this.childElements();
       this.selection.html(value);
-      notify({ type: "childList", target: this });
+      notify({ type: "childList", target: this, addedNodes: this.childElements(), removedNodes });
     }
     get textContent() {
       return this.selection.text();
     }
     set textContent(value: string) {
+      const removedNodes = this.childElements();
       this.selection.text(value);
-      notify({ type: "childList", target: this });
+      notify({ type: "childList", target: this, addedNodes: [], removedNodes });
     }
     get classList() {
       const change = (names: string[], add: boolean) => {
@@ -151,18 +166,18 @@ export function createThemeDom(html: string) {
     }
     appendChild(element: DomElement) {
       this.selection.append(element.selection);
-      notify({ type: "childList", target: this });
+      notify({ type: "childList", target: this, addedNodes: [element], removedNodes: [] });
       return element;
     }
     insertBefore(element: DomElement, anchor: DomElement | null) {
       if (anchor) anchor.selection.before(element.selection);
       else this.selection.append(element.selection);
-      notify({ type: "childList", target: this });
+      notify({ type: "childList", target: this, addedNodes: [element], removedNodes: [] });
       return element;
     }
     removeChild(element: DomElement) {
       element.selection.remove();
-      notify({ type: "childList", target: this });
+      notify({ type: "childList", target: this, addedNodes: [], removedNodes: [element] });
       return element;
     }
     remove() {

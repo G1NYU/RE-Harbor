@@ -429,11 +429,13 @@ aside[data-harbor-sidebar][data-collapsed="true"]:not([aria-hidden="true"]) {
   box-shadow: none;
   transition-delay: 0s !important;
 }
-/* The drawer stays fixed during morphing; only the pinned rail occupies page space. */
-html:not(:has([data-games-library])):has(aside[data-harbor-sidebar]:not([aria-hidden="true"])) {
+/* The drawer stays fixed during morphing; only the pinned rail occupies page space.
+   The ef-* state classes on html are kept by the theme script (syncFacts). A page-level
+   html:has(...) would re-check, and then restyle, the whole document on every DOM change. */
+html.ef-sidebar-shown:not(.ef-games) {
   --ef-header-inset: 4.25rem;
 }
-html:not(:has([data-games-library])):has(aside[data-harbor-sidebar][data-collapsed="true"]:not([aria-hidden="true"])) {
+html.ef-sidebar-rail:not(.ef-games) {
   --ef-rail-space: var(--ef-rail-width);
   --ef-header-inset: calc(var(--ef-rail-width) + 1rem);
 }
@@ -951,7 +953,7 @@ textarea {
   border-radius: 999px;
 }
 html.ef-drawer-open #ef-topleft,
-html:has(aside[data-harbor-sidebar][data-collapsed="true"]) #ef-topleft {
+html.ef-sidebar-collapsed #ef-topleft {
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
@@ -965,14 +967,14 @@ html:has(aside[data-harbor-sidebar][data-collapsed="true"]) #ef-topleft {
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
-html.ef-drawer-open:has(aside[data-harbor-sidebar][data-collapsed="false"]:not([aria-hidden="true"])) #ef-scrim {
+html.ef-drawer-open.ef-sidebar-expanded #ef-scrim {
   pointer-events: auto;
   opacity: 1;
 }
-html:not(:has(header.fixed.inset-x-0.top-0)) #ef-topleft,
-html:not(:has(aside[data-harbor-sidebar])) #ef-menu,
-html:not(:has(aside[data-harbor-sidebar])) #ef-profile,
-html:not(:has(aside[data-harbor-sidebar])) #ef-scrim {
+html:not(.ef-topbar) #ef-topleft,
+html:not(.ef-sidebar) #ef-menu,
+html:not(.ef-sidebar) #ef-profile,
+html:not(.ef-sidebar) #ef-scrim {
   display: none !important;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -994,7 +996,7 @@ html:not(:has(aside[data-harbor-sidebar])) #ef-scrim {
    ========================================================================== */
 /* Games takes over the corner with its library menu; the drawer button must not
    sit on top of it, or clicks open the app navigation instead of the Games menu. */
-html:has([data-games-library]) #ef-topleft {
+html.ef-games #ef-topleft {
   display: none !important;
 }
 /* The Games menu reveals the shell navigation. Show the same drawer without
@@ -1145,6 +1147,46 @@ function buildElegantFinJs(): string {
   var previousCollapsed = null;
   var originalInert = false;
   var observer = new MutationObserver(syncSidebar);
+  // The CSS reads these page facts as classes on <html>. Asking with html:has(...) makes the
+  // browser re-check, and then restyle, the whole document for every node that scrolls in.
+  var facts = [
+    ["ef-games", "[data-games-library]"],
+    ["ef-sidebar", "aside[data-harbor-sidebar]"],
+    ["ef-sidebar-shown", 'aside[data-harbor-sidebar]:not([aria-hidden="true"])'],
+    ["ef-sidebar-rail", 'aside[data-harbor-sidebar][data-collapsed="true"]:not([aria-hidden="true"])'],
+    ["ef-sidebar-collapsed", 'aside[data-harbor-sidebar][data-collapsed="true"]'],
+    ["ef-sidebar-expanded", 'aside[data-harbor-sidebar][data-collapsed="false"]:not([aria-hidden="true"])'],
+    ["ef-topbar", "header.fixed.inset-x-0.top-0"]
+  ];
+  var factSources = "aside, header, [data-games-library]";
+  function syncFacts() {
+    for (var i = 0; i < facts.length; i++) {
+      root.classList.toggle(facts[i][0], !!document.querySelector(facts[i][1]));
+    }
+  }
+  function holdsFactSource(nodes) {
+    // Without a node list the change cannot be narrowed down, so it counts.
+    if (!nodes) return true;
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (typeof node.matches !== "function") continue;
+      if (node.matches(factSources) || node.querySelector(factSources)) return true;
+    }
+    return false;
+  }
+  // Cards scrolling in are skipped, so the document is only searched when a fact can change.
+  var factObserver = new MutationObserver(function (records) {
+    for (var i = 0; i < records.length; i++) {
+      var record = records[i];
+      var changed = record.type === "childList"
+        ? holdsFactSource(record.addedNodes) || holdsFactSource(record.removedNodes)
+        : record.attributeName === "data-games-library" || record.target.matches(factSources);
+      if (changed) {
+        syncFacts();
+        return;
+      }
+    }
+  });
   function gamesWorkspaceActive() {
     if (!sidebar) return false;
     var shell = sidebar.closest("[data-harbor-shell]");
@@ -1285,12 +1327,22 @@ function buildElegantFinJs(): string {
       if (slot.getAttribute("src") !== src) slot.setAttribute("src", src);
     }
   }
+  // First, so the layout the CSS derives from these classes never waits for the rest of the script.
+  factObserver.observe(document.body, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ["aria-hidden", "class", "data-collapsed", "data-games-library"]
+  });
+  syncFacts();
   document.addEventListener("click", onClick, true);
   window.addEventListener("keydown", onKey);
   var iv = w.setInterval(tick, 800);
   tick();
   var cleanup = function () {
     observer.disconnect();
+    factObserver.disconnect();
+    for (var i = 0; i < facts.length; i++) root.classList.remove(facts[i][0]);
     if (sidebar) sidebar.inert = originalInert;
     root.classList.remove("ef-drawer-open");
     document.removeEventListener("click", onClick, true);
@@ -1519,7 +1571,7 @@ html[data-theme-layout="custom"] ::selection { background: rgba(53,116,252,0.35)
 
 function buildFeishinHtml(): string {
   return `<aside class="fsh-rail" data-tv-nav-zone data-tauri-drag-region>
-  <div class="fsh-actionbar">
+  <div class="fsh-actionbar" data-tauri-drag-region="deep">
     <button class="fsh-search" type="button" onclick="window.harbor.search()" aria-label="${escapeGeneratedHtml(t("Search"))}" title="${escapeGeneratedHtml(t("Search"))}">
       <svg class="fsh-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
       <span class="fsh-search-ph">${escapeGeneratedHtml(t("Search"))}</span>
