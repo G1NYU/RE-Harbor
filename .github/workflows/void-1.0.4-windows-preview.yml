@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - feature/void-harborcommunity-v1.0.4-beta-candidate
+      - build/void-1.0.4-pr3-pr4-pr8-preview
     paths:
       - .github/workflows/void-1.0.4-windows-preview.yml
       - src-tauri/src/music/commands/playback.rs
+      - src-tauri/src/proc_guard.rs
+      - src/lib/awards-history-eager.ts
   workflow_dispatch:
 
 permissions:
