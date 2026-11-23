@@ -2,14 +2,6 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Harbor Community Performance Preview",
   "identifier": "app.harbor.communityperformancepreview",
-  "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "Harbor Community Performance Preview"
-      }
-    ]
-  },
   "bundle": {
     "fileAssociations": []
   },
