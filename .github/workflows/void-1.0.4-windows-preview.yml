@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - feature/void-harborcommunity-v1.0.4-beta-candidate
+      - build/void-1.0.4-pr8-tv-card-preview
     paths:
       - .github/workflows/void-1.0.4-windows-preview.yml
       - src-tauri/src/music/commands/playback.rs
+      - src/components/tv-card.tsx
   workflow_dispatch:
 
 permissions:
