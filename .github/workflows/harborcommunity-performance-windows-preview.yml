@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: harbor-community-performance-preview-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   windows-native:
