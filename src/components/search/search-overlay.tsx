@@ -79,7 +79,8 @@ export function SearchOverlay() {
   const [mediaFilter, setMediaFilter] = useState<SearchFilter>("all");
   const { activeProfile } = useProfiles();
   const { settings, update } = useSettings();
-  const gamesEnabled = useInstallFeatures().games;
+  const installFeatures = useInstallFeatures();
+  const gamesEnabled = installFeatures.games;
   const storeQuery =
     activeProfile?.kid || !gamesEnabled
       ? null
@@ -510,11 +511,15 @@ export function SearchOverlay() {
                   commit();
                   openPerson(id);
                 }}
-                onOpenMusic={(q) => {
-                  commit();
-                  requestMusicSearch(q);
-                  setView("music");
-                }}
+                onOpenMusic={
+                  installFeatures.music
+                    ? (q) => {
+                        commit();
+                        requestMusicSearch(q);
+                        setView("music");
+                      }
+                    : undefined
+                }
               />
             ) : (
               <>

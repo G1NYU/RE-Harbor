@@ -1,6 +1,6 @@
 import { startupMarkOnce } from "@/lib/startup-trace";
 
-export type BootDependency = "features" | "secrets" | "themes" | "locale" | "music";
+export type BootDependency = "features" | "secrets" | "themes" | "locale" | "music" | "awards";
 
 export type BootDependencyState = "ok" | "timed-out" | "failed" | "fallback";
 
