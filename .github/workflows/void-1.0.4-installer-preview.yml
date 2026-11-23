@@ -1,6 +1,11 @@
 name: VOID 1.0.4 PR3 PR4 PR8 Windows setup preview
 
 on:
+  push:
+    branches:
+      - feature/void-harborcommunity-v1.0.4-beta-candidate
+    paths:
+      - .github/workflows/void-1.0.4-installer-preview.yml
   workflow_dispatch:
 
 permissions:
@@ -28,7 +33,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           foreach ($commit in @(
-            '285f57550db516bb78f4840446892bba8a7becf5',
+            '65e89dd4403fb0a21792295ce4f75502e6ee36fc',
             '67eaf501d8b9ca4541f6563e4b0b2fdfc89c5410',
             '952bed0c3969e2e3984fab60f82af682c0d47587'
           )) {
