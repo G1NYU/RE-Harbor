@@ -32,25 +32,17 @@ test("changes to source art or provider preferences do not inherit stale posters
   const original = posterCardCacheKey(config);
   rememberPosterChoice(original, "https://art.invalid/a.jpg");
   assert.equal(recallPosterChoice(posterCardCacheKey(config)), "https://art.invalid/a.jpg");
-  assert.equal(
-    recallPosterChoice(
-      posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/b.jpg", "provider-a", "", "en"]),
-    ),
-    undefined,
-  );
-  assert.equal(
-    recallPosterChoice(
-      posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/a.jpg", "provider-b", "", "en"]),
-    ),
-    undefined,
-  );
-  assert.equal(
-    recallPosterChoice(
-      posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/a.jpg", "provider-a", "", "fr"]),
-    ),
-    undefined,
-  );
-  assert.equal(recallPosterChoice(posterCardCacheKey(["tt0999999", ...config.slice(1)])), undefined);
+  const changedArtwork = [...config];
+  changedArtwork[2] = "https://art.invalid/b.jpg";
+  const changedProvider = [...config];
+  changedProvider[3] = "provider-b";
+  const changedLanguage = [...config];
+  changedLanguage[5] = "fr";
+  const changedTitle = [...config];
+  changedTitle[0] = "tt0999999";
+  for (const changed of [changedArtwork, changedProvider, changedLanguage, changedTitle]) {
+    assert.equal(recallPosterChoice(posterCardCacheKey(changed)), undefined);
+  }
 });
 
 test("a remounted card starts at its measured image rung without downshifting", () => {
