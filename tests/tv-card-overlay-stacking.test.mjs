@@ -90,6 +90,7 @@ function renderCard({
       peekStaticHeroArt: () => null,
       ensureStaticHeroArt: async () => {},
     },
+    "@/lib/expanding-card-artwork": { expandingCardArtworkKey: (meta) => meta.id },
   });
 
   const nodes = walk(

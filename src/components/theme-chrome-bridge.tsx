@@ -21,11 +21,13 @@ import {
 } from "@/lib/social/presence";
 import { getUnreadCount, subscribeUnread } from "@/lib/social/unread-bridge";
 import { activeLayout } from "@/lib/theme";
+import { runBlockedHarborCall } from "@/lib/theme-markup-calls";
 import { useBigPictureEntry } from "@/chrome/use-big-picture-entry";
 import { useThemePreview } from "@/lib/theme-preview";
 
 const SCAN_MS = 1200;
 const STATUS_EVENT = "harbor:open-status-picker";
+const BIG_PICTURE_SLOT_FLAG = "data-harbor-bigpicture-slot";
 
 const STATUS_COLORS: Record<string, string> = {
   online: "var(--color-success, #22c55e)",
@@ -85,6 +87,8 @@ function syncUnreadSlots(count: number): void {
 
 function syncBigPictureSlots(offer: boolean): void {
   const slots = document.querySelectorAll<HTMLElement>("[data-harbor-bigpicture]");
+  // index.css hides Harbor's own entry button while a theme supplies one.
+  document.documentElement.toggleAttribute(BIG_PICTURE_SLOT_FLAG, slots.length > 0);
   for (const el of Array.from(slots)) {
     if (offer) el.removeAttribute("data-empty");
     else el.setAttribute("data-empty", "");
@@ -174,11 +178,19 @@ export function ThemeChromeBridge() {
 
   useEffect(() => syncAvatarSlots(avatarUrl), [avatarUrl]);
 
-  useEffect(() => syncBigPictureSlots(bpOffer), [bpOffer]);
+  // Also when the selected theme or the custom HTML changes, so the flag on <html> follows the new
+  // slots at once. Any other change of the markup is picked up by the scan below.
+  useEffect(
+    () => syncBigPictureSlots(bpOffer),
+    [bpOffer, settings.theme.preset, settings.customHtml],
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute("data-harbor-bridge", "1");
-    return () => document.documentElement.removeAttribute("data-harbor-bridge");
+    return () => {
+      document.documentElement.removeAttribute("data-harbor-bridge");
+      document.documentElement.removeAttribute(BIG_PICTURE_SLOT_FLAG);
+    };
   }, []);
 
   useEffect(() => {
@@ -225,6 +237,19 @@ export function ThemeChromeBridge() {
     };
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
+  }, []);
+
+  // An inline handler runs at its element, after capture handlers, and not at all once the click was
+  // stopped on the way. A bubble listener on document keeps that order for the handlers the CSP blocks.
+  useEffect(() => {
+    // The node CustomCodeMount renders next to this component, not just any element with its id.
+    const markup = document.getElementById("harbor-custom-overlay");
+    if (!markup) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.target instanceof Element) runBlockedHarborCall(e.target, markup);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
   }, []);
 
   useEffect(() => {

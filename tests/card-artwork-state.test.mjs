@@ -85,6 +85,9 @@ function artworkFixture() {
       ensureStaticHeroArt: async () => {},
     },
     "@/lib/expanding-card-artwork": {
+      // As in production: the title and the fields the lookup reads, never the object itself.
+      expandingCardArtworkKey: (m, tmdbKey) =>
+        [m.id, m.type, m.animeFormat, tmdbKey, m.background, m.poster].join("|"),
       prepareExpandingCardArtwork: (m) => new Promise((resolve) => pending.set(m.id, resolve)),
     },
   });
@@ -142,6 +145,32 @@ test("late results from a previous title cannot replace current artwork", async 
   f.pending.get(a.id)("a-wide");
   await tick();
   assert.equal(f.image(b).src, "b-wide");
+});
+
+test("the same title handed down as a new object keeps its resolved artwork", async () => {
+  const f = artworkFixture();
+  const a = meta("kitsu:1");
+  f.image(a);
+  f.flush();
+  await tick();
+  f.pending.get(a.id)("a-wide");
+  await tick();
+  assert.equal(f.image(a).src, "a-wide");
+  // A list that is rebuilt hands the same title down as a new object. The Anime page does that
+  // for every title whose name it shortens, each time one of its rows receives data.
+  const rebuilt = { ...a, name: "shortened" };
+  assert.equal(f.image(rebuilt).src, "a-wide");
+  f.flush();
+  await tick();
+  assert.equal(f.image(rebuilt).src, "a-wide");
+});
+
+test("the same title handed down as a new object keeps its cached artwork", () => {
+  const f = artworkFixture();
+  const a = meta("kitsu:1");
+  f.cached.set(a.id, { bg: "a-wide" });
+  assert.equal(f.image(a).src, "a-wide");
+  assert.equal(f.image({ ...a }).src, "a-wide");
 });
 
 test("a failed backdrop falls back but does not suppress a replacement URL", () => {

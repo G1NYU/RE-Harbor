@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useInstallFeatures } from "@/lib/features/install";
 import { useProfiles } from "@/lib/profiles";
 import { useT } from "@/lib/i18n";
 import { osClass } from "@/lib/platform";
@@ -14,12 +15,14 @@ export function GameDownloadNotificationsRunner() {
   const { activeId } = useProfiles(),
     profile = activeId ?? "default",
     t = useT();
+  const gamesEnabled = useInstallFeatures().games;
   const currentProfile = useRef(profile),
     translate = useRef(t);
   currentProfile.current = profile;
   translate.current = t;
   useEffect(() => {
     if (
+      !gamesEnabled ||
       !isTauri() ||
       !["windows", "linux", "macos"].includes(osClass()) ||
       getCurrentWindow().label !== "main"
@@ -75,6 +78,6 @@ export function GameDownloadNotificationsRunner() {
       current = false;
       stop();
     };
-  }, [profile]);
+  }, [gamesEnabled, profile]);
   return null;
 }

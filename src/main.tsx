@@ -17,7 +17,7 @@ import { HdrOverlayApp } from "@/views/hdr-overlay-app";
 import { hdrOverlayEmitAction } from "@/lib/hdr-overlay";
 import { PipApp } from "@/views/pip";
 import { VideoPipApp } from "@/views/video-pip";
-import "@/lib/awards-history-eager";
+import { bundledAwardsReady } from "@/lib/awards-history-eager";
 import "@/lib/cw-derived-caches";
 import "@/index.css";
 import "flag-icons/css/flag-icons.min.css";
@@ -318,6 +318,12 @@ async function mount() {
     ensureUiLocale(getUiLanguage()).then(() => startupMarkOnce("boot.locale-done")),
     2_000,
   );
+  // Readers look the award table up synchronously, so the root waits for it like the reads above.
+  const awardsPromise = withBootWatchdog(
+    "awards",
+    bundledAwardsReady.then(() => startupMarkOnce("boot.awards-done")),
+    8_000,
+  );
   const features = await featuresPromise;
   if (features.timedOut || features.failed) markBootFallback("features");
   const musicEnabled = getInstallFeatures().music;
@@ -346,15 +352,17 @@ async function mount() {
       : Promise.resolve(),
     3_000,
   );
-  const [secrets, themes, locale, music] = await Promise.all([
+  const [secrets, themes, locale, music, awards] = await Promise.all([
     secretsPromise,
     themesPromise,
     localePromise,
     musicPromise,
+    awardsPromise,
   ]);
   if (themes.timedOut || themes.failed) markBootFallback("themes");
   if (locale.timedOut || locale.failed) markBootFallback("locale");
   if (music.timedOut || music.failed) markBootFallback("music");
+  if (awards.timedOut || awards.failed) markBootFallback("awards");
   const secretsUnavailable = secrets.timedOut || secrets.failed;
   if (secretsUnavailable) startupMarkOnce("boot.secrets.unavailable");
   startupMarkOnce("boot.critical-done");

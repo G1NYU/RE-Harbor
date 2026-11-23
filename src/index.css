@@ -352,7 +352,9 @@ body {
   opacity: 0;
   pointer-events: none;
 }
-html[data-theme-layout="custom"]:has([data-harbor-bigpicture]) .harbor-bp-proxy {
+/* The chrome bridge sets the flag while a theme supplies its own Big Picture control. Asking with
+   html:has(...) instead makes every DOM change re-check, and then restyle, the whole document. */
+html[data-theme-layout="custom"][data-harbor-bigpicture-slot] .harbor-bp-proxy {
   display: none;
 }
 
