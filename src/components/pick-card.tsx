@@ -240,9 +240,8 @@ const PosterCard = memo(function PosterCard({
   const pinnedPoster = useTitlePoster(meta.id);
   const posterCandidates = useMemo(() => {
     if (posterPending && !pinnedPoster && !rememberedPoster) return [];
-    if (posterLocalizing) return [pinnedPoster, rememberedPoster].filter(
-      (url): url is string => !!url,
-    );
+    if (posterLocalizing)
+      return [pinnedPoster, rememberedPoster].filter((url): url is string => !!url);
     const base = localizedPoster ?? meta.poster;
     const seen = new Set<string>();
     const out: string[] = [];
