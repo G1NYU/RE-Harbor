@@ -50,8 +50,10 @@ type Ratio = "portrait" | "landscape" | "wide" | "square";
 const decodedPosters = new Set<string>();
 const DECODED_POSTER_CAP = 20000;
 function rememberDecoded(url: string) {
-  if (decodedPosters.size >= DECODED_POSTER_CAP) decodedPosters.clear();
+  decodedPosters.delete(url);
   decodedPosters.add(url);
+  if (decodedPosters.size > DECODED_POSTER_CAP)
+    decodedPosters.delete(decodedPosters.values().next().value!);
 }
 
 export function useLocalizedPoster(metaId: string): {
@@ -417,7 +419,12 @@ function PosterBody({
       rememberPosterSize(sizeKey, t);
       setTargetPx(t);
     });
-  }, [qMult, ratio]);
+  }, [qMult, ratio, sizeKey]);
+  useEffect(() => {
+    // When the provider changes in the same card, reuse the existing measured
+    // slot rather than forcing that source to start from a zero-sized request.
+    if (targetPxRef.current > 0) rememberPosterSize(sizeKey, targetPxRef.current);
+  }, [sizeKey]);
   const rawSig = rawCandidates.join("|");
   useEffect(() => {
     // A non-resizable provider can be replaced by a CDN URL without any box resize.
