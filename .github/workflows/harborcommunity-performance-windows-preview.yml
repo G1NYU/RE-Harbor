@@ -125,6 +125,17 @@ jobs:
           pnpm run setup
           if ($LASTEXITCODE -ne 0) { throw 'Native media setup failed' }
 
+      - name: Stage Community Moonshine speech runtime for the full release payload
+        shell: pwsh
+        run: |
+          # The stock managed payload requires this self-contained worker.
+          # Reuse the official release build script, not a VOID modification.
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-moonshine-worker.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Community Moonshine worker build failed' }
+          if (-not (Test-Path -LiteralPath 'src-tauri/resources/moonshine/moonshine-worker.exe')) {
+            throw 'Required Community Moonshine runtime missing'
+          }
+
       - name: Compile the Community app with the three upstream PRs
         shell: pwsh
         run: |
