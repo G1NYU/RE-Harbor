@@ -29,9 +29,10 @@ type RawData = Record<string, Record<string, { name: string; entries: RawEntry[]
 // parses the same bytes through JSON.parse. Measured on a Fire TV Stick 4K Max
 // it was the single largest thing in the Big Picture boot graph. So the file is
 // no longer wired in here; whoever boots the app decides how it arrives.
-// Desktop keeps the old timing exactly via awards-history-eager, which main.tsx
-// imports before it mounts. Television calls ensureBundledAwards after the
-// first paint and re-renders through subscribeBundledAwards when it lands.
+// Desktop still has the table before its root mounts: awards-history-eager
+// requests it as a chunk of its own and main.tsx waits for it with the other
+// boot reads. Television calls ensureBundledAwards after the first paint and
+// re-renders through subscribeBundledAwards when it lands.
 let data: RawData = {};
 let version = 0;
 const listeners = new Set<() => void>();
