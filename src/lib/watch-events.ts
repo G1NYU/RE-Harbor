@@ -1,3 +1,5 @@
+import type { RefractHint } from "./refract/sync";
+
 const KEY_PREFIX = "harbor.watchevents.v1.";
 const LEGACY_KEY = "harbor.watchevents.v1";
 const PROFILES_KEY = "harbor.profiles.v1";
@@ -84,7 +86,7 @@ export function listWatchEvents(): WatchEvent[] {
   return load();
 }
 
-export function recordWatchEvent(e: WatchEvent): void {
+export function recordWatchEvent(e: WatchEvent, refract?: RefractHint): void {
   if (!e.id || !e.name) return;
   const key = `${e.id}|${e.season ?? ""}|${e.episode ?? ""}`;
   const next = [e, ...load().filter((p) => `${p.id}|${p.season ?? ""}|${p.episode ?? ""}` !== key)];
@@ -94,6 +96,11 @@ export function recordWatchEvent(e: WatchEvent): void {
     return;
   }
   subs.forEach((fn) => fn());
+  if (e.type === "movie" || e.season !== undefined || (refract?.episodes?.length ?? 0) > 0) {
+    void import("./refract/sync")
+      .then(({ enqueueRefractWatch }) => enqueueRefractWatch(e, refract))
+      .catch(() => {});
+  }
 }
 
 export function subscribeWatchEvents(fn: () => void): () => void {
