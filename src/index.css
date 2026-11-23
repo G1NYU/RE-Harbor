@@ -4601,6 +4601,12 @@ html[data-scrolling] .harbor-shimmer::after {
 .harbor-row-shell[data-row-near] {
   content-visibility: auto;
 }
+/* LazyMount already performs off-screen containment. Avoid a second `auto` on
+   its inner row: it can defer the row's first paint until the cards are onscreen.
+   Keep the default `auto` for standalone rows that are not inside LazyMount. */
+.harbor-lazy-cull .harbor-row-shell {
+  content-visibility: visible;
+}
 .harbor-preview-img {
   background-color: var(--color-raised);
   background-image: linear-gradient(
