@@ -1,0 +1,250 @@
+name: Harbor 1.0.4 nested-row culling Windows A/B preview
+
+on:
+  push:
+    branches:
+      - fix/harborcommunity-1.0.4-nested-row-culling
+    paths:
+      - .github/workflows/harborcommunity-culling-windows-preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harbor-community-culling-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-native:
+    name: Build and verify nested-row culling Community Harbor 1.0.4 portable (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      CARGO_BUILD_JOBS: "2"
+      HARBOR_CHANNEL: beta
+      HARBOR_CAPSTAN_OPTIONAL: "1"
+      HARBOR_EXPECTED_UPSTREAM: c4f0242a65e9a0b57da4f877e0df8b8f360aab06
+    steps:
+      - name: Checkout pinned Community candidate without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify stock 1.0.4 ancestry and exact four-file experiment scope
+        shell: pwsh
+        run: |
+          git merge-base --is-ancestor $env:HARBOR_EXPECTED_UPSTREAM HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Official v1.0.4-beta release is not an ancestor' }
+          $allowed = @(
+            '.github/workflows/harborcommunity-culling-windows-preview.yml',
+            'src/index.css',
+            'tests/nested-row-visibility.test.mjs',
+            'HANDOFF.md'
+          )
+          $changed = @(git diff --name-only $env:HARBOR_EXPECTED_UPSTREAM HEAD)
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot compare source with the official release' }
+          foreach ($file in $changed) {
+            if ($file -notin $allowed) { throw "Unexpected source modification: $file" }
+          }
+          if ($changed.Count -ne $allowed.Count) { throw "Unexpected experiment scope: $($changed -join ', ')" }
+          foreach ($forbidden in @('src/void-native.css', 'src/void-stream-picker.css', 'themes/VOID-Original-Glass.harborstyle')) {
+            if (Test-Path -LiteralPath $forbidden) { throw "VOID customization unexpectedly present: $forbidden" }
+          }
+          node --test tests/nested-row-visibility.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Nested-row visibility source regression test failed' }
+          Write-Host "Verified exact upstream release ancestry, four-file scope and nested-culling test."
+
+      - name: Create isolated Tauri preview identity without repository config changes
+        shell: pwsh
+        run: |
+          $app = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          if ($app.version -ne '1.0.4' -or $app.identifier -ne 'app.harbor') {
+            throw 'Unexpected official Harbor app identity or version'
+          }
+          $configPath = 'src-tauri/tauri.community-culling-preview.conf.json'
+          $preview = @{
+            productName = 'Harbor Community Culling Preview'
+            identifier = 'app.harbor.communitycullingpreview'
+            bundle = @{ fileAssociations = @() }
+            plugins = @{
+              'deep-link' = @{ desktop = @{ schemes = @('harbor-community-culling-preview') } }
+              updater = @{ endpoints = @() }
+            }
+          }
+          $preview | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $configPath -Encoding utf8
+          $check = Get-Content $configPath -Raw | ConvertFrom-Json
+          if ($check.identifier -ne 'app.harbor.communitycullingpreview') {
+            throw 'Preview identity was not isolated'
+          }
+          if ($check.plugins.updater.endpoints.Count -ne 0) {
+            throw 'Preview updater must be disabled'
+          }
+          if ($check.plugins.'deep-link'.desktop.schemes -contains 'harbor') {
+            throw 'Production deep-link collision'
+          }
+          Write-Host "Independent app identity: $($check.identifier); updater disabled."
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+            installer/src-tauri
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Set up JDK 17 for Community game engine
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up the original Community Pokemon engine SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.401"
+
+      - name: Build Community Pokemon engine
+        run: node tools/pokemon-engine/build.mjs --fetch-source "${{ runner.temp }}/harbor-pokemon-source" --output src-tauri/resources/pokemon-engine --artifacts "${{ runner.temp }}/harbor-pokemon-build"
+
+      - name: Install pinned JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Stage upstream FFmpeg binaries without broken PowerShell zip extraction
+        shell: pwsh
+        run: |
+          # The stock v1.0.4-beta fetcher invokes Windows PowerShell Expand-Archive.
+          # On this runner its ZipFileExtensions overload fails. Keep the upstream
+          # files and app code unchanged; extract the same official upstream URL
+          # with the Windows tar tool and let setup:binaries reuse both files.
+          $archive = Join-Path $env:RUNNER_TEMP 'harbor-ffmpeg-essentials.zip'
+          $unpacked = Join-Path $env:RUNNER_TEMP 'harbor-ffmpeg-essentials'
+          New-Item -ItemType Directory -Force -Path $unpacked | Out-Null
+          Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile $archive
+          & tar.exe -xf $archive -C $unpacked
+          if ($LASTEXITCODE -ne 0) { throw 'Upstream FFmpeg archive extraction failed' }
+          $bins = 'src-tauri/binaries'
+          New-Item -ItemType Directory -Force -Path $bins | Out-Null
+          foreach ($name in @('ffmpeg', 'ffprobe')) {
+            $matched = Get-ChildItem -LiteralPath $unpacked -Filter "$name.exe" -File -Recurse |
+              Select-Object -First 1
+            if (-not $matched) { throw "Upstream FFmpeg archive missing $name.exe" }
+            $dest = Join-Path $bins "$name-x86_64-pc-windows-msvc.exe"
+            Copy-Item -LiteralPath $matched.FullName -Destination $dest -Force
+            if ((Get-Item -LiteralPath $dest).Length -lt 1000000) { throw "Invalid $name binary" }
+            Write-Host "Staged $name from the original Community build source"
+          }
+
+      - name: Stage native media tools and fonts
+        shell: pwsh
+        run: |
+          $env:HARBOR_CAPSTAN_SRC = Join-Path $env:RUNNER_TEMP 'harbor-community-preview-no-capstan'
+          "HARBOR_CAPSTAN_SRC=$env:HARBOR_CAPSTAN_SRC" >> $env:GITHUB_ENV
+          pnpm run setup
+          if ($LASTEXITCODE -ne 0) { throw 'Native media setup failed' }
+
+      - name: Stage Community Moonshine speech runtime for the full release payload
+        shell: pwsh
+        run: |
+          # The stock managed payload requires this self-contained worker.
+          # Reuse the official release build script, not a VOID modification.
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-moonshine-worker.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Community Moonshine worker build failed' }
+          if (-not (Test-Path -LiteralPath 'src-tauri/resources/moonshine/moonshine-worker.exe')) {
+            throw 'Required Community Moonshine runtime missing'
+          }
+
+      - name: Compile unmodified Community 1.0.4 with only the nested-row culling experiment
+        shell: pwsh
+        run: |
+          # ort-sys copies DirectML.dll to multiple release locations.
+          foreach ($dir in @(
+            'src-tauri/target/release/examples',
+            'src-tauri/target/release/deps',
+            'src-tauri/target/release/build/examples',
+            'src-tauri/target/release/build/deps'
+          )) {
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          }
+          pnpm tauri build --no-bundle --config src-tauri/tauri.community-culling-preview.conf.json
+          if ($LASTEXITCODE -ne 0) { throw 'Community 1.0.4 native Tauri compilation failed' }
+          if (-not (Test-Path -LiteralPath src-tauri/target/release/harbor.exe -PathType Leaf)) {
+            throw 'Compiled Community Harbor executable missing'
+          }
+
+      - name: Build payload uninstaller without installing anything
+        shell: pwsh
+        run: |
+          cargo build --manifest-path installer/src-tauri/Cargo.toml --release --no-default-features --features tauri/custom-protocol --bin harbor-uninstall --locked
+          if ($LASTEXITCODE -ne 0) { throw 'Portable payload uninstaller compilation failed' }
+
+      - name: Assemble and verify portable release payload
+        shell: pwsh
+        run: |
+          node installer/scripts/make-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Community payload assembly failed' }
+          node scripts/verify-managed-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Community payload integrity check failed' }
+          $destination = 'harbor-community-culling-preview'
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          Expand-Archive -LiteralPath installer/src-tauri/payload/harbor-payload.zip -DestinationPath $destination -Force
+          foreach ($name in @('harbor.exe', 'libmpv-2.dll', 'mpv.exe', 'ffmpeg.exe', 'ffprobe.exe', 'yt-dlp.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $destination $name) -PathType Leaf)) {
+              throw "Missing essential portable media binary: $name"
+            }
+          }
+          $appBinary = Join-Path $destination 'harbor.exe'
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $appBinary).Path)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            throw 'Invalid Windows executable'
+          }
+          Remove-Item -LiteralPath (Join-Path $destination 'uninstall.exe') -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -LiteralPath $destination -File |
+            Where-Object { $_.Extension -in @('.exe', '.dll') } |
+            ForEach-Object { "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash) *$($_.Name)" } |
+            Set-Content -LiteralPath (Join-Path $destination 'SHA256SUMS.txt') -Encoding UTF8
+          @'
+          Harbor Community v1.0.4 Beta - NESTED ROW VISIBILITY A/B TEST
+          ISOLATED WINDOWS x64 PORTABLE PREVIEW
+
+          Based on exact HarborCommunity/Harbor v1.0.4-beta release commit.
+          ONLY experimental code change: nested row content-visibility CSS.
+          NO upstream PR3/PR4/PR8, native VOID, music redesign or image-proxy patches.
+
+          Extract the complete ZIP; run harbor.exe in the extracted folder.
+          Separate Tauri profile: app.harbor.communitycullingpreview.
+          Automatic updates are disabled; this binary is unsigned.
+          Do not copy files over or install on top of existing Harbor / VOID.
+
+          Compare stock 1.0.4 with this build using the DEFAULT theme.
+          Measure blank poster cards versus missed scroll frames at the same
+          refresh rate and CPU conditions. Test category A -> B -> A.
+          This experiment does NOT yet fix category-return flashing by design.
+
+          This is NOT an official Harbor Community release or a proven fix.
+          Optional Capstan extension runtime is not included.
+          Separate deep-link scheme may change OAuth and integration callbacks.
+          '@ | Set-Content -LiteralPath (Join-Path $destination 'README-COMMUNITY-PREVIEW.txt') -Encoding UTF8
+          Write-Host 'Community portable app, required native tools and SHA-256 manifest verified.'
+
+      - name: Upload Community Windows preview (no release, install or deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-community-v1.0.4-beta-nested-culling-windows-x64
+          path: harbor-community-culling-preview/
+          if-no-files-found: error
+          retention-days: 7
