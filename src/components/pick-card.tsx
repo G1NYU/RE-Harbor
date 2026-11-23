@@ -292,7 +292,6 @@ const PosterCard = memo(function PosterCard({
     meta.id,
     posterAltId,
     meta.poster,
-    meta.background,
     hydratedPoster,
     animeImdb,
     animeTvdb,
@@ -304,10 +303,13 @@ const PosterCard = memo(function PosterCard({
     rememberedPoster,
   ]);
   const posterSrc = posterCandidates[imgIdx];
+  const posterCandidateSignature = posterCandidates.join("|");
 
   useEffect(() => {
+    // Metadata rows are frequently recreated. Only reset a successful fallback
+    // when the actual source URLs change, not on unrelated metadata updates.
     setImgIdx(0);
-  }, [posterCandidates]);
+  }, [posterCandidateSignature]);
 
   useEffect(() => {
     setHydratedPoster(undefined);
