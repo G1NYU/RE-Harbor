@@ -237,7 +237,10 @@ mod tests {
             releases[0].id,
             "musicbrainz:release:ff6c4560-1234-4e7c-bd9f-a5f31d5cfe1a"
         );
-        assert!(releases[0].artwork.ends_with("-42_thumb500.jpg"));
+        assert_eq!(
+            releases[0].artwork,
+            "https://coverartarchive.org/release/dd21d4e9-af51-4e7c-bd9f-a5f31d5cfe1a/42-500"
+        );
         assert_eq!(releases[1].artist, "Bonobo");
     }
 

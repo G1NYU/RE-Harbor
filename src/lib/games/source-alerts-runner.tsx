@@ -2,6 +2,7 @@ import { matchingReleasesAsync } from "./source-matches";
 import { useEffect, useRef } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useInstallFeatures } from "@/lib/features/install";
 import { useProfiles } from "@/lib/profiles";
 import { useT } from "@/lib/i18n";
 import { emitListToast } from "@/components/lists/list-toast";
@@ -21,11 +22,13 @@ export function GameSourceAlertsRunner() {
   const { activeId } = useProfiles(),
     profile = activeId ?? "default",
     t = useT();
+  const gamesEnabled = useInstallFeatures().games;
   const owner = useRef(profile),
     translate = useRef(t);
   owner.current = profile;
   translate.current = t;
   useEffect(() => {
+    if (!gamesEnabled) return;
     if (isTauri() && getCurrentWindow().label !== "main") return;
     let stopped = false,
       running = false,
@@ -156,6 +159,6 @@ export function GameSourceAlertsRunner() {
       window.removeEventListener("storage", storage);
       window.removeEventListener("online", online);
     };
-  }, [profile]);
+  }, [gamesEnabled, profile]);
   return null;
 }

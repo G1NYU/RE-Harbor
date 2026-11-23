@@ -3,6 +3,7 @@ import type { Meta } from "@/lib/cinemeta";
 import { useSearch } from "@/lib/search-context";
 import { getSearchDisplayState } from "@/lib/search-display-state";
 import { useSettings } from "@/lib/settings";
+import { useInstallFeatures } from "@/lib/features/install";
 import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { useParental } from "@/lib/parental";
 import { useUiLanguage } from "@/lib/i18n";
@@ -347,6 +348,7 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
   );
   const collections = useCollectionHits(query.trim());
   const { settings } = useSettings();
+  const mangaInstalled = useInstallFeatures().manga;
   const playlists = usePlaylists();
   const { hiddenTabs } = useParental();
 
@@ -356,7 +358,7 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
   const gates = useMemo<BpSourceGates>(
     () => ({
       anime: !hiddenTabs.anime && !settings.hideContent.anime,
-      manga: settings.mangaEnabled,
+      manga: settings.mangaEnabled && mangaInstalled,
       liveTv: !hiddenTabs.liveTv && playlists.some((p) => (p.kind ?? "m3u") !== "epg"),
     }),
     // The dedicated playlist store publishes only when IPTV sources change, so
@@ -366,6 +368,7 @@ export function useBpSearch(filter: BpSearchFilter): BpSearchState {
       hiddenTabs.liveTv,
       settings.hideContent.anime,
       settings.mangaEnabled,
+      mangaInstalled,
       playlists,
     ],
   );

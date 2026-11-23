@@ -47,6 +47,7 @@ import { anilistCharacterSearch, type CharacterHit } from "@/lib/anilist/charact
 import { gatherCatalogAddons, type Addon } from "@/lib/addons";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
+import { useInstallFeatures } from "@/lib/features/install";
 import { usePlaylists } from "@/lib/iptv/playlists-store";
 import { isMagnetInput, isDirectVideoUrl } from "@/lib/torrent/magnet";
 import { useView, type Frame } from "@/lib/view";
@@ -189,6 +190,7 @@ function saveRecent(items: string[]): void {
 
 export function SearchProvider({ children }: { children: ReactNode }) {
   const { settings } = useSettings();
+  const installFeatures = useInstallFeatures();
   const playlists = usePlaylists();
   const { authKey } = useAuth();
   const { hiddenTabs } = useParental();
@@ -246,7 +248,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setAddonQueries([]);
     setStatus("typing");
     const animeAllowed = !hiddenTabs.anime && !settings.hideContent.anime;
-    const mangaAllowed = settings.mangaEnabled;
+    const mangaAllowed = settings.mangaEnabled && installFeatures.manga;
+    const musicAllowed = installFeatures.music;
+    const ebookAllowed = installFeatures.ebook;
     const franchiseAllowed = animeAllowed || mangaAllowed;
     const liveTvAllowed = !hiddenTabs.liveTv && playlists.length > 0;
     const controller = new AbortController();
@@ -318,11 +322,12 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       const mangaPromise: Promise<MangaSummary[]> = mangaAllowed
         ? guard(searchManga(trimmed), [])
         : Promise.resolve([]);
-      const musicPromise: Promise<MusicSearchHit[]> = guard(
-        searchTyped(trimmed, 10).then(toMusicHits),
-        [],
-      );
-      const ebookPromise: Promise<EBook[]> = guard(searchEBooks(trimmed), []);
+      const musicPromise: Promise<MusicSearchHit[]> = musicAllowed
+        ? guard(searchTyped(trimmed, 10).then(toMusicHits), [])
+        : Promise.resolve([]);
+      const ebookPromise: Promise<EBook[]> = ebookAllowed
+        ? guard(searchEBooks(trimmed), [])
+        : Promise.resolve([]);
       const sportsPromise: Promise<SportsEventHit[]> = guard(
         searchSportsEvents(trimmed, signal),
         [],
@@ -578,6 +583,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     settings.hideContent.anime,
     hiddenTabs.liveTv,
     settings.mangaEnabled,
+    installFeatures.manga,
+    installFeatures.music,
+    installFeatures.ebook,
     authKey,
   ]);
 
