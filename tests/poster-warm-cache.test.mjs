@@ -32,9 +32,24 @@ test("changes to source art or provider preferences do not inherit stale posters
   const original = posterCardCacheKey(config);
   rememberPosterChoice(original, "https://art.invalid/a.jpg");
   assert.equal(recallPosterChoice(posterCardCacheKey(config)), "https://art.invalid/a.jpg");
-  assert.equal(recallPosterChoice(posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/b.jpg", "provider-a", "", "en"])), undefined);
-  assert.equal(recallPosterChoice(posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/a.jpg", "provider-b", "", "en"])), undefined);
-  assert.equal(recallPosterChoice(posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/a.jpg", "provider-a", "", "fr"])), undefined);
+  assert.equal(
+    recallPosterChoice(
+      posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/b.jpg", "provider-a", "", "en"]),
+    ),
+    undefined,
+  );
+  assert.equal(
+    recallPosterChoice(
+      posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/a.jpg", "provider-b", "", "en"]),
+    ),
+    undefined,
+  );
+  assert.equal(
+    recallPosterChoice(
+      posterCardCacheKey(["tt0111162", "movie", "https://art.invalid/a.jpg", "provider-a", "", "fr"]),
+    ),
+    undefined,
+  );
   assert.equal(recallPosterChoice(posterCardCacheKey(["tt0999999", ...config.slice(1)])), undefined);
 });
 
