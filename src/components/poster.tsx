@@ -35,6 +35,7 @@ import {
 } from "@/lib/img-size";
 import { shouldLocalizePosters } from "@/lib/providers/tmdb/tmdb-image-lang";
 import { useProxiedImageSrc } from "@/lib/remote-image-proxy";
+import { recallPosterSize, rememberPosterSize } from "@/lib/poster-warm-cache";
 import { observeResize, observeWithin } from "@/lib/visibility";
 import { noteProbe, recordRenderCause } from "@/lib/render-cause";
 import { resolveRowScrollRoot, ScrollRootContext } from "./row";
@@ -49,8 +50,10 @@ type Ratio = "portrait" | "landscape" | "wide" | "square";
 const decodedPosters = new Set<string>();
 const DECODED_POSTER_CAP = 20000;
 function rememberDecoded(url: string) {
-  if (decodedPosters.size >= DECODED_POSTER_CAP) decodedPosters.clear();
+  decodedPosters.delete(url);
   decodedPosters.add(url);
+  if (decodedPosters.size > DECODED_POSTER_CAP)
+    decodedPosters.delete(decodedPosters.values().next().value!);
 }
 
 export function useLocalizedPoster(metaId: string): {
@@ -313,6 +316,7 @@ function PosterBody({
   className = "",
   children,
   onError,
+  onLoaded,
   lazy = false,
   preferDirect = false,
   fallbacks,
@@ -326,6 +330,7 @@ function PosterBody({
   className?: string;
   children?: React.ReactNode;
   onError?: () => void;
+  onLoaded?: (url: string) => void;
   lazy?: boolean | "release";
   /** For public browse-grid covers, try HTTPS img loading before the native proxy. */
   preferDirect?: boolean;
@@ -358,13 +363,18 @@ function PosterBody({
   const effect = settings.posterEffect;
   const pageScrollRoot = useContext(ScrollRootContext);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const [imageEnabled, setImageEnabled] = useState(!lazy);
-  const imageEnabledRef = useRef(!lazy);
-  const [targetPx, setTargetPx] = useState(0);
-  const targetPxRef = useRef(0);
-  const measuredPxRef = useRef(0);
   const qMult = qualityMultiplier(settings.posterQuality);
   const rawCandidates = [src, ...(fallbacks ?? [])].filter((u): u is string => !!u);
+  const sizeKey = `${ratio}|${qMult}|${rawCandidates[0] ?? ""}`;
+  // Previously decoded posters should not wait for a fresh visibility event after
+  // a virtualized row remounts. Their native asset path can be reused synchronously.
+  const [imageEnabled, setImageEnabled] = useState(
+    () => !lazy || rawCandidates.some((candidate) => decodedPosters.has(candidate)),
+  );
+  const imageEnabledRef = useRef(imageEnabled);
+  const [targetPx, setTargetPx] = useState(() => (qMult > 0 ? recallPosterSize(sizeKey) : 0));
+  const targetPxRef = useRef(targetPx);
+  const measuredPxRef = useRef(0);
   const rawCandidatesRef = useRef(rawCandidates);
   rawCandidatesRef.current = rawCandidates;
   // Wake lazy images once, and pause the shimmer outside the artwork loading range.
@@ -406,9 +416,15 @@ function PosterBody({
       )
         return;
       targetPxRef.current = t;
+      rememberPosterSize(sizeKey, t);
       setTargetPx(t);
     });
-  }, [qMult, ratio]);
+  }, [qMult, ratio, sizeKey]);
+  useEffect(() => {
+    // When the provider changes in the same card, reuse the existing measured
+    // slot rather than forcing that source to start from a zero-sized request.
+    if (targetPxRef.current > 0) rememberPosterSize(sizeKey, targetPxRef.current);
+  }, [sizeKey]);
   const rawSig = rawCandidates.join("|");
   useEffect(() => {
     // A non-resizable provider can be replaced by a CDN URL without any box resize.
@@ -437,6 +453,8 @@ function PosterBody({
   const shownRef = useRef<string | undefined>(undefined);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const onLoadedRef = useRef(onLoaded);
+  onLoadedRef.current = onLoaded;
 
   // The reveal is CSS-driven (`.harbor-poster[data-loaded]` in index.css), so a poster that loads
   // costs no React render — it did two per image before, and a grid of a few hundred was the
@@ -445,6 +463,9 @@ function PosterBody({
   const markLoaded = useCallback((url: string | undefined) => {
     if (!url) return;
     rememberDecoded(url);
+    const raw = rawCandidatesRef.current[candidatesRef.current.indexOf(url)] ?? url;
+    rememberDecoded(raw);
+    onLoadedRef.current?.(raw);
     shownRef.current = url;
     rootRef.current?.setAttribute("data-loaded", "1");
   }, []);

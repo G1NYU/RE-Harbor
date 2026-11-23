@@ -26,7 +26,11 @@ test("poster sizing consumes observer measurements without forcing layout during
     "the shared observer already provides the poster's dimensions",
   );
   assert.doesNotMatch(poster, /el\.getBoundingClientRect\(\)/);
-  assert.match(poster, /\}, \[qMult, ratio\]\);/, "ratio must be a dependency");
+  assert.match(
+    poster,
+    /\}, \[qMult, ratio, sizeKey\]\);/,
+    "ratio and source sizing must be dependencies",
+  );
 });
 
 test("the declared aspect ratios match the aspect padding", () => {

@@ -16,6 +16,11 @@ import { animeKitsuMeta } from "@/lib/providers/anime-kitsu-addon";
 import { useCardScoreState } from "@/components/use-card-score-state";
 import { needsImdbForPoster, needsTmdbForPoster, rpdbPoster } from "@/lib/providers/rpdb";
 import { useTitlePoster } from "@/lib/title-poster";
+import {
+  posterCardCacheKey,
+  recallPosterChoice,
+  rememberPosterChoice,
+} from "@/lib/poster-warm-cache";
 import { externalToKitsu, kitsuToImdb, kitsuToTvdb } from "@/lib/providers/anime-mapping";
 import { useTmdbIdFromImdb, useTmdbImdbId } from "@/lib/providers/tmdb";
 import { useSettings } from "@/lib/settings";
@@ -204,6 +209,21 @@ const PosterCard = memo(function PosterCard({
 
   const [imgIdx, setImgIdx] = useState(0);
   const advancePoster = useCallback(() => setImgIdx((i) => i + 1), []);
+  const posterCacheKey = posterCardCacheKey([
+    meta.id,
+    meta.type,
+    meta.poster,
+    settings.rpdbKey,
+    settings.posterBaseUrl,
+    settings.tmdbLanguage,
+    settings.tmdbImageLangs,
+    settings.metadataSources?.poster,
+  ]);
+  const rememberedPoster = useMemo(() => recallPosterChoice(posterCacheKey), [posterCacheKey]);
+  const onPosterLoaded = useCallback(
+    (url: string) => rememberPosterChoice(posterCacheKey, url),
+    [posterCacheKey],
+  );
   const [hydratedPoster, setHydratedPoster] = useState<string | undefined>();
   const { url: localizedPoster, localizing: posterLocalizing } = useLocalizedPoster(meta.id);
   const resolvedTmdb = useTmdbIdFromImdb(wantTmdbPoster ? meta.id : undefined);
@@ -219,13 +239,15 @@ const PosterCard = memo(function PosterCard({
       (wantTmdbPoster && resolvedTmdb === undefined));
   const pinnedPoster = useTitlePoster(meta.id);
   const posterCandidates = useMemo(() => {
-    if (posterPending && !pinnedPoster) return [];
-    if (posterLocalizing) return pinnedPoster ? [pinnedPoster] : [];
+    if (posterPending && !pinnedPoster && !rememberedPoster) return [];
+    if (posterLocalizing)
+      return [pinnedPoster, rememberedPoster].filter((url): url is string => !!url);
     const base = localizedPoster ?? meta.poster;
     const seen = new Set<string>();
     const out: string[] = [];
     for (const u of [
       pinnedPoster,
+      rememberedPoster,
       animeImdb
         ? rpdbPoster(
             settings.rpdbKey,
@@ -270,7 +292,6 @@ const PosterCard = memo(function PosterCard({
     meta.id,
     posterAltId,
     meta.poster,
-    meta.background,
     hydratedPoster,
     animeImdb,
     animeTvdb,
@@ -279,12 +300,16 @@ const PosterCard = memo(function PosterCard({
     posterLocalizing,
     posterPending,
     pinnedPoster,
+    rememberedPoster,
   ]);
   const posterSrc = posterCandidates[imgIdx];
+  const posterCandidateSignature = posterCandidates.join("|");
 
   useEffect(() => {
+    // Metadata rows are frequently recreated. Only reset a successful fallback
+    // when the actual source URLs change, not on unrelated metadata updates.
     setImgIdx(0);
-  }, [posterCandidates]);
+  }, [posterCandidateSignature]);
 
   useEffect(() => {
     setHydratedPoster(undefined);
@@ -564,6 +589,7 @@ const PosterCard = memo(function PosterCard({
           ratio="portrait"
           lazy="release"
           onError={advancePoster}
+          onLoaded={onPosterLoaded}
           className={`harbor-card-ring rounded-[var(--poster-radius,12px)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] transition-[box-shadow] duration-300 group-hover:shadow-[0_24px_48px_-14px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)] ${
             customProps ? customProps.className : cardHoverPosterClass(inCardHover)
           }`}
