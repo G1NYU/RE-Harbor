@@ -1,4 +1,4 @@
-name: VOID 1.0.4 PR4 PR8 isolated Windows setup preview
+name: VOID 1.0.4 PR3 PR4 PR8 Windows setup preview
 
 on:
   workflow_dispatch:
@@ -15,38 +15,45 @@ jobs:
   package:
     name: Package verified VOID portable app as Windows setup
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
-      - name: Verify the exact PR 8 source build and isolated configuration
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Confirm PR 3, 4 and 8 source build and isolated app identity
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          git merge-base --is-ancestor 67eaf501d8b9ca4541f6563e4b0b2fdfc89c5410 HEAD
-          if ($LASTEXITCODE -ne 0) { throw 'Required PR #8 application fix missing' }
-          git merge-base --is-ancestor 952bed0c3969e2e3984fab60f82af682c0d47587 HEAD
-          if ($LASTEXITCODE -ne 0) { throw 'Required PR #4 theme engine fix missing' }
+          foreach ($commit in @(
+            '285f57550db516bb78f4840446892bba8a7becf5',
+            '67eaf501d8b9ca4541f6563e4b0b2fdfc89c5410',
+            '952bed0c3969e2e3984fab60f82af682c0d47587'
+          )) {
+            git merge-base --is-ancestor $commit HEAD
+            if ($LASTEXITCODE -ne 0) { throw "Required commit not in installer ancestry: $commit" }
+          }
           $app = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
           $preview = Get-Content src-tauri/tauri.music-preview.conf.json -Raw | ConvertFrom-Json
           if ($app.version -ne '1.0.4') { throw 'Unexpected app version' }
-          if ($preview.identifier -ne 'app.harbor.voidnativepreview') { throw 'Unapproved preview identity' }
-          if ($preview.plugins.updater.endpoints.Count -ne 0) { throw 'Preview updater must remain disabled' }
-          if ($preview.plugins.'deep-link'.desktop.schemes -contains 'harbor') { throw 'Preview must not claim official Harbor links' }
-          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/45102081338" | ConvertFrom-Json
+          if ($preview.identifier -ne 'app.harbor.voidnativepreview') { throw 'Unexpected app identifier' }
+          if ($preview.plugins.updater.endpoints.Count -ne 0) { throw 'Preview updater must be disabled' }
+          if ($preview.plugins.'deep-link'.desktop.schemes -contains 'harbor') { throw 'Preview conflicts with official Harbor links' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/45106248935" | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'Cannot verify source preview run' }
-          if ($run.head_sha -ne 'fc5208e99ed9d277b71d7bd78f0694de24beda29') { throw 'Preview source commit changed' }
-          if ($run.status -ne 'completed' -or $run.conclusion -ne 'success') { throw 'Windows source preview not successful' }
+          if ($run.head_sha -ne '8fd345c3ecaefc66d1dac40e94eadd5f42f8213a') { throw 'Unexpected source preview commit' }
           if ($run.name -ne 'VOID 1.0.4 isolated Windows preview') { throw 'Unexpected source workflow' }
-          Write-Host 'PR #4 + #8, isolated identifier, and source Windows artifact run verified'
+          if ($run.status -ne 'completed' -or $run.conclusion -ne 'success') { throw 'Windows source preview not successful' }
+          Write-Host 'All PRs, source Windows artifact, and application isolation verified'
 
       - name: Fetch exact validated Windows portable artifact
         uses: actions/download-artifact@v4
         with:
           name: harbor-void-1.0.4-beta-windows-x64-preview
           repository: G1NYU/RE-Harbor
-          run-id: 45102081338
+          run-id: 45106248935
           github-token: ${{ github.token }}
           path: installer/void/payload
       - name: Verify the original portable payload
@@ -64,16 +71,25 @@ jobs:
           if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw 'Input harbor.exe is not a Windows PE binary' }
           Get-ChildItem -LiteralPath $root | Select-Object Name, Length
           "SOURCE_HARBOR_SHA256=$((Get-FileHash $exe -Algorithm SHA256).Hash)"
-      - name: Verify exact SHA256 manifest for source portable binaries
+      - name: Validate source portable SHA256 manifest
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $root = 'installer/void/payload'
           $manifestPath = Join-Path $root 'SHA256SUMS.txt'
-          if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'Preview SHA256SUMS.txt missing' }
+          if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'SHA256SUMS.txt missing' }
           $manifest = @{}
           foreach ($line in (Get-Content -LiteralPath $manifestPath)) {
-            if ($line -match '^([0-9a-fA-F]{64}) \*(.+)
+            if ($line -match '^([0-9a-fA-F]{64}) \*(.+)$') { $manifest[$Matches[2]] = $Matches[1] }
+          }
+          foreach ($file in @('harbor.exe','libmpv-2.dll','mpv.exe','ffmpeg.exe','ffprobe.exe','yt-dlp.exe')) {
+            if (-not $manifest.ContainsKey($file)) { throw "Missing SHA256 entry: $file" }
+            $actual = (Get-FileHash -LiteralPath (Join-Path $root $file) -Algorithm SHA256).Hash
+            if ($actual -ne $manifest[$file]) { throw "Hash mismatch: $file" }
+          }
+          Write-Host 'All source executables and sidecars match the portable manifest'
+
+      - name: Copy both verified VOID Glass theme options
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -81,19 +97,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path $themes | Out-Null
           Copy-Item -LiteralPath 'themes/VOID-Original-Glass.harborstyle' -Destination (Join-Path $themes 'VOID-Original-Glass.harborstyle')
           Copy-Item -LiteralPath 'themes/VOID-Glass-Poster-Stable-1.0.4.harborstyle' -Destination (Join-Path $themes 'VOID-Glass-Poster-Stable-1.0.4.harborstyle')
-          $original = (Get-FileHash (Join-Path $themes 'VOID-Original-Glass.harborstyle') -Algorithm SHA256).Hash
-          $stable = (Get-FileHash (Join-Path $themes 'VOID-Glass-Poster-Stable-1.0.4.harborstyle') -Algorithm SHA256).Hash
-          if ($original -ne 'd30b7c9aaa0f617e34fd9e4ffe7a85bd848d533decb5aa127fe7d37ee74a8229') { throw 'OG Glass does not match uploaded original' }
-          if ($stable -ne '85e97326f6b0e3463ef7db8122951d543d2a78d1b0765ded2ca32720a5ad3d04') { throw 'Poster Stable theme does not match PR #14 asset' }
+          $original = (Get-FileHash -LiteralPath (Join-Path $themes 'VOID-Original-Glass.harborstyle') -Algorithm SHA256).Hash
+          $stable = (Get-FileHash -LiteralPath (Join-Path $themes 'VOID-Glass-Poster-Stable-1.0.4.harborstyle') -Algorithm SHA256).Hash
+          if ($original -ne 'd30b7c9aaa0f617e34fd9e4ffe7a85bd848d533decb5aa127fe7d37ee74a8229') { throw 'OG Glass theme differs from uploaded original' }
+          if ($stable -ne '85e97326f6b0e3463ef7db8122951d543d2a78d1b0765ded2ca32720a5ad3d04') { throw 'Poster Stable theme differs from verified package' }
           @(
             'VOID GLASS THEMES - HARBOR 1.0.4',
-            'Themes are not automatically applied and do not alter your profile.',
+            'Themes are optional imports; the installer does not change your current theme.',
             'In VOID: Settings > Themes > Custom Themes > Import.',
-            'VOID-Original-Glass.harborstyle: original user-supplied OG Glass skin.',
-            'VOID-Glass-Poster-Stable-1.0.4.harborstyle: optional theme-side stability variant, not user-tested yet.',
-            'PR #4 theme-engine and PR #8 TV-card fixes are included in harbor.exe.'
+            'VOID-Original-Glass.harborstyle: exact original glass theme.',
+            'VOID-Glass-Poster-Stable-1.0.4.harborstyle: optional poster-stability variant (not yet user tested).',
+            'PR #3, #4 and #8 runtime fixes are included in harbor.exe.'
           ) | Set-Content -LiteralPath (Join-Path $themes 'README.txt') -Encoding UTF8
-          Write-Host 'Both original and poster-stable glass options retained'
+          Write-Host 'Exact original and optional poster-stable skin bundled'
 
       - name: Install NSIS build tool
         shell: pwsh
@@ -125,8 +141,8 @@ jobs:
           if (Test-Path -LiteralPath $dest) { throw 'Destination unexpectedly pre-exists on CI runner' }
           $profile = Join-Path $env:APPDATA 'app.harbor.voidnativepreview'
           New-Item -ItemType Directory -Force -Path $profile | Out-Null
-          $sentinel = Join-Path $profile 'void-installer-ci-sentinel.txt'
-          'preserve user settings' | Set-Content -LiteralPath $sentinel
+          $sentinel = Join-Path $profile 'void-setup-preserved.txt'
+          'preserve user profile' | Set-Content -LiteralPath $sentinel
           $proc = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
           if ($proc.ExitCode -ne 0) { throw "Installer failed: $($proc.ExitCode)" }
           $installed = Join-Path $dest 'harbor.exe'
@@ -140,24 +156,22 @@ jobs:
             if ($source -ne $actual) { throw "Changed/missing sidecar: $file" }
           }
           foreach ($skin in @('VOID-Original-Glass.harborstyle','VOID-Glass-Poster-Stable-1.0.4.harborstyle')) {
-            $source = (Get-FileHash (Join-Path 'installer/void/payload/Themes' $skin) -Algorithm SHA256).Hash
-            $actual = (Get-FileHash (Join-Path $dest 'Themes' $skin) -Algorithm SHA256).Hash
-            if ($source -ne $actual) { throw "Changed/missing optional theme: $skin" }
+            $inputHash = (Get-FileHash (Join-Path 'installer/void/payload/Themes' $skin) -Algorithm SHA256).Hash
+            $installedSkinHash = (Get-FileHash (Join-Path $dest 'Themes' $skin) -Algorithm SHA256).Hash
+            if ($inputHash -ne $installedSkinHash) { throw "Installed theme mismatch: $skin" }
           }
           if (-not (Test-Path -LiteralPath $registry)) { throw 'Missing uninstall registration' }
-          if ((Get-ItemProperty $registry).DisplayVersion -ne '1.0.4') { throw 'Wrong installed VOID version' }
+          if ((Get-ItemProperty $registry).DisplayVersion -ne '1.0.4') { throw 'Wrong installed app version' }
           if (-not (Test-Path -LiteralPath $menu)) { throw 'Missing Start Menu shortcut' }
           if (-not (Test-Path -LiteralPath $desktop)) { throw 'Missing Desktop shortcut' }
           $uninstaller = Join-Path $dest 'Uninstall Harbor VOID.exe'
           if (-not (Test-Path -LiteralPath $uninstaller)) { throw 'Missing uninstaller' }
-          if (-not (Test-Path -LiteralPath $sentinel)) { throw 'Installer removed the VOID profile' }
+          if (-not (Test-Path -LiteralPath $sentinel)) { throw 'Installer erased the app profile' }
           $again = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
-          if ($again.ExitCode -ne 0) { throw "Repeat install failed: $($again.ExitCode)" }
-          if ((Get-FileHash $installed -Algorithm SHA256).Hash -ne $originalHash) {
-            throw 'Repeat install changed the verified application executable'
-          }
-          if (-not (Test-Path -LiteralPath $sentinel)) { throw 'Repeat install removed the VOID profile' }
-          Write-Host "INSTALL_VERIFIED: exact PR8 portable binary, glass themes, shortcuts and registry"
+          if ($again.ExitCode -ne 0) { throw 'Second installer run failed' }
+          if ((Get-FileHash $installed -Algorithm SHA256).Hash -ne $originalHash) { throw 'Repeat install changed the app executable' }
+          if (-not (Test-Path -LiteralPath $sentinel)) { throw 'Repeat install erased the app profile' }
+          Write-Host "INSTALL_VERIFIED: exact portable app, themes, repeat install and shortcuts"
           $process = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
           Start-Sleep -Seconds 2
@@ -165,115 +179,13 @@ jobs:
           if (Test-Path -LiteralPath $registry) { throw 'Uninstall left registry entry behind' }
           if (Test-Path -LiteralPath $menu) { throw 'Uninstall left Start Menu shortcut behind' }
           if (Test-Path -LiteralPath $desktop) { throw 'Uninstall left Desktop shortcut behind' }
-          if (-not (Test-Path -LiteralPath $sentinel)) { throw 'Uninstall deleted application profile data' }
+          if (-not (Test-Path -LiteralPath $sentinel)) { throw 'Uninstall erased the app profile' }
           Remove-Item -LiteralPath $sentinel -Force
-          Write-Host 'UNINSTALL_VERIFIED: files, registry, and shortcuts cleaned'
-      - name: Upload Windows setup candidate (no publication)
-        # The existing November release and its installation remain untouched.
-
+          Write-Host 'UNINSTALL_VERIFIED: files, registry, shortcuts and profile preserved'
+      - name: Upload isolated Windows setup candidate (no publication)
         uses: actions/upload-artifact@v4
         with:
-          name: harbor-void-1.0.4-pr8-setup-windows-x64
-          path: installer/void/Harbor-VOID-1.0.4-Setup-Windows-x64.exe
-          if-no-files-found: error
-          retention-days: 30
-) { $manifest[$Matches[2]] = $Matches[1] }
-          }
-          foreach ($name in @('harbor.exe','libmpv-2.dll','mpv.exe','ffmpeg.exe','ffprobe.exe','yt-dlp.exe')) {
-            if (-not $manifest.ContainsKey($name)) { throw "No checksum for $name" }
-            $actual = (Get-FileHash -LiteralPath (Join-Path $root $name) -Algorithm SHA256).Hash
-            if ($actual -ne $manifest[$name]) { throw "Source artifact hash mismatch: $name" }
-          }
-          Write-Host 'Portable SHA256SUMS verified for harbor.exe and all required media sidecars'
-
-      - name: Stage optional OG and Poster Stable Glass skins
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $themes = 'installer/void/payload/Themes'
-          New-Item -ItemType Directory -Force -Path $themes | Out-Null
-          Copy-Item -LiteralPath 'themes/VOID-Original-Glass.harborstyle' -Destination (Join-Path $themes 'VOID-Original-Glass.harborstyle')
-          Copy-Item -LiteralPath 'themes/VOID-Glass-Poster-Stable-1.0.4.harborstyle' -Destination (Join-Path $themes 'VOID-Glass-Poster-Stable-1.0.4.harborstyle')
-          $original = (Get-FileHash (Join-Path $themes 'VOID-Original-Glass.harborstyle') -Algorithm SHA256).Hash
-          $stable = (Get-FileHash (Join-Path $themes 'VOID-Glass-Poster-Stable-1.0.4.harborstyle') -Algorithm SHA256).Hash
-          if ($original -ne 'd30b7c9aaa0f617e34fd9e4ffe7a85bd848d533decb5aa127fe7d37ee74a8229') { throw 'OG Glass does not match uploaded original' }
-          if ($stable -ne '85e97326f6b0e3463ef7db8122951d543d2a78d1b0765ded2ca32720a5ad3d04') { throw 'Poster Stable theme does not match PR #14 asset' }
-          @(
-            'VOID GLASS THEMES - HARBOR 1.0.4',
-            'Themes are not automatically applied and do not alter your profile.',
-            'In VOID: Settings > Themes > Custom Themes > Import.',
-            'VOID-Original-Glass.harborstyle: original user-supplied OG Glass skin.',
-            'VOID-Glass-Poster-Stable-1.0.4.harborstyle: optional theme-side stability variant, not user-tested yet.',
-            'PR #4 theme-engine and PR #8 TV-card fixes are included in harbor.exe.'
-          ) | Set-Content -LiteralPath (Join-Path $themes 'README.txt') -Encoding UTF8
-          Write-Host 'Both original and poster-stable glass options retained'
-
-      - name: Install NSIS build tool
-        shell: pwsh
-        run: |
-          $exe = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-          if (-not (Test-Path -LiteralPath $exe)) {
-            choco install nsis -y --no-progress
-            if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
-          }
-          if (-not (Test-Path -LiteralPath $exe)) { throw 'makensis.exe unavailable' }
-      - name: Build Windows setup executable
-        shell: pwsh
-        working-directory: installer/void
-        run: |
-          $makensis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-          & $makensis /V3 /DPAYLOAD_DIR=payload void-1.0.4-preview.nsi
-          if ($LASTEXITCODE -ne 0) { throw 'NSIS packaging failed' }
-          if (-not (Test-Path -LiteralPath 'Harbor-VOID-1.0.4-Setup-Windows-x64.exe')) { throw 'Setup EXE missing' }
-          Get-FileHash 'Harbor-VOID-1.0.4-Setup-Windows-x64.exe' -Algorithm SHA256 | Format-List
-      - name: Test silent installation, shortcuts, registry and uninstallation
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $installer = (Resolve-Path 'installer/void/Harbor-VOID-1.0.4-Setup-Windows-x64.exe').Path
-          $dest = Join-Path $env:LOCALAPPDATA 'Programs\Harbor VOID'
-          $registry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HarborVOID'
-          $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Harbor VOID.lnk'
-          $desktop = Join-Path $env:USERPROFILE 'Desktop\Harbor VOID.lnk'
-          if (Test-Path -LiteralPath $dest) { throw 'Destination unexpectedly pre-exists on CI runner' }
-          $proc = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
-          if ($proc.ExitCode -ne 0) { throw "Installer failed: $($proc.ExitCode)" }
-          $installed = Join-Path $dest 'harbor.exe'
-          if (-not (Test-Path -LiteralPath $installed)) { throw 'App not installed' }
-          $originalHash = (Get-FileHash 'installer/void/payload/harbor.exe' -Algorithm SHA256).Hash
-          $installedHash = (Get-FileHash $installed -Algorithm SHA256).Hash
-          if ($originalHash -ne $installedHash) { throw 'Installed app differs from the user-tested portable binary' }
-          foreach ($file in @('mpv.exe','ffmpeg.exe','ffprobe.exe','yt-dlp.exe','libmpv-2.dll')) {
-            $source = (Get-FileHash (Join-Path 'installer/void/payload' $file) -Algorithm SHA256).Hash
-            $actual = (Get-FileHash (Join-Path $dest $file) -Algorithm SHA256).Hash
-            if ($source -ne $actual) { throw "Changed/missing sidecar: $file" }
-          }
-          foreach ($skin in @('VOID-Original-Glass.harborstyle','VOID-Glass-Poster-Stable-1.0.4.harborstyle')) {
-            $source = (Get-FileHash (Join-Path 'installer/void/payload/Themes' $skin) -Algorithm SHA256).Hash
-            $actual = (Get-FileHash (Join-Path $dest 'Themes' $skin) -Algorithm SHA256).Hash
-            if ($source -ne $actual) { throw "Changed/missing optional theme: $skin" }
-          }
-          if (-not (Test-Path -LiteralPath $registry)) { throw 'Missing uninstall registration' }
-          if ((Get-ItemProperty $registry).DisplayVersion -ne '1.0.4') { throw 'Wrong installed VOID version' }
-          if (-not (Test-Path -LiteralPath $menu)) { throw 'Missing Start Menu shortcut' }
-          if (-not (Test-Path -LiteralPath $desktop)) { throw 'Missing Desktop shortcut' }
-          $uninstaller = Join-Path $dest 'Uninstall Harbor VOID.exe'
-          if (-not (Test-Path -LiteralPath $uninstaller)) { throw 'Missing uninstaller' }
-          Write-Host "INSTALL_VERIFIED: exact PR8 portable binary, glass themes, shortcuts and registry"
-          $process = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
-          Start-Sleep -Seconds 2
-          if (Test-Path -LiteralPath (Join-Path $dest 'harbor.exe')) { throw 'Uninstall left the executable behind' }
-          if (Test-Path -LiteralPath $registry) { throw 'Uninstall left registry entry behind' }
-          if (Test-Path -LiteralPath $menu) { throw 'Uninstall left Start Menu shortcut behind' }
-          if (Test-Path -LiteralPath $desktop) { throw 'Uninstall left Desktop shortcut behind' }
-          Write-Host 'UNINSTALL_VERIFIED: files, registry, and shortcuts cleaned'
-      - name: Upload Windows setup candidate (no publication)
-        # The existing November release and its installation remain untouched.
-
-        uses: actions/upload-artifact@v4
-        with:
-          name: harbor-void-1.0.4-pr8-setup-windows-x64
+          name: harbor-void-1.0.4-pr3-pr4-pr8-setup-windows-x64
           path: installer/void/Harbor-VOID-1.0.4-Setup-Windows-x64.exe
           if-no-files-found: error
           retention-days: 30
