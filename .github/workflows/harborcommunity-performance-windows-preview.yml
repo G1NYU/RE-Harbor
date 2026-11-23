@@ -1,0 +1,180 @@
+name: Harbor 1.0.4 clean Community performance preview
+
+on:
+  push:
+    branches:
+      - build/harborcommunity-v1.0.4-beta-performance-clean
+    paths:
+      - .github/workflows/harborcommunity-performance-windows-preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harbor-community-performance-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-native:
+    name: Build and verify clean Community Harbor 1.0.4 portable (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      CARGO_BUILD_JOBS: "2"
+      HARBOR_CHANNEL: beta
+      HARBOR_CAPSTAN_OPTIONAL: "1"
+      HARBOR_EXPECTED_UPSTREAM: c4f0242a65e9a0b57da4f877e0df8b8f360aab06
+      HARBOR_EXPECTED_PATCHSET: 07bc19fdc72a1c1f6921abb43a3b6226f0f6ad28
+    steps:
+      - name: Checkout pinned Community candidate without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify release ancestry, untouched VOID code and isolated preview identity
+        shell: pwsh
+        run: |
+          git merge-base --is-ancestor $env:HARBOR_EXPECTED_UPSTREAM HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Official v1.0.4-beta release is not an ancestor' }
+          git merge-base --is-ancestor $env:HARBOR_EXPECTED_PATCHSET HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Verified PR3, PR4 and PR8 patch set is not an ancestor' }
+          foreach ($forbidden in @('src/void-native.css', 'src/void-stream-picker.css', 'themes/VOID-Original-Glass.harborstyle')) {
+            if (Test-Path -LiteralPath $forbidden) { throw "VOID customization unexpectedly present: $forbidden" }
+          }
+          $app = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $preview = Get-Content src-tauri/tauri.community-performance-preview.conf.json -Raw | ConvertFrom-Json
+          if ($app.version -ne '1.0.4') { throw 'Unexpected app version' }
+          if ($app.identifier -ne 'app.harbor') { throw 'Original Harbor identifier unexpectedly changed' }
+          if ($preview.identifier -ne 'app.harbor.communityperformancepreview') { throw 'Preview identity not isolated' }
+          if ($preview.plugins.updater.endpoints.Count -ne 0) { throw 'Preview updater must be disabled' }
+          if ($preview.plugins.'deep-link'.desktop.schemes -contains 'harbor') { throw 'Production deep link collision' }
+          Write-Host "Release: $env:HARBOR_EXPECTED_UPSTREAM"
+          Write-Host "Source patch set: $env:HARBOR_EXPECTED_PATCHSET"
+          Write-Host "Preview identity: $($preview.identifier); updater disabled."
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            harbor-core
+            src-tauri
+            installer/src-tauri
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Set up JDK 17 for Community game engine
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up the original Community Pokemon engine SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.401"
+
+      - name: Build Community Pokemon engine
+        run: node tools/pokemon-engine/build.mjs --fetch-source "${{ runner.temp }}/harbor-pokemon-source" --output src-tauri/resources/pokemon-engine --artifacts "${{ runner.temp }}/harbor-pokemon-build"
+
+      - name: Install pinned JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Stage native media tools and fonts
+        shell: pwsh
+        run: |
+          $env:HARBOR_CAPSTAN_SRC = Join-Path $env:RUNNER_TEMP 'harbor-community-preview-no-capstan'
+          "HARBOR_CAPSTAN_SRC=$env:HARBOR_CAPSTAN_SRC" >> $env:GITHUB_ENV
+          pnpm run setup
+          if ($LASTEXITCODE -ne 0) { throw 'Native media setup failed' }
+
+      - name: Compile the Community app with the three upstream PRs
+        shell: pwsh
+        run: |
+          # ort-sys copies DirectML.dll to multiple release locations.
+          foreach ($dir in @(
+            'src-tauri/target/release/examples',
+            'src-tauri/target/release/deps',
+            'src-tauri/target/release/build/examples',
+            'src-tauri/target/release/build/deps'
+          )) {
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          }
+          pnpm tauri build --no-bundle --config src-tauri/tauri.community-performance-preview.conf.json
+          if ($LASTEXITCODE -ne 0) { throw 'Community 1.0.4 native Tauri compilation failed' }
+          if (-not (Test-Path -LiteralPath src-tauri/target/release/harbor.exe -PathType Leaf)) {
+            throw 'Compiled Community Harbor executable missing'
+          }
+
+      - name: Build payload uninstaller without installing anything
+        shell: pwsh
+        run: |
+          cargo build --manifest-path installer/src-tauri/Cargo.toml --release --no-default-features --features tauri/custom-protocol --bin harbor-uninstall --locked
+          if ($LASTEXITCODE -ne 0) { throw 'Portable payload uninstaller compilation failed' }
+
+      - name: Assemble and verify portable release payload
+        shell: pwsh
+        run: |
+          node installer/scripts/make-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Community payload assembly failed' }
+          node scripts/verify-managed-payload.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Community payload integrity check failed' }
+          $destination = 'harbor-community-performance-preview'
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          Expand-Archive -LiteralPath installer/src-tauri/payload/harbor-payload.zip -DestinationPath $destination -Force
+          foreach ($name in @('harbor.exe', 'libmpv-2.dll', 'mpv.exe', 'ffmpeg.exe', 'ffprobe.exe', 'yt-dlp.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $destination $name) -PathType Leaf)) {
+              throw "Missing essential portable media binary: $name"
+            }
+          }
+          $appBinary = Join-Path $destination 'harbor.exe'
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $appBinary).Path)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            throw 'Invalid Windows executable'
+          }
+          Remove-Item -LiteralPath (Join-Path $destination 'uninstall.exe') -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -LiteralPath $destination -File |
+            Where-Object { $_.Extension -in @('.exe', '.dll') } |
+            ForEach-Object { "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash) *$($_.Name)" } |
+            Set-Content -LiteralPath (Join-Path $destination 'SHA256SUMS.txt') -Encoding UTF8
+          @'
+          Harbor Community v1.0.4 Beta - PR3 + PR4 + PR8
+          ISOLATED WINDOWS x64 PORTABLE PREVIEW
+
+          Based on exact HarborCommunity/Harbor v1.0.4-beta release commit.
+          Only upstream PRs 3, 4 and 8 applied. No compiled native VOID.
+          The original Community Music and Refract functionality remains.
+
+          Extract the complete ZIP; run harbor.exe in the extracted folder.
+          This preview has a separate profile (app.harbor.communityperformancepreview)
+          and updater disabled. It cannot replace an official Harbor/VOID install.
+          This build is unsigned and is NOT an official Harbor Community release.
+
+          First test the default Harbor theme and portrait poster scrolling.
+          Only afterwards, install the original VOID .harborstyle in Settings
+          and repeat. Do not copy files over your existing Harbor installation.
+
+          Optional Capstan extension runtime is not included in this CI preview.
+          The preview deep-link scheme is separate and may impact OAuth callbacks.
+          '@ | Set-Content -LiteralPath (Join-Path $destination 'README-COMMUNITY-PREVIEW.txt') -Encoding UTF8
+          Write-Host 'Community portable app, required native tools and SHA-256 manifest verified.'
+
+      - name: Upload Community Windows preview (no release, install or deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-community-v1.0.4-beta-pr3-pr4-pr8-windows-x64
+          path: harbor-community-performance-preview/
+          if-no-files-found: error
+          retention-days: 7
