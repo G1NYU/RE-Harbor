@@ -4552,11 +4552,15 @@ html[data-theme-card="crunch"][dir="rtl"] .harbor-profile-dropdown {
 .harbor-shimmer[data-idle]::after {
   display: none;
 }
-/* The poster reveal is driven from the DOM, not React: poster.tsx sets data-loaded on load, so a
-   grid of a few hundred images costs no re-renders. See markLoaded in poster.tsx. */
+/* The poster reveal is driven from the DOM, not React. Avoid the per-image
+   opacity animation: virtualized grids otherwise appear to flash even as
+   cached images are redisplayed on scroll. */
 .harbor-poster-img {
   opacity: 0;
-  transition: opacity 300ms ease-out;
+  transition: none;
+}
+.harbor-poster .harbor-shimmer::after {
+  animation: none;
 }
 .harbor-poster[data-loaded] .harbor-poster-img {
   opacity: 1;
