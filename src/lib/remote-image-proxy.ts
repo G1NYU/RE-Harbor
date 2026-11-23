@@ -69,6 +69,29 @@ export function needsImageProxy(url: string): boolean {
 }
 
 const blobCache = createObjectUrlCache();
+// A native thumbnail already cached on disk has a stable asset:// URL. Retain the
+// resolved path briefly so remounted cards don't repeat an IPC/database lookup and
+// transiently render a placeholder. This stores URLs, not image bytes.
+const assetPathCache = new Map<string, { src: string; expires: number }>();
+const ASSET_PATH_LIMIT = 4096;
+const ASSET_PATH_TTL_MS = 5 * 60_000;
+function warmAssetPath(key: string): string | undefined {
+  const entry = assetPathCache.get(key);
+  if (!entry) return undefined;
+  if (entry.expires <= Date.now()) {
+    assetPathCache.delete(key);
+    return undefined;
+  }
+  assetPathCache.delete(key);
+  assetPathCache.set(key, entry);
+  return entry.src;
+}
+function rememberAssetPath(key: string, src: string): string {
+  assetPathCache.delete(key);
+  assetPathCache.set(key, { src, expires: Date.now() + ASSET_PATH_TTL_MS });
+  if (assetPathCache.size > ASSET_PATH_LIMIT) assetPathCache.delete(assetPathCache.keys().next().value!);
+  return src;
+}
 type BlobEntry = NonNullable<ReturnType<typeof blobCache.get>>;
 type ProxyImageResult = BlobEntry | string;
 // Module scoped, like the blob cache beside it. A failure used to live in
@@ -100,6 +123,7 @@ function getLegacyPosterKeys(): Promise<Set<string>> {
 export async function clearThumbCache(): Promise<void> {
   cacheGeneration++;
   blobCache.clear();
+  assetPathCache.clear();
   inflight.clear();
   deadUrls.clear();
   const keys = await getLegacyPosterKeys();
@@ -130,6 +154,8 @@ function proxyImage(
   const key = cacheKeyFor(url, thumbWidthPx);
   const cached = blobCache.get(key);
   if (cached) return Promise.resolve(cached);
+  const asset = warmAssetPath(key);
+  if (asset) return Promise.resolve(asset);
   if (isDead(key)) return Promise.resolve(null);
   const existing = inflight.get(key);
   if (existing) return existing;
@@ -149,7 +175,8 @@ function proxyImage(
           width: thumbWidthPx ?? 0,
         }).catch(() => null);
         if (generation !== cacheGeneration) return null;
-        if (typeof path === "string" && path) return convertFileSrc(path);
+        if (typeof path === "string" && path)
+          return rememberAssetPath(key, convertFileSrc(path));
       }
       if (persist && migrateLegacy) {
         const legacyKeys = await getLegacyPosterKeys();
@@ -219,7 +246,7 @@ function proxyImage(
         });
       const type = resp.headers?.["content-type"] || resp.contentType || "image/jpeg";
       if (type && !type.startsWith("image/")) throw new Error(`type ${type}`);
-      if (resp.assetPath) return convertFileSrc(resp.assetPath);
+      if (resp.assetPath) return rememberAssetPath(key, convertFileSrc(resp.assetPath));
       phase = "base64-decode";
       const bytes = base64ToBytes(resp.body);
       phase = "blob";
@@ -304,7 +331,8 @@ export function useProxiedImageSrc(
   const imageKey = cacheKeyFor(url ?? "", thumbWidthPx);
   const [blob, setBlob] = useState<{ key: string; src: string } | undefined>(() => {
     const cached = url && need ? blobCache.get(imageKey) : undefined;
-    return cached ? { key: imageKey, src: cached.src } : undefined;
+    const asset = url && need && !cached ? warmAssetPath(imageKey) : undefined;
+    return cached ? { key: imageKey, src: cached.src } : asset ? { key: imageKey, src: asset } : undefined;
   });
   const [failed, setFailed] = useState(() =>
     url && need && isDead(imageKey) ? imageKey : undefined,
@@ -324,6 +352,16 @@ export function useProxiedImageSrc(
           : { key: imageKey, src: cached.src },
       );
       return blobCache.retain(cached);
+    }
+    const asset = warmAssetPath(imageKey);
+    if (asset) {
+      setFailed(undefined);
+      setBlob((previous) =>
+        previous?.key === imageKey && previous.src === asset
+          ? previous
+          : { key: imageKey, src: asset },
+      );
+      return;
     }
     if (isDead(imageKey)) {
       setBlob(undefined);
@@ -355,5 +393,5 @@ export function useProxiedImageSrc(
   if (!need) return url;
   // Loading -> undefined (caller shows its placeholder/shimmer). Failed -> the
   // original url so the <img> errors and the caller's fallback/plate logic runs.
-  return blob?.key === imageKey ? blob.src : failed === imageKey ? url : undefined;
+  return blob?.key === imageKey ? blob.src : (warmAssetPath(imageKey) ?? (failed === imageKey ? url : undefined));
 }
