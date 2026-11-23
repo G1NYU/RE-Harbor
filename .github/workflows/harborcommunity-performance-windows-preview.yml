@@ -92,6 +92,31 @@ jobs:
       - name: Install pinned JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Stage upstream FFmpeg binaries without broken PowerShell zip extraction
+        shell: pwsh
+        run: |
+          # The stock v1.0.4-beta fetcher invokes Windows PowerShell Expand-Archive.
+          # On this runner its ZipFileExtensions overload fails. Keep the upstream
+          # files and app code unchanged; extract the same official upstream URL
+          # with the Windows tar tool and let setup:binaries reuse both files.
+          $archive = Join-Path $env:RUNNER_TEMP 'harbor-ffmpeg-essentials.zip'
+          $unpacked = Join-Path $env:RUNNER_TEMP 'harbor-ffmpeg-essentials'
+          New-Item -ItemType Directory -Force -Path $unpacked | Out-Null
+          Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile $archive
+          & tar.exe -xf $archive -C $unpacked
+          if ($LASTEXITCODE -ne 0) { throw 'Upstream FFmpeg archive extraction failed' }
+          $bins = 'src-tauri/binaries'
+          New-Item -ItemType Directory -Force -Path $bins | Out-Null
+          foreach ($name in @('ffmpeg', 'ffprobe')) {
+            $matched = Get-ChildItem -LiteralPath $unpacked -Filter "$name.exe" -File -Recurse |
+              Select-Object -First 1
+            if (-not $matched) { throw "Upstream FFmpeg archive missing $name.exe" }
+            $dest = Join-Path $bins "$name-x86_64-pc-windows-msvc.exe"
+            Copy-Item -LiteralPath $matched.FullName -Destination $dest -Force
+            if ((Get-Item -LiteralPath $dest).Length -lt 1000000) { throw "Invalid $name binary" }
+            Write-Host "Staged $name from the original Community build source"
+          }
+
       - name: Stage native media tools and fonts
         shell: pwsh
         run: |
